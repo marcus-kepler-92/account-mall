@@ -1,0 +1,58 @@
+{"location":"middleware.ts:8","message":"Middleware hit","data":{"path":"/","hasSession":false,"isAuthRoute":false,"isPublicPage":false},"timestamp":1770818055271,"hypothesisId":"D"}
+{"location":"middleware.ts:20","message":"Redirecting to login - no session","data":{"path":"/"},"timestamp":1770818055271,"hypothesisId":"D"}
+{"location":"middleware.ts:8","message":"Middleware hit","data":{"path":"/login","hasSession":false,"isAuthRoute":false,"isPublicPage":true},"timestamp":1770818055290,"hypothesisId":"D"}
+{"location":"middleware.ts:8","message":"Middleware hit","data":{"path":"/register","hasSession":false,"isAuthRoute":false,"isPublicPage":true},"timestamp":1770818058767,"hypothesisId":"D"}
+{"location":"middleware.ts:8","message":"Middleware hit","data":{"path":"/api/auth/sign-up/email","hasSession":false,"isAuthRoute":true,"isPublicPage":false},"timestamp":1770818073650,"hypothesisId":"D"}
+{"location":"lib/prisma.ts:7","message":"PrismaClient import source","data":{"PrismaClientType":"function","connectionString":"SET"},"timestamp":1770818074013,"hypothesisId":"A"}
+{"location":"lib/prisma.ts:19","message":"PrismaClient creation FAILED","data":{"error":"Using engine type \"client\" requires either \"adapter\" or \"accelerateUrl\" to be provided to PrismaClient constructor.\nRead more at https://pris.ly/d/client-constructor","errorName":"PrismaClientConstructorValidationError"},"timestamp":1770818074015,"hypothesisId":"A"}
+{"location":"middleware.ts:8","message":"Middleware hit","data":{"path":"/register","hasSession":false,"isAuthRoute":false,"isPublicPage":true},"timestamp":1770818393655,"hypothesisId":"D"}
+{"location":"middleware.ts:8","message":"Middleware hit","data":{"path":"/login","hasSession":false,"isAuthRoute":false,"isPublicPage":true},"timestamp":1770818401589,"hypothesisId":"D"}
+{"location":"middleware.ts:8","message":"Middleware hit","data":{"path":"/register","hasSession":false,"isAuthRoute":false,"isPublicPage":true},"timestamp":1770818404008,"hypothesisId":"D"}
+{"location":"middleware.ts:8","message":"Middleware hit","data":{"path":"/api/auth/sign-up/email","hasSession":false,"isAuthRoute":true,"isPublicPage":false},"timestamp":1770818407261,"hypothesisId":"D"}
+{"location":"lib/prisma.ts:4","message":"Prisma init start","data":{"dbUrl":"SET"},"timestamp":1770818408504,"runId":"post-fix","hypothesisId":"A"}
+{"location":"lib/prisma.ts:11","message":"PrismaClient created with PrismaPg adapter","data":{"success":true},"timestamp":1770818408506,"runId":"post-fix","hypothesisId":"A"}
+{"location":"route.ts:4","message":"Auth route module loaded","data":{"authType":"object"},"timestamp":1770818408512,"hypothesisId":"E"}
+{"location":"lib/prisma.ts:4","message":"Prisma init start","data":{"dbUrl":"SET"},"timestamp":1770818409495,"runId":"post-fix","hypothesisId":"A"}
+{"location":"lib/prisma.ts:11","message":"PrismaClient created with PrismaPg adapter","data":{"success":true},"timestamp":1770818409503,"runId":"post-fix","hypothesisId":"A"}
+{"location":"route.ts:4","message":"Auth route module loaded","data":{"authType":"object"},"timestamp":1770818409509,"hypothesisId":"E"}
+{"location":"middleware.ts:8","message":"Middleware hit","data":{"path":"/login","hasSession":false,"isAuthRoute":false,"isPublicPage":true},"timestamp":1770818419821,"hypothesisId":"D"}
+{"location":"middleware.ts:8","message":"Middleware hit","data":{"path":"/api/auth/sign-in/email","hasSession":false,"isAuthRoute":true,"isPublicPage":false},"timestamp":1770818421704,"hypothesisId":"D"}
+{"location":"lib/prisma.ts:4","message":"Prisma init start","data":{"dbUrl":"SET"},"timestamp":1770818422677,"runId":"post-fix","hypothesisId":"A"}
+{"location":"lib/prisma.ts:11","message":"PrismaClient created with PrismaPg adapter","data":{"success":true},"timestamp":1770818422685,"runId":"post-fix","hypothesisId":"A"}
+{"location":"route.ts:4","message":"Auth route module loaded","data":{"authType":"object"},"timestamp":1770818422691,"hypothesisId":"E"}
+{"location":"middleware.ts:8","message":"Middleware hit","data":{"path":"/api/auth/sign-in/email","hasSession":false,"isAuthRoute":true,"isPublicPage":false},"timestamp":1770818516685,"hypothesisId":"D"}
+{"location":"lib/prisma.ts:5","message":"Prisma init start","data":{"dbUrl":"SET"},"timestamp":1770818516798,"runId":"post-fix-2","hypothesisId":"F"}
+{"location":"lib/prisma.ts:14","message":"PrismaClient created with pg.Pool + PrismaPg adapter","data":{"success":true},"timestamp":1770818516799,"runId":"post-fix-2","hypothesisId":"F"}
+{"location":"route.ts:4","message":"Auth route module loaded","data":{"authType":"object"},"timestamp":1770818516800,"hypothesisId":"E"}
+{"location":"lib/prisma.ts:5","message":"Prisma init start","data":{"dbUrl":"SET"},"timestamp":1770818517784,"runId":"post-fix-2","hypothesisId":"F"}
+{"location":"lib/prisma.ts:14","message":"PrismaClient created with pg.Pool + PrismaPg adapter","data":{"success":true},"timestamp":1770818517793,"runId":"post-fix-2","hypothesisId":"F"}
+{"location":"route.ts:4","message":"Auth route module loaded","data":{"authType":"object"},"timestamp":1770818517798,"hypothesisId":"E"}
+{"location":"middleware.ts:8","message":"Middleware hit","data":{"path":"/register","hasSession":false,"isAuthRoute":false,"isPublicPage":true},"timestamp":1770818519002,"hypothesisId":"D"}
+{"location":"middleware.ts:8","message":"Middleware hit","data":{"path":"/api/auth/sign-up/email","hasSession":false,"isAuthRoute":true,"isPublicPage":false},"timestamp":1770818526332,"hypothesisId":"D"}
+{"location":"lib/prisma.ts:5","message":"Prisma init start","data":{"dbUrl":"SET"},"timestamp":1770818527306,"runId":"post-fix-2","hypothesisId":"F"}
+{"location":"lib/prisma.ts:14","message":"PrismaClient created with pg.Pool + PrismaPg adapter","data":{"success":true},"timestamp":1770818527313,"runId":"post-fix-2","hypothesisId":"F"}
+{"location":"route.ts:4","message":"Auth route module loaded","data":{"authType":"object"},"timestamp":1770818527319,"hypothesisId":"E"}
+{"location":"middleware.ts:8","message":"Middleware hit","data":{"path":"/login","hasSession":false,"isAuthRoute":false,"isPublicPage":true},"timestamp":1770818528682,"hypothesisId":"D"}
+{"location":"middleware.ts:8","message":"Middleware hit","data":{"path":"/api/auth/sign-in/email","hasSession":false,"isAuthRoute":true,"isPublicPage":false},"timestamp":1770818530543,"hypothesisId":"D"}
+{"location":"lib/prisma.ts:5","message":"Prisma init start","data":{"dbUrl":"SET"},"timestamp":1770818531474,"runId":"post-fix-2","hypothesisId":"F"}
+{"location":"lib/prisma.ts:14","message":"PrismaClient created with pg.Pool + PrismaPg adapter","data":{"success":true},"timestamp":1770818531482,"runId":"post-fix-2","hypothesisId":"F"}
+{"location":"route.ts:4","message":"Auth route module loaded","data":{"authType":"object"},"timestamp":1770818531488,"hypothesisId":"E"}
+{"location":"middleware.ts:8","message":"Middleware hit","data":{"path":"/login","hasSession":false,"isAuthRoute":false,"isPublicPage":true},"timestamp":1770819328270,"hypothesisId":"D"}
+{"location":"middleware.ts:8","message":"Middleware hit","data":{"path":"/api/auth/sign-in/email","hasSession":false,"isAuthRoute":true,"isPublicPage":false},"timestamp":1770819349062,"hypothesisId":"D"}
+{"location":"lib/prisma.ts:17","message":"Prisma singleton ready","data":{"isReused":true,"dbUrl":"SET"},"timestamp":1770819350314,"runId":"post-fix-3","hypothesisId":"H-I"}
+{"location":"route.ts:4","message":"Auth route module loaded","data":{"authType":"object"},"timestamp":1770819350324,"hypothesisId":"E"}
+{"location":"lib/prisma.ts:17","message":"Prisma singleton ready","data":{"isReused":true,"dbUrl":"SET"},"timestamp":1770819351288,"runId":"post-fix-3","hypothesisId":"H-I"}
+{"location":"route.ts:4","message":"Auth route module loaded","data":{"authType":"object"},"timestamp":1770819351300,"hypothesisId":"E"}
+{"location":"middleware.ts:8","message":"Middleware hit","data":{"path":"/register","hasSession":false,"isAuthRoute":false,"isPublicPage":true},"timestamp":1770819353484,"hypothesisId":"D"}
+{"location":"middleware.ts:8","message":"Middleware hit","data":{"path":"/api/auth/sign-up/email","hasSession":false,"isAuthRoute":true,"isPublicPage":false},"timestamp":1770819356860,"hypothesisId":"D"}
+{"location":"middleware.ts:8","message":"Middleware hit","data":{"path":"/login","hasSession":true,"isAuthRoute":false,"isPublicPage":true},"timestamp":1770819357144,"hypothesisId":"D"}
+{"location":"lib/prisma.ts:17","message":"Prisma singleton ready","data":{"isReused":true,"dbUrl":"SET"},"timestamp":1770819357851,"runId":"post-fix-3","hypothesisId":"H-I"}
+{"location":"route.ts:4","message":"Auth route module loaded","data":{"authType":"object"},"timestamp":1770819357863,"hypothesisId":"E"}
+{"location":"middleware.ts:8","message":"Middleware hit","data":{"path":"/api/auth/sign-in/email","hasSession":true,"isAuthRoute":true,"isPublicPage":false},"timestamp":1770819359251,"hypothesisId":"D"}
+{"location":"middleware.ts:8","message":"Middleware hit","data":{"path":"/","hasSession":true,"isAuthRoute":false,"isPublicPage":false},"timestamp":1770819359479,"hypothesisId":"D"}
+{"location":"middleware.ts:8","message":"Middleware hit","data":{"path":"/","hasSession":true,"isAuthRoute":false,"isPublicPage":false},"timestamp":1770819359934,"hypothesisId":"D"}
+{"location":"middleware.ts:8","message":"Middleware hit","data":{"path":"/api/auth/get-session","hasSession":true,"isAuthRoute":true,"isPublicPage":false},"timestamp":1770819360006,"hypothesisId":"D"}
+{"location":"middleware.ts:8","message":"Middleware hit","data":{"path":"/api/auth/get-session","hasSession":true,"isAuthRoute":true,"isPublicPage":false},"timestamp":1770819360047,"hypothesisId":"D"}
+{"location":"middleware.ts:8","message":"Middleware hit","data":{"path":"/api/auth/get-session","hasSession":true,"isAuthRoute":true,"isPublicPage":false},"timestamp":1770819360087,"hypothesisId":"D"}
+{"location":"lib/prisma.ts:17","message":"Prisma singleton ready","data":{"isReused":true,"dbUrl":"SET"},"timestamp":1770819360294,"runId":"post-fix-3","hypothesisId":"H-I"}
+{"location":"route.ts:4","message":"Auth route module loaded","data":{"authType":"object"},"timestamp":1770819360308,"hypothesisId":"E"}
