@@ -1,0 +1,42 @@
+import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card"
+import { ShoppingCart, Search } from "lucide-react"
+import { Input } from "@/components/ui/input"
+
+export default function AdminOrdersPage() {
+    return (
+        <div className="space-y-6">
+            {/* Page header */}
+            <div>
+                <h2 className="text-2xl font-bold tracking-tight">Orders</h2>
+                <p className="text-muted-foreground">
+                    View and manage customer orders.
+                </p>
+            </div>
+
+            {/* Search & Filter bar */}
+            <div className="flex items-center gap-4">
+                <div className="relative flex-1 max-w-sm">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                    <Input
+                        placeholder="Search orders by email or ID..."
+                        className="pl-9"
+                        disabled
+                    />
+                </div>
+            </div>
+
+            {/* Empty state */}
+            <Card>
+                <CardContent className="flex flex-col items-center justify-center py-16">
+                    <div className="rounded-full bg-muted p-4 mb-4">
+                        <ShoppingCart className="size-8 text-muted-foreground" />
+                    </div>
+                    <CardTitle className="mb-2">No orders yet</CardTitle>
+                    <CardDescription className="text-center max-w-sm">
+                        Orders will appear here once customers start purchasing products.
+                    </CardDescription>
+                </CardContent>
+            </Card>
+        </div>
+    )
+}

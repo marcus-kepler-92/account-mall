@@ -1,40 +1,54 @@
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
-import { redirect } from "next/navigation"
-import SignOutButton from "./components/sign-out-button"
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { Zap, Search } from "lucide-react"
+import { ProductCatalog } from "@/app/components/product-catalog"
 
-export default async function Home() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  })
+export default function HomePage() {
+    return (
+        <div className="flex min-h-screen flex-col">
+            {/* Header */}
+            <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-sm">
+                <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
+                    <Link href="/" className="flex items-center gap-2">
+                        <div className="flex size-8 items-center justify-center rounded-lg bg-primary">
+                            <Zap className="size-4 text-primary-foreground" />
+                        </div>
+                        <span className="text-lg font-bold tracking-tight">Account Mall</span>
+                    </Link>
+                    <nav className="flex items-center gap-2">
+                        <Button variant="ghost" size="sm" asChild>
+                            <Link href="/orders/lookup">
+                                <Search className="size-4" />
+                                Order Lookup
+                            </Link>
+                        </Button>
+                    </nav>
+                </div>
+            </header>
 
-  if (!session) {
-    redirect("/login")
-  }
+            {/* Main content */}
+            <main className="flex-1">
+                <div className="mx-auto max-w-6xl px-4 py-8">
+                    <ProductCatalog />
+                </div>
+            </main>
 
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
-      <div className="w-full max-w-lg space-y-8 rounded-2xl bg-white p-8 shadow-lg dark:bg-zinc-900">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-            Welcome{session.user.name ? `, ${session.user.name}` : ""}
-          </h1>
-          <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-            {session.user.email}
-          </p>
+            {/* Footer */}
+            <footer className="border-t">
+                <div className="mx-auto max-w-6xl px-4 py-8">
+                    <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
+                        <div className="flex items-center gap-2">
+                            <div className="flex size-6 items-center justify-center rounded-md bg-primary">
+                                <Zap className="size-3 text-primary-foreground" />
+                            </div>
+                            <span className="text-sm font-medium">Account Mall</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                            &copy; {new Date().getFullYear()} Account Mall. All rights reserved.
+                        </p>
+                    </div>
+                </div>
+            </footer>
         </div>
-
-        <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800">
-          <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-            Session Info
-          </h2>
-          <pre className="mt-2 overflow-auto text-xs text-zinc-700 dark:text-zinc-300">
-            {JSON.stringify(session, null, 2)}
-          </pre>
-        </div>
-
-        <SignOutButton />
-      </div>
-    </div>
-  )
+    )
 }

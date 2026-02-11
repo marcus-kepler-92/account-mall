@@ -56,3 +56,80 @@ model Verification {
   createdAt  DateTime?
   updatedAt  DateTime?
 }
+
+// ─── Business Models ─────────────────────────────────────────────
+
+enum ProductStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum CardStatus {
+  UNSOLD
+  RESERVED
+  SOLD
+}
+
+enum OrderStatus {
+  PENDING
+  COMPLETED
+  CLOSED
+}
+
+model Product {
+  id          String        @id @default(cuid())
+  name        String
+  slug        String        @unique
+  description String?
+  price       Decimal       @db.Decimal(10, 2)
+  maxQuantity Int           @default(10)
+  status      ProductStatus @default(ACTIVE)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  cards       Card[]
+  orders      Order[]
+  tags        Tag[]
+}
+
+model Tag {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  slug      String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  products  Product[]
+}
+
+model Card {
+  id        String     @id @default(cuid())
+  productId String
+  content   String
+  status    CardStatus @default(UNSOLD)
+  orderId   String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  product   Product    @relation(fields: [productId], references: [id])
+  order     Order?     @relation(fields: [orderId], references: [id])
+
+  @@index([productId, status])
+  @@index([orderId])
+}
+
+model Order {
+  id           String      @id @default(cuid())
+  orderNo      String      @unique
+  productId    String
+  email        String
+  passwordHash String
+  quantity     Int
+  amount       Decimal     @db.Decimal(10, 2)
+  status       OrderStatus @default(PENDING)
+  paidAt       DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  product      Product     @relation(fields: [productId], references: [id])
+  cards        Card[]
+
+  @@index([email])
+  @@index([status, createdAt])
+}

@@ -8,6 +8,7 @@ export const auth = betterAuth({
     }),
     emailAndPassword: {
         enabled: true,
+        disableSignUp: true, // Only admin login allowed, no public registration
     },
     trustedOrigins: [process.env.BETTER_AUTH_URL!],
     rateLimit: {
