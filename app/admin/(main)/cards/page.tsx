@@ -9,19 +9,19 @@ export default function AdminCardsPage() {
             {/* Page header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-2xl font-bold tracking-tight">Cards</h2>
+                    <h2 className="text-2xl font-bold tracking-tight">卡密管理</h2>
                     <p className="text-muted-foreground">
-                        Manage card inventory for your products.
+                        管理商品的卡密库存
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
                     <Button variant="outline">
                         <Upload className="size-4" />
-                        Import
+                        批量导入
                     </Button>
                     <Button>
                         <Plus className="size-4" />
-                        Add Card
+                        添加卡密
                     </Button>
                 </div>
             </div>
@@ -31,7 +31,7 @@ export default function AdminCardsPage() {
                 <div className="relative flex-1 max-w-sm">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
                     <Input
-                        placeholder="Search cards..."
+                        placeholder="搜索卡密..."
                         className="pl-9"
                         disabled
                     />
@@ -44,18 +44,18 @@ export default function AdminCardsPage() {
                     <div className="rounded-full bg-muted p-4 mb-4">
                         <CreditCard className="size-8 text-muted-foreground" />
                     </div>
-                    <CardTitle className="mb-2">No cards in stock</CardTitle>
+                    <CardTitle className="mb-2">暂无卡密</CardTitle>
                     <CardDescription className="mb-6 text-center max-w-sm">
-                        Add cards to your inventory. You can add them one by one or import in bulk.
+                        添加卡密到库存，可逐条添加或批量导入
                     </CardDescription>
                     <div className="flex items-center gap-2">
                         <Button variant="outline">
                             <Upload className="size-4" />
-                            Bulk Import
+                            批量导入
                         </Button>
                         <Button>
                             <Plus className="size-4" />
-                            Add First Card
+                            添加第一张卡密
                         </Button>
                     </div>
                 </CardContent>

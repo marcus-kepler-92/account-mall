@@ -81,6 +81,7 @@ model Product {
   name        String
   slug        String        @unique
   description String?
+  image       String?       @db.Text
   price       Decimal       @db.Decimal(10, 2)
   maxQuantity Int           @default(10)
   status      ProductStatus @default(ACTIVE)

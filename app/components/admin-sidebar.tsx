@@ -10,6 +10,7 @@ import {
     LogOut,
     Store,
 } from "lucide-react"
+import { ThemeToggle } from "@/app/components/theme-toggle"
 import { authClient } from "@/lib/auth-client"
 import { useRouter } from "next/navigation"
 
@@ -30,22 +31,22 @@ import {
 // Navigation items for the admin panel
 const navItems = [
     {
-        title: "Dashboard",
+        title: "仪表盘",
         href: "/admin/dashboard",
         icon: LayoutDashboard,
     },
     {
-        title: "Products",
+        title: "商品管理",
         href: "/admin/products",
         icon: Package,
     },
     {
-        title: "Orders",
+        title: "订单管理",
         href: "/admin/orders",
         icon: ShoppingCart,
     },
     {
-        title: "Cards",
+        title: "卡密管理",
         href: "/admin/cards",
         icon: CreditCard,
     },
@@ -77,7 +78,7 @@ export function AdminSidebar() {
                                 </div>
                                 <div className="flex flex-col gap-0.5 leading-none">
                                     <span className="font-semibold">Account Mall</span>
-                                    <span className="text-xs text-muted-foreground">Admin Panel</span>
+                                    <span className="text-xs text-muted-foreground">管理后台</span>
                                 </div>
                             </Link>
                         </SidebarMenuButton>
@@ -87,14 +88,14 @@ export function AdminSidebar() {
 
             <SidebarContent>
                 <SidebarGroup>
-                    <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+                    <SidebarGroupLabel>导航</SidebarGroupLabel>
                     <SidebarGroupContent>
                         <SidebarMenu>
                             {navItems.map((item) => (
                                 <SidebarMenuItem key={item.title}>
                                     <SidebarMenuButton
                                         asChild
-                                        isActive={pathname === item.href}
+                                        isActive={pathname === item.href || pathname.startsWith(item.href + "/")}
                                         tooltip={item.title}
                                     >
                                         <Link href={item.href}>
@@ -112,12 +113,17 @@ export function AdminSidebar() {
             <SidebarFooter>
                 <SidebarMenu>
                     <SidebarMenuItem>
+                        <SidebarMenuButton tooltip="切换主题" asChild>
+                            <ThemeToggle showLabel />
+                        </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
                         <SidebarMenuButton
-                            tooltip="Sign Out"
+                            tooltip="退出登录"
                             onClick={handleSignOut}
                         >
                             <LogOut />
-                            <span>Sign Out</span>
+                            <span>退出登录</span>
                         </SidebarMenuButton>
                     </SidebarMenuItem>
                 </SidebarMenu>

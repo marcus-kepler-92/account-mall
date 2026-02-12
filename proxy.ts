@@ -43,6 +43,11 @@ function isPublicApi(pathname: string, method: string): boolean {
         return true;
     }
 
+    // POST /api/orders is public (customer creates order)
+    if (pathname === "/api/orders" && method === "POST") {
+        return true;
+    }
+
     return false;
 }
 
@@ -65,8 +70,13 @@ function isProtectedRoute(pathname: string, method: string): boolean {
         return true;
     }
 
-    // Admin order management API
-    if (pathname.startsWith("/api/orders") && !PUBLIC_API_EXACT.includes(pathname)) {
+    // Admin order management API (GET /api/orders, GET /api/orders/:id, etc.)
+    // POST /api/orders is public, handled in isPublicApi
+    if (
+        pathname.startsWith("/api/orders") &&
+        !PUBLIC_API_EXACT.includes(pathname) &&
+        !(pathname === "/api/orders" && method === "POST")
+    ) {
         return true;
     }
 
@@ -77,17 +87,45 @@ export async function proxy(request: NextRequest) {
     const { pathname } = request.nextUrl;
     const method = request.method;
 
-    // 1. Allow all public pages
+    // 1. Admin login page: redirect to dashboard if already authenticated
+    if (pathname === "/admin/login") {
+        const sessionCookie = request.cookies.get("better-auth.session_token");
+        if (sessionCookie) {
+            try {
+                const response = await fetch(
+                    new URL("/api/auth/get-session", request.nextUrl.origin),
+                    {
+                        headers: {
+                            cookie: request.headers.get("cookie") || "",
+                        },
+                    }
+                );
+                if (response.ok) {
+                    const session = await response.json();
+                    if (session?.session) {
+                        return NextResponse.redirect(
+                            new URL("/admin/dashboard", request.url)
+                        );
+                    }
+                }
+            } catch {
+                // Fall through to allow access to login page
+            }
+        }
+        return NextResponse.next();
+    }
+
+    // 2. Allow all public pages
     if (isPublicPage(pathname)) {
         return NextResponse.next();
     }
 
-    // 2. Allow all public APIs
+    // 3. Allow all public APIs
     if (isPublicApi(pathname, method)) {
         return NextResponse.next();
     }
 
-    // 3. For protected routes, validate session
+    // 4. For protected routes, validate session
     if (isProtectedRoute(pathname, method)) {
         const sessionCookie = request.cookies.get("better-auth.session_token");
 
@@ -134,7 +172,7 @@ export async function proxy(request: NextRequest) {
         }
     }
 
-    // 4. Everything else passes through
+    // 5. Everything else passes through
     return NextResponse.next();
 }
 

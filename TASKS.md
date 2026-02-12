@@ -27,7 +27,7 @@
 
 ## P0 - 数据基础（最高优先级，所有功能的前置条件）
 
-- [ ] **1. 重构 Prisma Schema：新增 Product / Card / Order / Tag 模型**
+- [x] **1. 重构 Prisma Schema：新增 Product / Card / Order / Tag 模型**
   - 路由：无（数据库层）
   - 说明：
     - 新增 `Product` 模型：id, name, slug, description, price, maxQuantity (单笔最大购买数量，默认 10), status (ACTIVE/INACTIVE), createdAt, updatedAt
@@ -37,7 +37,7 @@
     - 关系：Product N:N Tag（多对多，通过隐式中间表），Product 1:N Card，Product 1:N Order，**Order 1:N Card**（一笔订单可对应多条卡密）
   - 技术：Prisma Schema 设计，`prisma migrate dev`
 
-- [ ] **2. 重构认证系统：改为仅管理员使用**
+- [x] **2. 重构认证系统：改为仅管理员使用**
   - 路由：`POST /api/auth/*`、`GET /admin/login`
   - 说明：
     - 保留 better-auth 仅用于管理员登录
@@ -46,7 +46,7 @@
     - 移除 `/register` 页面
   - 技术：better-auth 配置调整，路由重组
 
-- [ ] **3. 重构 Middleware：区分前台公开路由和后台保护路由**
+- [x] **3. 重构 Middleware：区分前台公开路由和后台保护路由**
   - 路由：全部路由
   - 说明：
     - 公开路由（无需认证）：`/`、`/products/*`、`/orders/*`、`/api/orders/by-email`、`/api/orders/lookup`、`/api/payment/*`、`/api/products`（仅 GET）
@@ -57,7 +57,7 @@
 
 ## P1 - 后台管理（第二优先级，管理商品和卡密的基础）
 
-- [ ] **4. 后台布局与导航**
+- [x] **4. 后台布局与导航**
   - 路由：`/admin/*`
   - 说明：
     - 创建后台管理布局，包含侧边栏导航（仪表盘、商品管理、订单管理）
@@ -65,7 +65,7 @@
     - 顶部栏显示管理员信息和退出按钮
   - 技术：Next.js App Router layout，React Server Components
 
-- [ ] **5. 商品 CRUD 管理（含 Tag 管理）**
+- [x] **5. 商品 CRUD 管理（含 Tag 管理）**
   - 路由：`GET /admin/products`、`GET /admin/products/new`、`GET /admin/products/{productId}`
   - API：`GET/POST /api/products`、`GET/PUT/DELETE /api/products/{productId}`、`GET/POST/DELETE /api/tags`
   - 说明：

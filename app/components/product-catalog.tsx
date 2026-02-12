@@ -1,9 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
+import Link from "next/link"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
     Select,
@@ -27,55 +27,99 @@ import {
     Package,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { ProductCard, ProductCardSkeleton, type ProductCardData } from "@/app/components/product-card"
 
-// Mock data - will be replaced with real data from API
-const mockTags = [
-    { id: "1", name: "Game Accounts", slug: "game-accounts", count: 12 },
-    { id: "2", name: "Software Keys", slug: "software-keys", count: 8 },
-    { id: "3", name: "Subscriptions", slug: "subscriptions", count: 5 },
-    { id: "4", name: "Gift Cards", slug: "gift-cards", count: 15 },
-    { id: "5", name: "Social Media", slug: "social-media", count: 3 },
-]
-
-const mockProducts = [
-    { id: "1", name: "Premium Game Account", price: "29.99", tags: ["Game Accounts"], stock: 5 },
-    { id: "2", name: "Office 365 License Key", price: "49.99", tags: ["Software Keys"], stock: 12 },
-    { id: "3", name: "Netflix 1-Year Sub", price: "99.99", tags: ["Subscriptions"], stock: 0 },
-    { id: "4", name: "Steam Gift Card $50", price: "45.00", tags: ["Gift Cards"], stock: 20 },
-    { id: "5", name: "Spotify Premium 6M", price: "39.99", tags: ["Subscriptions"], stock: 8 },
-    { id: "6", name: "Windows 11 Pro Key", price: "19.99", tags: ["Software Keys"], stock: 30 },
-]
+type TagItem = { id: string; name: string; slug: string; _count?: { products: number } }
 
 type SortOption = "default" | "price-asc" | "price-desc" | "newest"
 
+const PAGE_SIZE = 18
+
 export function ProductCatalog() {
+    const [searchInput, setSearchInput] = useState("")
     const [search, setSearch] = useState("")
-    const [selectedTags, setSelectedTags] = useState<string[]>([])
+    const [selectedTagSlugs, setSelectedTagSlugs] = useState<string[]>([])
     const [sort, setSort] = useState<SortOption>("default")
     const [currentPage, setCurrentPage] = useState(1)
     const [categoriesOpen, setCategoriesOpen] = useState(true)
     const [showMobileFilters, setShowMobileFilters] = useState(false)
 
-    const pageSize = 9
-    const totalPages = 3 // Mock total pages
+    const [tags, setTags] = useState<TagItem[]>([])
+    const [products, setProducts] = useState<ProductCardData[]>([])
+    const [loading, setLoading] = useState(true)
+    const [error, setError] = useState<string | null>(null)
+    const [totalPages, setTotalPages] = useState(1)
 
-    const toggleTag = (tagName: string) => {
-        setSelectedTags((prev) =>
-            prev.includes(tagName)
-                ? prev.filter((t) => t !== tagName)
-                : [...prev, tagName]
+    const fetchTags = useCallback(async () => {
+        try {
+            const res = await fetch("/api/tags")
+            if (!res.ok) throw new Error("Failed to fetch tags")
+            const data = await res.json()
+            setTags(data)
+        } catch {
+            setTags([])
+        }
+    }, [])
+
+    const fetchProducts = useCallback(async () => {
+        setLoading(true)
+        setError(null)
+        try {
+            const params = new URLSearchParams()
+            if (search.trim()) params.set("q", search.trim())
+            if (selectedTagSlugs.length > 0) params.set("tag", selectedTagSlugs.join(","))
+            if (sort !== "default") params.set("sort", sort)
+            params.set("page", String(currentPage))
+            params.set("pageSize", String(PAGE_SIZE))
+
+            const res = await fetch(`/api/products?${params}`)
+            if (!res.ok) throw new Error("Failed to fetch products")
+            const json = await res.json()
+            setProducts(json.data ?? [])
+            setTotalPages(json.meta?.totalPages ?? 1)
+        } catch (e) {
+            setError(e instanceof Error ? e.message : "加载失败")
+            setProducts([])
+        } finally {
+            setLoading(false)
+        }
+    }, [search, selectedTagSlugs, sort, currentPage])
+
+    useEffect(() => {
+        fetchTags()
+    }, [fetchTags])
+
+    useEffect(() => {
+        fetchProducts()
+    }, [fetchProducts])
+
+    // Debounce search input
+    useEffect(() => {
+        const t = setTimeout(() => {
+            setSearch(searchInput)
+            setCurrentPage(1)
+        }, 300)
+        return () => clearTimeout(t)
+    }, [searchInput])
+
+    const toggleTag = (tagSlug: string) => {
+        setSelectedTagSlugs((prev) =>
+            prev.includes(tagSlug)
+                ? prev.filter((s) => s !== tagSlug)
+                : [...prev, tagSlug]
         )
         setCurrentPage(1)
     }
 
     const clearFilters = () => {
+        setSearchInput("")
         setSearch("")
-        setSelectedTags([])
+        setSelectedTagSlugs([])
         setSort("default")
         setCurrentPage(1)
     }
 
-    const hasActiveFilters = search || selectedTags.length > 0 || sort !== "default"
+    const hasActiveFilters = searchInput || selectedTagSlugs.length > 0 || sort !== "default"
 
     // Sidebar filter content (shared between desktop and mobile)
     const filterContent = (
@@ -83,22 +127,24 @@ export function ProductCatalog() {
             {/* Categories */}
             <Collapsible open={categoriesOpen} onOpenChange={setCategoriesOpen}>
                 <CollapsibleTrigger className="flex w-full items-center justify-between py-2 text-sm font-semibold hover:text-foreground transition-colors">
-                    Categories
+                    分类
                     <ChevronDown className={`size-4 text-muted-foreground transition-transform ${categoriesOpen ? "rotate-180" : ""}`} />
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                     <div className="space-y-2 pt-2">
-                        {mockTags.map((tag) => (
+                        {tags.map((tag) => (
                             <label
                                 key={tag.id}
                                 className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent transition-colors"
                             >
                                 <Checkbox
-                                    checked={selectedTags.includes(tag.name)}
-                                    onCheckedChange={() => toggleTag(tag.name)}
+                                    checked={selectedTagSlugs.includes(tag.slug)}
+                                    onCheckedChange={() => toggleTag(tag.slug)}
                                 />
                                 <span className="flex-1">{tag.name}</span>
-                                <span className="text-xs text-muted-foreground">{tag.count}</span>
+                                <span className="text-xs text-muted-foreground">
+                                    {tag._count?.products ?? 0}
+                                </span>
                             </label>
                         ))}
                     </div>
@@ -108,20 +154,20 @@ export function ProductCatalog() {
             {/* Price filter */}
             <Collapsible defaultOpen>
                 <CollapsibleTrigger className="flex w-full items-center justify-between py-2 text-sm font-semibold hover:text-foreground transition-colors">
-                    Sort By
+                    排序
                     <ChevronDown className="size-4 text-muted-foreground transition-transform data-[state=open]:rotate-180" />
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                     <div className="pt-2">
                         <Select value={sort} onValueChange={(v) => { setSort(v as SortOption); setCurrentPage(1) }}>
                             <SelectTrigger className="w-full">
-                                <SelectValue placeholder="Default" />
+                                <SelectValue placeholder="默认" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="default">Default</SelectItem>
-                                <SelectItem value="price-asc">Price: Low to High</SelectItem>
-                                <SelectItem value="price-desc">Price: High to Low</SelectItem>
-                                <SelectItem value="newest">Newest First</SelectItem>
+                                <SelectItem value="default">默认</SelectItem>
+                                <SelectItem value="price-asc">价格从低到高</SelectItem>
+                                <SelectItem value="price-desc">价格从高到低</SelectItem>
+                                <SelectItem value="newest">最新优先</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -144,9 +190,9 @@ export function ProductCatalog() {
                     <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
                         <Input
-                            placeholder="Search products..."
-                            value={search}
-                            onChange={(e) => { setSearch(e.target.value); setCurrentPage(1) }}
+                            placeholder="搜索商品..."
+                            value={searchInput}
+                            onChange={(e) => setSearchInput(e.target.value)}
                             className="pl-9"
                         />
                     </div>
@@ -163,13 +209,13 @@ export function ProductCatalog() {
                     <div className="hidden sm:block lg:hidden">
                         <Select value={sort} onValueChange={(v) => { setSort(v as SortOption); setCurrentPage(1) }}>
                             <SelectTrigger className="w-[160px]">
-                                <SelectValue placeholder="Sort by" />
+                                <SelectValue placeholder="排序" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="default">Default</SelectItem>
-                                <SelectItem value="price-asc">Price: Low → High</SelectItem>
-                                <SelectItem value="price-desc">Price: High → Low</SelectItem>
-                                <SelectItem value="newest">Newest First</SelectItem>
+                                <SelectItem value="default">默认</SelectItem>
+                                <SelectItem value="price-asc">价格从低到高</SelectItem>
+                                <SelectItem value="price-desc">价格从高到低</SelectItem>
+                                <SelectItem value="newest">最新优先</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -185,22 +231,22 @@ export function ProductCatalog() {
                 {/* Active filters */}
                 {hasActiveFilters && (
                     <div className="mb-4 flex flex-wrap items-center gap-2">
-                        {selectedTags.map((tag) => (
-                            <Badge key={tag} variant="secondary" className="gap-1 pr-1">
-                                {tag}
+                        {selectedTagSlugs.map((slug) => (
+                            <Badge key={slug} variant="secondary" className="gap-1 pr-1">
+                                {tags.find((t) => t.slug === slug)?.name ?? slug}
                                 <button
-                                    onClick={() => toggleTag(tag)}
+                                    onClick={() => toggleTag(slug)}
                                     className="ml-0.5 rounded-full p-0.5 hover:bg-muted-foreground/20 transition-colors"
                                 >
                                     <X className="size-3" />
                                 </button>
                             </Badge>
                         ))}
-                        {search && (
+                        {searchInput && (
                             <Badge variant="secondary" className="gap-1 pr-1">
-                                &quot;{search}&quot;
+                                &quot;{searchInput}&quot;
                                 <button
-                                    onClick={() => setSearch("")}
+                                    onClick={() => { setSearchInput(""); setSearch(""); setCurrentPage(1) }}
                                     className="ml-0.5 rounded-full p-0.5 hover:bg-muted-foreground/20 transition-colors"
                                 >
                                     <X className="size-3" />
@@ -211,62 +257,54 @@ export function ProductCatalog() {
                             onClick={clearFilters}
                             className="text-xs text-muted-foreground hover:text-foreground transition-colors"
                         >
-                            Clear all
+                            清除全部
                         </button>
                     </div>
                 )}
 
-                {/* Product grid */}
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                    {mockProducts.map((product) => (
-                        <Card key={product.id} className="group overflow-hidden transition-colors hover:border-foreground/20">
-                            <CardContent className="pt-5">
-                                <div className="mb-3 flex flex-wrap gap-1.5">
-                                    {product.tags.map((tag) => (
-                                        <Badge key={tag} variant="secondary" className="text-xs font-normal">
-                                            {tag}
-                                        </Badge>
-                                    ))}
-                                </div>
-                                <h3 className="font-medium leading-snug group-hover:text-primary transition-colors">
-                                    {product.name}
-                                </h3>
-                            </CardContent>
-                            <CardFooter className="flex items-center justify-between">
-                                <div>
-                                    <span className="text-lg font-bold">${product.price}</span>
-                                    {product.stock > 0 ? (
-                                        <span className="ml-2 text-xs text-muted-foreground">
-                                            {product.stock} in stock
-                                        </span>
-                                    ) : (
-                                        <span className="ml-2 text-xs text-destructive">
-                                            Out of stock
-                                        </span>
-                                    )}
-                                </div>
-                                <Button size="sm" disabled={product.stock === 0}>
-                                    Buy
-                                </Button>
-                            </CardFooter>
-                        </Card>
+                {/* Loading state */}
+                {loading && (
+                    <div className="grid grid-cols-1 items-stretch gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 min-[1600px]:grid-cols-6">
+                        {Array.from({ length: 6 }).map((_, i) => (
+                            <ProductCardSkeleton key={i} />
+                        ))}
+                    </div>
+                )}
+
+                {/* Error state */}
+                {!loading && error && (
+                    <div className="flex flex-col items-center justify-center py-20">
+                        <p className="text-sm font-medium text-destructive">{error}</p>
+                        <Button variant="outline" className="mt-4" onClick={() => fetchProducts()}>
+                            重试
+                        </Button>
+                    </div>
+                )}
+
+                {/* Product grid - equal height, cover aspect ratio preserved */}
+                {!loading && !error && (
+                <div className="grid grid-cols-1 items-stretch gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 min-[1600px]:grid-cols-6">
+                    {products.map((product, idx) => (
+                        <ProductCard key={product.id} product={product} gradientIndex={idx} />
                     ))}
                 </div>
+                )}
 
                 {/* Empty state */}
-                {mockProducts.length === 0 && (
+                {!loading && !error && products.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-20">
                         <div className="mb-4 rounded-full bg-muted p-4">
                             <Package className="size-8 text-muted-foreground" />
                         </div>
-                        <p className="text-sm font-medium">No products found</p>
+                        <p className="text-sm font-medium">未找到商品</p>
                         <p className="mt-1 text-sm text-muted-foreground">
-                            Try adjusting your search or filters.
+                            试试调整搜索或筛选条件
                         </p>
                     </div>
                 )}
 
                 {/* Pagination */}
+                {!loading && !error && totalPages > 1 && (
                 <div className="mt-8 flex items-center justify-center gap-2">
                     <Button
                         variant="outline"
@@ -295,6 +333,7 @@ export function ProductCatalog() {
                         <ChevronRight className="size-4" />
                     </Button>
                 </div>
+                )}
             </div>
         </div>
     )
