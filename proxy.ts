@@ -13,6 +13,7 @@ const PUBLIC_API_PREFIXES = [
 const PUBLIC_API_EXACT = [
     "/api/orders/by-email",
     "/api/orders/lookup",
+    "/api/orders/lookup-by-email",
 ];
 
 // Protected API routes that require admin authentication

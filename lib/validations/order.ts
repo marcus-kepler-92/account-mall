@@ -30,6 +30,11 @@ export const publicOrderLookupSchema = z.object({
     password: z.string().min(6, "Password must be at least 6 characters"),
 })
 
+export const publicOrderLookupByEmailSchema = z.object({
+    email: z.string().email("Invalid email address"),
+    password: z.string().min(6, "Password must be at least 6 characters"),
+})
+
 export const orderByEmailQuerySchema = z.object({
     email: z.string().email("Invalid email address"),
     page: z.coerce.number().int().min(1).default(1),
@@ -40,4 +45,5 @@ export type CreateOrderInput = z.infer<typeof createOrderSchema>
 export type OrderListQueryInput = z.infer<typeof orderListQuerySchema>
 export type UpdateOrderStatusInput = z.infer<typeof updateOrderStatusSchema>
 export type PublicOrderLookupInput = z.infer<typeof publicOrderLookupSchema>
+export type PublicOrderLookupByEmailInput = z.infer<typeof publicOrderLookupByEmailSchema>
 export type OrderByEmailQueryInput = z.infer<typeof orderByEmailQuerySchema>
