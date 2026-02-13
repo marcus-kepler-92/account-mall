@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,6 +13,7 @@ type ProductOrderFormProps = {
     maxQuantity: number
     price: number
     inStock: boolean
+    formId?: string
 }
 
 export function ProductOrderForm({
@@ -19,11 +21,14 @@ export function ProductOrderForm({
     maxQuantity,
     price,
     inStock,
+    formId = "product-order-form",
 }: ProductOrderFormProps) {
     const [email, setEmail] = useState("")
     const [orderPassword, setOrderPassword] = useState("")
     const [quantity, setQuantity] = useState(1)
     const [loading, setLoading] = useState(false)
+
+    const router = useRouter()
 
     const totalPrice = (price * quantity).toFixed(2)
 
@@ -58,7 +63,8 @@ export function ProductOrderForm({
                 if (data.paymentUrl) {
                     window.location.href = data.paymentUrl
                 } else if (data.orderNo) {
-                    toast.success(`订单号: ${data.orderNo}，请保存订单号和密码以便查询`)
+                    toast.success(`订单号: ${data.orderNo}，请妥善保管订单号和密码`)
+                    router.push(`/orders/lookup?orderNo=${encodeURIComponent(data.orderNo)}`)
                 }
                 return
             }
@@ -73,6 +79,7 @@ export function ProductOrderForm({
 
     return (
         <form
+            id={formId}
             onSubmit={handleSubmit}
             className="space-y-4 rounded-xl border bg-card p-4 shadow-sm sm:p-5"
         >
@@ -128,7 +135,11 @@ export function ProductOrderForm({
 
             <div className="flex items-center justify-between pt-2">
                 <span className="text-lg font-bold">合计: ¥{totalPrice}</span>
-                <Button type="submit" disabled={!inStock || loading}>
+                <Button
+                    type="submit"
+                    disabled={!inStock || loading}
+                    className="hidden lg:flex"
+                >
                     {loading && <Loader2 className="size-4 animate-spin" />}
                     {inStock ? "立即购买" : "售罄"}
                 </Button>

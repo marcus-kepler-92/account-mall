@@ -134,6 +134,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
                                 maxQuantity={product.maxQuantity}
                                 price={priceNumber}
                                 inStock={!isSoldOut}
+                                formId="product-order-form"
                             />
                         </section>
 
@@ -154,6 +155,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
                 inStock={!isSoldOut}
                 orderSectionId="order-section"
                 restockSectionId={isSoldOut ? "restock-section" : undefined}
+                formId="product-order-form"
             />
         </div>
     )

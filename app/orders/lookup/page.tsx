@@ -1,5 +1,5 @@
 import { Suspense } from "react"
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -11,10 +11,8 @@ async function lookupOrder(formData: FormData) {
     const password = (formData.get("password") as string | null) ?? ""
 
     if (!orderNo || !password) {
-        return {
-            ok: false,
-            error: "订单号和查询密码不能为空",
-        }
+        redirect(`/orders/lookup?error=${encodeURIComponent("订单号和查询密码不能为空")}&orderNo=${encodeURIComponent(orderNo)}`)
+        return
     }
 
     const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/api/orders/lookup`, {
@@ -37,34 +35,31 @@ async function lookupOrder(formData: FormData) {
             // ignore JSON parse errors
         }
 
-        return {
-            ok: false,
-            error: message,
-        }
+        redirect(`/orders/lookup?error=${encodeURIComponent(message)}&orderNo=${encodeURIComponent(orderNo)}`)
+        return
     }
 
     const data = await res.json()
 
     if (!data || !data.orderNo) {
-        return {
-            ok: false,
-            error: "订单不存在或密码错误",
-        }
+        redirect(`/orders/lookup?error=${encodeURIComponent("订单不存在或密码错误")}&orderNo=${encodeURIComponent(orderNo)}`)
+        return
     }
 
-    return {
-        ok: true,
-        order: data as {
-            orderNo: string
-            productName: string
-            createdAt: string | Date
-            status: string
-            cards?: { content: string }[]
-        },
-    }
+    // Redirect to success page with order data in URL params or session
+    // For now, redirect back with success flag
+    redirect(`/orders/lookup?success=true&orderNo=${encodeURIComponent(data.orderNo)}`)
 }
 
-export default function OrderLookupPage() {
+export default function OrderLookupPage({
+    searchParams,
+}: {
+    searchParams: {
+        orderNo?: string
+        error?: string
+        success?: string
+    }
+}) {
     // If NEXT_PUBLIC_APP_URL is not configured, this page should not be reachable in production.
     if (!process.env.NEXT_PUBLIC_APP_URL) {
         notFound()
@@ -80,6 +75,16 @@ export default function OrderLookupPage() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
+                    {searchParams.error && (
+                        <div className="rounded-lg border border-destructive bg-destructive/10 p-3 text-sm text-destructive">
+                            {searchParams.error}
+                        </div>
+                    )}
+                    {searchParams.success === "true" && (
+                        <div className="rounded-lg border border-green-500 bg-green-50 p-3 text-sm text-green-700 dark:bg-green-950 dark:text-green-300">
+                            查询成功！订单号: {searchParams.orderNo}
+                        </div>
+                    )}
                     <Suspense fallback={null}>
                         {/* Simple server action based form; errors are returned inline. */}
                         {/* In a real app you might want to convert this to a Client Component with better UX. */}
@@ -92,6 +97,7 @@ export default function OrderLookupPage() {
                                     id="orderNo"
                                     name="orderNo"
                                     placeholder="例如：FAK2024021300001"
+                                    defaultValue={searchParams.orderNo ?? ""}
                                     required
                                 />
                             </div>

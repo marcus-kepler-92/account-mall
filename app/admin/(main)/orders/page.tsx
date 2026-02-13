@@ -270,22 +270,24 @@ export default async function AdminOrdersPage({
                             每页 <span className="font-medium">{pageSize}</span> 条
                         </div>
                         <div className="flex items-center gap-2">
-                            <Button
-                                asChild
-                                variant="outline"
-                                size="sm"
-                                disabled={page <= 1}
-                            >
-                                <Link href={buildPageLink(page - 1)}>上一页</Link>
-                            </Button>
-                            <Button
-                                asChild
-                                variant="outline"
-                                size="sm"
-                                disabled={page >= totalPages}
-                            >
-                                <Link href={buildPageLink(page + 1)}>下一页</Link>
-                            </Button>
+                            {page <= 1 ? (
+                                <Button variant="outline" size="sm" disabled>
+                                    上一页
+                                </Button>
+                            ) : (
+                                <Button asChild variant="outline" size="sm">
+                                    <Link href={buildPageLink(page - 1)}>上一页</Link>
+                                </Button>
+                            )}
+                            {page >= totalPages ? (
+                                <Button variant="outline" size="sm" disabled>
+                                    下一页
+                                </Button>
+                            ) : (
+                                <Button asChild variant="outline" size="sm">
+                                    <Link href={buildPageLink(page + 1)}>下一页</Link>
+                                </Button>
+                            )}
                         </div>
                     </div>
                 </div>

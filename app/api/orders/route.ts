@@ -1,27 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
+import { randomUUID } from "crypto"
 import { prisma } from "@/lib/prisma"
 import { hashPassword } from "better-auth/crypto"
 import { getAdminSession } from "@/lib/auth-guard"
 import { createOrderSchema, orderListQuerySchema } from "@/lib/validations/order"
 
-function generateOrderNo(): string {
-    const today = new Date().toISOString().slice(0, 10).replace(/-/g, "")
-    return `FAK${today}`
-}
-
-export function getNextOrderNo(prefix: string, lastOrderNo?: string | null): string {
-    let seq = 1
-
-    if (lastOrderNo) {
-        const suffix = lastOrderNo.slice(prefix.length)
-        const parsed = parseInt(suffix, 10)
-
-        if (!Number.isNaN(parsed)) {
-            seq = parsed + 1
-        }
-    }
-
-    return `${prefix}${String(seq).padStart(5, "0")}`
+/**
+ * Generate a unique order number using UUID v4.
+ * Implemented via Node's built-in crypto.randomUUID.
+ */
+export function generateOrderNo(): string {
+    return randomUUID()
 }
 
 /**
@@ -237,47 +226,81 @@ export async function POST(request: NextRequest) {
     const amount = Number(product.price) * quantity
     const passwordHash = await hashPassword(orderPassword)
 
-    const order = await prisma.$transaction(async (tx) => {
-        const prefix = generateOrderNo()
+    // Generate unique order number using UUID v4 (guaranteed uniqueness)
+    // Retry only if there's an extremely rare collision (shouldn't happen in practice)
+    const MAX_RETRIES = 3
+    let order
+    let retries = 0
 
-        const lastOrder = await tx.order.findFirst({
-            where: { orderNo: { startsWith: prefix } },
-            orderBy: { orderNo: "desc" },
-            select: { orderNo: true },
-        })
+    while (retries < MAX_RETRIES) {
+        try {
+            order = await prisma.$transaction(async (tx) => {
+                const orderNo = generateOrderNo()
 
-        const orderNo = getNextOrderNo(prefix, lastOrder?.orderNo ?? null)
+                const newOrder = await tx.order.create({
+                    data: {
+                        orderNo,
+                        productId,
+                        email: email.trim().toLowerCase(),
+                        passwordHash,
+                        quantity,
+                        amount,
+                        status: "PENDING",
+                    },
+                })
 
-        const newOrder = await tx.order.create({
-            data: {
-                orderNo,
-                productId,
-                email: email.trim().toLowerCase(),
-                passwordHash,
-                quantity,
-                amount,
-                status: "PENDING",
-            },
-        })
+                const cardsToReserve = await tx.card.findMany({
+                    where: { productId, status: "UNSOLD" },
+                    take: quantity,
+                    orderBy: { createdAt: "asc" },
+                    select: { id: true },
+                })
 
-        const cardsToReserve = await tx.card.findMany({
-            where: { productId, status: "UNSOLD" },
-            take: quantity,
-            orderBy: { createdAt: "asc" },
-            select: { id: true },
-        })
+                if (cardsToReserve.length < quantity) {
+                    throw new Error("Insufficient stock during reservation")
+                }
 
-        if (cardsToReserve.length < quantity) {
-            throw new Error("Insufficient stock during reservation")
+                await tx.card.updateMany({
+                    where: { id: { in: cardsToReserve.map((c) => c.id) } },
+                    data: { status: "RESERVED", orderId: newOrder.id },
+                })
+
+                return newOrder
+            })
+            break // Success, exit retry loop
+        } catch (error: unknown) {
+            // Check if it's a unique constraint violation on orderNo (extremely rare with UUID)
+            if (
+                error &&
+                typeof error === "object" &&
+                "code" in error &&
+                error.code === "P2002" &&
+                "meta" in error &&
+                error.meta &&
+                typeof error.meta === "object" &&
+                "target" in error.meta &&
+                Array.isArray(error.meta.target) &&
+                error.meta.target.includes("orderNo")
+            ) {
+                retries++
+                if (retries >= MAX_RETRIES) {
+                    return NextResponse.json(
+                        { error: "Failed to create order after retries. Please try again." },
+                        { status: 500 }
+                    )
+                }
+                // Wait a short random time before retry (shouldn't be needed with UUID)
+                await new Promise((resolve) => setTimeout(resolve, Math.random() * 50))
+                continue
+            }
+            // Re-throw other errors
+            throw error
         }
+    }
 
-        await tx.card.updateMany({
-            where: { id: { in: cardsToReserve.map((c) => c.id) } },
-            data: { status: "RESERVED", orderId: newOrder.id },
-        })
-
-        return newOrder
-    })
+    if (!order) {
+        return NextResponse.json({ error: "Failed to create order" }, { status: 500 })
+    }
 
     return NextResponse.json({
         orderNo: order.orderNo,

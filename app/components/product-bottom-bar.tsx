@@ -8,6 +8,7 @@ type ProductBottomBarProps = {
     inStock: boolean
     orderSectionId: string
     restockSectionId?: string
+    formId?: string
 }
 
 export function ProductBottomBar({
@@ -15,8 +16,19 @@ export function ProductBottomBar({
     inStock,
     orderSectionId,
     restockSectionId,
+    formId,
 }: ProductBottomBarProps) {
     const handleClick = () => {
+        if (inStock && formId) {
+            // Submit the form directly when in stock
+            const form = document.getElementById(formId) as HTMLFormElement
+            if (form) {
+                form.requestSubmit()
+                return
+            }
+        }
+
+        // Fallback: scroll to target section (for restock or if form not found)
         const targetId = inStock ? orderSectionId : restockSectionId ?? orderSectionId
         if (!targetId) return
 
