@@ -4,7 +4,7 @@ import Link from "next/link"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ImageIcon } from "lucide-react"
+import { ImageIcon, Bell } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SoldOutOverlay } from "@/app/components/sold-out-overlay"
 
@@ -45,8 +45,12 @@ export function ProductCard({ product, gradientIndex = 0, className }: ProductCa
     const isSoldOut = product.stock === 0
     const productSlug = `${product.id}-${product.slug}`
 
+    const detailHref = isSoldOut
+        ? `/products/${productSlug}?restock=1`
+        : `/products/${productSlug}`
+
     return (
-        <Link href={`/products/${productSlug}`} className={cn("group block h-full", className)}>
+        <Link href={detailHref} className={cn("group block h-full", className)}>
             <Card
                 className={cn(
                     "relative flex h-full flex-col overflow-hidden border p-0 shadow-sm transition-all duration-300 hover:shadow-lg hover:-translate-y-1 hover:border-primary/20 group-focus-within:ring-2 group-focus-within:ring-ring"
@@ -121,8 +125,15 @@ export function ProductCard({ product, gradientIndex = 0, className }: ProductCa
                                 </span>
                             )}
                         </div>
-                        <Button size="sm" className="shrink-0" disabled={product.stock === 0}>
-                            购买
+                        <Button size="sm" className="shrink-0" disabled={false}>
+                            {isSoldOut ? (
+                                <>
+                                    <Bell className="size-3.5" />
+                                    到货提醒
+                                </>
+                            ) : (
+                                "购买"
+                            )}
                         </Button>
                     </div>
                 </CardFooter>

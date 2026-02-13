@@ -9,9 +9,3 @@ export const prismaMock =
 beforeEach(() => {
   mockReset(prismaMock);
 });
-
-// Mock the prisma module so all imports get the mock instance
-jest.mock("@/lib/prisma", () => ({
-  __esModule: true,
-  prisma: prismaMock,
-}));

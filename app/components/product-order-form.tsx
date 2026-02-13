@@ -72,8 +72,16 @@ export function ProductOrderForm({
     }
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-4 border-t pt-6">
-            <h3 className="text-sm font-semibold text-muted-foreground">立即购买</h3>
+        <form
+            onSubmit={handleSubmit}
+            className="space-y-4 rounded-xl border bg-card p-4 shadow-sm sm:p-5"
+        >
+            <div className="space-y-1">
+                <h3 className="text-sm font-semibold text-foreground">立即购买</h3>
+                <p className="text-xs text-muted-foreground">
+                    支持邮箱接收卡密，请妥善保管订单密码以便后续查询。
+                </p>
+            </div>
 
             <div className="space-y-2">
                 <Label htmlFor="email">邮箱</Label>

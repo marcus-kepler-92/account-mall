@@ -48,6 +48,11 @@ function isPublicApi(pathname: string, method: string): boolean {
         return true;
     }
 
+    // Restock subscription API (subscribe / check status) is public
+    if (pathname.startsWith("/api/restock-subscriptions")) {
+        return true;
+    }
+
     return false;
 }
 

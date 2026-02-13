@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAdminSession } from "@/lib/auth-guard";
 import { bulkImportCardsSchema } from "@/lib/validations/card";
+import { notifyRestockSubscribers } from "@/lib/restock-notify";
 
 type RouteContext = {
     params: Promise<{ productId: string }>;
@@ -111,6 +112,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
         );
     }
 
+    const oldUnsoldCount = await prisma.card.count({
+        where: { productId, status: "UNSOLD" },
+    });
+
     const { count } = await prisma.card.createMany({
         data: contents.map((content) => ({
             productId,
@@ -118,6 +123,23 @@ export async function POST(request: NextRequest, context: RouteContext) {
             status: "UNSOLD",
         })),
     });
+
+    if (oldUnsoldCount === 0 && count > 0) {
+        const productWithDetails = await prisma.product.findUnique({
+            where: { id: productId },
+            select: { id: true, name: true, slug: true, price: true },
+        });
+        if (productWithDetails) {
+            notifyRestockSubscribers({
+                id: productWithDetails.id,
+                name: productWithDetails.name,
+                slug: productWithDetails.slug,
+                price: Number(productWithDetails.price),
+            }).catch((err) => {
+                console.error("[restock-notify] Failed to send restock emails:", err);
+            });
+        }
+    }
 
     return NextResponse.json({ imported: count, total: contents.length }, { status: 201 });
 }

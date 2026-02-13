@@ -76,6 +76,12 @@ enum OrderStatus {
   CLOSED
 }
 
+enum RestockSubscriptionStatus {
+  PENDING
+  NOTIFIED
+  CANCELLED
+}
+
 model Product {
   id          String        @id @default(cuid())
   name        String
@@ -87,9 +93,10 @@ model Product {
   status      ProductStatus @default(ACTIVE)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
-  cards       Card[]
-  orders      Order[]
-  tags        Tag[]
+  cards              Card[]
+  orders             Order[]
+  tags               Tag[]
+  restockSubscriptions RestockSubscription[]
 }
 
 model Tag {
@@ -133,4 +140,18 @@ model Order {
 
   @@index([email])
   @@index([status, createdAt])
+}
+
+model RestockSubscription {
+  id         String                  @id @default(cuid())
+  productId  String
+  email      String
+  status     RestockSubscriptionStatus @default(PENDING)
+  notifiedAt DateTime?
+  createdAt  DateTime                @default(now())
+  updatedAt  DateTime                @updatedAt
+  product    Product                 @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, email])
+  @@index([productId, status])
 }
