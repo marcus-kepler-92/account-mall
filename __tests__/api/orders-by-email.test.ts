@@ -10,6 +10,10 @@ jest.mock("@/lib/prisma", () => {
   }
 })
 
+jest.mock("@/lib/rate-limit", () => ({
+  checkOrderQueryRateLimit: jest.fn().mockResolvedValue(null),
+}))
+
 function createUrlRequest(url: string): NextRequest {
   return {
     url,
@@ -17,6 +21,24 @@ function createUrlRequest(url: string): NextRequest {
 }
 
 describe("GET /api/orders/by-email", () => {
+  it("returns 429 when query rate limited", async () => {
+    const { checkOrderQueryRateLimit } = require("@/lib/rate-limit")
+    ;(checkOrderQueryRateLimit as jest.Mock).mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ error: "Too many requests. Please try again later." }),
+        { status: 429, headers: { "Content-Type": "application/json" } },
+      ),
+    )
+    const req = createUrlRequest(
+      "http://localhost/api/orders/by-email?email=user@example.com",
+    )
+    const res = await GET(req)
+    expect(res.status).toBe(429)
+    const data = await res.json()
+    expect(data.error).toContain("Too many")
+    expect(prismaMock.order.findMany).not.toHaveBeenCalled()
+  })
+
   it("returns 400 when email is missing or invalid", async () => {
     const req = createUrlRequest("http://localhost/api/orders/by-email")
     const res = await GET(req)

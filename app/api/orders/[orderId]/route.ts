@@ -4,19 +4,10 @@ import { prisma } from "@/lib/prisma"
 import { getAdminSession } from "@/lib/auth-guard"
 import { updateOrderStatusSchema } from "@/lib/validations/order"
 
+/** Only allow: PENDING → COMPLETED, PENDING → CLOSED. COMPLETED → CLOSED is forbidden. */
 function isValidStatusTransition(from: string, to: string): boolean {
-    if (from === to) {
-        return true
-    }
-
-    if (from === "PENDING" && (to === "COMPLETED" || to === "CLOSED")) {
-        return true
-    }
-
-    if (from === "COMPLETED" && to === "CLOSED") {
-        return true
-    }
-
+    if (from === to) return true
+    if (from === "PENDING" && (to === "COMPLETED" || to === "CLOSED")) return true
     return false
 }
 

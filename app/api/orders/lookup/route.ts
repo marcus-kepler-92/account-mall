@@ -2,15 +2,17 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { publicOrderLookupSchema } from "@/lib/validations/order"
 import { verifyPassword } from "better-auth/crypto"
+import { createOrderSuccessToken } from "@/lib/order-success-token"
+import { checkOrderQueryRateLimit } from "@/lib/rate-limit"
 
 /**
  * POST /api/orders/lookup
  * Public: users can query order details and cards by orderNo + password.
- *
- * TODO: Add IP/orderNo level rate limiting and basic WAF to prevent brute-force attacks.
- * TODO: Add structured logging for lookup attempts without logging raw passwords or card content.
  */
 export async function POST(request: NextRequest) {
+    const rateLimitRes = await checkOrderQueryRateLimit(request)
+    if (rateLimitRes) return rateLimitRes
+
     let body: unknown
     try {
         body = await request.json()
@@ -71,14 +73,12 @@ export async function POST(request: NextRequest) {
             })
         }
 
-        // For COMPLETED/CLOSED orders, return cards
+        // For COMPLETED/CLOSED orders, return cards and optional successToken for redirect to success page
         const cards = order.cards
-            // Only return cards that belong to this order and are in SOLD or RESERVED status.
-            // TODO: Consider encrypting card content at rest and decrypting only when needed.
             .filter((card) => card.status === "SOLD" || card.status === "RESERVED")
-            .map((card) => ({
-                content: card.content,
-            }))
+            .map((card) => ({ content: card.content }))
+
+        const successToken = createOrderSuccessToken(order.orderNo)
 
         return NextResponse.json({
             orderNo: order.orderNo,
@@ -86,6 +86,7 @@ export async function POST(request: NextRequest) {
             createdAt: order.createdAt,
             status: order.status,
             cards,
+            ...(successToken && { successToken }),
         })
     } catch (error) {
         if (error instanceof Error && error.message === "LOOKUP_FAILED") {

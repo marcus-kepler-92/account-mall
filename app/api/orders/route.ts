@@ -4,6 +4,12 @@ import { prisma } from "@/lib/prisma"
 import { hashPassword } from "better-auth/crypto"
 import { getAdminSession } from "@/lib/auth-guard"
 import { createOrderSchema, orderListQuerySchema } from "@/lib/validations/order"
+import { getAlipayPagePayUrl } from "@/lib/alipay"
+import {
+    checkOrderCreateRateLimit,
+    getClientIp,
+    MAX_PENDING_ORDERS_PER_IP,
+} from "@/lib/rate-limit"
 
 /**
  * Generate a unique order number using UUID v4.
@@ -179,6 +185,24 @@ export async function GET(request: NextRequest) {
  * Create order and reserve cards.
  */
 export async function POST(request: NextRequest) {
+    const rateLimitRes = await checkOrderCreateRateLimit(request)
+    if (rateLimitRes) return rateLimitRes
+
+    const clientIp = getClientIp(request)
+    if (clientIp !== "unknown") {
+        const pendingCount = await prisma.order.count({
+            where: { status: "PENDING", clientIp },
+        })
+        if (pendingCount >= MAX_PENDING_ORDERS_PER_IP) {
+            return NextResponse.json(
+                {
+                    error: `You have ${pendingCount} unpaid order(s). Please pay or wait for them to expire before creating more.`,
+                },
+                { status: 400 },
+            )
+        }
+    }
+
     let body: unknown
     try {
         body = await request.json()
@@ -246,6 +270,7 @@ export async function POST(request: NextRequest) {
                         quantity,
                         amount,
                         status: "PENDING",
+                        ...(clientIp !== "unknown" && { clientIp }),
                     },
                 })
 
@@ -302,10 +327,18 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Failed to create order" }, { status: 500 })
     }
 
+    const amountStr = Number(order.amount).toFixed(2)
+    const subject = product.name ?? `订单 ${order.orderNo}`
+    const paymentUrl = getAlipayPagePayUrl({
+        orderNo: order.orderNo,
+        totalAmount: amountStr,
+        subject,
+    })
+
     return NextResponse.json({
         orderNo: order.orderNo,
         amount: Number(order.amount),
-        paymentUrl: null,
+        paymentUrl: paymentUrl ?? null,
     })
 }
 

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import ReactECharts from "echarts-for-react"
 import type { EChartsOption } from "echarts"
 import type { DashboardTrendPoint } from "@/app/admin/(main)/dashboard/types"
+import { useTheme } from "next-themes"
 import { useEChartsTheme, getEChartsTooltip } from "@/app/components/echarts-theme"
 
 export function DashboardChart({
@@ -13,6 +14,7 @@ export function DashboardChart({
     title?: string
 }) {
     const [mounted, setMounted] = useState(false)
+    const { resolvedTheme } = useTheme()
     const colors = useEChartsTheme()
 
     useEffect(() => {
@@ -102,6 +104,7 @@ export function DashboardChart({
     return (
         <div className="h-[280px] w-full min-w-0">
             <ReactECharts
+                key={resolvedTheme ?? "light"}
                 option={option}
                 style={{ height: "100%", width: "100%" }}
                 opts={{ renderer: "canvas" }}

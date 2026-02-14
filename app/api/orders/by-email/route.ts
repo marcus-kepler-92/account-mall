@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { orderByEmailQuerySchema } from "@/lib/validations/order"
+import { checkOrderQueryRateLimit } from "@/lib/rate-limit"
 
 /**
  * GET /api/orders/by-email
  * Public: users can query their own orders by email.
- *
- * TODO: Add IP/email level rate limiting to prevent abuse and enumeration attacks.
  */
 export async function GET(request: NextRequest) {
+    const rateLimitRes = await checkOrderQueryRateLimit(request)
+    if (rateLimitRes) return rateLimitRes
+
     const { searchParams } = new URL(request.url)
 
     const rawQuery = {

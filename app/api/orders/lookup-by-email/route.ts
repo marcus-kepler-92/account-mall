@@ -2,16 +2,17 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { publicOrderLookupByEmailSchema } from "@/lib/validations/order"
 import { verifyPassword } from "better-auth/crypto"
+import { checkOrderQueryRateLimit } from "@/lib/rate-limit"
 
 /**
  * POST /api/orders/lookup-by-email
  * Public: users can query order details and cards by email + password.
  * Returns a list of matching orders if multiple exist, or a single order with cards if only one matches.
- *
- * TODO: Add IP/email level rate limiting and basic WAF to prevent brute-force attacks.
- * TODO: Add structured logging for lookup attempts without logging raw passwords or card content.
  */
 export async function POST(request: NextRequest) {
+    const rateLimitRes = await checkOrderQueryRateLimit(request)
+    if (rateLimitRes) return rateLimitRes
+
     let body: unknown
     try {
         body = await request.json()

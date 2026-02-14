@@ -77,9 +77,9 @@
     - Tag 管理：在商品表单中内联创建/选择 Tag，后台提供 Tag 列表查看和删除
   - 技术：Server Actions 或 API Routes，表单验证，Prisma CRUD，多对多关系操作
 
-- [ ] **6. 卡密管理**
+- [x] **6. 卡密管理**
   - 路由：`GET /admin/products/{productId}/cards`
-  - API：`GET /api/products/{productId}/cards`、`POST /api/products/{productId}/cards/bulk`、`DELETE /api/cards/{cardId}`
+  - API：`GET /api/products/{productId}/cards`、`POST /api/products/{productId}/cards`（批量导入）、`DELETE /api/cards/{cardId}`
   - 说明：
     - 按商品查看所有卡密：内容（明文）、状态（未售/预占中/已售）、关联订单号（已售时）
     - 批量导入：文本框输入，每行一条卡密
@@ -87,7 +87,7 @@
     - 显示库存统计（未售 / 预占中 / 已售）
   - 技术：Prisma 批量插入，文本解析
 
-- [ ] **7. 订单管理**
+- [x] **7. 订单管理**
   - 路由：`GET /admin/orders`、`GET /admin/orders/{orderId}`
   - API：`GET /api/orders`、`GET /api/orders/{orderId}`
   - 说明：
@@ -96,7 +96,7 @@
     - 订单详情：完整订单信息 + 卡密明文
   - 技术：Prisma 查询与筛选，分页
 
-- [ ] **8. 管理仪表盘**
+- [x] **8. 管理仪表盘**
   - 路由：`GET /admin/dashboard`
   - 说明：
     - 总营收（已完成订单金额汇总）
@@ -109,7 +109,7 @@
 
 ## P2 - 前台商品展示（第三优先级，面向买家的核心页面）
 
-- [ ] **9. 商品列表首页（SSR，支持按 Tag 分类）**
+- [x] **9. 商品列表首页（SSR，支持按 Tag 分类）**
   - 路由：`GET /`、`GET /?tag={slug}`
   - 说明：
     - 以响应式网格/列表展示所有上架商品
@@ -118,7 +118,7 @@
     - 链接到商品详情页，使用 SEO 友好的 URL
   - 技术：React Server Components，SSR，响应式 CSS，URL searchParams 筛选
 
-- [ ] **10. 商品详情页（SSR + SEO）**
+- [x] **10. 商品详情页（SSR + SEO）**
   - 路由：`GET /products/{id}-{slug}`
   - 说明：
     - 商品信息：名称、价格、完整描述
@@ -128,7 +128,7 @@
     - URL 格式示例：`/products/123-chatgpt-plus-account`
   - 技术：Next.js `generateMetadata`，动态路由，SSR
 
-- [ ] **11. SEO 基础设施**
+- [x] **11. SEO 基础设施**
   - 路由：`/sitemap.xml`、`/robots.txt`
   - 说明：
     - 自动生成 sitemap.xml，包含所有上架商品页面
@@ -140,7 +140,7 @@
 
 ## P3 - 订单与支付流程（核心业务逻辑）
 
-- [ ] **12. 创建订单 API（含卡密预占，支持多数量）**
+- [x] **12. 创建订单 API（含卡密预占，支持多数量）**
   - API：`POST /api/orders`
   - 请求体：`{ productId, email, orderPassword, quantity }`
   - 说明：
@@ -157,7 +157,7 @@
     - 防恶意下单（详见任务 22）
   - 技术：Prisma `$transaction`，@node-rs/argon2，Zod 校验，批量原子化卡密预占
 
-- [ ] **13. 支付宝支付集成**
+- [x] **13. 支付宝支付集成**
   - API：`POST /api/payment/alipay/create`
   - 说明：
     - 根据订单信息创建支付宝支付请求
@@ -166,7 +166,7 @@
     - 配置同步返回地址（return_url）和异步通知地址（notify_url）
   - 技术：alipay-sdk，RSA2 签名
 
-- [ ] **14. 支付宝异步回调处理**
+- [x] **14. 支付宝异步回调处理**
   - API：`POST /api/payment/alipay/notify`
   - 说明：
     - 验证支付宝回调签名（RSA2 公钥验签）
@@ -182,14 +182,14 @@
     - 返回纯文本 "success" 或 "failure" 给支付宝
   - 技术：支付宝签名验证，数据库事务，幂等处理
 
-- [ ] **15. 订单状态机**
+- [x] **15. 订单状态机**
   - 说明：
     - 仅允许合法状态流转：`null → PENDING`、`PENDING → COMPLETED`、`PENDING → CLOSED`
     - 禁止其他流转（如 COMPLETED → CLOSED 不合法）
     - 实现为工具函数，供订单创建、支付回调、超时处理调用
   - 技术：状态机模式，TypeScript 枚举
 
-- [ ] **16. 订单超时机制（15 分钟自动关闭）**
+- [x] **16. 订单超时机制（15 分钟自动关闭）**
   - 说明：
     - 处于 PENDING 状态超过 15 分钟的订单自动关闭
     - 关闭时：订单状态设为 CLOSED，释放该订单预占的所有卡密（RESERVED → UNSOLD）
@@ -203,7 +203,7 @@
 
 ## P4 - 卡密交付（支付成功后的关键路径）
 
-- [ ] **17. 支付成功页**
+- [x] **17. 支付成功页**
   - 路由：`GET /orders/{orderNo}/success`
   - 说明：
     - 展示：商品名称、订单号、购买数量、所有卡密内容列表（明文）
@@ -214,7 +214,7 @@
     - 需要订单密码验证（通过会话或查询参数 token）
   - 技术：客户端组件实现复制功能，条件渲染
 
-- [ ] **18. 邮件通知**
+- [x] **18. 邮件通知**
   - 说明：
     - 支付成功后触发发送
     - 收件人：买家邮箱（来自订单记录）
@@ -227,18 +227,18 @@
 
 ## P5 - 订单查询与安全（买家自助服务）
 
-- [ ] **19. 按邮箱查看订单列表**
-  - 路由：`GET /orders/by-email`
-  - API：`GET /api/orders/by-email?email=xxx`
+- [x] **19. 按邮箱查看订单列表**
+  - 路由：`GET /orders/lookup`（邮箱+密码模式）、API `GET /api/orders/by-email?email=xxx`
+  - API：`GET /api/orders/by-email?email=xxx`、`POST /api/orders/lookup-by-email`
   - 说明：
     - 输入表单：邮箱地址
     - 返回该邮箱下的订单列表（仅概要）：订单号、商品名、金额、状态、创建时间
     - 不展示卡密内容（防止邮箱泄露导致卡密泄露）
   - 技术：服务端查询，表单提交
 
-- [ ] **20. 按订单号 + 订单密码查看卡密**
+- [x] **20. 按订单号 + 订单密码查看卡密**
   - 路由：`GET /orders/lookup`
-  - API：`POST /api/orders/lookup`（请求体：`{ orderNo, orderPassword }`）
+  - API：`POST /api/orders/lookup`（请求体：`{ orderNo, password }`）
   - 说明：
     - 输入表单：订单号 + 订单密码
     - 校验订单密码与存储的 argon2 哈希值
@@ -247,20 +247,22 @@
     - 作为邮箱填错时的备用找回机制
   - 技术：@node-rs/argon2 比对，会话 token 或短期 JWT
 
-- [ ] **21. 本地订单历史（浏览器 localStorage）**
+- [x] **21. 本地订单历史（浏览器 localStorage）**
+  - 路由：`GET /orders/my`（我的订单详情页）
   - 说明：
-    - 订单创建/完成时写入 localStorage：
-      - 订单号、商品名、金额、创建时间、状态
-    - 展示「我的订单」区域（仅客户端）
-    - 帮助用户在忘记订单号时查找
+    - 订单创建/完成时写入 localStorage：订单号、商品名、金额、创建时间、状态
+    - 「我的订单」使用一个详情页：左侧订单列表、右侧当前订单详情（订单号、商品、金额、创建时间、状态）
+    - 未支付且未超时（15 分钟内）的订单展示「继续支付」按钮，跳转支付宝
+    - 已超时的待支付订单提示「订单已超时关闭」
+    - 查看卡密需在「订单查询」输入密码，本页仅展示本地概要
     - 不存储敏感信息（无卡密内容、无密码）
-  - 技术：localStorage API，React 客户端组件
+  - 技术：localStorage API，React 客户端组件，`POST /api/payment/alipay/create` 获取支付链接
 
 ---
 
 ## P6 - 防刷与风控（上线前必须完成）
 
-- [ ] **22. 订单创建频率限制与防恶意下单**
+- [x] **22. 订单创建频率限制与防恶意下单**
   - API：`POST /api/orders`
   - 说明：
     - 同一 IP 每分钟最多创建 5 笔订单（可配置）
@@ -269,8 +271,8 @@
     - 超出限制返回 429 Too Many Requests 或 400 Bad Request
   - 技术：rate-limiter-flexible，数据库查询 PENDING 订单数
 
-- [ ] **23. 查询接口限流**
-  - API：`/api/orders/by-email`、`/api/orders/lookup`
+- [x] **23. 查询接口限流**
+  - API：`/api/orders/by-email`、`/api/orders/lookup`、`/api/orders/lookup-by-email`
   - 说明：
     - 同一 IP 每分钟最多调用 5 次（可配置）
     - 防止暴力破解订单密码和邮箱枚举攻击

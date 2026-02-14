@@ -20,6 +20,17 @@ jest.mock("better-auth/crypto", () => ({
     hashPassword: jest.fn().mockResolvedValue("hashed-password"),
 }))
 
+jest.mock("@/lib/rate-limit", () => ({
+    __esModule: true,
+    checkOrderCreateRateLimit: jest.fn().mockResolvedValue(null),
+    getClientIp: jest.fn().mockReturnValue("127.0.0.1"),
+    MAX_PENDING_ORDERS_PER_IP: 3,
+}))
+
+jest.mock("@/lib/alipay", () => ({
+    getAlipayPagePayUrl: jest.fn().mockReturnValue(null),
+}))
+
 function createJsonRequest(body: unknown): NextRequest {
     return {
         json: async () => body,
@@ -254,7 +265,7 @@ describe("POST /api/orders (create order)", () => {
             paymentUrl: null,
         })
         expect(mockTx.order.create).toHaveBeenCalledWith({
-            data: {
+            data: expect.objectContaining({
                 orderNo: expect.any(String),
                 productId: "prod_1",
                 email: "user@example.com",
@@ -262,7 +273,8 @@ describe("POST /api/orders (create order)", () => {
                 quantity: 2,
                 amount: 100,
                 status: "PENDING",
-            },
+                clientIp: "127.0.0.1",
+            }),
         })
         expect(mockTx.card.findMany).toHaveBeenCalledWith({
             where: { productId: "prod_1", status: "UNSOLD" },
@@ -274,5 +286,50 @@ describe("POST /api/orders (create order)", () => {
             where: { id: { in: ["card_1", "card_2"] } },
             data: { status: "RESERVED", orderId: "order_new" },
         })
+    })
+
+    it("returns 429 when rate limited", async () => {
+        const { checkOrderCreateRateLimit } = require("@/lib/rate-limit")
+        ;(checkOrderCreateRateLimit as jest.Mock).mockResolvedValueOnce(
+            new Response(
+                JSON.stringify({ error: "Too many orders. Please try again later." }),
+                { status: 429, headers: { "Content-Type": "application/json" } },
+            ),
+        )
+        const res = await POST(
+            createJsonRequest({
+                productId: "prod_1",
+                email: "user@example.com",
+                orderPassword: "password123",
+                quantity: 1,
+            }),
+        )
+        expect(res.status).toBe(429)
+        const data = await res.json()
+        expect(data.error).toContain("Too many")
+        expect(prismaMock.product.findUnique).not.toHaveBeenCalled()
+    })
+
+    it("returns 400 when IP has too many PENDING orders", async () => {
+        prismaMock.order.count.mockResolvedValueOnce(3)
+        prismaMock.product.findUnique.mockResolvedValueOnce({
+            id: "prod_1",
+            name: "Test",
+            price: 100,
+            maxQuantity: 5,
+            status: "ACTIVE",
+        })
+        const res = await POST(
+            createJsonRequest({
+                productId: "prod_1",
+                email: "user@example.com",
+                orderPassword: "password123",
+                quantity: 1,
+            }),
+        )
+        expect(res.status).toBe(400)
+        const data = await res.json()
+        expect(data.error).toMatch(/unpaid order|expire/)
+        expect(prismaMock.$transaction).not.toHaveBeenCalled()
     })
 })

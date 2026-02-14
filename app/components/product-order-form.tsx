@@ -7,9 +7,11 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Loader2 } from "lucide-react"
+import { addOrUpdateOrder } from "@/lib/order-history-storage"
 
 type ProductOrderFormProps = {
     productId: string
+    productName?: string
     maxQuantity: number
     price: number
     inStock: boolean
@@ -18,6 +20,7 @@ type ProductOrderFormProps = {
 
 export function ProductOrderForm({
     productId,
+    productName,
     maxQuantity,
     price,
     inStock,
@@ -60,6 +63,13 @@ export function ProductOrderForm({
 
             if (res.ok) {
                 toast.success("订单创建成功")
+                addOrUpdateOrder({
+                    orderNo: data.orderNo,
+                    productName: productName ?? "商品",
+                    amount: data.amount,
+                    createdAt: new Date().toISOString(),
+                    status: "PENDING",
+                })
                 if (data.paymentUrl) {
                     window.location.href = data.paymentUrl
                 } else if (data.orderNo) {

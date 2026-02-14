@@ -1,32 +1,13 @@
 import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Zap, Search } from "lucide-react"
+import { Suspense } from "react"
+import { Zap } from "lucide-react"
 import { ProductCatalog } from "@/app/components/product-catalog"
-import { ThemeToggle } from "@/app/components/theme-toggle"
+import { SiteHeader } from "@/app/components/site-header"
 
 export default function HomePage() {
     return (
         <div className="flex min-h-screen flex-col">
-            {/* Header */}
-            <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-sm">
-                <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
-                    <Link href="/" className="flex items-center gap-2">
-                        <div className="flex size-8 items-center justify-center rounded-lg bg-primary">
-                            <Zap className="size-4 text-primary-foreground" />
-                        </div>
-                        <span className="text-lg font-bold tracking-tight">Account Mall</span>
-                    </Link>
-                    <nav className="flex items-center gap-2">
-                        <ThemeToggle />
-                        <Button variant="ghost" size="sm" asChild>
-                            <Link href="/orders/lookup">
-                                <Search className="size-4" />
-                                订单查询
-                            </Link>
-                        </Button>
-                    </nav>
-                </div>
-            </header>
+            <SiteHeader />
 
             {/* Main content */}
             <main className="flex-1">
@@ -40,7 +21,9 @@ export default function HomePage() {
                             安全可靠的卡密自动发卡平台，支持多种数字商品类型
                         </p>
                     </section>
-                    <ProductCatalog />
+                    <Suspense fallback={<div className="min-h-[400px]" />}>
+                        <ProductCatalog />
+                    </Suspense>
                 </div>
             </main>
 

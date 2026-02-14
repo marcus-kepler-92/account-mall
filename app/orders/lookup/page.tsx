@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,9 +9,10 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
-import { ThemeToggle } from "@/app/components/theme-toggle"
-import { Zap, Search, Copy, Check, Loader2, Mail, Hash, AlertCircle, Package } from "lucide-react"
+import { SiteHeader } from "@/app/components/site-header"
+import { Copy, Check, Loader2, Mail, Hash, AlertCircle, Package, Search, Zap } from "lucide-react"
 import { toast } from "sonner"
+import { addOrUpdateOrder } from "@/lib/order-history-storage"
 
 interface OrderResult {
     orderNo: string
@@ -34,6 +35,7 @@ interface OrderListItem {
 type LookupMode = "orderNo" | "email"
 
 export default function OrderLookupPage() {
+    const router = useRouter()
     const searchParams = useSearchParams()
     const [lookupMode, setLookupMode] = useState<LookupMode>("orderNo")
     const [orderNo, setOrderNo] = useState("")
@@ -196,8 +198,22 @@ export default function OrderLookupPage() {
             }
 
             setResult(data)
+            if (data?.orderNo) {
+                addOrUpdateOrder({
+                    orderNo: data.orderNo,
+                    productName: data.productName ?? "商品",
+                    amount: data.amount ?? 0,
+                    createdAt: typeof data.createdAt === "string" ? data.createdAt : new Date().toISOString(),
+                    status: data.status ?? "PENDING",
+                })
+            }
             setSheetLoading(false)
             setLoadingOrderNo(null)
+            if (data?.successToken && data?.orderNo) {
+                router.replace(
+                    `/orders/${encodeURIComponent(data.orderNo)}/success?token=${encodeURIComponent(data.successToken)}`,
+                )
+            }
         } catch (err) {
             toast.error("网络错误，请稍后重试")
             setSheetOpen(false)
@@ -255,26 +271,7 @@ export default function OrderLookupPage() {
 
     return (
         <div className="flex min-h-screen flex-col">
-            {/* Header */}
-            <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-sm">
-                <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
-                    <Link href="/" className="flex items-center gap-2">
-                        <div className="flex size-8 items-center justify-center rounded-lg bg-primary">
-                            <Zap className="size-4 text-primary-foreground" />
-                        </div>
-                        <span className="text-lg font-bold tracking-tight">Account Mall</span>
-                    </Link>
-                    <nav className="flex items-center gap-2">
-                        <ThemeToggle />
-                        <Button variant="ghost" size="sm" asChild>
-                            <Link href="/orders/lookup">
-                                <Search className="size-4" />
-                                订单查询
-                            </Link>
-                        </Button>
-                    </nav>
-                </div>
-            </header>
+            <SiteHeader />
 
             {/* Main content */}
             <main className="flex-1">

@@ -4,10 +4,12 @@ import { useEffect, useState } from "react"
 import ReactECharts from "echarts-for-react"
 import type { EChartsOption } from "echarts"
 import type { OrderStatusCount } from "@/app/admin/(main)/dashboard/types"
+import { useTheme } from "next-themes"
 import { useEChartsTheme, getEChartsTooltip } from "@/app/components/echarts-theme"
 
 export function DashboardOrderStatusChart({ data }: { data: OrderStatusCount[] }) {
     const [mounted, setMounted] = useState(false)
+    const { resolvedTheme } = useTheme()
     const filtered = data.filter((d) => d.count > 0)
     const colors = useEChartsTheme()
 
@@ -74,6 +76,7 @@ export function DashboardOrderStatusChart({ data }: { data: OrderStatusCount[] }
     return (
         <div className="h-[240px] w-full min-w-0">
             <ReactECharts
+                key={resolvedTheme ?? "light"}
                 option={option}
                 style={{ height: "100%", width: "100%" }}
                 opts={{ renderer: "canvas" }}

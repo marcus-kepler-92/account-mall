@@ -15,6 +15,14 @@ jest.mock("better-auth/crypto", () => ({
   verifyPassword: jest.fn(),
 }))
 
+jest.mock("@/lib/rate-limit", () => ({
+  checkOrderQueryRateLimit: jest.fn().mockResolvedValue(null),
+}))
+
+jest.mock("@/lib/order-success-token", () => ({
+  createOrderSuccessToken: jest.fn().mockReturnValue(null),
+}))
+
 import { verifyPassword } from "better-auth/crypto"
 
 function createJsonRequest(body: unknown): NextRequest {

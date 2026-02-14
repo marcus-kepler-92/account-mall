@@ -70,7 +70,12 @@ export function useEChartsTheme() {
     const [colors, setColors] = useState(getEChartsThemeColors)
 
     useEffect(() => {
-        setColors(getEChartsThemeColors())
+        if (resolvedTheme === undefined) return
+        // 延迟一帧再读 CSS 变量，确保 next-themes 已把新主题应用到 document
+        const id = requestAnimationFrame(() => {
+            setColors(getEChartsThemeColors())
+        })
+        return () => cancelAnimationFrame(id)
     }, [resolvedTheme])
 
     return colors

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -35,10 +36,19 @@ type SortOption = "default" | "price-asc" | "price-desc" | "newest"
 
 const PAGE_SIZE = 18
 
+function parseTagFromUrl(tagParam: string | null): string[] {
+    if (!tagParam || typeof tagParam !== "string") return []
+    return tagParam.split(",").map((s) => s.trim()).filter(Boolean)
+}
+
 export function ProductCatalog() {
+    const router = useRouter()
+    const searchParams = useSearchParams()
+    const tagFromUrl = parseTagFromUrl(searchParams.get("tag"))
+
     const [searchInput, setSearchInput] = useState("")
     const [search, setSearch] = useState("")
-    const [selectedTagSlugs, setSelectedTagSlugs] = useState<string[]>([])
+    const [selectedTagSlugs, setSelectedTagSlugs] = useState<string[]>(() => tagFromUrl)
     const [sort, setSort] = useState<SortOption>("default")
     const [currentPage, setCurrentPage] = useState(1)
     const [categoriesOpen, setCategoriesOpen] = useState(true)
@@ -85,6 +95,13 @@ export function ProductCatalog() {
         }
     }, [search, selectedTagSlugs, sort, currentPage])
 
+    // Sync URL ?tag= to state when navigating (e.g. link to /?tag=xxx)
+    useEffect(() => {
+        if (tagFromUrl.length === 0 && selectedTagSlugs.length === 0) return
+        const same = tagFromUrl.length === selectedTagSlugs.length && tagFromUrl.every((t, i) => t === selectedTagSlugs[i])
+        if (!same) setSelectedTagSlugs(tagFromUrl)
+    }, [searchParams, tagFromUrl, selectedTagSlugs])
+
     useEffect(() => {
         fetchTags()
     }, [fetchTags])
@@ -92,6 +109,23 @@ export function ProductCatalog() {
     useEffect(() => {
         fetchProducts()
     }, [fetchProducts])
+
+    // Update URL when tag selection changes (GET /?tag={slug})
+    const updateTagInUrl = useCallback((slugs: string[]) => {
+        const params = new URLSearchParams(searchParams.toString())
+        if (slugs.length === 0) params.delete("tag")
+        else params.set("tag", slugs.join(","))
+        const q = params.toString()
+        const url = q ? `/?${q}` : "/"
+        router.replace(url, { scroll: false })
+    }, [router, searchParams])
+
+    useEffect(() => {
+        if (selectedTagSlugs.length === 0 && !searchParams.get("tag")) return
+        const current = parseTagFromUrl(searchParams.get("tag"))
+        const same = current.length === selectedTagSlugs.length && current.every((t, i) => t === selectedTagSlugs[i])
+        if (!same) updateTagInUrl(selectedTagSlugs)
+    }, [selectedTagSlugs, searchParams, updateTagInUrl])
 
     // Debounce search input
     useEffect(() => {

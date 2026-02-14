@@ -303,41 +303,17 @@ describe("/api/orders/[orderId] admin detail & status", () => {
     expect(data.status).toBe("CLOSED")
   })
 
-  it("PATCH COMPLETED -> CLOSED closes order without touching cards", async () => {
+  it("PATCH COMPLETED -> CLOSED returns 409 (forbidden transition)", async () => {
     adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
 
-    ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: any) =>
+    ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) =>
       fn(prismaMock),
     )
-
-    prismaMock.order.findUnique
-      .mockResolvedValueOnce({
-        id: "order_1",
-        status: "COMPLETED",
-        cards: [
-          { id: "card_1", status: "SOLD" },
-        ],
-      } as any)
-      .mockResolvedValueOnce({
-        id: "order_1",
-        orderNo: "FAK202402130001",
-        email: "user@example.com",
-        productId: "prod_1",
-        quantity: 2,
-        amount: 100,
-        status: "CLOSED",
-        paidAt: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        product: {
-          id: "prod_1",
-          name: "Test Product",
-          price: 50,
-        },
-        cards: [
-          { status: "SOLD" },
-        ],
-      } as any)
+    prismaMock.order.findUnique.mockResolvedValueOnce({
+      id: "order_1",
+      status: "COMPLETED",
+      cards: [{ id: "card_1", status: "SOLD" }],
+    } as any)
 
     const req = createJsonRequest({ status: "CLOSED" })
     const ctx: RouteContext = { params: { orderId: "order_1" } }
@@ -345,17 +321,10 @@ describe("/api/orders/[orderId] admin detail & status", () => {
     const res = await PATCH(req, ctx as any)
     const data = await res.json()
 
-    expect(prismaMock.order.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: "order_1" },
-        data: { status: "CLOSED" },
-      }),
-    )
-
+    expect(res.status).toBe(409)
+    expect(data.error).toBeDefined()
+    expect(prismaMock.order.update).not.toHaveBeenCalled()
     expect(prismaMock.card.updateMany).not.toHaveBeenCalled()
-
-    expect(res.status).toBe(200)
-    expect(data.status).toBe("CLOSED")
   })
 
   it("DELETE closes pending order and releases reserved cards", async () => {

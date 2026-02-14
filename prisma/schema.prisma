@@ -135,11 +135,13 @@ model Order {
   paidAt       DateTime?
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
+  clientIp     String?     // For rate limit: max PENDING orders per IP
   product      Product     @relation(fields: [productId], references: [id])
   cards        Card[]
 
   @@index([email])
   @@index([status, createdAt])
+  @@index([clientIp, status])
 }
 
 model RestockSubscription {

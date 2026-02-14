@@ -3,11 +3,10 @@ import { notFound, redirect } from "next/navigation"
 import type { Metadata } from "next"
 import { Suspense } from "react"
 import { prisma } from "@/lib/prisma"
-import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Zap } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ProductOrderForm } from "@/app/components/product-order-form"
+import { SiteHeader } from "@/app/components/site-header"
 import { SoldOutOverlay } from "@/app/components/sold-out-overlay"
 import { RestockReminderForm } from "@/app/components/restock-reminder-form"
 import { ProductBottomBar } from "../../components/product-bottom-bar"
@@ -80,22 +79,37 @@ export default async function ProductDetailPage({ params }: PageProps) {
     const isSoldOut = stockCount === 0
     const priceNumber = Number(product.price)
 
+    const baseUrl =
+        process.env.BETTER_AUTH_URL ??
+        (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000")
+    const productUrl = `${baseUrl}/products/${product.id}-${product.slug}`
+    const descriptionPlain = product.description
+        ? String(product.description).replace(/<[^>]+>/g, "").slice(0, 160)
+        : `${product.name} - ¥${priceNumber.toFixed(2)}`
+    const jsonLd = {
+        "@context": "https://schema.org",
+        "@type": "Product",
+        name: product.name,
+        description: descriptionPlain,
+        url: productUrl,
+        ...(productWithImage.image && { image: productWithImage.image }),
+        offers: {
+            "@type": "Offer",
+            price: priceNumber,
+            priceCurrency: "CNY",
+            availability: isSoldOut
+                ? "https://schema.org/OutOfStock"
+                : "https://schema.org/InStock",
+        },
+    }
+
     return (
         <div className="min-h-screen flex flex-col">
-            {/* Header */}
-            <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-sm">
-                <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 2xl:max-w-7xl">
-                    <Link href="/" className="flex items-center gap-2">
-                        <div className="size-8 flex items-center justify-center rounded-lg bg-primary">
-                            <Zap className="size-4 text-primary-foreground" />
-                        </div>
-                        <span className="text-lg font-bold tracking-tight">Account Mall</span>
-                    </Link>
-                    <Button variant="ghost" size="sm" asChild>
-                        <Link href="/">返回首页</Link>
-                    </Button>
-                </div>
-            </header>
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+            />
+            <SiteHeader />
 
             <main className="flex-1 mx-auto w-full max-w-6xl px-4 pb-24 pt-4 2xl:max-w-7xl lg:pb-10 lg:pt-8">
                 <div
@@ -131,6 +145,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
                         <section id="order-section">
                             <ProductOrderForm
                                 productId={product.id}
+                                productName={product.name}
                                 maxQuantity={product.maxQuantity}
                                 price={priceNumber}
                                 inStock={!isSoldOut}
