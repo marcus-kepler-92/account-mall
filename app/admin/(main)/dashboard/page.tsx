@@ -1,7 +1,5 @@
 import Link from "next/link"
-import { prisma } from "@/lib/prisma"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Package, ShoppingCart, CreditCard, DollarSign } from "lucide-react"
 import {
     Table,
     TableBody,
@@ -11,213 +9,234 @@ import {
     TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { DashboardChart } from "@/app/components/dashboard-chart"
+import {
+    DollarSign,
+    ShoppingCart,
+    Percent,
+    TrendingUp,
+    CreditCard,
+    Bell,
+} from "lucide-react"
+import { getDashboardData } from "./dashboard-data"
+import { ORDER_STATUS_LABEL } from "./types"
+import { DashboardTrendSection } from "@/app/components/dashboard-trend-section"
+import { DashboardOrderStatusChart } from "@/app/components/dashboard-order-status-chart"
+import { DashboardTopProductsChart } from "@/app/components/dashboard-top-products-chart"
+import { DashboardInventoryAlerts } from "@/app/components/dashboard-inventory-alerts"
+import { DashboardRestockPending } from "@/app/components/dashboard-restock-pending"
 
 export const dynamic = "force-dynamic"
 
-async function getDashboardData() {
-    const now = new Date()
-    const startOfWeek = new Date(now)
-    startOfWeek.setDate(now.getDate() - 7)
-    startOfWeek.setHours(0, 0, 0, 0)
-    const startOfLastWeek = new Date(startOfWeek)
-    startOfLastWeek.setDate(startOfLastWeek.getDate() - 7)
-
-    const [productCount, orderCount, unsoldCardCount, revenue, revenueLastWeek, recentOrders, chartData] =
-        await Promise.all([
-            prisma.product.count(),
-            prisma.order.count(),
-            prisma.card.count({ where: { status: "UNSOLD" } }),
-            prisma.order.aggregate({
-                where: { status: "COMPLETED" },
-                _sum: { amount: true },
-            }),
-            prisma.order.aggregate({
-                where: {
-                    status: "COMPLETED",
-                    paidAt: { gte: startOfLastWeek, lt: startOfWeek },
-                },
-                _sum: { amount: true },
-            }),
-            prisma.order.findMany({
-                take: 10,
-                orderBy: { createdAt: "desc" },
-                include: {
-                    product: { select: { name: true } },
-                },
-            }),
-            prisma.order.groupBy({
-                by: ["createdAt"],
-                where: {
-                    createdAt: { gte: startOfWeek },
-                    status: "COMPLETED",
-                },
-                _sum: { amount: true },
-                _count: { id: true },
-            }),
-        ])
-
-    const totalRevenue = Number(revenue._sum.amount ?? 0)
-    const lastWeekRevenue = Number(revenueLastWeek._sum.amount ?? 0)
-    const revenueTrend = lastWeekRevenue > 0
-        ? ((totalRevenue - lastWeekRevenue) / lastWeekRevenue) * 100
-        : totalRevenue > 0 ? 100 : 0
-
-    const lastWeekOrders = await prisma.order.count({
-        where: { createdAt: { gte: startOfLastWeek, lt: startOfWeek } },
-    })
-    const thisWeekOrders = await prisma.order.count({
-        where: { createdAt: { gte: startOfWeek } },
-    })
-    const orderTrend = lastWeekOrders > 0
-        ? ((thisWeekOrders - lastWeekOrders) / lastWeekOrders) * 100
-        : thisWeekOrders > 0 ? 100 : 0
-
-    const days = Array.from({ length: 7 }, (_, i) => {
-        const d = new Date(now)
-        d.setDate(d.getDate() - (6 - i))
-        d.setHours(0, 0, 0, 0)
-        return d
-    })
-    const chartByDay = days.map((d) => {
-        const next = new Date(d)
-        next.setDate(next.getDate() + 1)
-        const dayOrders = chartData.filter(
-            (o) => o.createdAt >= d && o.createdAt < next
-        )
-        const dayRevenue = dayOrders.reduce(
-            (s, o) => s + Number(o._sum.amount ?? 0),
-            0
-        )
-        return {
-            date: d.toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" }),
-            订单: dayOrders.length,
-            营收: dayRevenue,
-        }
-    })
-
-    return {
-        productCount,
-        orderCount,
-        unsoldCardCount,
-        totalRevenue,
-        revenueTrend,
-        orderTrend,
-        recentOrders,
-        chartByDay,
-    }
-}
+const sectionGap = "space-y-6 sm:space-y-8"
+const cardGrid = "grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-[repeat(2,minmax(0,1fr))]"
+const kpiGrid =
+    "grid grid-cols-1 gap-4 sm:grid-cols-[repeat(2,minmax(0,1fr))] lg:grid-cols-[repeat(3,minmax(0,1fr))] xl:grid-cols-[repeat(6,minmax(0,1fr))]"
 
 export default async function AdminDashboardPage() {
     const data = await getDashboardData()
+    const { kpis, trend7, trend30, orderStatusDistribution, topProducts, inventory, restockPending, recentOrders } =
+        data
 
-    const stats = [
+    const kpiCards = [
         {
-            title: "商品",
-            value: String(data.productCount),
-            description: "商品总数",
-            href: "/admin/products",
-            icon: Package,
-        },
-        {
-            title: "订单",
-            value: String(data.orderCount),
-            description: "订单总数",
-            href: "/admin/orders",
-            icon: ShoppingCart,
-        },
-        {
-            title: "卡密",
-            value: String(data.unsoldCardCount),
-            description: "卡密库存",
-            href: "/admin/cards",
-            icon: CreditCard,
-        },
-        {
-            title: "营收",
-            value: `¥${data.totalRevenue.toFixed(2)}`,
+            title: "总营收",
+            value: `¥${kpis.totalRevenue.toFixed(2)}`,
             description: "已完成订单总金额",
             href: "/admin/orders",
             icon: DollarSign,
-            trend: data.revenueTrend,
+            trend: kpis.revenueTrend,
+            ariaLabel: `总营收 ${kpis.totalRevenue.toFixed(2)} 元，较上周 ${kpis.revenueTrend >= 0 ? "增" : "降"} ${Math.abs(kpis.revenueTrend).toFixed(0)}%，查看订单`,
+        },
+        {
+            title: "订单数",
+            value: String(kpis.orderCount),
+            description: "订单总数",
+            href: "/admin/orders",
+            icon: ShoppingCart,
+            trend: kpis.orderTrend,
+            ariaLabel: `订单数 ${kpis.orderCount}，较上周 ${kpis.orderTrend >= 0 ? "增" : "降"} ${Math.abs(kpis.orderTrend).toFixed(0)}%，查看订单`,
+        },
+        {
+            title: "完成率",
+            value: `${kpis.completionRate.toFixed(1)}%`,
+            description: "已完成 / 总订单",
+            href: "/admin/orders",
+            icon: Percent,
+            ariaLabel: `完成率 ${kpis.completionRate.toFixed(1)}%，查看订单`,
+        },
+        {
+            title: "客单价",
+            value: kpis.completedCount > 0 ? `¥${kpis.aov.toFixed(2)}` : "—",
+            description: "平均订单金额",
+            href: "/admin/orders",
+            icon: TrendingUp,
+            ariaLabel: `客单价 ${kpis.aov.toFixed(2)} 元，查看订单`,
+        },
+        {
+            title: "卡密库存",
+            value: String(kpis.unsoldCardCount),
+            description: "未售出卡密总数",
+            href: "/admin/cards",
+            icon: CreditCard,
+            ariaLabel: `卡密库存 ${kpis.unsoldCardCount}，管理卡密`,
+        },
+        {
+            title: "待补货需求",
+            value: String(kpis.restockPendingCount),
+            description: "待通知到货提醒人数",
+            href: "/admin/products",
+            icon: Bell,
+            ariaLabel: `待补货需求 ${kpis.restockPendingCount} 人，查看商品`,
         },
     ]
 
     return (
-        <div className="space-y-8">
-            <div>
-                <h2 className="text-2xl font-bold tracking-tight">概览</h2>
-                <p className="text-muted-foreground">
+        <div className={sectionGap}>
+            <header>
+                <h2 className="text-xl font-bold tracking-tight sm:text-2xl">概览</h2>
+                <p className="mt-1 text-sm text-muted-foreground sm:text-base">
                     欢迎使用 Account Mall 管理后台
                 </p>
-            </div>
+            </header>
 
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                {stats.map((stat) => (
-                    <Link key={stat.title} href={stat.href}>
-                        <Card className="hover:bg-accent/50 transition-colors cursor-pointer">
-                            <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                <CardDescription>{stat.description}</CardDescription>
-                                <stat.icon className="size-4 text-muted-foreground" />
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-3xl font-bold">{stat.value}</div>
-                                <div className="mt-1 flex items-center gap-2">
-                                    <p className="text-sm text-muted-foreground">
-                                        管理{stat.title} →
-                                    </p>
-                                    {"trend" in stat && typeof stat.trend === "number" && stat.trend !== 0 && (
-                                        <span
-                                            className={`text-xs ${
-                                                stat.trend > 0 ? "text-green-600" : "text-red-600"
-                                            }`}
-                                        >
-                                            {stat.trend > 0 ? "↑" : "↓"} {Math.abs(stat.trend).toFixed(0)}%
+            <section className="min-w-0" aria-label="核心指标">
+                <div className={kpiGrid}>
+                    {kpiCards.map((stat) => (
+                        <Link
+                            key={stat.title}
+                            href={stat.href}
+                            aria-label={stat.ariaLabel}
+                            className="block h-full min-w-0"
+                        >
+                            <Card className="flex h-full min-w-0 flex-col transition-colors hover:bg-accent/50 cursor-pointer">
+                                <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                                    <CardDescription className="min-w-0 truncate">
+                                        {stat.description}
+                                    </CardDescription>
+                                    <stat.icon className="size-4 shrink-0 text-muted-foreground" />
+                                </CardHeader>
+                                <CardContent className="flex min-w-0 flex-1 flex-col justify-end">
+                                    <div
+                                        className="truncate text-lg font-bold sm:text-xl xl:text-2xl"
+                                        title={stat.value}
+                                    >
+                                        {stat.value}
+                                    </div>
+                                    <div className="mt-1 flex items-center gap-2">
+                                        <span className="text-xs text-muted-foreground sm:text-sm">
+                                            查看 →
                                         </span>
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </Link>
-                ))}
-            </div>
+                                        {"trend" in stat &&
+                                            typeof stat.trend === "number" &&
+                                            stat.trend !== 0 && (
+                                                <span
+                                                    className={
+                                                        stat.trend > 0
+                                                            ? "text-xs text-green-600"
+                                                            : "text-xs text-red-600"
+                                                    }
+                                                >
+                                                    {stat.trend > 0 ? "↑" : "↓"}{" "}
+                                                    {Math.abs(stat.trend).toFixed(0)}%
+                                                </span>
+                                            )}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </Link>
+                    ))}
+                </div>
+            </section>
 
-            <div className="grid gap-6 lg:grid-cols-2">
-                <Card>
+            <section className={`min-w-0 ${cardGrid}`} aria-label="趋势与分布">
+                <Card className="min-w-0">
                     <CardHeader>
-                        <CardTitle>近 7 日趋势</CardTitle>
+                        <CardTitle className="text-base sm:text-lg">近 7 / 30 日趋势</CardTitle>
                         <CardDescription>订单数与营收</CardDescription>
                     </CardHeader>
-                    <CardContent>
-                        <DashboardChart data={data.chartByDay} />
+                    <CardContent className="min-w-0">
+                        <DashboardTrendSection trend7={trend7} trend30={trend30} />
                     </CardContent>
                 </Card>
-
-                <Card>
+                <Card className="min-w-0">
                     <CardHeader>
-                        <CardTitle>最近订单</CardTitle>
-                        <CardDescription>最新的 10 笔订单</CardDescription>
+                        <CardTitle className="text-base sm:text-lg">订单状态分布</CardTitle>
+                        <CardDescription>已完成 / 待支付 / 已关闭</CardDescription>
                     </CardHeader>
-                    <CardContent>
-                        {data.recentOrders.length > 0 ? (
-                            <div className="rounded-md border">
+                    <CardContent className="min-w-0">
+                        <DashboardOrderStatusChart data={orderStatusDistribution} />
+                    </CardContent>
+                </Card>
+            </section>
+
+            <section className={`min-w-0 ${cardGrid}`} aria-label="商品与库存">
+                <Card className="min-w-0">
+                    <CardHeader>
+                        <CardTitle className="text-base sm:text-lg">商品表现 Top 8</CardTitle>
+                        <CardDescription>按营收排序</CardDescription>
+                    </CardHeader>
+                    <CardContent className="min-w-0">
+                        <DashboardTopProductsChart data={topProducts} />
+                    </CardContent>
+                </Card>
+                <Card className="min-w-0">
+                    <CardHeader>
+                        <CardTitle className="text-base sm:text-lg">库存预警</CardTitle>
+                        <CardDescription>各商品未售出卡密数量</CardDescription>
+                    </CardHeader>
+                    <CardContent className="min-w-0">
+                        <DashboardInventoryAlerts data={inventory} />
+                    </CardContent>
+                </Card>
+            </section>
+
+            <section className={`min-w-0 ${cardGrid}`} aria-label="订单与补货">
+                <Card className="min-w-0">
+                    <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                            <CardTitle className="text-base sm:text-lg">最近订单</CardTitle>
+                            <CardDescription>最新 10 笔订单</CardDescription>
+                        </div>
+                        <Link
+                            href="/admin/orders"
+                            className="shrink-0 text-sm text-muted-foreground hover:underline"
+                        >
+                            查看全部
+                        </Link>
+                    </CardHeader>
+                    <CardContent className="min-w-0">
+                        {recentOrders.length > 0 ? (
+                            <div className="overflow-x-auto rounded-md border">
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead>订单号</TableHead>
                                             <TableHead>商品</TableHead>
                                             <TableHead>金额</TableHead>
+                                            <TableHead className="hidden sm:table-cell">下单时间</TableHead>
                                             <TableHead>状态</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {data.recentOrders.map((order) => (
+                                        {recentOrders.map((order) => (
                                             <TableRow key={order.id}>
-                                                <TableCell className="font-mono text-sm">
+                                                <TableCell className="font-mono text-xs sm:text-sm">
                                                     {order.orderNo}
                                                 </TableCell>
-                                                <TableCell>{order.product.name}</TableCell>
-                                                <TableCell>¥{Number(order.amount).toFixed(2)}</TableCell>
+                                                <TableCell className="max-w-[120px] truncate sm:max-w-none">
+                                                    {order.product.name}
+                                                </TableCell>
+                                                <TableCell className="whitespace-nowrap">
+                                                    ¥{Number(order.amount).toFixed(2)}
+                                                </TableCell>
+                                                <TableCell className="hidden text-muted-foreground text-sm sm:table-cell">
+                                                    {order.createdAt.toLocaleString("zh-CN", {
+                                                        month: "numeric",
+                                                        day: "numeric",
+                                                        hour: "2-digit",
+                                                        minute: "2-digit",
+                                                    })}
+                                                </TableCell>
                                                 <TableCell>
                                                     <Badge
                                                         variant={
@@ -228,11 +247,7 @@ export default async function AdminDashboardPage() {
                                                                   : "outline"
                                                         }
                                                     >
-                                                        {order.status === "COMPLETED"
-                                                            ? "已完成"
-                                                            : order.status === "PENDING"
-                                                              ? "待支付"
-                                                              : "已关闭"}
+                                                        {ORDER_STATUS_LABEL[order.status]}
                                                     </Badge>
                                                 </TableCell>
                                             </TableRow>
@@ -247,7 +262,16 @@ export default async function AdminDashboardPage() {
                         )}
                     </CardContent>
                 </Card>
-            </div>
+                <Card className="min-w-0">
+                    <CardHeader>
+                        <CardTitle className="text-base sm:text-lg">待通知到货提醒</CardTitle>
+                        <CardDescription>缺货商品的订阅人数</CardDescription>
+                    </CardHeader>
+                    <CardContent className="min-w-0">
+                        <DashboardRestockPending data={restockPending} />
+                    </CardContent>
+                </Card>
+            </section>
         </div>
     )
 }
