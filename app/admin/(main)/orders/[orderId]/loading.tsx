@@ -21,7 +21,7 @@ export default function OrderDetailLoading() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
-                        {Array.from({ length: 6 }).map((i) => (
+                        {Array.from({ length: 6 }).map((_, i) => (
                             <div key={i} className="space-y-1">
                                 <Skeleton className="h-3 w-16" />
                                 <Skeleton className="h-5 w-32" />

@@ -1,9 +1,8 @@
-import Link from "next/link"
 import { notFound } from "next/navigation"
 import { prisma } from "@/lib/prisma"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { ArrowLeft, CreditCard, Package } from "lucide-react"
+import { CreditCard, Package } from "lucide-react"
+import { BackButton } from "@/app/components/back-button"
 import { CardsList } from "@/app/components/cards-list"
 import { BulkImportCards } from "@/app/components/bulk-import-cards"
 
@@ -61,11 +60,7 @@ export default async function AdminProductCardsPage({ params, searchParams }: Pa
             {/* Page header */}
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-4">
-                    <Button variant="ghost" size="icon" asChild>
-                        <Link href={`/admin/products/${product.id}`}>
-                            <ArrowLeft className="size-4" />
-                        </Link>
-                    </Button>
+                    <BackButton />
                     <div>
                         <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
                             <Package className="size-6" />

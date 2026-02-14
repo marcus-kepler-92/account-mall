@@ -12,12 +12,15 @@ import {
 } from "@/components/ui/breadcrumb"
 
 const routeLabels: Record<string, string> = {
-    admin: "管理后台",
     dashboard: "仪表盘",
     products: "商品管理",
-    new: "新建",
+    new: "新建商品",
     orders: "订单管理",
     cards: "卡密管理",
+}
+
+function isIdSegment(seg: string) {
+    return seg.length >= 20 && /^[a-z0-9]+$/i.test(seg)
 }
 
 function getBreadcrumbItems(pathname: string) {
@@ -27,18 +30,24 @@ function getBreadcrumbItems(pathname: string) {
 
     for (let i = 0; i < segments.length; i++) {
         const seg = segments[i]
+        const prev = segments[i - 1]
         href += `/${seg}`
 
-        // Skip "admin" - we show "管理后台" as first item or skip
-        if (seg === "admin") {
-            continue
-        }
+        if (seg === "admin") continue
 
         let label: string
         if (seg in routeLabels) {
             label = routeLabels[seg]
-        } else if (segments[i - 1] === "products" && seg !== "products") {
-            label = "编辑"
+        } else if (prev === "products") {
+            if (seg === "cards") {
+                label = "卡密"
+            } else if (isIdSegment(seg)) {
+                label = "商品详情"
+            } else {
+                label = seg
+            }
+        } else if (prev === "orders" && isIdSegment(seg)) {
+            label = "订单详情"
         } else {
             label = seg
         }
@@ -65,7 +74,7 @@ export function AdminBreadcrumb() {
                     </BreadcrumbLink>
                 </BreadcrumbItem>
                 {items.map((item, idx) => (
-                    <span key={idx} className="flex items-center gap-1.5">
+                    <span key={`${item.href ?? "current"}-${idx}`} className="flex items-center gap-1.5">
                         <BreadcrumbSeparator />
                         <BreadcrumbItem>
                             {item.href ? (
