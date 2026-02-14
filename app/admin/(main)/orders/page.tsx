@@ -1,6 +1,14 @@
 import { prisma } from "@/lib/prisma"
 import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card"
-import { ShoppingCart } from "lucide-react"
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table"
+import { ShoppingCart, ChevronLeft, ChevronRight, Clock, CheckCircle2, XCircle, DollarSign } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
@@ -76,7 +84,7 @@ export default async function AdminOrdersPage({
         where.createdAt = createdAt
     }
 
-    const [orders, total] = await Promise.all([
+    const [orders, total, statusCounts, revenueAgg] = await Promise.all([
         prisma.order.findMany({
             where,
             include: {
@@ -98,7 +106,22 @@ export default async function AdminOrdersPage({
             take: pageSize,
         }),
         prisma.order.count({ where }),
+        prisma.order.groupBy({
+            by: ["status"],
+            _count: { id: true },
+        }),
+        prisma.order.aggregate({
+            where: { status: "COMPLETED" },
+            _sum: { amount: true },
+        }),
     ])
+
+    const orderStats = {
+        PENDING: statusCounts.find((c) => c.status === "PENDING")?._count.id ?? 0,
+        COMPLETED: statusCounts.find((c) => c.status === "COMPLETED")?._count.id ?? 0,
+        CLOSED: statusCounts.find((c) => c.status === "CLOSED")?._count.id ?? 0,
+    }
+    const totalRevenue = Number(revenueAgg._sum.amount ?? 0)
 
     const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
@@ -157,11 +180,61 @@ export default async function AdminOrdersPage({
         return `/admin/orders${query ? `?${query}` : ""}`
     }
 
-    const getStatusBadgeVariant = (status: string) => {
-        if (status === "COMPLETED") return "default" as const
-        if (status === "PENDING") return "secondary" as const
-        return "outline" as const
+    const buildStatusLink = (status: string) => {
+        const paramsEntries = new URLSearchParams()
+        if (status !== "ALL") {
+            paramsEntries.set("status", status)
+        }
+        const query = paramsEntries.toString()
+        return `/admin/orders${query ? `?${query}` : ""}`
     }
+
+    const hasFilters =
+        filters.status !== "ALL" ||
+        filters.email ||
+        filters.orderNo ||
+        filters.dateFrom ||
+        filters.dateTo
+
+    const statCards = [
+        {
+            key: "PENDING",
+            label: "待完成",
+            value: String(orderStats.PENDING),
+            icon: Clock,
+            color: "text-warning",
+            borderColor: "border-l-warning",
+            active: filters.status === "PENDING",
+        },
+        {
+            key: "COMPLETED",
+            label: "已完成",
+            value: String(orderStats.COMPLETED),
+            icon: CheckCircle2,
+            color: "text-success",
+            borderColor: "border-l-success",
+            active: filters.status === "COMPLETED",
+        },
+        {
+            key: "CLOSED",
+            label: "已关闭",
+            value: String(orderStats.CLOSED),
+            icon: XCircle,
+            color: "text-muted-foreground",
+            borderColor: "border-l-muted-foreground",
+            active: filters.status === "CLOSED",
+        },
+        {
+            key: "REVENUE",
+            label: "总营收",
+            value: `¥${totalRevenue.toFixed(2)}`,
+            icon: DollarSign,
+            color: "text-primary",
+            borderColor: "border-l-primary",
+            active: false,
+            noLink: true,
+        },
+    ]
 
     return (
         <div className="space-y-6">
@@ -173,9 +246,31 @@ export default async function AdminOrdersPage({
                         查看和管理客户订单
                     </p>
                 </div>
-                <div className="text-sm text-muted-foreground">
-                    共 <span className="font-medium">{total}</span> 笔订单
-                </div>
+            </div>
+
+            {/* Stats cards */}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {statCards.map((stat) => {
+                    const cardEl = (
+                        <Card className={`border-l-4 ${stat.borderColor} transition-colors ${!("noLink" in stat && stat.noLink) ? "hover:bg-accent/50 cursor-pointer" : ""} ${stat.active ? "ring-2 ring-primary/20 bg-accent/30" : ""}`}>
+                            <CardContent className="pt-4 pb-4">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm font-medium text-muted-foreground">{stat.label}</p>
+                                        <p className="text-2xl font-bold mt-1">{stat.value}</p>
+                                    </div>
+                                    <stat.icon className={`size-8 ${stat.color} opacity-80`} />
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )
+                    if ("noLink" in stat && stat.noLink) return <div key={stat.key}>{cardEl}</div>
+                    return (
+                        <Link key={stat.key} href={buildStatusLink(stat.active ? "ALL" : stat.key)}>
+                            {cardEl}
+                        </Link>
+                    )
+                })}
             </div>
 
             {/* Search & Filter bar */}
@@ -183,127 +278,187 @@ export default async function AdminOrdersPage({
 
             {/* Orders table */}
             {serializedOrders.length > 0 ? (
-                <div className="space-y-4">
-                    <div className="overflow-x-auto rounded-md border bg-card">
-                        <table className="min-w-full text-sm">
-                            <thead className="border-b bg-muted/50 text-xs text-muted-foreground">
-                                <tr>
-                                    <th className="px-4 py-2 text-left font-medium">订单号</th>
-                                    <th className="px-4 py-2 text-left font-medium">邮箱</th>
-                                    <th className="px-4 py-2 text-left font-medium">商品</th>
-                                    <th className="px-4 py-2 text-right font-medium">数量</th>
-                                    <th className="px-4 py-2 text-right font-medium">金额</th>
-                                    <th className="px-4 py-2 text-center font-medium">状态</th>
-                                    <th className="px-4 py-2 text-center font-medium">卡密</th>
-                                    <th className="px-4 py-2 text-right font-medium">创建时间</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {serializedOrders.map((order) => (
-                                    <tr
-                                        key={order.id}
-                                        className="border-b last:border-0 hover:bg-muted/40"
-                                    >
-                                        <td className="px-4 py-2 align-middle">
-                                            <span className="font-mono text-xs">
-                                                {order.orderNo}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-2 align-middle">
-                                            <span className="text-xs text-muted-foreground">
-                                                {order.email}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-2 align-middle">
-                                            <div className="flex flex-col">
-                                                <span className="font-medium">
-                                                    {order.product.name}
-                                                </span>
-                                                <span className="text-xs text-muted-foreground">
-                                                    ¥{order.product.price.toFixed(2)}
-                                                </span>
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-2 text-right align-middle">
-                                            {order.quantity}
-                                        </td>
-                                        <td className="px-4 py-2 text-right align-middle">
-                                            ¥{order.amount.toFixed(2)}
-                                        </td>
-                                        <td className="px-4 py-2 text-center align-middle">
-                                            <Badge variant={getStatusBadgeVariant(order.status)}>
-                                                {order.status === "PENDING"
-                                                    ? "待完成"
-                                                    : order.status === "COMPLETED"
-                                                        ? "已完成"
-                                                        : "已关闭"}
-                                            </Badge>
-                                        </td>
-                                        <td className="px-4 py-2 text-center align-middle">
-                                            <span className="text-xs text-muted-foreground">
-                                                {order.soldCardsCount}/{order.cardsCount} 已售
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-2 text-right align-middle">
-                                            <div className="flex flex-col items-end">
-                                                <span className="text-xs">
-                                                    {order.createdAt.toLocaleString("zh-CN")}
-                                                </span>
-                                                {order.paidAt && (
-                                                    <span className="text-[11px] text-muted-foreground">
-                                                        支付于 {order.paidAt.toLocaleString("zh-CN")}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                <Card>
+                    {/* Table toolbar */}
+                    <div className="flex items-center justify-between px-4 py-3 border-b">
+                        <p className="text-sm text-muted-foreground">
+                            {hasFilters ? "筛选结果：" : ""}共 <span className="font-medium text-foreground">{total}</span> 笔订单
+                        </p>
                     </div>
 
+                    {/* Table */}
+                    <Table>
+                        <TableHeader>
+                            <TableRow className="bg-muted/50">
+                                <TableHead className="pl-4">订单号</TableHead>
+                                <TableHead>邮箱</TableHead>
+                                <TableHead>商品</TableHead>
+                                <TableHead className="text-right">数量</TableHead>
+                                <TableHead className="text-right">金额</TableHead>
+                                <TableHead className="text-center">状态</TableHead>
+                                <TableHead className="text-center">卡密</TableHead>
+                                <TableHead className="text-right pr-4">创建时间</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {serializedOrders.map((order) => (
+                                <TableRow key={order.id}>
+                                    <TableCell className="pl-4">
+                                        <span className="font-mono text-xs">
+                                            {order.orderNo}
+                                        </span>
+                                    </TableCell>
+                                    <TableCell>
+                                        <span className="text-sm text-muted-foreground">
+                                            {order.email}
+                                        </span>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex flex-col">
+                                            <span className="font-medium">
+                                                {order.product.name}
+                                            </span>
+                                            <span className="text-xs text-muted-foreground">
+                                                ¥{order.product.price.toFixed(2)}
+                                            </span>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        {order.quantity}
+                                    </TableCell>
+                                    <TableCell className="text-right font-medium">
+                                        ¥{order.amount.toFixed(2)}
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                        <Badge
+                                            variant="outline"
+                                            className={
+                                                order.status === "COMPLETED"
+                                                    ? "border-success/50 bg-success/10 text-success"
+                                                    : order.status === "PENDING"
+                                                        ? "border-warning/50 bg-warning/10 text-warning"
+                                                        : "border-muted-foreground/30 bg-muted text-muted-foreground"
+                                            }
+                                        >
+                                            {order.status === "PENDING"
+                                                ? "待完成"
+                                                : order.status === "COMPLETED"
+                                                    ? "已完成"
+                                                    : "已关闭"}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                        <span className="text-xs text-muted-foreground">
+                                            {order.soldCardsCount}/{order.cardsCount} 已售
+                                        </span>
+                                    </TableCell>
+                                    <TableCell className="text-right pr-4">
+                                        <div className="flex flex-col items-end">
+                                            <span className="text-xs">
+                                                {order.createdAt.toLocaleString("zh-CN")}
+                                            </span>
+                                            {order.paidAt && (
+                                                <span className="text-[11px] text-muted-foreground">
+                                                    支付于 {order.paidAt.toLocaleString("zh-CN")}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+
                     {/* Pagination */}
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <div>
-                            第 <span className="font-medium">{page}</span> /
-                            <span className="font-medium">{totalPages}</span> 页，
-                            每页 <span className="font-medium">{pageSize}</span> 条
-                        </div>
-                        <div className="flex items-center gap-2">
-                            {page <= 1 ? (
-                                <Button variant="outline" size="sm" disabled>
-                                    上一页
-                                </Button>
-                            ) : (
-                                <Button asChild variant="outline" size="sm">
-                                    <Link href={buildPageLink(page - 1)}>上一页</Link>
-                                </Button>
-                            )}
-                            {page >= totalPages ? (
-                                <Button variant="outline" size="sm" disabled>
-                                    下一页
-                                </Button>
-                            ) : (
-                                <Button asChild variant="outline" size="sm">
-                                    <Link href={buildPageLink(page + 1)}>下一页</Link>
-                                </Button>
-                            )}
+                    <div className="flex items-center justify-between px-4 py-3 border-t">
+                        <p className="text-sm text-muted-foreground">
+                            第 <span className="font-medium">{page}</span> / {totalPages} 页
+                        </p>
+                        <div className="flex items-center gap-1">
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className="size-8"
+                                disabled={page <= 1}
+                                asChild={page > 1}
+                            >
+                                {page > 1 ? (
+                                    <Link href={buildPageLink(page - 1)}>
+                                        <ChevronLeft className="size-4" />
+                                    </Link>
+                                ) : (
+                                    <span><ChevronLeft className="size-4" /></span>
+                                )}
+                            </Button>
+                            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                let pageNum: number
+                                if (totalPages <= 5) {
+                                    pageNum = i + 1
+                                } else if (page <= 3) {
+                                    pageNum = i + 1
+                                } else if (page >= totalPages - 2) {
+                                    pageNum = totalPages - 4 + i
+                                } else {
+                                    pageNum = page - 2 + i
+                                }
+                                return (
+                                    <Button
+                                        key={pageNum}
+                                        variant={pageNum === page ? "default" : "outline"}
+                                        size="icon"
+                                        className="size-8"
+                                        asChild={pageNum !== page}
+                                    >
+                                        {pageNum === page ? (
+                                            <span>{pageNum}</span>
+                                        ) : (
+                                            <Link href={buildPageLink(pageNum)}>{pageNum}</Link>
+                                        )}
+                                    </Button>
+                                )
+                            })}
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className="size-8"
+                                disabled={page >= totalPages}
+                                asChild={page < totalPages}
+                            >
+                                {page < totalPages ? (
+                                    <Link href={buildPageLink(page + 1)}>
+                                        <ChevronRight className="size-4" />
+                                    </Link>
+                                ) : (
+                                    <span><ChevronRight className="size-4" /></span>
+                                )}
+                            </Button>
                         </div>
                     </div>
-                </div>
+                </Card>
             ) : (
                 <Card>
                     <CardContent className="flex flex-col items-center justify-center py-16">
                         <div className="rounded-full bg-muted p-4 mb-4">
                             <ShoppingCart className="size-8 text-muted-foreground" />
                         </div>
-                        <CardTitle className="mb-2">暂无订单</CardTitle>
+                        <CardTitle className="mb-2">
+                            {hasFilters ? "当前筛选无结果" : "暂无订单"}
+                        </CardTitle>
                         <CardDescription className="mb-4 text-center max-w-sm">
-                            客户购买后订单将显示在这里，你可以通过筛选快速定位指定订单。
+                            {hasFilters
+                                ? "当前筛选条件下没有订单，请调整筛选条件后重试。"
+                                : "客户购买后订单将显示在这里，你可以通过筛选快速定位指定订单。"}
                         </CardDescription>
-                        <CardDescription className="text-xs text-muted-foreground">
-                            可以先在前台完成一次测试下单，刷新此页面查看效果。
-                        </CardDescription>
+                        {hasFilters && (
+                            <Button asChild variant="outline">
+                                <Link href="/admin/orders">重置筛选</Link>
+                            </Button>
+                        )}
+                        {!hasFilters && (
+                            <CardDescription className="text-xs text-muted-foreground">
+                                可以先在前台完成一次测试下单，刷新此页面查看效果。
+                            </CardDescription>
+                        )}
                     </CardContent>
                 </Card>
             )}

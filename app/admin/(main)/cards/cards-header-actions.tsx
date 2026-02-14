@@ -26,12 +26,20 @@ type ProductOption = {
     slug: string
 }
 
+type DialogMode = "add" | "import"
+
 export function CardsHeaderActions() {
     const router = useRouter()
     const [open, setOpen] = useState(false)
+    const [mode, setMode] = useState<DialogMode>("add")
     const [products, setProducts] = useState<ProductOption[]>([])
     const [selectedProductId, setSelectedProductId] = useState<string | undefined>()
     const [loading, setLoading] = useState(false)
+
+    const openDialog = (m: DialogMode) => {
+        setMode(m)
+        setOpen(true)
+    }
 
     useEffect(() => {
         if (!open) return
@@ -76,17 +84,21 @@ export function CardsHeaderActions() {
     const handleConfirm = () => {
         if (!selectedProductId) return
         setOpen(false)
-        router.push(`/admin/products/${selectedProductId}/cards`)
+        const action = mode === "add" ? "add" : "import"
+        router.push(`/admin/products/${selectedProductId}/cards?action=${action}`)
     }
+
+    const title = mode === "add" ? "添加卡密 - 选择商品" : "批量导入 - 选择商品"
+    const confirmLabel = mode === "add" ? "前往添加卡密" : "前往批量导入"
 
     return (
         <>
             <div className="flex items-center gap-2">
-                <Button variant="outline" onClick={() => setOpen(true)}>
+                <Button variant="outline" onClick={() => openDialog("import")}>
                     <Upload className="size-4" />
                     批量导入
                 </Button>
-                <Button onClick={() => setOpen(true)}>
+                <Button onClick={() => openDialog("add")}>
                     <Plus className="size-4" />
                     添加卡密
                 </Button>
@@ -95,7 +107,7 @@ export function CardsHeaderActions() {
             <Dialog open={open} onOpenChange={setOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>选择商品</DialogTitle>
+                        <DialogTitle>{title}</DialogTitle>
                         <DialogDescription>
                             请选择要管理卡密的商品，系统会跳转到该商品的卡密管理页面，在那里可以新增、删除或批量导入卡密。
                         </DialogDescription>
@@ -135,7 +147,7 @@ export function CardsHeaderActions() {
                             disabled={!selectedProductId || loading || products.length === 0}
                         >
                             {loading && <Loader2 className="size-4 animate-spin" />}
-                            前往管理卡密
+                            {confirmLabel}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
