@@ -56,54 +56,22 @@ export async function POST(request: NextRequest) {
                 throw new Error("LOOKUP_FAILED")
             }
 
-            // If order is still pending, completing it is idempotent-safe.
-            if (existing.status === "PENDING") {
-                await tx.order.update({
-                    where: { id: existing.id },
-                    data: {
-                        status: "COMPLETED",
-                        paidAt: new Date(),
-                    },
-                })
-
-                await tx.card.updateMany({
-                    where: {
-                        orderId: existing.id,
-                        status: "RESERVED",
-                    },
-                    data: {
-                        status: "SOLD",
-                    },
-                })
-
-                const updated = await tx.order.findUnique({
-                    where: { id: existing.id },
-                    include: {
-                        product: {
-                            select: {
-                                name: true,
-                            },
-                        },
-                        cards: {
-                            select: {
-                                id: true,
-                                content: true,
-                                status: true,
-                            },
-                        },
-                    },
-                })
-
-                if (!updated) {
-                    throw new Error("LOOKUP_FAILED")
-                }
-
-                return updated
-            }
-
             return existing
         })
 
+        // For PENDING orders, return order info without cards
+        if (order.status === "PENDING") {
+            return NextResponse.json({
+                orderNo: order.orderNo,
+                productName: order.product.name,
+                createdAt: order.createdAt,
+                status: order.status,
+                cards: [],
+                isPending: true,
+            })
+        }
+
+        // For COMPLETED/CLOSED orders, return cards
         const cards = order.cards
             // Only return cards that belong to this order and are in SOLD or RESERVED status.
             // TODO: Consider encrypting card content at rest and decrypting only when needed.

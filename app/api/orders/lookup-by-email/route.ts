@@ -6,7 +6,7 @@ import { verifyPassword } from "better-auth/crypto"
 /**
  * POST /api/orders/lookup-by-email
  * Public: users can query order details and cards by email + password.
- * Returns the most recent order matching the email and password.
+ * Returns a list of matching orders if multiple exist, or a single order with cards if only one matches.
  *
  * TODO: Add IP/email level rate limiting and basic WAF to prevent brute-force attacks.
  * TODO: Add structured logging for lookup attempts without logging raw passwords or card content.
@@ -33,9 +33,12 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-        const order = await prisma.$transaction(async (tx) => {
-            // Find the most recent order matching the email
-            const existing = await tx.order.findFirst({
+        // Maximum orders to check for password match (performance limit)
+        const MAX_ORDERS_TO_CHECK = 20
+
+        const result = await prisma.$transaction(async (tx) => {
+            // Find all orders matching the email (limit to recent ones for performance)
+            const allOrders = await tx.order.findMany({
                 where: {
                     email: email.trim().toLowerCase(),
                 },
@@ -46,6 +49,8 @@ export async function POST(request: NextRequest) {
                     passwordHash: true,
                     status: true,
                     createdAt: true,
+                    quantity: true,
+                    amount: true,
                     product: {
                         select: {
                             name: true,
@@ -62,128 +67,115 @@ export async function POST(request: NextRequest) {
                 orderBy: {
                     createdAt: "desc",
                 },
+                take: MAX_ORDERS_TO_CHECK,
             })
 
-            if (!existing) {
+            if (allOrders.length === 0) {
                 throw new Error("LOOKUP_FAILED")
             }
 
             // Debug logging in development
             if (process.env.NODE_ENV === "development") {
-                console.log("[lookup-by-email] Found order:", {
-                    id: existing.id,
-                    orderNo: existing.orderNo,
-                    email: existing.email,
-                    hasPasswordHash: !!existing.passwordHash,
-                    passwordHashType: typeof existing.passwordHash,
+                console.log("[lookup-by-email] Found orders:", {
+                    count: allOrders.length,
+                    email: email.trim().toLowerCase(),
                 })
             }
 
-            if (!existing.passwordHash || typeof existing.passwordHash !== "string") {
-                if (process.env.NODE_ENV === "development") {
-                    console.error("[lookup-by-email] passwordHash is missing or invalid:", existing.passwordHash)
+            // Verify password for each order and collect matching ones
+            const matchingOrders = []
+            for (const order of allOrders) {
+                if (!order.passwordHash || typeof order.passwordHash !== "string") {
+                    if (process.env.NODE_ENV === "development") {
+                        console.warn("[lookup-by-email] Skipping order with invalid passwordHash:", order.orderNo)
+                    }
+                    continue
                 }
+
+                try {
+                    const passwordOk = await verifyPassword({
+                        hash: order.passwordHash,
+                        password: password.trim(),
+                    })
+                    if (passwordOk) {
+                        matchingOrders.push(order)
+                    }
+                } catch (err) {
+                    if (process.env.NODE_ENV === "development") {
+                        console.error("[lookup-by-email] Password verification error for order:", order.orderNo, err)
+                    }
+                }
+            }
+
+            if (matchingOrders.length === 0) {
                 throw new Error("LOOKUP_FAILED")
             }
 
-            // Debug logging in development
-            if (process.env.NODE_ENV === "development") {
-                console.log("[lookup-by-email] Verifying password:", {
-                    hasPassword: !!password,
-                    passwordType: typeof password,
-                    passwordLength: password?.length,
-                    hasPasswordHash: !!existing.passwordHash,
-                    passwordHashLength: existing.passwordHash?.length,
-                })
-            }
+            // If only one order matches, return full details
+            if (matchingOrders.length === 1) {
+                const order = matchingOrders[0]
 
-            if (!password || typeof password !== "string") {
-                if (process.env.NODE_ENV === "development") {
-                    console.error("[lookup-by-email] password is missing or invalid:", password)
+                return {
+                    type: "single" as const,
+                    data: order,
                 }
-                throw new Error("LOOKUP_FAILED")
-            }
-            // verifyPassword signature: verifyPassword({ hash, password })
-            // better-auth uses scrypt format: salt:hash (hex strings separated by colon)
-            const passwordOk = await verifyPassword({ hash: existing.passwordHash, password: password.trim() })
-            if (!passwordOk) {
-                throw new Error("LOOKUP_FAILED")
             }
 
-            // If order is still pending, completing it is idempotent-safe.
-            if (existing.status === "PENDING") {
-                await tx.order.update({
-                    where: { id: existing.id },
-                    data: {
-                        status: "COMPLETED",
-                        paidAt: new Date(),
-                    },
-                })
-
-                await tx.card.updateMany({
-                    where: {
-                        orderId: existing.id,
-                        status: "RESERVED",
-                    },
-                    data: {
-                        status: "SOLD",
-                    },
-                })
-
-                const updated = await tx.order.findUnique({
-                    where: { id: existing.id },
-                    select: {
-                        id: true,
-                        orderNo: true,
-                        email: true,
-                        passwordHash: true,
-                        status: true,
-                        createdAt: true,
-                        product: {
-                            select: {
-                                name: true,
-                            },
-                        },
-                        cards: {
-                            select: {
-                                id: true,
-                                content: true,
-                                status: true,
-                            },
-                        },
-                    },
-                })
-
-                if (!updated) {
-                    throw new Error("LOOKUP_FAILED")
-                }
-
-                return updated
+            // Multiple orders match - return list without cards
+            return {
+                type: "multiple" as const,
+                data: matchingOrders,
             }
-
-            return existing
         })
 
-        // Ensure product exists
-        if (!order.product) {
-            throw new Error("LOOKUP_FAILED")
-        }
+        // Format response based on result type
+        if (result.type === "single") {
+            const order = result.data
+            if (!order.product) {
+                throw new Error("LOOKUP_FAILED")
+            }
 
-        const cards = order.cards
-            // Only return cards that belong to this order and are in SOLD or RESERVED status.
-            // TODO: Consider encrypting card content at rest and decrypting only when needed.
-            .filter((card) => card.status === "SOLD" || card.status === "RESERVED")
-            .map((card) => ({
-                content: card.content,
+            // For PENDING orders, return order info without cards
+            if (order.status === "PENDING") {
+                return NextResponse.json({
+                    orderNo: order.orderNo,
+                    productName: order.product.name,
+                    createdAt: order.createdAt instanceof Date ? order.createdAt.toISOString() : order.createdAt,
+                    status: order.status,
+                    cards: [],
+                    isPending: true,
+                })
+            }
+
+            // For COMPLETED/CLOSED orders, return cards
+            const cards = order.cards
+                .filter((card) => card.status === "SOLD" || card.status === "RESERVED")
+                .map((card) => ({
+                    content: card.content,
+                }))
+
+            return NextResponse.json({
+                orderNo: order.orderNo,
+                productName: order.product.name,
+                createdAt: order.createdAt instanceof Date ? order.createdAt.toISOString() : order.createdAt,
+                status: order.status,
+                cards,
+            })
+        } else {
+            // Multiple orders - return list
+            const orders = result.data.map((order) => ({
+                orderNo: order.orderNo,
+                productName: order.product?.name || "",
+                createdAt: order.createdAt instanceof Date ? order.createdAt.toISOString() : order.createdAt,
+                status: order.status,
+                quantity: order.quantity,
+                amount: Number(order.amount),
             }))
 
-        return NextResponse.json({
-            orderNo: order.orderNo,
-            productName: order.product.name,
-            createdAt: order.createdAt instanceof Date ? order.createdAt.toISOString() : order.createdAt,
-            status: order.status,
-            cards,
-        })
+            return NextResponse.json({
+                orders,
+            })
+        }
     } catch (error) {
         if (error instanceof Error && error.message === "LOOKUP_FAILED") {
             return NextResponse.json(
