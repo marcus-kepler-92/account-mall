@@ -104,42 +104,27 @@ describe("POST /api/orders/lookup", () => {
     })
   })
 
-  it("completes PENDING order and returns cards when password is correct", async () => {
+  it("returns PENDING order with isPending and no cards when password is correct", async () => {
     ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: any) =>
       fn(prismaMock),
     )
 
     const createdAt = new Date("2024-02-13T00:00:00.000Z")
 
-    prismaMock.order.findUnique
-      .mockResolvedValueOnce({
-        id: "order_1",
-        orderNo: "FAK202402130001",
-        passwordHash: "hash",
-        status: "PENDING",
-        product: {
-          name: "Test Product",
-        },
-        cards: [
-          { id: "card_1", content: "code-1", status: "RESERVED" },
-          { id: "card_2", content: "code-2", status: "UNSOLD" },
-        ],
-        createdAt,
-      } as any)
-      .mockResolvedValueOnce({
-        id: "order_1",
-        orderNo: "FAK202402130001",
-        passwordHash: "hash",
-        status: "COMPLETED",
-        product: {
-          name: "Test Product",
-        },
-        cards: [
-          { id: "card_1", content: "code-1", status: "SOLD" },
-          { id: "card_2", content: "code-2", status: "SOLD" },
-        ],
-        createdAt,
-      } as any)
+    prismaMock.order.findUnique.mockResolvedValueOnce({
+      id: "order_1",
+      orderNo: "FAK202402130001",
+      passwordHash: "hash",
+      status: "PENDING",
+      product: {
+        name: "Test Product",
+      },
+      cards: [
+        { id: "card_1", content: "code-1", status: "RESERVED" },
+        { id: "card_2", content: "code-2", status: "UNSOLD" },
+      ],
+      createdAt,
+    } as any)
 
     verifyPasswordMock.mockResolvedValueOnce(true)
 
@@ -147,41 +132,19 @@ describe("POST /api/orders/lookup", () => {
     const res = await POST(req)
     const data = await res.json()
 
-    expect(verifyPasswordMock).toHaveBeenCalledWith("secret123", "hash")
-
-    expect(prismaMock.order.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: "order_1" },
-        data: expect.objectContaining({
-          status: "COMPLETED",
-          paidAt: expect.any(Date),
-        }),
-      }),
-    )
-
-    expect(prismaMock.card.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          orderId: "order_1",
-          status: "RESERVED",
-        },
-        data: {
-          status: "SOLD",
-        },
-      }),
-    )
+    expect(verifyPasswordMock).toHaveBeenCalledWith({ hash: "hash", password: "secret123" })
+    expect(prismaMock.order.update).not.toHaveBeenCalled()
+    expect(prismaMock.card.updateMany).not.toHaveBeenCalled()
 
     expect(res.status).toBe(200)
-    expect(data).toEqual({
+    expect(data).toMatchObject({
       orderNo: "FAK202402130001",
       productName: "Test Product",
-      createdAt: createdAt.toISOString(),
-      status: "COMPLETED",
-      cards: [
-        { content: "code-1" },
-        { content: "code-2" },
-      ],
+      status: "PENDING",
+      cards: [],
+      isPending: true,
     })
+    expect(data.createdAt).toBe(createdAt.toISOString())
   })
 
   it("returns existing COMPLETED order without changing status on lookup", async () => {

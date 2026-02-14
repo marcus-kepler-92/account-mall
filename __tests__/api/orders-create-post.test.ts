@@ -1,0 +1,278 @@
+import { type NextRequest } from "next/server"
+import { POST } from "@/app/api/orders/route"
+import { prismaMock } from "../../__mocks__/prisma"
+
+jest.mock("@/lib/prisma", () => {
+    const { prismaMock } = require("../../__mocks__/prisma")
+    return {
+        __esModule: true,
+        prisma: prismaMock,
+    }
+})
+
+jest.mock("@/lib/auth-guard", () => ({
+    __esModule: true,
+    getAdminSession: jest.fn(),
+}))
+
+jest.mock("better-auth/crypto", () => ({
+    __esModule: true,
+    hashPassword: jest.fn().mockResolvedValue("hashed-password"),
+}))
+
+function createJsonRequest(body: unknown): NextRequest {
+    return {
+        json: async () => body,
+    } as unknown as NextRequest
+}
+
+function createInvalidJsonRequest(): NextRequest {
+    return {
+        json: async () => {
+            throw new Error("Invalid JSON")
+        },
+    } as unknown as NextRequest
+}
+
+describe("POST /api/orders (create order)", () => {
+    beforeEach(() => {
+        jest.clearAllMocks()
+        ;(prismaMock.$transaction as jest.Mock).mockReset()
+    })
+
+    it("returns 400 when body is not valid JSON", async () => {
+        const res = await POST(createInvalidJsonRequest())
+        const data = await res.json()
+        expect(res.status).toBe(400)
+        expect(data).toEqual({ error: "Invalid JSON body" })
+    })
+
+    it("returns 400 when validation fails (missing productId)", async () => {
+        const res = await POST(
+            createJsonRequest({
+                email: "user@example.com",
+                orderPassword: "password123",
+                quantity: 1,
+            })
+        )
+        const data = await res.json()
+        expect(res.status).toBe(400)
+        expect(data.error).toBe("Validation failed")
+        expect(data.details).toBeDefined()
+    })
+
+    it("returns 400 when validation fails (invalid email)", async () => {
+        const res = await POST(
+            createJsonRequest({
+                productId: "prod_1",
+                email: "not-an-email",
+                orderPassword: "password123",
+                quantity: 1,
+            })
+        )
+        const data = await res.json()
+        expect(res.status).toBe(400)
+        expect(data.error).toBe("Validation failed")
+    })
+
+    it("returns 400 when validation fails (password too short)", async () => {
+        const res = await POST(
+            createJsonRequest({
+                productId: "prod_1",
+                email: "user@example.com",
+                orderPassword: "short",
+                quantity: 1,
+            })
+        )
+        const data = await res.json()
+        expect(res.status).toBe(400)
+        expect(data.error).toBe("Validation failed")
+    })
+
+    it("returns 404 when product does not exist", async () => {
+        prismaMock.product.findUnique.mockResolvedValueOnce(null)
+
+        const res = await POST(
+            createJsonRequest({
+                productId: "nonexistent",
+                email: "user@example.com",
+                orderPassword: "password123",
+                quantity: 1,
+            })
+        )
+        const data = await res.json()
+        expect(res.status).toBe(404)
+        expect(data).toEqual({ error: "Product not found or unavailable" })
+    })
+
+    it("returns 404 when product is INACTIVE", async () => {
+        prismaMock.product.findUnique.mockResolvedValueOnce({
+            id: "prod_1",
+            name: "Test",
+            price: 100,
+            maxQuantity: 5,
+            status: "INACTIVE",
+        })
+
+        const res = await POST(
+            createJsonRequest({
+                productId: "prod_1",
+                email: "user@example.com",
+                orderPassword: "password123",
+                quantity: 1,
+            })
+        )
+        const data = await res.json()
+        expect(res.status).toBe(404)
+        expect(data).toEqual({ error: "Product not found or unavailable" })
+    })
+
+    it("returns 400 when quantity exceeds maxQuantity", async () => {
+        prismaMock.product.findUnique.mockResolvedValueOnce({
+            id: "prod_1",
+            name: "Test",
+            price: 100,
+            maxQuantity: 2,
+            status: "ACTIVE",
+        })
+        prismaMock.card.count.mockResolvedValueOnce(10)
+
+        const res = await POST(
+            createJsonRequest({
+                productId: "prod_1",
+                email: "user@example.com",
+                orderPassword: "password123",
+                quantity: 5,
+            })
+        )
+        const data = await res.json()
+        expect(res.status).toBe(400)
+        expect(data.error).toContain("Quantity must be between 1 and 2")
+    })
+
+    it("returns 400 when quantity is less than 1", async () => {
+        prismaMock.product.findUnique.mockResolvedValueOnce({
+            id: "prod_1",
+            name: "Test",
+            price: 100,
+            maxQuantity: 5,
+            status: "ACTIVE",
+        })
+
+        const res = await POST(
+            createJsonRequest({
+                productId: "prod_1",
+                email: "user@example.com",
+                orderPassword: "password123",
+                quantity: 0,
+            })
+        )
+        const data = await res.json()
+        expect(res.status).toBe(400)
+        expect(data.error).toBe("Validation failed")
+    })
+
+    it("returns 400 when insufficient stock", async () => {
+        prismaMock.product.findUnique.mockResolvedValueOnce({
+            id: "prod_1",
+            name: "Test",
+            price: 100,
+            maxQuantity: 10,
+            status: "ACTIVE",
+        })
+        prismaMock.card.count.mockResolvedValueOnce(1)
+
+        const res = await POST(
+            createJsonRequest({
+                productId: "prod_1",
+                email: "user@example.com",
+                orderPassword: "password123",
+                quantity: 3,
+            })
+        )
+        const data = await res.json()
+        expect(res.status).toBe(400)
+        expect(data.error).toContain("Insufficient stock")
+        expect(data.error).toContain("Available: 1")
+    })
+
+    it("creates order and reserves cards, returns orderNo and amount", async () => {
+        const product = {
+            id: "prod_1",
+            name: "Test Product",
+            price: 50,
+            maxQuantity: 5,
+            status: "ACTIVE",
+        }
+        prismaMock.product.findUnique.mockResolvedValueOnce(product)
+        prismaMock.card.count.mockResolvedValueOnce(3)
+
+        const createdOrder = {
+            id: "order_new",
+            orderNo: "550e8400-e29b-41d4-a716-446655440000",
+            productId: "prod_1",
+            email: "user@example.com",
+            passwordHash: "hashed-password",
+            quantity: 2,
+            amount: 100,
+            status: "PENDING",
+            paidAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+        }
+
+        const mockTx = {
+            order: {
+                create: jest.fn().mockResolvedValue(createdOrder),
+            },
+            card: {
+                findMany: jest.fn().mockResolvedValue([
+                    { id: "card_1" },
+                    { id: "card_2" },
+                ]),
+                updateMany: jest.fn().mockResolvedValue({ count: 2 }),
+            },
+        }
+        ;(prismaMock.$transaction as jest.Mock).mockImplementation((cb: (tx: unknown) => Promise<unknown>) =>
+            cb(mockTx)
+        )
+
+        const res = await POST(
+            createJsonRequest({
+                productId: "prod_1",
+                email: "User@Example.com",
+                orderPassword: "password123",
+                quantity: 2,
+            })
+        )
+        const data = await res.json()
+
+        expect(res.status).toBe(200)
+        expect(data).toMatchObject({
+            orderNo: createdOrder.orderNo,
+            amount: 100,
+            paymentUrl: null,
+        })
+        expect(mockTx.order.create).toHaveBeenCalledWith({
+            data: {
+                orderNo: expect.any(String),
+                productId: "prod_1",
+                email: "user@example.com",
+                passwordHash: "hashed-password",
+                quantity: 2,
+                amount: 100,
+                status: "PENDING",
+            },
+        })
+        expect(mockTx.card.findMany).toHaveBeenCalledWith({
+            where: { productId: "prod_1", status: "UNSOLD" },
+            take: 2,
+            orderBy: { createdAt: "asc" },
+            select: { id: true },
+        })
+        expect(mockTx.card.updateMany).toHaveBeenCalledWith({
+            where: { id: { in: ["card_1", "card_2"] } },
+            data: { status: "RESERVED", orderId: "order_new" },
+        })
+    })
+})

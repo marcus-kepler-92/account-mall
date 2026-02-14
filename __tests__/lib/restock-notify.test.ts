@@ -12,10 +12,13 @@ jest.mock("@/lib/prisma", () => {
 jest.mock("@/lib/email", () => ({
   __esModule: true,
   sendMail: jest.fn().mockResolvedValue({ success: true }),
-  getAdminEmail: jest.fn().mockReturnValue(""),
 }))
 
-import { sendMail, getAdminEmail } from "@/lib/email"
+jest.mock("@react-email/render", () => ({
+  render: jest.fn().mockResolvedValue("<html><body>stub</body></html>"),
+}))
+
+import { sendMail } from "@/lib/email"
 import { notifyRestockSubscribers } from "@/lib/restock-notify"
 
 type DeepMockPrisma = typeof prismaMock & PrismaClient
@@ -30,7 +33,6 @@ describe("notifyRestockSubscribers", () => {
 
   beforeEach(() => {
     ;(sendMail as jest.Mock).mockClear()
-    ;(getAdminEmail as jest.Mock).mockClear()
   })
 
   it("does nothing when there are no pending subscriptions", async () => {
@@ -101,51 +103,6 @@ describe("notifyRestockSubscribers", () => {
       where: { id: { in: ["sub_1"] } },
       data: { status: "NOTIFIED", notifiedAt: expect.any(Date) },
     })
-  })
-
-  it("sends summary email to admin when admin email is configured", async () => {
-    const subs = [
-      { id: "sub_1", email: "a@example.com" },
-      { id: "sub_2", email: "b@example.com" },
-    ]
-    ;(prismaMock as DeepMockPrisma).restockSubscription.findMany.mockResolvedValue(
-      subs as any,
-    )
-
-    ;(getAdminEmail as jest.Mock).mockReturnValue("admin@test.com")
-
-    await notifyRestockSubscribers(product)
-
-    const sendMailMock = sendMail as jest.Mock
-    // two user emails + one admin email
-    expect(sendMailMock).toHaveBeenCalledTimes(3)
-
-    expect(sendMailMock).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        to: "admin@test.com",
-        subject: expect.stringContaining("商品补货通知"),
-      }),
-    )
-  })
-
-  it("does not send admin email when admin email is empty", async () => {
-    const subs = [{ id: "sub_1", email: "a@example.com" }]
-    ;(prismaMock as DeepMockPrisma).restockSubscription.findMany.mockResolvedValue(
-      subs as any,
-    )
-
-    ;(getAdminEmail as jest.Mock).mockReturnValue("")
-
-    await notifyRestockSubscribers(product)
-
-    const sendMailMock = sendMail as jest.Mock
-    // only user email
-    expect(sendMailMock).toHaveBeenCalledTimes(1)
-    expect(sendMailMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        to: "a@example.com",
-      }),
-    )
   })
 })
 

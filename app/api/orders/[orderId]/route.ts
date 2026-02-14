@@ -1,3 +1,4 @@
+import { sendOrderCompletionEmail } from "@/lib/order-completion-email"
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getAdminSession } from "@/lib/auth-guard"
@@ -230,6 +231,12 @@ export async function PATCH(
 
     if (!updated) {
         return NextResponse.json({ error: "Order not found" }, { status: 404 })
+    }
+
+    if (nextStatus === "COMPLETED") {
+        sendOrderCompletionEmail(params.orderId).catch((err) =>
+            console.error("[order-completion-email]", err),
+        )
     }
 
     return NextResponse.json(mapOrderToResponse(updated))

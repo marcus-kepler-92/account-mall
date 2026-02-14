@@ -6,7 +6,6 @@ const resend = process.env.RESEND_API_KEY
 
 const FROM_EMAIL =
     process.env.EMAIL_FROM ?? "Account Mall <onboarding@resend.dev>";
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? "";
 
 export type SendMailOptions = {
     to: string | string[];
@@ -24,14 +23,21 @@ export async function sendMail({
     html,
     text,
 }: SendMailOptions): Promise<{ success: boolean; error?: string }> {
+    const toList = Array.isArray(to) ? to : [to];
+    if (toList.length === 0) {
+        console.warn("[email] No recipients, skip send");
+        return { success: false, error: "No recipients" };
+    }
+
     if (!resend) {
-        console.warn("[email] RESEND_API_KEY not set, skipping send");
+        console.warn("[email] RESEND_API_KEY not set, skipping send", {
+            to: toList,
+            subject,
+        });
         return { success: true };
     }
 
-    const toList = Array.isArray(to) ? to : [to];
-    if (toList.length === 0) return { success: false, error: "No recipients" };
-
+    console.log("[email] Sending", { to: toList, subject });
     const { error } = await resend.emails.send({
         from: FROM_EMAIL,
         to: toList,
@@ -41,15 +47,14 @@ export async function sendMail({
     });
 
     if (error) {
-        console.error("[email] Send failed:", error);
-        return { success: false, error: String(error) };
+        const errorStr = typeof error === "object" && error !== null && "message" in error
+            ? String((error as { message?: unknown }).message)
+            : typeof error === "object"
+                ? JSON.stringify(error)
+                : String(error);
+        console.error("[email] Send failed", { to: toList, subject, error: errorStr });
+        return { success: false, error: errorStr };
     }
+    console.log("[email] Sent OK", { to: toList, subject });
     return { success: true };
-}
-
-/**
- * Get admin email for restock notifications. Empty when not configured.
- */
-export function getAdminEmail(): string {
-    return ADMIN_EMAIL.trim();
 }

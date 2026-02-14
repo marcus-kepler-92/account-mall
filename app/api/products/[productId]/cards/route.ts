@@ -130,13 +130,14 @@ export async function POST(request: NextRequest, context: RouteContext) {
             select: { id: true, name: true, slug: true, price: true },
         });
         if (productWithDetails) {
+            console.log("[restock-notify] Triggering async (0 -> stock), productId:", productId);
             notifyRestockSubscribers({
                 id: productWithDetails.id,
                 name: productWithDetails.name,
                 slug: productWithDetails.slug,
                 price: Number(productWithDetails.price),
             }).catch((err) => {
-                console.error("[restock-notify] Failed to send restock emails:", err);
+                console.error("[restock-notify] Failed to send restock emails", { productId, error: err });
             });
         }
     }

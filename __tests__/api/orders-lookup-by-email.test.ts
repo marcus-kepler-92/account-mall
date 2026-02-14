@@ -68,7 +68,7 @@ describe("POST /api/orders/lookup-by-email", () => {
       fn(prismaMock),
     )
 
-    prismaMock.order.findFirst.mockResolvedValueOnce(null)
+    prismaMock.order.findMany.mockResolvedValueOnce([])
 
     const req = createJsonRequest({ email: "user@example.com", password: "secret123" })
     const res = await POST(req)
@@ -85,18 +85,20 @@ describe("POST /api/orders/lookup-by-email", () => {
       fn(prismaMock),
     )
 
-    prismaMock.order.findFirst.mockResolvedValueOnce({
-      id: "order_1",
-      orderNo: "FAK202402130001",
-      email: "user@example.com",
-      passwordHash: "hash",
-      status: "PENDING",
-      product: {
-        name: "Test Product",
+    prismaMock.order.findMany.mockResolvedValueOnce([
+      {
+        id: "order_1",
+        orderNo: "FAK202402130001",
+        email: "user@example.com",
+        passwordHash: "hash",
+        status: "PENDING",
+        product: {
+          name: "Test Product",
+        },
+        cards: [],
+        createdAt: new Date(),
       },
-      cards: [],
-      createdAt: new Date(),
-    } as any)
+    ] as any)
 
     verifyPasswordMock.mockResolvedValueOnce(false)
 
@@ -120,21 +122,23 @@ describe("POST /api/orders/lookup-by-email", () => {
 
     const createdAt = new Date("2024-02-13T00:00:00.000Z")
 
-    prismaMock.order.findFirst.mockResolvedValueOnce({
-      id: "order_1",
-      orderNo: "FAK202402130001",
-      email: "user@example.com",
-      passwordHash: "hash",
-      status: "COMPLETED",
-      product: {
-        name: "Test Product",
+    prismaMock.order.findMany.mockResolvedValueOnce([
+      {
+        id: "order_1",
+        orderNo: "FAK202402130001",
+        email: "user@example.com",
+        passwordHash: "hash",
+        status: "COMPLETED",
+        product: {
+          name: "Test Product",
+        },
+        cards: [
+          { id: "card_1", content: "code-1", status: "SOLD" },
+          { id: "card_2", content: "code-2", status: "RESERVED" },
+        ],
+        createdAt,
       },
-      cards: [
-        { id: "card_1", content: "code-1", status: "SOLD" },
-        { id: "card_2", content: "code-2", status: "RESERVED" },
-      ],
-      createdAt,
-    } as any)
+    ] as any)
 
     verifyPasswordMock.mockResolvedValueOnce(true)
 
@@ -142,7 +146,7 @@ describe("POST /api/orders/lookup-by-email", () => {
     const res = await POST(req)
     const data = await res.json()
 
-    expect(prismaMock.order.findFirst).toHaveBeenCalledWith(
+    expect(prismaMock.order.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
           email: "user@example.com",
@@ -153,7 +157,7 @@ describe("POST /api/orders/lookup-by-email", () => {
       }),
     )
 
-    expect(verifyPasswordMock).toHaveBeenCalledWith("secret123", "hash")
+    expect(verifyPasswordMock).toHaveBeenCalledWith({ hash: "hash", password: "secret123" })
 
     expect(res.status).toBe(200)
     expect(data).toEqual({
@@ -168,44 +172,30 @@ describe("POST /api/orders/lookup-by-email", () => {
     })
   })
 
-  it("completes PENDING order and returns cards when password is correct", async () => {
+  it("returns single PENDING order with isPending when password is correct", async () => {
     ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: any) =>
       fn(prismaMock),
     )
 
     const createdAt = new Date("2024-02-13T00:00:00.000Z")
 
-    prismaMock.order.findFirst.mockResolvedValueOnce({
-      id: "order_1",
-      orderNo: "FAK202402130001",
-      email: "user@example.com",
-      passwordHash: "hash",
-      status: "PENDING",
-      product: {
-        name: "Test Product",
+    prismaMock.order.findMany.mockResolvedValueOnce([
+      {
+        id: "order_1",
+        orderNo: "FAK202402130001",
+        email: "user@example.com",
+        passwordHash: "hash",
+        status: "PENDING",
+        product: {
+          name: "Test Product",
+        },
+        cards: [
+          { id: "card_1", content: "code-1", status: "RESERVED" },
+          { id: "card_2", content: "code-2", status: "UNSOLD" },
+        ],
+        createdAt,
       },
-      cards: [
-        { id: "card_1", content: "code-1", status: "RESERVED" },
-        { id: "card_2", content: "code-2", status: "UNSOLD" },
-      ],
-      createdAt,
-    } as any)
-
-    prismaMock.order.findUnique.mockResolvedValueOnce({
-      id: "order_1",
-      orderNo: "FAK202402130001",
-      email: "user@example.com",
-      passwordHash: "hash",
-      status: "COMPLETED",
-      product: {
-        name: "Test Product",
-      },
-      cards: [
-        { id: "card_1", content: "code-1", status: "SOLD" },
-        { id: "card_2", content: "code-2", status: "SOLD" },
-      ],
-      createdAt,
-    } as any)
+    ] as any)
 
     verifyPasswordMock.mockResolvedValueOnce(true)
 
@@ -213,46 +203,18 @@ describe("POST /api/orders/lookup-by-email", () => {
     const res = await POST(req)
     const data = await res.json()
 
-    expect(verifyPasswordMock).toHaveBeenCalledWith("secret123", "hash")
-
-    expect(prismaMock.order.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: "order_1" },
-        data: expect.objectContaining({
-          status: "COMPLETED",
-          paidAt: expect.any(Date),
-        }),
-      }),
-    )
-
-    expect(prismaMock.card.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          orderId: "order_1",
-          status: "RESERVED",
-        },
-        data: {
-          status: "SOLD",
-        },
-      }),
-    )
-
-    expect(prismaMock.order.findUnique).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: "order_1" },
-      }),
-    )
+    expect(verifyPasswordMock).toHaveBeenCalledWith({ hash: "hash", password: "secret123" })
+    expect(prismaMock.order.update).not.toHaveBeenCalled()
+    expect(prismaMock.card.updateMany).not.toHaveBeenCalled()
 
     expect(res.status).toBe(200)
     expect(data).toEqual({
       orderNo: "FAK202402130001",
       productName: "Test Product",
       createdAt: createdAt.toISOString(),
-      status: "COMPLETED",
-      cards: [
-        { content: "code-1" },
-        { content: "code-2" },
-      ],
+      status: "PENDING",
+      cards: [],
+      isPending: true,
     })
   })
 
@@ -263,20 +225,22 @@ describe("POST /api/orders/lookup-by-email", () => {
 
     const createdAt = new Date("2024-02-13T00:00:00.000Z")
 
-    prismaMock.order.findFirst.mockResolvedValueOnce({
-      id: "order_1",
-      orderNo: "FAK202402130001",
-      email: "user@example.com",
-      passwordHash: "hash",
-      status: "COMPLETED",
-      product: {
-        name: "Test Product",
+    prismaMock.order.findMany.mockResolvedValueOnce([
+      {
+        id: "order_1",
+        orderNo: "FAK202402130001",
+        email: "user@example.com",
+        passwordHash: "hash",
+        status: "COMPLETED",
+        product: {
+          name: "Test Product",
+        },
+        cards: [
+          { id: "card_1", content: "code-1", status: "SOLD" },
+        ],
+        createdAt,
       },
-      cards: [
-        { id: "card_1", content: "code-1", status: "SOLD" },
-      ],
-      createdAt,
-    } as any)
+    ] as any)
 
     verifyPasswordMock.mockResolvedValueOnce(true)
 
@@ -304,25 +268,27 @@ describe("POST /api/orders/lookup-by-email", () => {
 
     const createdAt = new Date("2024-02-13T00:00:00.000Z")
 
-    prismaMock.order.findFirst.mockResolvedValueOnce({
-      id: "order_1",
-      orderNo: "FAK202402130001",
-      email: "user@example.com",
-      passwordHash: "hash",
-      status: "COMPLETED",
-      product: {
-        name: "Test Product",
+    prismaMock.order.findMany.mockResolvedValueOnce([
+      {
+        id: "order_1",
+        orderNo: "FAK202402130001",
+        email: "user@example.com",
+        passwordHash: "hash",
+        status: "COMPLETED",
+        product: {
+          name: "Test Product",
+        },
+        cards: [],
+        createdAt,
       },
-      cards: [],
-      createdAt,
-    } as any)
+    ] as any)
 
     verifyPasswordMock.mockResolvedValueOnce(true)
 
     const req = createJsonRequest({ email: "User@Example.COM", password: "secret123" })
     const res = await POST(req)
 
-    expect(prismaMock.order.findFirst).toHaveBeenCalledWith(
+    expect(prismaMock.order.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
           email: "user@example.com",
@@ -340,22 +306,24 @@ describe("POST /api/orders/lookup-by-email", () => {
 
     const createdAt = new Date("2024-02-13T00:00:00.000Z")
 
-    prismaMock.order.findFirst.mockResolvedValueOnce({
-      id: "order_1",
-      orderNo: "FAK202402130001",
-      email: "user@example.com",
-      passwordHash: "hash",
-      status: "COMPLETED",
-      product: {
-        name: "Test Product",
+    prismaMock.order.findMany.mockResolvedValueOnce([
+      {
+        id: "order_1",
+        orderNo: "FAK202402130001",
+        email: "user@example.com",
+        passwordHash: "hash",
+        status: "COMPLETED",
+        product: {
+          name: "Test Product",
+        },
+        cards: [
+          { id: "card_1", content: "code-1", status: "SOLD" },
+          { id: "card_2", content: "code-2", status: "RESERVED" },
+          { id: "card_3", content: "code-3", status: "UNSOLD" },
+        ],
+        createdAt,
       },
-      cards: [
-        { id: "card_1", content: "code-1", status: "SOLD" },
-        { id: "card_2", content: "code-2", status: "RESERVED" },
-        { id: "card_3", content: "code-3", status: "UNSOLD" },
-      ],
-      createdAt,
-    } as any)
+    ] as any)
 
     verifyPasswordMock.mockResolvedValueOnce(true)
 

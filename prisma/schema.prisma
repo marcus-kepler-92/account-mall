@@ -145,6 +145,7 @@ model Order {
 model RestockSubscription {
   id         String                  @id @default(cuid())
   productId  String
+  ip         String
   email      String
   status     RestockSubscriptionStatus @default(PENDING)
   notifiedAt DateTime?
@@ -152,6 +153,6 @@ model RestockSubscription {
   updatedAt  DateTime                @updatedAt
   product    Product                 @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-  @@unique([productId, email])
+  @@unique([productId, ip])
   @@index([productId, status])
 }

@@ -1,5 +1,5 @@
 import { type NextRequest } from "next/server"
-import { POST } from "@/app/api/products/[productId]/cards/route"
+import { GET, POST } from "@/app/api/products/[productId]/cards/route"
 import { prismaMock } from "../../__mocks__/prisma"
 
 jest.mock("@/lib/prisma", () => {
@@ -20,10 +20,21 @@ jest.mock("@/lib/restock-notify", () => ({
   notifyRestockSubscribers: jest.fn().mockResolvedValue(undefined),
 }))
 
+import { getAdminSession } from "@/lib/auth-guard"
 import { notifyRestockSubscribers } from "@/lib/restock-notify"
 
 type RouteContext = {
   params: Promise<{ productId: string }>
+}
+
+const productId = "prod_1"
+
+function createContext(): RouteContext {
+  return { params: Promise.resolve({ productId }) }
+}
+
+function createUrlRequest(url: string): NextRequest {
+  return { url } as unknown as NextRequest
 }
 
 function createJsonRequest(body: unknown): NextRequest {
@@ -32,12 +43,163 @@ function createJsonRequest(body: unknown): NextRequest {
   } as unknown as NextRequest
 }
 
-describe("/api/products/[productId]/cards POST restock trigger", () => {
-  const productId = "prod_1"
+describe("GET /api/products/[productId]/cards", () => {
+  const adminSessionMock = getAdminSession as jest.Mock
 
-  const context: RouteContext = {
-    params: Promise.resolve({ productId }),
-  }
+  beforeEach(() => {
+    adminSessionMock.mockReset()
+    adminSessionMock.mockResolvedValue({ id: "admin_1" })
+  })
+
+  it("returns 401 when not authenticated", async () => {
+    adminSessionMock.mockResolvedValueOnce(null)
+
+    const res = await GET(createUrlRequest("http://localhost"), createContext() as any)
+    const data = await res.json()
+
+    expect(res.status).toBe(401)
+    expect(data).toEqual({ error: "Unauthorized" })
+  })
+
+  it("returns 404 when product does not exist", async () => {
+    prismaMock.product.findUnique.mockResolvedValueOnce(null)
+
+    const res = await GET(createUrlRequest("http://localhost"), createContext() as any)
+    const data = await res.json()
+
+    expect(res.status).toBe(404)
+    expect(data).toEqual({ error: "Product not found" })
+  })
+
+  it("returns cards and stats for product", async () => {
+    prismaMock.product.findUnique.mockResolvedValueOnce({ id: productId })
+    prismaMock.card.findMany.mockResolvedValueOnce([
+      {
+        id: "c1",
+        content: "card1",
+        status: "UNSOLD",
+        createdAt: new Date("2024-01-01"),
+        order: null,
+      },
+    ])
+    prismaMock.card.groupBy.mockResolvedValueOnce([
+      { status: "UNSOLD", _count: { id: 5 } },
+      { status: "RESERVED", _count: { id: 2 } },
+      { status: "SOLD", _count: { id: 3 } },
+    ])
+
+    const res = await GET(createUrlRequest("http://localhost"), createContext() as any)
+    const data = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(data.cards).toHaveLength(1)
+    expect(data.cards[0]).toMatchObject({
+      id: "c1",
+      content: "card1",
+      status: "UNSOLD",
+      orderNo: null,
+    })
+    expect(data.stats).toEqual({ UNSOLD: 5, RESERVED: 2, SOLD: 3 })
+  })
+
+  it("applies status filter when status param is provided", async () => {
+    prismaMock.product.findUnique.mockResolvedValueOnce({ id: productId })
+    prismaMock.card.findMany.mockResolvedValueOnce([])
+    prismaMock.card.groupBy.mockResolvedValueOnce([])
+
+    await GET(
+      createUrlRequest("http://localhost?status=UNSOLD"),
+      createContext() as any
+    )
+
+    expect(prismaMock.card.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { productId, status: "UNSOLD" },
+      })
+    )
+  })
+})
+
+describe("POST /api/products/[productId]/cards", () => {
+  const adminSessionMock = getAdminSession as jest.Mock
+  const context = createContext()
+
+  beforeEach(() => {
+    adminSessionMock.mockReset()
+    adminSessionMock.mockResolvedValue({ id: "admin_1" })
+    ;(notifyRestockSubscribers as jest.Mock).mockClear()
+  })
+
+  it("returns 401 when not authenticated", async () => {
+    adminSessionMock.mockResolvedValueOnce(null)
+
+    const res = await POST(
+      createJsonRequest({ contents: ["a"] }),
+      context as any
+    )
+    const data = await res.json()
+
+    expect(res.status).toBe(401)
+    expect(data).toEqual({ error: "Unauthorized" })
+  })
+
+  it("returns 404 when product does not exist", async () => {
+    prismaMock.product.findUnique.mockResolvedValueOnce(null)
+
+    const res = await POST(
+      createJsonRequest({ contents: ["a"] }),
+      context as any
+    )
+    const data = await res.json()
+
+    expect(res.status).toBe(404)
+    expect(data).toEqual({ error: "Product not found" })
+  })
+
+  it("returns 400 when body is invalid JSON", async () => {
+    prismaMock.product.findUnique.mockResolvedValueOnce({ id: productId })
+
+    const req = {
+      json: async () => {
+        throw new Error("bad json")
+      },
+    } as unknown as NextRequest
+
+    const res = await POST(req, context as any)
+    const data = await res.json()
+
+    expect(res.status).toBe(400)
+    expect(data).toEqual({ error: "Invalid JSON body" })
+  })
+
+  it("returns 400 when validation fails (missing contents)", async () => {
+    prismaMock.product.findUnique.mockResolvedValueOnce({ id: productId })
+
+    const res = await POST(createJsonRequest({}), context as any)
+    const data = await res.json()
+
+    expect(res.status).toBe(400)
+    expect(data.error).toBe("Validation failed")
+  })
+
+  it("returns 201 and imported count when import succeeds", async () => {
+    prismaMock.product.findUnique.mockResolvedValueOnce({ id: productId })
+    prismaMock.card.count.mockResolvedValueOnce(1)
+    prismaMock.card.createMany.mockResolvedValueOnce({ count: 2 } as any)
+
+    const res = await POST(
+      createJsonRequest({ contents: ["line1", "line2"] }),
+      context as any
+    )
+    const data = await res.json()
+
+    expect(res.status).toBe(201)
+    expect(data).toEqual({ imported: 2, total: 2 })
+  })
+})
+
+describe("/api/products/[productId]/cards POST restock trigger", () => {
+  const context = createContext()
 
   const validBody = {
     contents: [" card1 ", "card2", "card1"], // includes duplicate & whitespace
