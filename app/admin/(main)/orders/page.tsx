@@ -304,9 +304,12 @@ export default async function AdminOrdersPage({
                             {serializedOrders.map((order) => (
                                 <TableRow key={order.id}>
                                     <TableCell className="pl-4">
-                                        <span className="font-mono text-xs">
+                                        <Link
+                                            href={`/admin/orders/${order.id}`}
+                                            className="font-mono text-xs hover:underline"
+                                        >
                                             {order.orderNo}
-                                        </span>
+                                        </Link>
                                     </TableCell>
                                     <TableCell>
                                         <span className="text-sm text-muted-foreground">

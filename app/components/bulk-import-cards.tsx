@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
+import { useRouter, usePathname } from "next/navigation"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -19,13 +19,22 @@ import { Upload, Loader2 } from "lucide-react"
 type BulkImportCardsProps = {
     productId: string
     trigger?: React.ReactNode
+    /** When true, dialog opens on mount (e.g. when landing with ?action=import). Clears action from URL after open. */
+    defaultOpen?: boolean
 }
 
 const MAX_LINES = 500
 
-export function BulkImportCards({ productId, trigger }: BulkImportCardsProps) {
+export function BulkImportCards({ productId, trigger, defaultOpen = false }: BulkImportCardsProps) {
     const router = useRouter()
-    const [open, setOpen] = useState(false)
+    const pathname = usePathname()
+    const [open, setOpen] = useState(defaultOpen)
+
+    useEffect(() => {
+        if (!defaultOpen) return
+        setOpen(true)
+        router.replace(pathname)
+    }, [defaultOpen, pathname, router])
     const [text, setText] = useState("")
     const [loading, setLoading] = useState(false)
 

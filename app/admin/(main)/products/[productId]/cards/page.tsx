@@ -11,10 +11,12 @@ export const dynamic = "force-dynamic"
 
 type PageProps = {
     params: Promise<{ productId: string }>
+    searchParams: Promise<{ action?: string }>
 }
 
-export default async function AdminProductCardsPage({ params }: PageProps) {
+export default async function AdminProductCardsPage({ params, searchParams }: PageProps) {
     const { productId } = await params
+    const { action } = await searchParams
 
     const product = await prisma.product.findUnique({
         where: { id: productId },
@@ -74,7 +76,7 @@ export default async function AdminProductCardsPage({ params }: PageProps) {
                         </p>
                     </div>
                 </div>
-                <BulkImportCards productId={productId} />
+                <BulkImportCards productId={productId} defaultOpen={action === "import"} />
             </div>
 
             {/* Stats */}
