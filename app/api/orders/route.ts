@@ -274,6 +274,13 @@ export async function POST(request: NextRequest) {
     }
 
     const amount = Number(product.price) * quantity
+    const amountRounded = Math.round(amount * 100) / 100
+    if (amountRounded <= 0 || amountRounded > 999_999.99) {
+        return NextResponse.json(
+            { error: "Invalid order amount" },
+            { status: 400 },
+        )
+    }
     const passwordHash = await hashPassword(orderPassword)
 
     // Generate unique order number using UUID v4 (guaranteed uniqueness)
@@ -294,7 +301,7 @@ export async function POST(request: NextRequest) {
                         email: email.trim().toLowerCase(),
                         passwordHash,
                         quantity,
-                        amount,
+                        amount: amountRounded,
                         status: "PENDING",
                         ...(clientIp !== "unknown" && { clientIp }),
                     },

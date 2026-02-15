@@ -1,54 +1,75 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { orderByEmailQuerySchema } from "@/lib/validations/order"
+import { orderByEmailPostSchema } from "@/lib/validations/order"
+import { verifyPassword } from "better-auth/crypto"
 import { checkOrderQueryRateLimit } from "@/lib/rate-limit"
 
+const MAX_ORDERS_TO_CHECK = 100
+
 /**
- * GET /api/orders/by-email
- * Public: users can query their own orders by email.
+ * POST /api/orders/by-email
+ * Public: list orders by email + order password (required for security).
+ * Body: { email, password, page?, pageSize? }
  */
-export async function GET(request: NextRequest) {
+export async function POST(request: NextRequest) {
     const rateLimitRes = await checkOrderQueryRateLimit(request)
     if (rateLimitRes) return rateLimitRes
 
-    const { searchParams } = new URL(request.url)
-
-    const rawQuery = {
-        email: searchParams.get("email") ?? "",
-        page: searchParams.get("page") ?? undefined,
-        pageSize: searchParams.get("pageSize") ?? undefined,
+    let body: unknown
+    try {
+        body = await request.json()
+    } catch {
+        return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
     }
 
-    const parsed = orderByEmailQuerySchema.safeParse(rawQuery)
+    const parsed = orderByEmailPostSchema.safeParse(body)
     if (!parsed.success) {
-        // Public endpoint: avoid returning detailed validation structure.
         return NextResponse.json({ error: "Validation failed" }, { status: 400 })
     }
 
-    const { email, page, pageSize } = parsed.data
+    const { email, password, page, pageSize } = parsed.data
 
-    const where = {
-        email: email.trim().toLowerCase(),
+    const orders = await prisma.order.findMany({
+        where: { email: email.trim().toLowerCase() },
+        select: {
+            orderNo: true,
+            createdAt: true,
+            status: true,
+            quantity: true,
+            amount: true,
+            passwordHash: true,
+            product: { select: { name: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        take: MAX_ORDERS_TO_CHECK,
+    })
+
+    const matching: typeof orders = []
+    for (const order of orders) {
+        if (!order.passwordHash || typeof order.passwordHash !== "string") continue
+        try {
+            const ok = await verifyPassword({
+                hash: order.passwordHash,
+                password: password.trim(),
+            })
+            if (ok) matching.push(order)
+        } catch {
+            // skip
+        }
     }
 
-    const [orders, total] = await Promise.all([
-        prisma.order.findMany({
-            where,
-            include: {
-                product: {
-                    select: {
-                        name: true,
-                    },
-                },
-            },
-            orderBy: { createdAt: "desc" },
-            skip: (page - 1) * pageSize,
-            take: pageSize,
-        }),
-        prisma.order.count({ where }),
-    ])
+    if (matching.length === 0) {
+        return NextResponse.json(
+            { error: "Order not found or password incorrect" },
+            { status: 400 },
+        )
+    }
 
-    const data = orders.map((order) => ({
+    const total = matching.length
+    const start = (page - 1) * pageSize
+    const pageOrders = matching.slice(start, start + pageSize)
+
+    const data = pageOrders.map((order) => ({
         orderNo: order.orderNo,
         createdAt: order.createdAt,
         status: order.status,
@@ -68,5 +89,17 @@ export async function GET(request: NextRequest) {
     })
 }
 
-export const runtime = "nodejs"
+/**
+ * GET /api/orders/by-email
+ * Deprecated: requires password for security. Use POST with body { email, password, page?, pageSize? }.
+ */
+export async function GET(_request: NextRequest) {
+    return NextResponse.json(
+        {
+            error: "Use POST with email and order password. GET is disabled for security.",
+        },
+        { status: 400 },
+    )
+}
 
+export const runtime = "nodejs"

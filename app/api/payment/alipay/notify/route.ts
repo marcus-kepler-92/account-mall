@@ -20,6 +20,9 @@ export async function POST(request: NextRequest) {
     }
 
     if (!verifyAlipayNotifySign(postData)) {
+        console.warn("[alipay/notify] Sign verification failed", {
+            out_trade_no: postData.out_trade_no,
+        })
         return new NextResponse("failure", { status: 400, headers: { "Content-Type": "text/plain" } })
     }
 
@@ -42,11 +45,17 @@ export async function POST(request: NextRequest) {
     })
 
     if (!order) {
+        console.warn("[alipay/notify] Order not found", { out_trade_no: outTradeNo })
         return new NextResponse("failure", { status: 400, headers: { "Content-Type": "text/plain" } })
     }
 
-    const orderAmount = Number(order.amount).toFixed(2)
-    if (orderAmount !== totalAmount) {
+    const orderAmountStr = (Math.round(Number(order.amount) * 100) / 100).toFixed(2)
+    if (orderAmountStr !== totalAmount) {
+        console.warn("[alipay/notify] Amount mismatch", {
+            orderNo: outTradeNo,
+            orderAmount: orderAmountStr,
+            totalAmount,
+        })
         return new NextResponse("failure", { status: 400, headers: { "Content-Type": "text/plain" } })
     }
 
@@ -55,27 +64,43 @@ export async function POST(request: NextRequest) {
     }
 
     if (order.status !== "PENDING") {
+        console.warn("[alipay/notify] TRADE_SUCCESS but order not PENDING (possible race with cron)", {
+            orderNo: outTradeNo,
+            status: order.status,
+        })
         return new NextResponse("success", { headers: { "Content-Type": "text/plain" } })
     }
 
+    let completedInThisRequest = 0
     try {
-        await prisma.$transaction(async (tx) => {
-            await tx.order.update({
-                where: { id: order.id },
+        completedInThisRequest = await prisma.$transaction(async (tx) => {
+            const updateResult = await tx.order.updateMany({
+                where: { id: order.id, status: "PENDING" },
                 data: { status: "COMPLETED", paidAt: new Date() },
             })
-            await tx.card.updateMany({
-                where: { orderId: order.id, status: "RESERVED" },
-                data: { status: "SOLD" },
-            })
+            if (updateResult.count > 0) {
+                await tx.card.updateMany({
+                    where: { orderId: order.id, status: "RESERVED" },
+                    data: { status: "SOLD" },
+                })
+            }
+            return updateResult.count
         })
-    } catch {
+        if (completedInThisRequest === 0) {
+            console.warn("[alipay/notify] Order no longer PENDING in transaction", {
+                orderNo: outTradeNo,
+            })
+        }
+    } catch (err) {
+        console.error("[alipay/notify] Transaction failed", { orderNo: outTradeNo, err })
         return new NextResponse("failure", { status: 500, headers: { "Content-Type": "text/plain" } })
     }
 
-    sendOrderCompletionEmail(order.id).catch((err) =>
-        console.error("[order-completion-email]", err),
-    )
+    if (completedInThisRequest > 0) {
+        sendOrderCompletionEmail(order.id).catch((err) =>
+            console.error("[order-completion-email]", err),
+        )
+    }
 
     return new NextResponse("success", { headers: { "Content-Type": "text/plain" } })
 }

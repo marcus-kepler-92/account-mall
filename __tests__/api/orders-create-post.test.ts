@@ -198,6 +198,54 @@ describe("POST /api/orders (create order)", () => {
         expect(data.error).toBe("Validation failed")
     })
 
+    it("returns 400 when order amount is invalid (zero)", async () => {
+        prismaMock.product.findUnique.mockResolvedValueOnce({
+            id: "prod_1",
+            name: "Test",
+            price: 0,
+            maxQuantity: 10,
+            status: "ACTIVE",
+        })
+        prismaMock.card.count.mockResolvedValueOnce(10)
+
+        const res = await POST(
+            createJsonRequest({
+                productId: "prod_1",
+                email: "user@example.com",
+                orderPassword: "password123",
+                quantity: 1,
+            })
+        )
+        const data = await res.json()
+        expect(res.status).toBe(400)
+        expect(data.error).toBe("Invalid order amount")
+        expect(prismaMock.$transaction).not.toHaveBeenCalled()
+    })
+
+    it("returns 400 when order amount exceeds max (999999.99)", async () => {
+        prismaMock.product.findUnique.mockResolvedValueOnce({
+            id: "prod_1",
+            name: "Test",
+            price: 500000,
+            maxQuantity: 10,
+            status: "ACTIVE",
+        })
+        prismaMock.card.count.mockResolvedValueOnce(10)
+
+        const res = await POST(
+            createJsonRequest({
+                productId: "prod_1",
+                email: "user@example.com",
+                orderPassword: "password123",
+                quantity: 2,
+            })
+        )
+        const data = await res.json()
+        expect(res.status).toBe(400)
+        expect(data.error).toBe("Invalid order amount")
+        expect(prismaMock.$transaction).not.toHaveBeenCalled()
+    })
+
     it("returns 400 when insufficient stock", async () => {
         prismaMock.product.findUnique.mockResolvedValueOnce({
             id: "prod_1",

@@ -42,9 +42,16 @@ export const orderByEmailQuerySchema = z.object({
     pageSize: z.coerce.number().int().min(1).max(100).default(20),
 })
 
+/** POST /api/orders/by-email: requires email + password to list orders (security). */
+export const orderByEmailPostSchema = publicOrderLookupByEmailSchema.extend({
+    page: z.coerce.number().int().min(1).default(1),
+    pageSize: z.coerce.number().int().min(1).max(100).default(20),
+})
+
 export type CreateOrderInput = z.infer<typeof createOrderSchema>
 export type OrderListQueryInput = z.infer<typeof orderListQuerySchema>
 export type UpdateOrderStatusInput = z.infer<typeof updateOrderStatusSchema>
 export type PublicOrderLookupInput = z.infer<typeof publicOrderLookupSchema>
 export type PublicOrderLookupByEmailInput = z.infer<typeof publicOrderLookupByEmailSchema>
 export type OrderByEmailQueryInput = z.infer<typeof orderByEmailQuerySchema>
+export type OrderByEmailPostInput = z.infer<typeof orderByEmailPostSchema>

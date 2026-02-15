@@ -225,6 +225,13 @@ export async function PATCH(
     }
 
     if (nextStatus === "COMPLETED") {
+        console.warn("[admin/order-completed]", {
+            orderId: params.orderId,
+            orderNo: updated.orderNo,
+            adminUserId: session.user?.id,
+            adminUserEmail: session.user?.email,
+            at: new Date().toISOString(),
+        })
         sendOrderCompletionEmail(params.orderId).catch((err) =>
             console.error("[order-completion-email]", err),
         )

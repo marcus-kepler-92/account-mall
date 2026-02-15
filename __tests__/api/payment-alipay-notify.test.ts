@@ -104,8 +104,9 @@ describe("POST /api/payment/alipay/notify", () => {
             product: { name: "Test" },
             cards: [{ id: "c1", status: "RESERVED" }],
         } as any)
-        prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<void>) => {
-            await fn(prismaMock)
+        prismaMock.order.updateMany.mockResolvedValue({ count: 1 })
+        prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<number>) => {
+            return await fn(prismaMock)
         })
         const req = createNotifyRequest({
             out_trade_no: "order-1",
@@ -115,9 +116,9 @@ describe("POST /api/payment/alipay/notify", () => {
         const res = await POST(req as any)
         expect(res.status).toBe(200)
         expect(await res.text()).toBe("success")
-        expect(prismaMock.order.update).toHaveBeenCalledWith(
+        expect(prismaMock.order.updateMany).toHaveBeenCalledWith(
             expect.objectContaining({
-                where: { id: "ord_1" },
+                where: { id: "ord_1", status: "PENDING" },
                 data: { status: "COMPLETED", paidAt: expect.any(Date) },
             }),
         )
@@ -136,6 +137,27 @@ describe("POST /api/payment/alipay/notify", () => {
             orderNo: "order-1",
             status: "COMPLETED",
             amount: 99,
+        } as any)
+        const req = createNotifyRequest({
+            out_trade_no: "order-1",
+            total_amount: "99.00",
+            trade_status: "TRADE_SUCCESS",
+        })
+        const res = await POST(req as any)
+        expect(res.status).toBe(200)
+        expect(await res.text()).toBe("success")
+        expect(prismaMock.$transaction).not.toHaveBeenCalled()
+    })
+
+    it("returns success without updating when order is CLOSED (race with cron)", async () => {
+        verifyMock.mockReturnValue(true)
+        prismaMock.order.findFirst.mockResolvedValue({
+            id: "ord_1",
+            orderNo: "order-1",
+            status: "CLOSED",
+            amount: 99,
+            product: { name: "Test" },
+            cards: [],
         } as any)
         const req = createNotifyRequest({
             out_trade_no: "order-1",
