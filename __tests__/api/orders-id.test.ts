@@ -161,8 +161,7 @@ describe("/api/orders/[orderId] admin detail & status", () => {
     const data = await res.json()
 
     expect(res.status).toBe(409)
-    expect(data.error).toBe("Bad request")
-    expect(data.message).toBe("Invalid status transition")
+    expect(data.error).toBe("Invalid status transition")
   })
 
   it("PATCH PENDING -> COMPLETED updates order and cards", async () => {

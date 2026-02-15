@@ -12,6 +12,7 @@ import {
 } from "@/lib/rate-limit"
 import { config } from "@/lib/config"
 import { verifyTurnstileToken } from "@/lib/turnstile"
+import { unauthorized, validationError, badRequest, invalidJsonBody, notFound, internalServerError } from "@/lib/api-response"
 
 /**
  * Generate a unique order number using UUID v4.
@@ -28,7 +29,7 @@ export function generateOrderNo(): string {
 export async function GET(request: NextRequest) {
     const session = await getAdminSession()
     if (!session) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+        return unauthorized()
     }
 
     const { searchParams } = new URL(request.url)
@@ -46,10 +47,7 @@ export async function GET(request: NextRequest) {
 
     const parsed = orderListQuerySchema.safeParse(rawQuery)
     if (!parsed.success) {
-        return NextResponse.json(
-            { error: "Validation failed", details: parsed.error.flatten() },
-            { status: 400 }
-        )
+        return validationError(parsed.error.flatten())
     }
 
     const { page, pageSize, status, email, orderNo, productId, dateFrom, dateTo } = parsed.data
@@ -60,12 +58,8 @@ export async function GET(request: NextRequest) {
     if (dateFrom) {
         const parsedDate = new Date(dateFrom)
         if (Number.isNaN(parsedDate.getTime())) {
-            return NextResponse.json(
-                {
-                    error: "Bad request",
-                    message: "Invalid dateFrom format. Expected a valid date string (e.g. YYYY-MM-DD).",
-                },
-                { status: 400 }
+            return badRequest(
+                "Invalid dateFrom format. Expected a valid date string (e.g. YYYY-MM-DD).",
             )
         }
         fromDate = parsedDate
@@ -74,25 +68,15 @@ export async function GET(request: NextRequest) {
     if (dateTo) {
         const parsedDate = new Date(dateTo)
         if (Number.isNaN(parsedDate.getTime())) {
-            return NextResponse.json(
-                {
-                    error: "Bad request",
-                    message: "Invalid dateTo format. Expected a valid date string (e.g. YYYY-MM-DD).",
-                },
-                { status: 400 }
+            return badRequest(
+                "Invalid dateTo format. Expected a valid date string (e.g. YYYY-MM-DD).",
             )
         }
         toDate = parsedDate
     }
 
     if (fromDate && toDate && fromDate > toDate) {
-        return NextResponse.json(
-            {
-                error: "Bad request",
-                message: "dateFrom must be before or equal to dateTo",
-            },
-            { status: 400 }
-        )
+        return badRequest("dateFrom must be before or equal to dateTo")
     }
 
     const where: Record<string, unknown> = {}
@@ -191,15 +175,12 @@ export async function POST(request: NextRequest) {
     try {
         body = await request.json()
     } catch {
-        return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
+        return invalidJsonBody()
     }
 
     const parsed = createOrderSchema.safeParse(body)
     if (!parsed.success) {
-        return NextResponse.json(
-            { error: "Validation failed", details: parsed.error.flatten() },
-            { status: 400 }
-        )
+        return validationError(parsed.error.flatten())
     }
 
     const { productId, email, orderPassword, quantity, turnstileToken } = parsed.data
@@ -207,10 +188,7 @@ export async function POST(request: NextRequest) {
     const secretKey = config.turnstileSecretKey
     if (secretKey) {
         if (!turnstileToken || !turnstileToken.trim()) {
-            return NextResponse.json(
-                { error: "请完成安全验证后再提交订单。" },
-                { status: 400 }
-            )
+            return badRequest("请完成安全验证后再提交订单。")
         }
         const clientIp = getClientIp(request)
         const verifyResult = await verifyTurnstileToken(
@@ -224,7 +202,7 @@ export async function POST(request: NextRequest) {
                 codes.includes("timeout-or-duplicate") || codes.includes("expired")
                     ? "验证已过期，请刷新页面后重试。"
                     : "安全验证未通过，请重试。"
-            return NextResponse.json({ error: message }, { status: 400 })
+            return badRequest(message)
         }
     }
 
@@ -237,11 +215,8 @@ export async function POST(request: NextRequest) {
             where: { status: "PENDING", clientIp },
         })
         if (pendingCount >= MAX_PENDING_ORDERS_PER_IP) {
-            return NextResponse.json(
-                {
-                    error: `You have ${pendingCount} unpaid order(s). Please pay or wait for them to expire before creating more.`,
-                },
-                { status: 400 },
+            return badRequest(
+                `You have ${pendingCount} unpaid order(s). Please pay or wait for them to expire before creating more.`,
             )
         }
     }
@@ -252,14 +227,11 @@ export async function POST(request: NextRequest) {
     })
 
     if (!product || product.status !== "ACTIVE") {
-        return NextResponse.json({ error: "Product not found or unavailable" }, { status: 404 })
+        return notFound("Product not found or unavailable")
     }
 
     if (quantity < 1 || quantity > product.maxQuantity) {
-        return NextResponse.json(
-            { error: `Quantity must be between 1 and ${product.maxQuantity}` },
-            { status: 400 }
-        )
+        return badRequest(`Quantity must be between 1 and ${product.maxQuantity}`)
     }
 
     const unsoldCount = await prisma.card.count({
@@ -267,19 +239,13 @@ export async function POST(request: NextRequest) {
     })
 
     if (unsoldCount < quantity) {
-        return NextResponse.json(
-            { error: `Insufficient stock. Available: ${unsoldCount}` },
-            { status: 400 }
-        )
+        return badRequest(`Insufficient stock. Available: ${unsoldCount}`)
     }
 
     const amount = Number(product.price) * quantity
     const amountRounded = Math.round(amount * 100) / 100
     if (amountRounded <= 0 || amountRounded > 999_999.99) {
-        return NextResponse.json(
-            { error: "Invalid order amount" },
-            { status: 400 },
-        )
+        return badRequest("Invalid order amount")
     }
     const passwordHash = await hashPassword(orderPassword)
 
@@ -342,10 +308,7 @@ export async function POST(request: NextRequest) {
             ) {
                 retries++
                 if (retries >= MAX_RETRIES) {
-                    return NextResponse.json(
-                        { error: "Failed to create order after retries. Please try again." },
-                        { status: 500 }
-                    )
+                    return internalServerError("Failed to create order after retries. Please try again.")
                 }
                 // Wait a short random time before retry (shouldn't be needed with UUID)
                 await new Promise((resolve) => setTimeout(resolve, Math.random() * 50))
@@ -357,7 +320,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!order) {
-        return NextResponse.json({ error: "Failed to create order" }, { status: 500 })
+        return internalServerError("Failed to create order")
     }
 
     const amountStr = Number(order.amount).toFixed(2)

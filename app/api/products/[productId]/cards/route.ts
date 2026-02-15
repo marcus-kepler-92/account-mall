@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getAdminSession } from "@/lib/auth-guard";
 import { bulkImportCardsSchema } from "@/lib/validations/card";
 import { notifyRestockSubscribers } from "@/lib/restock-notify";
+import { unauthorized, notFound, invalidJsonBody, validationError, badRequest } from "@/lib/api-response";
 
 type RouteContext = {
     params: Promise<{ productId: string }>;
@@ -15,7 +16,7 @@ type RouteContext = {
 export async function GET(request: NextRequest, context: RouteContext) {
     const session = await getAdminSession();
     if (!session) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        return unauthorized();
     }
 
     const { productId } = await context.params;
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
         select: { id: true },
     });
     if (!product) {
-        return NextResponse.json({ error: "Product not found" }, { status: 404 });
+        return notFound("Product not found");
     }
 
     const where: { productId: string; status?: "UNSOLD" | "RESERVED" | "SOLD" } = {
@@ -76,7 +77,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
 export async function POST(request: NextRequest, context: RouteContext) {
     const session = await getAdminSession();
     if (!session) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        return unauthorized();
     }
 
     const { productId } = await context.params;
@@ -86,30 +87,24 @@ export async function POST(request: NextRequest, context: RouteContext) {
         select: { id: true },
     });
     if (!product) {
-        return NextResponse.json({ error: "Product not found" }, { status: 404 });
+        return notFound("Product not found");
     }
 
     let body: unknown;
     try {
         body = await request.json();
     } catch {
-        return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+        return invalidJsonBody();
     }
 
     const parsed = bulkImportCardsSchema.safeParse(body);
     if (!parsed.success) {
-        return NextResponse.json(
-            { error: "Validation failed", details: parsed.error.flatten() },
-            { status: 400 }
-        );
+        return validationError(parsed.error.flatten());
     }
 
     const contents = [...new Set(parsed.data.contents.map((c) => c.trim()).filter(Boolean))];
     if (contents.length === 0) {
-        return NextResponse.json(
-            { error: "No valid card contents to import" },
-            { status: 400 }
-        );
+        return badRequest("No valid card contents to import");
     }
 
     const oldUnsoldCount = await prisma.card.count({

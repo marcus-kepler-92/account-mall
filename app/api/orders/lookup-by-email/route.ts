@@ -4,6 +4,7 @@ import { config } from "@/lib/config"
 import { publicOrderLookupByEmailSchema } from "@/lib/validations/order"
 import { verifyPassword } from "better-auth/crypto"
 import { checkOrderQueryRateLimit } from "@/lib/rate-limit"
+import { invalidJsonBody, validationError, badRequest, internalServerError } from "@/lib/api-response"
 
 /**
  * POST /api/orders/lookup-by-email
@@ -18,20 +19,20 @@ export async function POST(request: NextRequest) {
     try {
         body = await request.json()
     } catch {
-        return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
+        return invalidJsonBody()
     }
 
     const parsed = publicOrderLookupByEmailSchema.safeParse(body)
     if (!parsed.success) {
         // Public endpoint: avoid exposing detailed validation errors.
-        return NextResponse.json({ error: "Validation failed" }, { status: 400 })
+        return validationError(undefined)
     }
 
     const { email, password } = parsed.data
 
     // Validate password before transaction
     if (!password || typeof password !== "string" || password.length < 6) {
-        return NextResponse.json({ error: "Validation failed" }, { status: 400 })
+        return validationError(undefined)
     }
 
     try {
@@ -180,12 +181,7 @@ export async function POST(request: NextRequest) {
         }
     } catch (error) {
         if (error instanceof Error && error.message === "LOOKUP_FAILED") {
-            return NextResponse.json(
-                {
-                    error: "Order not found or password incorrect",
-                },
-                { status: 400 }
-            )
+            return badRequest("Order not found or password incorrect")
         }
 
         // Log error details in development for debugging
@@ -197,7 +193,7 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+        return internalServerError()
     }
 }
 

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { orderByEmailPostSchema } from "@/lib/validations/order"
 import { verifyPassword } from "better-auth/crypto"
 import { checkOrderQueryRateLimit } from "@/lib/rate-limit"
+import { invalidJsonBody, validationError, badRequest } from "@/lib/api-response"
 
 const MAX_ORDERS_TO_CHECK = 100
 
@@ -19,12 +20,12 @@ export async function POST(request: NextRequest) {
     try {
         body = await request.json()
     } catch {
-        return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
+        return invalidJsonBody()
     }
 
     const parsed = orderByEmailPostSchema.safeParse(body)
     if (!parsed.success) {
-        return NextResponse.json({ error: "Validation failed" }, { status: 400 })
+        return validationError(undefined)
     }
 
     const { email, password, page, pageSize } = parsed.data
@@ -59,10 +60,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (matching.length === 0) {
-        return NextResponse.json(
-            { error: "Order not found or password incorrect" },
-            { status: 400 },
-        )
+        return badRequest("Order not found or password incorrect")
     }
 
     const total = matching.length

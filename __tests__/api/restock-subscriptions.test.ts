@@ -157,8 +157,8 @@ describe("/api/restock-subscriptions POST", () => {
     const data = await res.json()
 
     expect(res.status).toBe(400)
-    expect(data.error).toBe("Subscription limit reached")
-    expect(data.message).toContain("50")
+    expect(data.error).toContain("50")
+    expect(data.error).toContain("订阅")
     expect(prismaMock.restockSubscription.upsert).not.toHaveBeenCalled()
   })
 
@@ -177,8 +177,7 @@ describe("/api/restock-subscriptions POST", () => {
     const data = await res.json()
 
     expect(res.status).toBe(400)
-    expect(data.error).toBe("Product is in stock")
-    expect(data.message).toContain("当前有货")
+    expect(data.error).toContain("当前有货")
   })
 
   it("returns 404 when product does not exist or is inactive", async () => {

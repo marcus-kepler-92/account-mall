@@ -12,5 +12,18 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
+  app:
+    build: .
+    container_name: account-mall-app
+    restart: unless-stopped
+    depends_on:
+      - db
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-johndoe}:${POSTGRES_PASSWORD:-randompassword}@db:5432/${POSTGRES_DB:-mydb}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
+
 volumes:
   pgdata:

@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=18.18.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
@@ -15,7 +18,9 @@
     "db:seed": "tsx prisma/seed.ts",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "test:e2e": "playwright test",
+    "audit": "npm audit --audit-level=high"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -52,6 +57,7 @@
   },
   "devDependencies": {
     "@jest/types": "^30.2.0",
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",

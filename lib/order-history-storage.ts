@@ -1,15 +1,21 @@
+import { z } from "zod"
+
 /**
  * Client-side only. Local storage key for recent orders (no card content, no password).
  */
 export const ORDER_HISTORY_KEY = "account-mall-order-history"
 
-export type OrderHistoryItem = {
-    orderNo: string
-    productName: string
-    amount: number
-    createdAt: string
-    status: "PENDING" | "COMPLETED" | "CLOSED"
-}
+const orderHistoryItemSchema = z.object({
+    orderNo: z.string(),
+    productName: z.string(),
+    amount: z.number(),
+    createdAt: z.string(),
+    status: z.enum(["PENDING", "COMPLETED", "CLOSED"]),
+})
+
+const orderHistoryArraySchema = z.array(orderHistoryItemSchema)
+
+export type OrderHistoryItem = z.infer<typeof orderHistoryItemSchema>
 
 const MAX_ITEMS = 50
 
@@ -18,18 +24,9 @@ function getStored(): OrderHistoryItem[] {
     try {
         const raw = localStorage.getItem(ORDER_HISTORY_KEY)
         if (!raw) return []
-        const parsed = JSON.parse(raw) as unknown
-        if (!Array.isArray(parsed)) return []
-        return parsed.filter(
-            (x): x is OrderHistoryItem =>
-                typeof x === "object" &&
-                x !== null &&
-                typeof (x as OrderHistoryItem).orderNo === "string" &&
-                typeof (x as OrderHistoryItem).productName === "string" &&
-                typeof (x as OrderHistoryItem).amount === "number" &&
-                typeof (x as OrderHistoryItem).createdAt === "string" &&
-                ["PENDING", "COMPLETED", "CLOSED"].includes((x as OrderHistoryItem).status),
-        )
+        const parsed = orderHistoryArraySchema.safeParse(JSON.parse(raw))
+        if (!parsed.success) return []
+        return parsed.data.slice(0, MAX_ITEMS)
     } catch {
         return []
     }
@@ -83,4 +80,3 @@ export function removeOrderFromHistory(orderNo: string): void {
         // ignore
     }
 }
-

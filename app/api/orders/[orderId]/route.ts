@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getAdminSession } from "@/lib/auth-guard"
 import { updateOrderStatusSchema } from "@/lib/validations/order"
+import { unauthorized, notFound, invalidJsonBody, validationError, conflict, internalServerError } from "@/lib/api-response"
 
 /** Only allow: PENDING → COMPLETED, PENDING → CLOSED. COMPLETED → CLOSED is forbidden. */
 function isValidStatusTransition(from: string, to: string): boolean {
@@ -55,15 +56,16 @@ function mapOrderToResponse(order: {
 
 export async function GET(
     _request: NextRequest,
-    { params }: { params: { orderId: string } }
+    { params }: { params: Promise<{ orderId: string }> }
 ) {
     const session = await getAdminSession()
     if (!session) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+        return unauthorized()
     }
 
+    const { orderId } = await params
     const order = await prisma.order.findUnique({
-        where: { id: params.orderId },
+        where: { id: orderId },
         include: {
             product: {
                 select: {
@@ -81,7 +83,7 @@ export async function GET(
     })
 
     if (!order) {
-        return NextResponse.json({ error: "Order not found" }, { status: 404 })
+        return notFound("Order not found")
     }
 
     return NextResponse.json(mapOrderToResponse(order))
@@ -89,26 +91,24 @@ export async function GET(
 
 export async function PATCH(
     request: NextRequest,
-    { params }: { params: { orderId: string } }
+    { params }: { params: Promise<{ orderId: string }> }
 ) {
     const session = await getAdminSession()
     if (!session) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+        return unauthorized()
     }
 
+    const { orderId } = await params
     let body: unknown
     try {
         body = await request.json()
     } catch {
-        return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
+        return invalidJsonBody()
     }
 
     const parsed = updateOrderStatusSchema.safeParse(body)
     if (!parsed.success) {
-        return NextResponse.json(
-            { error: "Validation failed", details: parsed.error.flatten() },
-            { status: 400 }
-        )
+        return validationError(parsed.error.flatten())
     }
 
     const { status: nextStatus } = parsed.data
@@ -116,7 +116,7 @@ export async function PATCH(
     try {
         await prisma.$transaction(async (tx) => {
             const existing = await tx.order.findUnique({
-                where: { id: params.orderId },
+                where: { id: orderId },
                 include: {
                     cards: {
                         select: {
@@ -185,25 +185,19 @@ export async function PATCH(
     } catch (error) {
         if (error instanceof Error) {
             if (error.message === "ORDER_NOT_FOUND") {
-                return NextResponse.json({ error: "Order not found" }, { status: 404 })
+                return notFound("Order not found")
             }
 
             if (error.message === "INVALID_STATUS_TRANSITION") {
-                return NextResponse.json(
-                    {
-                        error: "Bad request",
-                        message: "Invalid status transition",
-                    },
-                    { status: 409 }
-                )
+                return conflict("Invalid status transition")
             }
         }
 
-        return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+        return internalServerError()
     }
 
     const updated = await prisma.order.findUnique({
-        where: { id: params.orderId },
+        where: { id: orderId },
         include: {
             product: {
                 select: {
@@ -221,18 +215,18 @@ export async function PATCH(
     })
 
     if (!updated) {
-        return NextResponse.json({ error: "Order not found" }, { status: 404 })
+        return notFound("Order not found")
     }
 
     if (nextStatus === "COMPLETED") {
         console.warn("[admin/order-completed]", {
-            orderId: params.orderId,
+            orderId,
             orderNo: updated.orderNo,
             adminUserId: session.user?.id,
             adminUserEmail: session.user?.email,
             at: new Date().toISOString(),
         })
-        sendOrderCompletionEmail(params.orderId).catch((err) =>
+        sendOrderCompletionEmail(orderId).catch((err) =>
             console.error("[order-completion-email]", err),
         )
     }
@@ -242,17 +236,18 @@ export async function PATCH(
 
 export async function DELETE(
     _request: NextRequest,
-    { params }: { params: { orderId: string } }
+    { params }: { params: Promise<{ orderId: string }> }
 ) {
     const session = await getAdminSession()
     if (!session) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+        return unauthorized()
     }
 
+    const { orderId } = await params
     try {
         await prisma.$transaction(async (tx) => {
             const existing = await tx.order.findUnique({
-                where: { id: params.orderId },
+                where: { id: orderId },
                 include: {
                     cards: {
                         select: {
@@ -292,14 +287,14 @@ export async function DELETE(
         })
     } catch (error) {
         if (error instanceof Error && error.message === "ORDER_NOT_FOUND") {
-            return NextResponse.json({ error: "Order not found" }, { status: 404 })
+            return notFound("Order not found")
         }
 
-        return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+        return internalServerError()
     }
 
     const order = await prisma.order.findUnique({
-        where: { id: params.orderId },
+        where: { id: orderId },
         include: {
             product: {
                 select: {
@@ -317,7 +312,7 @@ export async function DELETE(
     })
 
     if (!order) {
-        return NextResponse.json({ error: "Order not found" }, { status: 404 })
+        return notFound("Order not found")
     }
 
     return NextResponse.json(mapOrderToResponse(order))

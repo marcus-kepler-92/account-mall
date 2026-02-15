@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAdminSession } from "@/lib/auth-guard";
+import { unauthorized, notFound } from "@/lib/api-response";
 
 type RouteContext = {
     params: Promise<{ tagId: string }>;
@@ -16,10 +17,7 @@ export async function DELETE(
 ) {
     const session = await getAdminSession();
     if (!session) {
-        return NextResponse.json(
-            { error: "Unauthorized" },
-            { status: 401 }
-        );
+        return unauthorized();
     }
 
     const { tagId } = await context.params;
@@ -28,10 +26,7 @@ export async function DELETE(
         where: { id: tagId },
     });
     if (!existing) {
-        return NextResponse.json(
-            { error: "Tag not found" },
-            { status: 404 }
-        );
+        return notFound("Tag not found");
     }
 
     await prisma.tag.delete({

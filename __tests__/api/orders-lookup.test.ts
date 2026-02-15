@@ -59,7 +59,8 @@ describe("POST /api/orders/lookup", () => {
     const data = await res.json()
 
     expect(res.status).toBe(400)
-    expect(data).toEqual({ error: "Validation failed" })
+    expect(data.error).toBe("Validation failed")
+expect(data.code).toBe("VALIDATION_FAILED")
   })
 
   it("returns 400 with fuzzy error when order does not exist", async () => {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getAlipayPagePayUrl, getAlipayWapPayUrl } from "@/lib/alipay"
+import { invalidJsonBody, badRequest, notFound } from "@/lib/api-response"
 
 /**
  * POST /api/payment/alipay/create
@@ -13,7 +14,7 @@ export async function POST(request: NextRequest) {
     try {
         body = await request.json()
     } catch {
-        return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
+        return invalidJsonBody()
     }
 
     const raw = body && typeof body === "object" && "orderNo" in body
@@ -23,7 +24,7 @@ export async function POST(request: NextRequest) {
     const clientType = raw.clientType === "wap" ? "wap" : "pc"
 
     if (!orderNo) {
-        return NextResponse.json({ error: "orderNo is required" }, { status: 400 })
+        return badRequest("orderNo is required")
     }
 
     const order = await prisma.order.findFirst({
@@ -34,13 +35,10 @@ export async function POST(request: NextRequest) {
     })
 
     if (!order) {
-        return NextResponse.json({ error: "Order not found" }, { status: 404 })
+        return notFound("Order not found")
     }
     if (order.status !== "PENDING") {
-        return NextResponse.json(
-            { error: "Order is not pending payment" },
-            { status: 400 },
-        )
+        return badRequest("Order is not pending payment")
     }
 
     const totalAmount = Number(order.amount).toFixed(2)

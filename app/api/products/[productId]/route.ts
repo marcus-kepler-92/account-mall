@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAdminSession } from "@/lib/auth-guard";
 import { updateProductSchema } from "@/lib/validations/product";
+import { notFound, unauthorized, invalidJsonBody, validationError, conflict } from "@/lib/api-response";
 
 type RouteContext = {
     params: Promise<{ productId: string }>;
@@ -27,10 +28,7 @@ export async function GET(
     });
 
     if (!product) {
-        return NextResponse.json(
-            { error: "Product not found" },
-            { status: 404 }
-        );
+        return notFound("Product not found");
     }
 
     // Get stock count
@@ -58,10 +56,7 @@ export async function PUT(
 ) {
     const session = await getAdminSession();
     if (!session) {
-        return NextResponse.json(
-            { error: "Unauthorized" },
-            { status: 401 }
-        );
+        return unauthorized();
     }
 
     const { productId } = await context.params;
@@ -70,18 +65,12 @@ export async function PUT(
     try {
         body = await request.json();
     } catch {
-        return NextResponse.json(
-            { error: "Invalid JSON body" },
-            { status: 400 }
-        );
+        return invalidJsonBody();
     }
 
     const parsed = updateProductSchema.safeParse(body);
     if (!parsed.success) {
-        return NextResponse.json(
-            { error: "Validation failed", details: parsed.error.flatten() },
-            { status: 400 }
-        );
+        return validationError(parsed.error.flatten());
     }
 
     // Check product exists
@@ -89,10 +78,7 @@ export async function PUT(
         where: { id: productId },
     });
     if (!existing) {
-        return NextResponse.json(
-            { error: "Product not found" },
-            { status: 404 }
-        );
+        return notFound("Product not found");
     }
 
     const { tagIds, ...data } = parsed.data;
@@ -103,10 +89,7 @@ export async function PUT(
             where: { slug: data.slug },
         });
         if (slugExists) {
-            return NextResponse.json(
-                { error: "A product with this slug already exists" },
-                { status: 409 }
-            );
+            return conflict("A product with this slug already exists");
         }
     }
 
@@ -144,10 +127,7 @@ export async function DELETE(
 ) {
     const session = await getAdminSession();
     if (!session) {
-        return NextResponse.json(
-            { error: "Unauthorized" },
-            { status: 401 }
-        );
+        return unauthorized();
     }
 
     const { productId } = await context.params;
@@ -156,10 +136,7 @@ export async function DELETE(
         where: { id: productId },
     });
     if (!existing) {
-        return NextResponse.json(
-            { error: "Product not found" },
-            { status: 404 }
-        );
+        return notFound("Product not found");
     }
 
     await prisma.product.update({

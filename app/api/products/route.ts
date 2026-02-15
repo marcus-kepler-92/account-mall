@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAdminSession } from "@/lib/auth-guard";
 import { createProductSchema } from "@/lib/validations/product";
+import { unauthorized, invalidJsonBody, validationError, conflict } from "@/lib/api-response";
 
 /**
  * GET /api/products
@@ -26,10 +27,7 @@ export async function GET(request: NextRequest) {
     if (isAdmin) {
         const session = await getAdminSession();
         if (!session) {
-            return NextResponse.json(
-                { error: "Unauthorized" },
-                { status: 401 }
-            );
+            return unauthorized();
         }
     }
 
@@ -135,18 +133,12 @@ export async function POST(request: NextRequest) {
     try {
         body = await request.json();
     } catch {
-        return NextResponse.json(
-            { error: "Invalid JSON body" },
-            { status: 400 }
-        );
+        return invalidJsonBody();
     }
 
     const parsed = createProductSchema.safeParse(body);
     if (!parsed.success) {
-        return NextResponse.json(
-            { error: "Validation failed", details: parsed.error.flatten() },
-            { status: 400 }
-        );
+        return validationError(parsed.error.flatten());
     }
 
     const { name, slug, description, image, price, maxQuantity, status, tagIds } =
@@ -157,10 +149,7 @@ export async function POST(request: NextRequest) {
         where: { slug },
     });
     if (existingSlug) {
-        return NextResponse.json(
-            { error: "A product with this slug already exists" },
-            { status: 409 }
-        );
+        return conflict("A product with this slug already exists");
     }
 
     const product = await prisma.product.create({

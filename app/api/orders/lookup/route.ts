@@ -4,6 +4,7 @@ import { publicOrderLookupSchema } from "@/lib/validations/order"
 import { verifyPassword } from "better-auth/crypto"
 import { createOrderSuccessToken } from "@/lib/order-success-token"
 import { checkOrderQueryRateLimit } from "@/lib/rate-limit"
+import { invalidJsonBody, validationError, badRequest, internalServerError } from "@/lib/api-response"
 
 /**
  * POST /api/orders/lookup
@@ -17,13 +18,13 @@ export async function POST(request: NextRequest) {
     try {
         body = await request.json()
     } catch {
-        return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
+        return invalidJsonBody()
     }
 
     const parsed = publicOrderLookupSchema.safeParse(body)
     if (!parsed.success) {
         // Public endpoint: avoid exposing detailed validation errors.
-        return NextResponse.json({ error: "Validation failed" }, { status: 400 })
+        return validationError()
     }
 
     const { orderNo, password } = parsed.data
@@ -90,15 +91,10 @@ export async function POST(request: NextRequest) {
         })
     } catch (error) {
         if (error instanceof Error && error.message === "LOOKUP_FAILED") {
-            return NextResponse.json(
-                {
-                    error: "Order not found or password incorrect",
-                },
-                { status: 400 }
-            )
+            return badRequest("Order not found or password incorrect")
         }
 
-        return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+        return internalServerError()
     }
 }
 

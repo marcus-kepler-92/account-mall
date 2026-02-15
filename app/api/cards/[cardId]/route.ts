@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAdminSession } from "@/lib/auth-guard";
+import { unauthorized, notFound, badRequest } from "@/lib/api-response";
 
 type RouteContext = {
     params: Promise<{ cardId: string }>;
@@ -13,7 +14,7 @@ type RouteContext = {
 export async function DELETE(_request: NextRequest, context: RouteContext) {
     const session = await getAdminSession();
     if (!session) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        return unauthorized();
     }
 
     const { cardId } = await context.params;
@@ -23,14 +24,11 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
     });
 
     if (!card) {
-        return NextResponse.json({ error: "Card not found" }, { status: 404 });
+        return notFound("Card not found");
     }
 
     if (card.status !== "UNSOLD") {
-        return NextResponse.json(
-            { error: "Only unsold cards can be deleted" },
-            { status: 400 }
-        );
+        return badRequest("Only unsold cards can be deleted");
     }
 
     await prisma.card.delete({

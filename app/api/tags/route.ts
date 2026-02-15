@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getAdminSession } from "@/lib/auth-guard";
 import { createTagSchema } from "@/lib/validations/product";
 import { generateSlug } from "@/lib/utils";
+import { unauthorized, invalidJsonBody, validationError, conflict } from "@/lib/api-response";
 
 /**
  * GET /api/tags
@@ -28,28 +29,19 @@ export async function GET() {
 export async function POST(request: NextRequest) {
     const session = await getAdminSession();
     if (!session) {
-        return NextResponse.json(
-            { error: "Unauthorized" },
-            { status: 401 }
-        );
+        return unauthorized();
     }
 
     let body: unknown;
     try {
         body = await request.json();
     } catch {
-        return NextResponse.json(
-            { error: "Invalid JSON body" },
-            { status: 400 }
-        );
+        return invalidJsonBody();
     }
 
     const parsed = createTagSchema.safeParse(body);
     if (!parsed.success) {
-        return NextResponse.json(
-            { error: "Validation failed", details: parsed.error.flatten() },
-            { status: 400 }
-        );
+        return validationError(parsed.error.flatten());
     }
 
     const { name } = parsed.data;
@@ -62,10 +54,7 @@ export async function POST(request: NextRequest) {
         },
     });
     if (existing) {
-        return NextResponse.json(
-            { error: "A tag with this name already exists" },
-            { status: 409 }
-        );
+        return conflict("A tag with this name already exists");
     }
 
     const tag = await prisma.tag.create({

@@ -10,7 +10,13 @@ const defaults = {
     adminPanelLabel: "管理后台",
 } as const
 
-export type SiteConfigValue = typeof defaults
+export type SiteConfigValue = {
+    siteName: string
+    siteDescription: string
+    siteTagline: string
+    siteSubtitle: string
+    adminPanelLabel: string
+}
 
 const SiteConfigContext = createContext<SiteConfigValue>(defaults)
 

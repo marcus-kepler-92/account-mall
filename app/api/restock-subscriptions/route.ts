@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createRestockSubscriptionSchema } from "@/lib/validations/restock-subscription";
+import { invalidJsonBody, validationError, notFound, badRequest } from "@/lib/api-response";
 
 /** Max PENDING subscriptions per email across all products (abuse prevention). */
 const MAX_PENDING_SUBSCRIPTIONS_PER_EMAIL = 50;
@@ -28,21 +29,12 @@ export async function POST(request: NextRequest) {
     try {
         body = await request.json();
     } catch {
-        return NextResponse.json(
-            { error: "Invalid JSON body" },
-            { status: 400 }
-        );
+        return invalidJsonBody();
     }
 
     const parsed = createRestockSubscriptionSchema.safeParse(body);
     if (!parsed.success) {
-        return NextResponse.json(
-            {
-                error: "Validation failed",
-                details: parsed.error.flatten(),
-            },
-            { status: 400 }
-        );
+        return validationError(parsed.error.flatten());
     }
 
     const { productId, email } = parsed.data;
@@ -58,10 +50,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!product || product.status !== "ACTIVE") {
-        return NextResponse.json(
-            { error: "Product not found or unavailable" },
-            { status: 404 }
-        );
+        return notFound("Product not found or unavailable");
     }
 
     const unsoldCount = await prisma.card.count({
@@ -69,13 +58,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (unsoldCount > 0) {
-        return NextResponse.json(
-            {
-                error: "Product is in stock",
-                message: "当前有货，可直接下单购买",
-            },
-            { status: 400 }
-        );
+        return badRequest("当前有货，可直接下单购买");
     }
 
     const normalizedEmail = email.trim().toLowerCase();
@@ -85,12 +68,8 @@ export async function POST(request: NextRequest) {
         where: { email: normalizedEmail, status: "PENDING" },
     });
     if (pendingCount >= MAX_PENDING_SUBSCRIPTIONS_PER_EMAIL) {
-        return NextResponse.json(
-            {
-                error: "Subscription limit reached",
-                message: `每个邮箱最多订阅 ${MAX_PENDING_SUBSCRIPTIONS_PER_EMAIL} 个商品的补货提醒，请先取消部分订阅后再试`,
-            },
-            { status: 400 }
+        return badRequest(
+            `每个邮箱最多订阅 ${MAX_PENDING_SUBSCRIPTIONS_PER_EMAIL} 个商品的补货提醒，请先取消部分订阅后再试`,
         );
     }
 
@@ -125,10 +104,7 @@ export async function GET(request: NextRequest) {
     const email = searchParams.get("email");
 
     if (!productId?.trim() || !email?.trim()) {
-        return NextResponse.json(
-            { error: "productId and email are required" },
-            { status: 400 }
-        );
+        return badRequest("productId and email are required");
     }
 
     const normalizedEmail = email.trim().toLowerCase();

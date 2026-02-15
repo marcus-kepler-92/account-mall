@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -35,7 +35,7 @@ interface OrderListItem {
 
 type LookupMode = "orderNo" | "email"
 
-export default function OrderLookupPage() {
+function OrderLookupPageContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
     const siteName = useSiteName()
@@ -630,5 +630,13 @@ export default function OrderLookupPage() {
                 </SheetContent>
             </Sheet>
         </div>
+    )
+}
+
+export default function OrderLookupPage() {
+    return (
+        <Suspense fallback={<div className="flex min-h-screen items-center justify-center">加载中...</div>}>
+            <OrderLookupPageContent />
+        </Suspense>
     )
 }

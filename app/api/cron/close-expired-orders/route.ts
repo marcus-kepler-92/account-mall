@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { config } from "@/lib/config"
+import { serviceUnavailable, unauthorized } from "@/lib/api-response"
 
 /** Grace period (ms) after timeout before closing orders, to allow Alipay notify to arrive first. */
 const PENDING_ORDER_CLOSE_GRACE_MS = 2 * 60 * 1000 // 2 minutes
@@ -15,13 +16,10 @@ export async function GET(request: NextRequest) {
     const authHeader = request.headers.get("authorization")
     const cronSecret = config.cronSecret
     if (!cronSecret) {
-        return NextResponse.json(
-            { error: "Cron is not configured (CRON_SECRET required)" },
-            { status: 503 },
-        )
+        return serviceUnavailable("Cron is not configured (CRON_SECRET required)")
     }
     if (authHeader !== `Bearer ${cronSecret}`) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+        return unauthorized()
     }
 
     const closeBeforeMs = config.pendingOrderTimeoutMs + PENDING_ORDER_CLOSE_GRACE_MS

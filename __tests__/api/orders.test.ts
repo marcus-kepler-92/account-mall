@@ -70,8 +70,7 @@ describe("GET /api/orders (admin list)", () => {
     const data = await res.json()
 
     expect(res.status).toBe(400)
-    expect(data.error).toBe("Bad request")
-    expect(data.message).toContain("dateFrom")
+    expect(data.error).toContain("dateFrom")
   })
 
   it("returns paginated orders with computed card counts", async () => {
@@ -219,8 +218,7 @@ describe("GET /api/orders (admin list)", () => {
     const data = await res.json()
 
     expect(res.status).toBe(400)
-    expect(data.error).toBe("Bad request")
-    expect(data.message).toContain("Invalid dateFrom format")
+    expect(data.error).toContain("Invalid dateFrom format")
   })
 })
 
