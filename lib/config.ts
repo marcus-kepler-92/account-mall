@@ -24,9 +24,9 @@ const envSchema = z
         alipayPublicKey: z.string().optional(),
         cronSecret: z.string().optional(),
         pendingOrderTimeoutMs: z.coerce.number().int().positive().default(900000),
-        orderRateLimitPoints: z.coerce.number().int().positive().default(5),
-        orderQueryRateLimitPoints: z.coerce.number().int().positive().default(5),
-        maxPendingOrdersPerIp: z.coerce.number().int().positive().default(3),
+        orderRateLimitPoints: z.coerce.number().int().positive().default(10),
+        orderQueryRateLimitPoints: z.coerce.number().int().positive().default(30),
+        maxPendingOrdersPerIp: z.coerce.number().int().positive().default(6),
         orderSuccessTokenSecret: z.string().optional(),
     })
     .transform((data) => {
