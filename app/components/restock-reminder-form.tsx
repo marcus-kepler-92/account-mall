@@ -84,7 +84,7 @@ export function RestockReminderForm({
         <>
             <div className="space-y-3">
                 <h3 className="text-sm font-semibold text-muted-foreground">
-                    到货提醒
+                    补货提醒
                 </h3>
                 <p className="text-sm text-muted-foreground">
                     商品补货后，我们会通过邮箱第一时间通知你。
@@ -104,7 +104,7 @@ export function RestockReminderForm({
                     ) : (
                         <>
                             <Bell className="size-4 shrink-0" />
-                            到货提醒我
+                            补货提醒我
                         </>
                     )}
                 </Button>
@@ -113,7 +113,7 @@ export function RestockReminderForm({
             <Dialog open={open} onOpenChange={setOpen}>
                 <DialogContent showCloseButton>
                     <DialogHeader>
-                        <DialogTitle>到货提醒</DialogTitle>
+                        <DialogTitle>补货提醒</DialogTitle>
                         <DialogDescription>
                             输入邮箱，商品补货后我们会第一时间通知你。
                         </DialogDescription>

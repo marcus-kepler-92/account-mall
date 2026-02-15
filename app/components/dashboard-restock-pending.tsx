@@ -21,7 +21,7 @@ export function DashboardRestockPending({
     if (data.length === 0) {
         return (
             <p className="py-4 text-center text-sm text-muted-foreground">
-                暂无待通知的到货提醒
+                暂无待通知的补货提醒
             </p>
         )
     }

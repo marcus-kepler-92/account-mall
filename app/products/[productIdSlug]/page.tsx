@@ -330,7 +330,7 @@ type ProductRestockSectionProps = {
 
 function ProductRestockSection({ productId, productName }: ProductRestockSectionProps) {
     return (
-        <section id="restock-section" aria-label="到货提醒">
+        <section id="restock-section" aria-label="补货提醒">
             <div className="rounded-xl border bg-card p-4 shadow-sm sm:p-5">
                 <RestockReminderForm productId={productId} productName={productName} />
             </div>

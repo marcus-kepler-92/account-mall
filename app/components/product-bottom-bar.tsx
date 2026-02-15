@@ -56,7 +56,7 @@ export function ProductBottomBar({
                         </span>
                         {!inStock && (
                             <span className="mt-0.5 text-[11px] text-muted-foreground">
-                                已售罄，可订阅到货提醒
+                                已售罄，可订阅补货提醒
                             </span>
                         )}
                     </div>
@@ -68,7 +68,7 @@ export function ProductBottomBar({
                     onClick={handleClick}
                     disabled={!inStock && !restockSectionId}
                 >
-                    {inStock ? "立即购买" : "到货提醒"}
+                    {inStock ? "立即购买" : "补货提醒"}
                 </Button>
             </div>
         </div>

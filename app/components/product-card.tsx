@@ -151,7 +151,7 @@ export function ProductCard({ product, gradientIndex = 0, className }: ProductCa
                             {isSoldOut ? (
                                 <>
                                     <Bell className="size-3.5" />
-                                    到货提醒
+                                    补货提醒
                                 </>
                             ) : (
                                 "购买"

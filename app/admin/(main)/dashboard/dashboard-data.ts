@@ -213,7 +213,7 @@ export async function getInventoryByProduct(): Promise<InventoryRow[]> {
 }
 
 /**
- * 待通知的到货提醒数量（按商品）
+ * 待通知的补货提醒数量（按商品）
  */
 export async function getRestockPending(): Promise<RestockPendingRow[]> {
     const [byProduct, products] = await Promise.all([

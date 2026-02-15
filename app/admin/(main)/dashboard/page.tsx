@@ -84,7 +84,7 @@ export default async function AdminDashboardPage() {
         {
             title: "待补货需求",
             value: String(kpis.restockPendingCount),
-            description: "待通知到货提醒人数",
+            description: "待通知补货提醒人数",
             href: "/admin/products",
             icon: Bell,
             ariaLabel: `待补货需求 ${kpis.restockPendingCount} 人，查看商品`,
@@ -265,7 +265,7 @@ export default async function AdminDashboardPage() {
                 </Card>
                 <Card className="min-w-0">
                     <CardHeader>
-                        <CardTitle className="text-base sm:text-lg">待通知到货提醒</CardTitle>
+                        <CardTitle className="text-base sm:text-lg">待通知补货提醒</CardTitle>
                         <CardDescription>缺货商品的订阅人数</CardDescription>
                     </CardHeader>
                     <CardContent className="min-w-0">
