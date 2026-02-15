@@ -1,4 +1,4 @@
-import Link from "next/link"
+import Image from "next/image"
 import { notFound, redirect } from "next/navigation"
 import type { Metadata } from "next"
 import { Suspense } from "react"
@@ -34,16 +34,34 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
     const product = await prisma.product.findUnique({
         where: { id: parsed.productId },
-        select: { name: true, description: true, price: true, status: true },
+        select: { name: true, description: true, price: true, status: true, image: true, id: true, slug: true },
     })
     if (!product || product.status !== "ACTIVE") return { title: "商品" }
 
     const desc = product.description
         ? String(product.description).replace(/<[^>]+>/g, "").slice(0, 160)
         : `${product.name} - ¥${Number(product.price).toFixed(2)}`
+    const productUrl = `${config.siteUrl}/products/${product.id}-${product.slug}`
+    const title = `${product.name} - ${config.siteName}`
+    const ogImages = product.image ? [{ url: product.image }] : undefined
     return {
-        title: `${product.name} - ${config.siteName}`,
+        title,
         description: desc,
+        alternates: { canonical: productUrl },
+        openGraph: {
+            title,
+            description: desc,
+            url: productUrl,
+            siteName: config.siteName,
+            type: "website",
+            ...(ogImages && { images: ogImages }),
+        },
+        twitter: {
+            card: "summary_large_image",
+            title,
+            description: desc,
+            ...(ogImages && { images: ogImages }),
+        },
     }
 }
 
@@ -180,18 +198,36 @@ type ProductMediaSectionProps = {
     isSoldOut: boolean
 }
 
+/** Only paths like /... are optimized by next/image; data: or external URLs use img. */
+function isOptimizableImage(src: string): boolean {
+    return src.startsWith("/")
+}
+
 function ProductMediaSection({ image, name, isSoldOut }: ProductMediaSectionProps) {
     if (!image) return null
 
     return (
         <section aria-label="商品图片">
             <div className="relative aspect-[4/3] w-full overflow-hidden rounded-xl bg-muted lg:aspect-square">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                    src={image}
-                    alt={name}
-                    className={cn("size-full object-cover object-center", isSoldOut && "grayscale")}
-                />
+                {isOptimizableImage(image) ? (
+                    <Image
+                        src={image}
+                        alt={name}
+                        fill
+                        sizes="(max-width: 1024px) 100vw, 50vw"
+                        className={cn("object-cover object-center", isSoldOut && "grayscale")}
+                        priority
+                    />
+                ) : (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                        src={image}
+                        alt={name}
+                        loading="eager"
+                        fetchPriority="high"
+                        className={cn("size-full object-cover object-center", isSoldOut && "grayscale")}
+                    />
+                )}
                 {isSoldOut && <SoldOutOverlay badgePosition="right-3 top-3" />}
             </div>
         </section>

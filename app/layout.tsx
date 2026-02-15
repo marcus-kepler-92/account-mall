@@ -9,17 +9,36 @@ import "./globals.css";
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
+  display: "swap",
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  display: "swap",
 });
 
 export async function generateMetadata(): Promise<Metadata> {
+  const title = config.siteName;
+  const description = config.siteDescription;
+  const url = config.siteUrl;
   return {
-    title: config.siteName,
-    description: config.siteDescription,
+    title,
+    description,
+    metadataBase: new URL(url),
+    openGraph: {
+      title,
+      description,
+      url,
+      siteName: title,
+      locale: "zh_CN",
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+    },
   };
 }
 

@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -9,6 +10,11 @@ import { cn } from "@/lib/utils"
 import { SoldOutOverlay } from "@/app/components/sold-out-overlay"
 
 // Primary-based gradients for theme consistency
+/** Relative or same-origin URLs use next/image; data: or external URLs use img (no optimization). */
+function isOptimizableImage(src: string): boolean {
+    return src.startsWith("/")
+}
+
 const CARD_GRADIENTS = [
     "from-primary/20 to-primary/40",
     "from-primary/15 to-primary/35",
@@ -59,15 +65,31 @@ export function ProductCard({ product, gradientIndex = 0, className }: ProductCa
                 {/* Cover: 1:1 aspect ratio, image preserves ratio via object-cover */}
                 <div className="relative aspect-square w-full shrink-0 overflow-hidden rounded-t-xl bg-muted">
                     {product.image ? (
-                        /* eslint-disable-next-line @next/next/no-img-element */
-                        <img
-                            src={product.image}
-                            alt={product.name}
-                            className={cn(
-                                "size-full object-cover transition-all duration-300 group-hover:scale-105",
-                                isSoldOut && "grayscale"
-                            )}
-                        />
+                        isOptimizableImage(product.image) ? (
+                            <Image
+                                src={product.image}
+                                alt={product.name}
+                                fill
+                                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, (max-width: 1536px) 25vw, (max-width: 1600px) 20vw, 16vw"
+                                className={cn(
+                                    "object-cover transition-all duration-300 group-hover:scale-105",
+                                    isSoldOut && "grayscale"
+                                )}
+                                priority={gradientIndex === 0}
+                            />
+                        ) : (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img
+                                src={product.image}
+                                alt={product.name}
+                                loading={gradientIndex === 0 ? "eager" : "lazy"}
+                                fetchPriority={gradientIndex === 0 ? "high" : "low"}
+                                className={cn(
+                                    "size-full object-cover transition-all duration-300 group-hover:scale-105",
+                                    isSoldOut && "grayscale"
+                                )}
+                            />
+                        )
                     ) : (
                         <div
                             className={cn(

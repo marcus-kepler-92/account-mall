@@ -194,7 +194,7 @@ export function ProductCatalog() {
                 <CollapsibleContent>
                     <div className="pt-2">
                         <Select value={sort} onValueChange={(v) => { setSort(v as SortOption); setCurrentPage(1) }}>
-                            <SelectTrigger className="w-full">
+                            <SelectTrigger className="w-full" aria-label="排序方式">
                                 <SelectValue placeholder="默认" />
                             </SelectTrigger>
                             <SelectContent>
@@ -242,7 +242,7 @@ export function ProductCatalog() {
                     {/* Desktop sort */}
                     <div className="hidden sm:block lg:hidden">
                         <Select value={sort} onValueChange={(v) => { setSort(v as SortOption); setCurrentPage(1) }}>
-                            <SelectTrigger className="w-[160px]">
+                            <SelectTrigger className="w-[160px]" aria-label="排序方式">
                                 <SelectValue placeholder="排序" />
                             </SelectTrigger>
                             <SelectContent>
@@ -317,11 +317,14 @@ export function ProductCatalog() {
 
                 {/* Product grid - equal height, cover aspect ratio preserved */}
                 {!loading && !error && (
+                <>
+                <h2 className="sr-only">商品列表</h2>
                 <div className="grid grid-cols-1 items-stretch gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 min-[1600px]:grid-cols-6">
                     {products.map((product, idx) => (
                         <ProductCard key={product.id} product={product} gradientIndex={idx} />
                     ))}
                 </div>
+                </>
                 )}
 
                 {/* Empty state */}
