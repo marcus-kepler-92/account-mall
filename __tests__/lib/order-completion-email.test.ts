@@ -9,6 +9,10 @@ jest.mock("@/lib/prisma", () => {
   }
 })
 
+jest.mock("@/lib/config", () => ({
+  config: { siteName: "Account Mall", siteUrl: "http://localhost:3000" },
+}))
+
 jest.mock("@/lib/email", () => ({
   __esModule: true,
   sendMail: jest.fn().mockResolvedValue({ success: true }),

@@ -3,11 +3,14 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { Turnstile } from "@marsidev/react-turnstile"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Loader2 } from "lucide-react"
 import { addOrUpdateOrder } from "@/lib/order-history-storage"
+
+const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? ""
 
 type ProductOrderFormProps = {
     productId: string
@@ -30,8 +33,10 @@ export function ProductOrderForm({
     const [orderPassword, setOrderPassword] = useState("")
     const [quantity, setQuantity] = useState(1)
     const [loading, setLoading] = useState(false)
+    const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
 
     const router = useRouter()
+    const requireTurnstile = Boolean(TURNSTILE_SITE_KEY)
 
     const totalPrice = (price * quantity).toFixed(2)
 
@@ -56,6 +61,7 @@ export function ProductOrderForm({
                     email: email.trim(),
                     orderPassword,
                     quantity,
+                    ...(turnstileToken && { turnstileToken }),
                 }),
             })
 
@@ -143,11 +149,21 @@ export function ProductOrderForm({
                 />
             </div>
 
+            {requireTurnstile && (
+                <div className="flex justify-center">
+                    <Turnstile
+                        siteKey={TURNSTILE_SITE_KEY}
+                        onSuccess={(token) => setTurnstileToken(token)}
+                        onExpire={() => setTurnstileToken(null)}
+                    />
+                </div>
+            )}
+
             <div className="flex items-center justify-between pt-2">
                 <span className="text-lg font-bold">合计: ¥{totalPrice}</span>
                 <Button
                     type="submit"
-                    disabled={!inStock || loading}
+                    disabled={!inStock || loading || (requireTurnstile && !turnstileToken)}
                     className="hidden lg:flex"
                 >
                     {loading && <Loader2 className="size-4 animate-spin" />}

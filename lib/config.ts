@@ -28,6 +28,8 @@ const envSchema = z
         orderQueryRateLimitPoints: z.coerce.number().int().positive().default(30),
         maxPendingOrdersPerIp: z.coerce.number().int().positive().default(6),
         orderSuccessTokenSecret: z.string().optional(),
+        turnstileSiteKey: z.string().optional(),
+        turnstileSecretKey: z.string().optional(),
     })
     .transform((data) => {
         const siteUrl =
@@ -63,6 +65,8 @@ function getEnvInput() {
         orderQueryRateLimitPoints: e.ORDER_QUERY_RATE_LIMIT_POINTS,
         maxPendingOrdersPerIp: e.MAX_PENDING_ORDERS_PER_IP,
         orderSuccessTokenSecret: e.ORDER_SUCCESS_TOKEN_SECRET,
+        turnstileSiteKey: e.TURNSTILE_SITE_KEY,
+        turnstileSecretKey: e.TURNSTILE_SECRET_KEY,
     }
 }
 

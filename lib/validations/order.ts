@@ -5,6 +5,7 @@ export const createOrderSchema = z.object({
     email: z.string().email("Invalid email address"),
     orderPassword: z.string().min(6, "Password must be at least 6 characters"),
     quantity: z.number().int().min(1, "Quantity must be at least 1"),
+    turnstileToken: z.string().optional(),
 })
 
 export const orderStatusSchema = z.enum(["PENDING", "COMPLETED", "CLOSED"])

@@ -10,6 +10,8 @@ import {
     getClientIp,
     MAX_PENDING_ORDERS_PER_IP,
 } from "@/lib/rate-limit"
+import { config } from "@/lib/config"
+import { verifyTurnstileToken } from "@/lib/turnstile"
 
 /**
  * Generate a unique order number using UUID v4.
@@ -185,6 +187,47 @@ export async function GET(request: NextRequest) {
  * Create order and reserve cards.
  */
 export async function POST(request: NextRequest) {
+    let body: unknown
+    try {
+        body = await request.json()
+    } catch {
+        return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
+    }
+
+    const parsed = createOrderSchema.safeParse(body)
+    if (!parsed.success) {
+        return NextResponse.json(
+            { error: "Validation failed", details: parsed.error.flatten() },
+            { status: 400 }
+        )
+    }
+
+    const { productId, email, orderPassword, quantity, turnstileToken } = parsed.data
+
+    const secretKey = config.turnstileSecretKey
+    if (secretKey) {
+        if (!turnstileToken || !turnstileToken.trim()) {
+            return NextResponse.json(
+                { error: "请完成安全验证后再提交订单。" },
+                { status: 400 }
+            )
+        }
+        const clientIp = getClientIp(request)
+        const verifyResult = await verifyTurnstileToken(
+            turnstileToken.trim(),
+            secretKey,
+            clientIp !== "unknown" ? clientIp : undefined
+        )
+        if (!verifyResult.success) {
+            const codes = verifyResult["error-codes"] ?? []
+            const message =
+                codes.includes("timeout-or-duplicate") || codes.includes("expired")
+                    ? "验证已过期，请刷新页面后重试。"
+                    : "安全验证未通过，请重试。"
+            return NextResponse.json({ error: message }, { status: 400 })
+        }
+    }
+
     const rateLimitRes = await checkOrderCreateRateLimit(request)
     if (rateLimitRes) return rateLimitRes
 
@@ -202,23 +245,6 @@ export async function POST(request: NextRequest) {
             )
         }
     }
-
-    let body: unknown
-    try {
-        body = await request.json()
-    } catch {
-        return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
-    }
-
-    const parsed = createOrderSchema.safeParse(body)
-    if (!parsed.success) {
-        return NextResponse.json(
-            { error: "Validation failed", details: parsed.error.flatten() },
-            { status: 400 }
-        )
-    }
-
-    const { productId, email, orderPassword, quantity } = parsed.data
 
     const product = await prisma.product.findUnique({
         where: { id: productId },

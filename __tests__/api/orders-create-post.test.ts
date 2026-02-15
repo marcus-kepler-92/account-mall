@@ -31,6 +31,16 @@ jest.mock("@/lib/alipay", () => ({
     getAlipayPagePayUrl: jest.fn().mockReturnValue(null),
 }))
 
+jest.mock("@/lib/config", () => {
+    const mock = { turnstileSecretKey: undefined as string | undefined }
+    ;(global as { __configMock?: typeof mock }).__configMock = mock
+    return { config: mock, getConfig: () => mock }
+})
+
+jest.mock("@/lib/turnstile", () => ({
+    verifyTurnstileToken: jest.fn(),
+}))
+
 function createJsonRequest(body: unknown): NextRequest {
     return {
         json: async () => body,
@@ -46,8 +56,13 @@ function createInvalidJsonRequest(): NextRequest {
 }
 
 describe("POST /api/orders (create order)", () => {
+    function getConfigMock() {
+    return (global as { __configMock?: { turnstileSecretKey?: string } }).__configMock!
+}
+
     beforeEach(() => {
         jest.clearAllMocks()
+        getConfigMock().turnstileSecretKey = undefined
         ;(prismaMock.$transaction as jest.Mock).mockReset()
     })
 
@@ -331,5 +346,150 @@ describe("POST /api/orders (create order)", () => {
         const data = await res.json()
         expect(data.error).toMatch(/unpaid order|expire/)
         expect(prismaMock.$transaction).not.toHaveBeenCalled()
+    })
+
+    describe("Turnstile verification", () => {
+        it("returns 400 when Turnstile is configured but token is missing", async () => {
+            getConfigMock().turnstileSecretKey = "test-secret"
+            const res = await POST(
+                createJsonRequest({
+                    productId: "prod_1",
+                    email: "user@example.com",
+                    orderPassword: "password123",
+                    quantity: 1,
+                })
+            )
+            const data = await res.json()
+            expect(res.status).toBe(400)
+            expect(data.error).toContain("安全验证")
+            const { verifyTurnstileToken } = require("@/lib/turnstile")
+            expect(verifyTurnstileToken).not.toHaveBeenCalled()
+        })
+
+        it("returns 400 when Turnstile is configured but token is empty string", async () => {
+            getConfigMock().turnstileSecretKey = "test-secret"
+            const res = await POST(
+                createJsonRequest({
+                    productId: "prod_1",
+                    email: "user@example.com",
+                    orderPassword: "password123",
+                    quantity: 1,
+                    turnstileToken: "   ",
+                })
+            )
+            const data = await res.json()
+            expect(res.status).toBe(400)
+            expect(data.error).toContain("安全验证")
+        })
+
+        it("returns 400 when Turnstile verification fails", async () => {
+            getConfigMock().turnstileSecretKey = "test-secret"
+            const { verifyTurnstileToken } = require("@/lib/turnstile")
+            ;(verifyTurnstileToken as jest.Mock).mockResolvedValueOnce({
+                success: false,
+                "error-codes": ["invalid-input-response"],
+            })
+            const res = await POST(
+                createJsonRequest({
+                    productId: "prod_1",
+                    email: "user@example.com",
+                    orderPassword: "password123",
+                    quantity: 1,
+                    turnstileToken: "bad-token",
+                })
+            )
+            const data = await res.json()
+            expect(res.status).toBe(400)
+            expect(data.error).toMatch(/安全验证|重试/)
+            expect(verifyTurnstileToken).toHaveBeenCalledWith(
+                "bad-token",
+                "test-secret",
+                "127.0.0.1"
+            )
+            expect(prismaMock.$transaction).not.toHaveBeenCalled()
+        })
+
+        it("returns 400 when Turnstile verification returns timeout-or-duplicate", async () => {
+            getConfigMock().turnstileSecretKey = "test-secret"
+            const { verifyTurnstileToken } = require("@/lib/turnstile")
+            ;(verifyTurnstileToken as jest.Mock).mockResolvedValueOnce({
+                success: false,
+                "error-codes": ["timeout-or-duplicate"],
+            })
+            const res = await POST(
+                createJsonRequest({
+                    productId: "prod_1",
+                    email: "user@example.com",
+                    orderPassword: "password123",
+                    quantity: 1,
+                    turnstileToken: "expired-token",
+                })
+            )
+            const data = await res.json()
+            expect(res.status).toBe(400)
+            expect(data.error).toMatch(/过期|刷新/)
+        })
+
+        it("creates order when Turnstile is configured and token verification succeeds", async () => {
+            getConfigMock().turnstileSecretKey = "test-secret"
+            const { verifyTurnstileToken } = require("@/lib/turnstile")
+            ;(verifyTurnstileToken as jest.Mock).mockResolvedValueOnce({
+                success: true,
+            })
+            prismaMock.product.findUnique.mockResolvedValueOnce({
+                id: "prod_1",
+                name: "Test",
+                price: 50,
+                maxQuantity: 5,
+                status: "ACTIVE",
+            })
+            prismaMock.card.count.mockResolvedValueOnce(3)
+            prismaMock.order.count.mockResolvedValueOnce(0)
+            const createdOrder = {
+                id: "order_new",
+                orderNo: "550e8400-e29b-41d4-a716-446655440000",
+                productId: "prod_1",
+                email: "user@example.com",
+                passwordHash: "hashed-password",
+                quantity: 1,
+                amount: 50,
+                status: "PENDING",
+                paidAt: null,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+            }
+            const mockTx = {
+                order: {
+                    create: jest.fn().mockResolvedValue(createdOrder),
+                },
+                card: {
+                    findMany: jest.fn().mockResolvedValue([{ id: "card_1" }]),
+                    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+                },
+            }
+            ;(prismaMock.$transaction as jest.Mock).mockImplementation((cb: (tx: unknown) => Promise<unknown>) =>
+                cb(mockTx)
+            )
+
+            const res = await POST(
+                createJsonRequest({
+                    productId: "prod_1",
+                    email: "user@example.com",
+                    orderPassword: "password123",
+                    quantity: 1,
+                    turnstileToken: "valid-token",
+                })
+            )
+            const data = await res.json()
+
+            expect(res.status).toBe(200)
+            expect(data.orderNo).toBe(createdOrder.orderNo)
+            expect(verifyTurnstileToken).toHaveBeenCalledWith(
+                "valid-token",
+                "test-secret",
+                "127.0.0.1"
+            )
+            expect(mockTx.order.create).toHaveBeenCalled()
+        })
     })
 })
