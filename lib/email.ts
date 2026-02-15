@@ -1,11 +1,11 @@
 import { Resend } from "resend";
+import { config } from "@/lib/config";
 
-const resend = process.env.RESEND_API_KEY
-    ? new Resend(process.env.RESEND_API_KEY)
+const resend = config.resendApiKey
+    ? new Resend(config.resendApiKey)
     : null;
 
-const FROM_EMAIL =
-    process.env.EMAIL_FROM ?? "Account Mall <onboarding@resend.dev>";
+const FROM_EMAIL = config.emailFrom;
 
 export type SendMailOptions = {
     to: string | string[];

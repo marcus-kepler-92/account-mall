@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/app/components/theme-provider";
+import { SiteNameProvider } from "@/app/components/site-name-provider";
+import { config } from "@/lib/config";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -14,10 +16,12 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "Account Mall",
-  description: "卡密自动发卡平台 - 即买即发，安全可靠",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    title: config.siteName,
+    description: config.siteDescription,
+  };
+}
 
 export default function RootLayout({
   children,
@@ -35,8 +39,16 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
-          <Toaster />
+          <SiteNameProvider
+            siteName={config.siteName}
+            siteDescription={config.siteDescription}
+            siteTagline={config.siteTagline}
+            siteSubtitle={config.siteSubtitle}
+            adminPanelLabel={config.adminPanelLabel}
+          >
+            {children}
+            <Toaster />
+          </SiteNameProvider>
         </ThemeProvider>
       </body>
     </html>

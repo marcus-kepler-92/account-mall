@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import { SiteHeader } from "@/app/components/site-header"
+import { useSiteName } from "@/app/components/site-name-provider"
 import { Copy, Check, Loader2, Mail, Hash, AlertCircle, Package, Search, Zap } from "lucide-react"
 import { toast } from "sonner"
 import { addOrUpdateOrder } from "@/lib/order-history-storage"
@@ -37,6 +38,7 @@ type LookupMode = "orderNo" | "email"
 export default function OrderLookupPage() {
     const router = useRouter()
     const searchParams = useSearchParams()
+    const siteName = useSiteName()
     const [lookupMode, setLookupMode] = useState<LookupMode>("orderNo")
     const [orderNo, setOrderNo] = useState("")
     const [email, setEmail] = useState("")
@@ -464,7 +466,7 @@ export default function OrderLookupPage() {
                                 <div className="flex size-6 items-center justify-center rounded-md bg-primary">
                                     <Zap className="size-3 text-primary-foreground" />
                                 </div>
-                                <span className="text-sm font-medium">Account Mall</span>
+                                <span className="text-sm font-medium">{siteName}</span>
                             </div>
                             <nav className="flex gap-4 text-sm text-muted-foreground">
                                 <Link href="/orders/lookup" className="hover:text-foreground transition-colors">
@@ -473,7 +475,7 @@ export default function OrderLookupPage() {
                             </nav>
                         </div>
                         <p className="text-sm text-muted-foreground">
-                            &copy; {new Date().getFullYear()} Account Mall 版权所有
+                            &copy; {new Date().getFullYear()} {siteName} 版权所有
                         </p>
                     </div>
                 </div>

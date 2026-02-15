@@ -3,6 +3,7 @@ import { Suspense } from "react"
 import { Zap } from "lucide-react"
 import { ProductCatalog } from "@/app/components/product-catalog"
 import { SiteHeader } from "@/app/components/site-header"
+import { config } from "@/lib/config"
 
 export default function HomePage() {
     return (
@@ -15,10 +16,10 @@ export default function HomePage() {
                     {/* Hero */}
                     <section className="mb-12 text-center">
                         <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-                            数字商品，即买即发
+                            {config.siteTagline}
                         </h1>
                         <p className="mx-auto mt-3 max-w-2xl text-lg text-muted-foreground">
-                            安全可靠的卡密自动发卡平台，支持多种数字商品类型
+                            {config.siteSubtitle}
                         </p>
                     </section>
                     <Suspense fallback={<div className="min-h-[400px]" />}>
@@ -36,7 +37,7 @@ export default function HomePage() {
                                 <div className="flex size-6 items-center justify-center rounded-md bg-primary">
                                     <Zap className="size-3 text-primary-foreground" />
                                 </div>
-                                <span className="text-sm font-medium">Account Mall</span>
+                                <span className="text-sm font-medium">{config.siteName}</span>
                             </div>
                             <nav className="flex gap-4 text-sm text-muted-foreground">
                                 <Link href="/orders/lookup" className="hover:text-foreground transition-colors">
@@ -45,7 +46,7 @@ export default function HomePage() {
                             </nav>
                         </div>
                         <p className="text-sm text-muted-foreground">
-                            &copy; {new Date().getFullYear()} Account Mall 版权所有
+                            &copy; {new Date().getFullYear()} {config.siteName} 版权所有
                         </p>
                     </div>
                 </div>

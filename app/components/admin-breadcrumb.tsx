@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useAdminPanelLabel } from "@/app/components/site-name-provider"
 import {
     Breadcrumb,
     BreadcrumbItem,
@@ -61,6 +62,7 @@ function getBreadcrumbItems(pathname: string) {
 
 export function AdminBreadcrumb() {
     const pathname = usePathname()
+    const adminPanelLabel = useAdminPanelLabel()
     const items = getBreadcrumbItems(pathname)
 
     if (items.length === 0) return null
@@ -70,7 +72,7 @@ export function AdminBreadcrumb() {
             <BreadcrumbList>
                 <BreadcrumbItem>
                     <BreadcrumbLink asChild>
-                        <Link href="/admin/dashboard">管理后台</Link>
+                        <Link href="/admin/dashboard">{adminPanelLabel}</Link>
                     </BreadcrumbLink>
                 </BreadcrumbItem>
                 {items.map((item, idx) => (

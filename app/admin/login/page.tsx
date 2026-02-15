@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useAdminPanelLabel } from "@/app/components/site-name-provider"
 
 export default function AdminLoginPage() {
     const router = useRouter()
@@ -41,6 +42,7 @@ export default function AdminLoginPage() {
         }
     }
 
+    const adminPanelLabel = useAdminPanelLabel()
     return (
         <div className="flex min-h-screen items-center justify-center bg-background">
             <Card className="w-full max-w-md">
@@ -49,7 +51,7 @@ export default function AdminLoginPage() {
                         管理员登录
                     </CardTitle>
                     <CardDescription>
-                        登录管理后台
+                        登录 {adminPanelLabel}
                     </CardDescription>
                 </CardHeader>
                 <CardContent>

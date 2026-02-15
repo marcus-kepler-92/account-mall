@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation"
 import type { Metadata } from "next"
 import { Suspense } from "react"
 import { prisma } from "@/lib/prisma"
+import { config } from "@/lib/config"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { ProductOrderForm } from "@/app/components/product-order-form"
@@ -41,7 +42,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
         ? String(product.description).replace(/<[^>]+>/g, "").slice(0, 160)
         : `${product.name} - ¥${Number(product.price).toFixed(2)}`
     return {
-        title: `${product.name} - Account Mall`,
+        title: `${product.name} - ${config.siteName}`,
         description: desc,
     }
 }
@@ -79,10 +80,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
     const isSoldOut = stockCount === 0
     const priceNumber = Number(product.price)
 
-    const baseUrl =
-        process.env.BETTER_AUTH_URL ??
-        (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000")
-    const productUrl = `${baseUrl}/products/${product.id}-${product.slug}`
+    const productUrl = `${config.siteUrl}/products/${product.id}-${product.slug}`
     const descriptionPlain = product.description
         ? String(product.description).replace(/<[^>]+>/g, "").slice(0, 160)
         : `${product.name} - ¥${priceNumber.toFixed(2)}`

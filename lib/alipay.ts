@@ -1,22 +1,16 @@
 import { AlipaySdk } from "alipay-sdk"
+import { config } from "@/lib/config"
 
 let alipaySdk: AlipaySdk | null = null
-
-function getBaseUrl(): string {
-    return (
-        process.env.BETTER_AUTH_URL ??
-        (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000")
-    )
-}
 
 /**
  * Get Alipay SDK instance. Returns null if Alipay is not configured.
  */
 export function getAlipaySdk(): AlipaySdk | null {
     if (alipaySdk) return alipaySdk
-    const appId = process.env.ALIPAY_APP_ID
-    const privateKey = process.env.ALIPAY_PRIVATE_KEY
-    const alipayPublicKey = process.env.ALIPAY_PUBLIC_KEY
+    const appId = config.alipayAppId
+    const privateKey = config.alipayPrivateKey
+    const alipayPublicKey = config.alipayPublicKey
     if (!appId || !privateKey || !alipayPublicKey) return null
     try {
         alipaySdk = new AlipaySdk({
@@ -43,7 +37,7 @@ export function getAlipayPagePayUrl(params: {
 }): string | null {
     const sdk = getAlipaySdk()
     if (!sdk) return null
-    const base = getBaseUrl()
+    const base = config.siteUrl
     try {
         const url = sdk.pageExecute(
             "alipay.trade.page.pay",
@@ -77,7 +71,7 @@ export function getAlipayWapPayUrl(params: {
 }): string | null {
     const sdk = getAlipaySdk()
     if (!sdk) return null
-    const base = getBaseUrl()
+    const base = config.siteUrl
     try {
         const url = sdk.pageExecute(
             "alipay.trade.wap.pay",

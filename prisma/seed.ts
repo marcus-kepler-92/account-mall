@@ -12,23 +12,20 @@ import { PrismaClient } from '@prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
 import pg from 'pg'
 import { hashPassword } from 'better-auth/crypto'
-
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@example.com'
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123456'
-const ADMIN_NAME = process.env.ADMIN_NAME || 'Admin'
+import { config } from '../lib/config'
 
 async function seed() {
-    const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL })
+    const pool = new pg.Pool({ connectionString: config.databaseUrl })
     const adapter = new PrismaPg(pool)
     const prisma = new PrismaClient({ adapter })
 
     console.log('🌱 Seeding database...')
-    console.log(`  Creating admin account: ${ADMIN_EMAIL}`)
+    console.log(`  Creating admin account: ${config.adminEmail}`)
 
     try {
         // Check if admin already exists
         const existing = await prisma.user.findUnique({
-            where: { email: ADMIN_EMAIL },
+            where: { email: config.adminEmail },
         })
 
         if (existing) {
@@ -37,13 +34,13 @@ async function seed() {
         }
 
         const now = new Date()
-        const hashedPassword = await hashPassword(ADMIN_PASSWORD)
+        const hashedPassword = await hashPassword(config.adminPassword)
 
         // Create user
         const user = await prisma.user.create({
             data: {
-                email: ADMIN_EMAIL,
-                name: ADMIN_NAME,
+                email: config.adminEmail,
+                name: config.adminName,
                 emailVerified: true,
                 createdAt: now,
                 updatedAt: now,
@@ -65,8 +62,8 @@ async function seed() {
         console.log('  ✅ Admin account created successfully!')
         console.log('')
         console.log('  ╔══════════════════════════════════════╗')
-        console.log(`  ║  Email:    ${ADMIN_EMAIL.padEnd(26)}║`)
-        console.log(`  ║  Password: ${ADMIN_PASSWORD.padEnd(26)}║`)
+        console.log(`  ║  Email:    ${config.adminEmail.padEnd(26)}║`)
+        console.log(`  ║  Password: ${config.adminPassword.padEnd(26)}║`)
         console.log('  ╚══════════════════════════════════════╝')
         console.log('')
         console.log('  ⚠️  Please change the password after first login!')

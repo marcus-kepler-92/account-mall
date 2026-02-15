@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { FileQuestion } from "lucide-react"
+import { config } from "@/lib/config"
 
 export default function AdminNotFound() {
     return (
@@ -14,7 +15,7 @@ export default function AdminNotFound() {
                     页面不存在
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                    您访问的管理后台页面可能不存在
+                    您访问的{config.adminPanelLabel}页面可能不存在
                 </p>
                 <Button asChild className="mt-8">
                     <Link href="/admin/dashboard">返回仪表盘</Link>

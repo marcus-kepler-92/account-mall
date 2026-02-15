@@ -1,15 +1,9 @@
 import type { MetadataRoute } from "next"
 import { prisma } from "@/lib/prisma"
-
-function getBaseUrl(): string {
-    return (
-        process.env.BETTER_AUTH_URL ??
-        (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000")
-    )
-}
+import { config } from "@/lib/config"
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-    const base = getBaseUrl()
+    const base = config.siteUrl
 
     const products = await prisma.product.findMany({
         where: { status: "ACTIVE" },

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { config } from "@/lib/config"
 import { publicOrderLookupByEmailSchema } from "@/lib/validations/order"
 import { verifyPassword } from "better-auth/crypto"
 import { checkOrderQueryRateLimit } from "@/lib/rate-limit"
@@ -76,7 +77,7 @@ export async function POST(request: NextRequest) {
             }
 
             // Debug logging in development
-            if (process.env.NODE_ENV === "development") {
+            if (config.nodeEnv === "development") {
                 console.log("[lookup-by-email] Found orders:", {
                     count: allOrders.length,
                     email: email.trim().toLowerCase(),
@@ -87,7 +88,7 @@ export async function POST(request: NextRequest) {
             const matchingOrders = []
             for (const order of allOrders) {
                 if (!order.passwordHash || typeof order.passwordHash !== "string") {
-                    if (process.env.NODE_ENV === "development") {
+                    if (config.nodeEnv === "development") {
                         console.warn("[lookup-by-email] Skipping order with invalid passwordHash:", order.orderNo)
                     }
                     continue
@@ -102,7 +103,7 @@ export async function POST(request: NextRequest) {
                         matchingOrders.push(order)
                     }
                 } catch (err) {
-                    if (process.env.NODE_ENV === "development") {
+                    if (config.nodeEnv === "development") {
                         console.error("[lookup-by-email] Password verification error for order:", order.orderNo, err)
                     }
                 }
@@ -188,7 +189,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Log error details in development for debugging
-        if (process.env.NODE_ENV === "development") {
+        if (config.nodeEnv === "development") {
             console.error("[lookup-by-email] Error:", error)
             if (error instanceof Error) {
                 console.error("[lookup-by-email] Error message:", error.message)

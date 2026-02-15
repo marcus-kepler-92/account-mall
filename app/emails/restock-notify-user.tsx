@@ -12,7 +12,6 @@ import {
 } from "@react-email/components";
 import * as React from "react";
 import {
-    BRAND_NAME,
     button,
     container,
     divider,
@@ -30,9 +29,15 @@ export interface RestockNotifyUserProps {
     productName: string;
     price: number;
     productUrl: string;
+    brandName?: string;
 }
 
-export function RestockNotifyUser({ productName, price, productUrl }: RestockNotifyUserProps) {
+export function RestockNotifyUser({
+    productName,
+    price,
+    productUrl,
+    brandName = "Account Mall",
+}: RestockNotifyUserProps) {
     return (
         <Html lang="zh-CN">
             <Head />
@@ -40,7 +45,7 @@ export function RestockNotifyUser({ productName, price, productUrl }: RestockNot
             <Body style={main}>
                 <Container style={container}>
                     <Section style={{ margin: "0 0 24px" }}>
-                        <Text style={headerBrand}>{BRAND_NAME}</Text>
+                        <Text style={headerBrand}>{brandName}</Text>
                     </Section>
 
                     <Section style={{ margin: "0 0 24px" }}>
@@ -64,7 +69,7 @@ export function RestockNotifyUser({ productName, price, productUrl }: RestockNot
 
                     <Hr style={divider} />
                     <Section>
-                        <Text style={footer}>{BRAND_NAME} · 补货提醒</Text>
+                        <Text style={footer}>{brandName} · 补货提醒</Text>
                     </Section>
                 </Container>
             </Body>

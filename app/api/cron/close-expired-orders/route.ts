@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-
-const PENDING_ORDER_TIMEOUT_MS = Number(process.env.PENDING_ORDER_TIMEOUT_MS) || 15 * 60 * 1000 // 15 min
+import { config } from "@/lib/config"
 
 /**
  * GET /api/cron/close-expired-orders
@@ -10,12 +9,12 @@ const PENDING_ORDER_TIMEOUT_MS = Number(process.env.PENDING_ORDER_TIMEOUT_MS) ||
  */
 export async function GET(request: NextRequest) {
     const authHeader = request.headers.get("authorization")
-    const cronSecret = process.env.CRON_SECRET
+    const cronSecret = config.cronSecret
     if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const before = new Date(Date.now() - PENDING_ORDER_TIMEOUT_MS)
+    const before = new Date(Date.now() - config.pendingOrderTimeoutMs)
 
     const expired = await prisma.order.findMany({
         where: {

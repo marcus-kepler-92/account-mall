@@ -12,7 +12,6 @@ import {
 } from "@react-email/components";
 import * as React from "react";
 import {
-    BRAND_NAME,
     button,
     container,
     divider,
@@ -30,6 +29,7 @@ export interface OrderCompletionProps {
     quantity: number;
     cards: { content: string }[];
     lookupUrl?: string;
+    brandName?: string;
 }
 
 const cardBlock = {
@@ -51,6 +51,7 @@ export function OrderCompletion({
     quantity,
     cards,
     lookupUrl,
+    brandName = "Account Mall",
 }: OrderCompletionProps) {
     return (
         <Html lang="zh-CN">
@@ -59,7 +60,7 @@ export function OrderCompletion({
             <Body style={main}>
                 <Container style={container}>
                     <Section style={{ margin: "0 0 24px" }}>
-                        <Text style={headerBrand}>{BRAND_NAME}</Text>
+                        <Text style={headerBrand}>{brandName}</Text>
                     </Section>
 
                     <Section style={{ margin: "0 0 24px" }}>
@@ -94,7 +95,7 @@ export function OrderCompletion({
 
                     <Hr style={divider} />
                     <Section>
-                        <Text style={footer}>{BRAND_NAME} · 订单通知</Text>
+                        <Text style={footer}>{brandName} · 订单通知</Text>
                     </Section>
                 </Container>
             </Body>

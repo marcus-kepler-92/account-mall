@@ -1,6 +1,7 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "@/lib/prisma";
+import { config } from "@/lib/config";
 
 export const auth = betterAuth({
     database: prismaAdapter(prisma, {
@@ -10,13 +11,13 @@ export const auth = betterAuth({
         enabled: true,
         disableSignUp: true, // Only admin login allowed, no public registration
     },
-    trustedOrigins: [process.env.BETTER_AUTH_URL!],
+    trustedOrigins: [config.siteUrl],
     rateLimit: {
         enabled: true,
         window: 60,
         max: 100,
     },
     advanced: {
-        useSecureCookies: process.env.NODE_ENV === "production",
+        useSecureCookies: config.nodeEnv === "production",
     },
 });

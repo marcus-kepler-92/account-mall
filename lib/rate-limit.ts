@@ -1,9 +1,10 @@
 import { RateLimiterMemory } from "rate-limiter-flexible"
 import { NextRequest } from "next/server"
+import { config } from "@/lib/config"
 
-const ORDER_CREATE_POINTS = Number(process.env.ORDER_RATE_LIMIT_POINTS) || 5
+const ORDER_CREATE_POINTS = config.orderRateLimitPoints
 const ORDER_CREATE_DURATION = 60 // 1 minute
-const QUERY_LIMIT_POINTS = Number(process.env.ORDER_QUERY_RATE_LIMIT_POINTS) || 5
+const QUERY_LIMIT_POINTS = config.orderQueryRateLimitPoints
 const QUERY_LIMIT_DURATION = 60
 
 const orderCreateLimiter = new RateLimiterMemory({
@@ -62,4 +63,4 @@ export async function checkOrderQueryRateLimit(request: NextRequest): Promise<Re
     }
 }
 
-export const MAX_PENDING_ORDERS_PER_IP = Number(process.env.MAX_PENDING_ORDERS_PER_IP) || 3
+export const MAX_PENDING_ORDERS_PER_IP = config.maxPendingOrdersPerIp

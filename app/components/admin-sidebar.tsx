@@ -30,6 +30,7 @@ import {
     SidebarMenuItem,
     SidebarRail,
 } from "@/components/ui/sidebar"
+import { useSiteName, useAdminPanelLabel } from "@/app/components/site-name-provider"
 
 // Navigation items for the admin panel
 const navItems = [
@@ -59,6 +60,8 @@ export function AdminSidebar() {
     const pathname = usePathname()
     const router = useRouter()
     const { theme, setTheme } = useTheme()
+    const siteName = useSiteName()
+    const adminPanelLabel = useAdminPanelLabel()
     const [mounted, setMounted] = useState(false)
     useEffect(() => setMounted(true), [])
 
@@ -83,8 +86,8 @@ export function AdminSidebar() {
                                     <Store className="size-4" />
                                 </div>
                                 <div className="flex flex-col gap-0.5 leading-none">
-                                    <span className="font-semibold">Account Mall</span>
-                                    <span className="text-xs text-muted-foreground">管理后台</span>
+                                    <span className="font-semibold">{siteName}</span>
+                                    <span className="text-xs text-muted-foreground">{adminPanelLabel}</span>
                                 </div>
                             </Link>
                         </SidebarMenuButton>

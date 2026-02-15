@@ -105,4 +105,4 @@ export const priceText = {
     margin: "0",
 };
 
-export const BRAND_NAME = "Account Mall";
+/** Brand/site name is passed as prop from callers (config.siteName), not from theme. */

@@ -1,9 +1,10 @@
 import { createHmac, timingSafeEqual } from "crypto"
+import { config } from "@/lib/config"
 
 const TOKEN_TTL_MS = 15 * 60 * 1000 // 15 minutes
 
 function getSecret(): string | null {
-    const secret = process.env.BETTER_AUTH_SECRET ?? process.env.ORDER_SUCCESS_TOKEN_SECRET
+    const secret = config.orderSuccessTokenSecret ?? config.betterAuthSecret
     if (!secret || secret.length < 16) return null
     return secret
 }

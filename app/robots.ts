@@ -1,14 +1,8 @@
 import type { MetadataRoute } from "next"
-
-function getBaseUrl(): string {
-    return (
-        process.env.BETTER_AUTH_URL ??
-        (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000")
-    )
-}
+import { config } from "@/lib/config"
 
 export default function robots(): MetadataRoute.Robots {
-    const base = getBaseUrl()
+    const base = config.siteUrl
     return {
         rules: {
             userAgent: "*",

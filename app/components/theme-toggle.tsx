@@ -17,13 +17,9 @@ export function ThemeToggle({ showLabel, ...props }: ThemeToggleProps) {
         setMounted(true)
     }, [])
 
-    if (!mounted) {
-        return (
-            <Button variant="ghost" size="icon" className="size-9" {...props}>
-                <Sun className="size-4" />
-                <span className="sr-only">切换主题</span>
-            </Button>
-        )
+    const isDark = theme === "dark"
+    const handleToggle = () => {
+        if (mounted) setTheme(isDark ? "light" : "dark")
     }
 
     return (
@@ -31,15 +27,11 @@ export function ThemeToggle({ showLabel, ...props }: ThemeToggleProps) {
             variant="ghost"
             size={showLabel ? "sm" : "icon"}
             className={showLabel ? "" : "size-9"}
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            onClick={handleToggle}
             aria-label="切换主题"
             {...props}
         >
-            {theme === "dark" ? (
-                <Sun className="size-4" />
-            ) : (
-                <Moon className="size-4" />
-            )}
+            {mounted ? (isDark ? <Sun className="size-4" /> : <Moon className="size-4" />) : <Sun className="size-4" />}
             {showLabel && <span>切换主题</span>}
         </Button>
     )

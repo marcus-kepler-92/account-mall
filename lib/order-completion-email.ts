@@ -1,12 +1,9 @@
 import { OrderCompletion } from "@/app/emails/order-completion";
 import { sendMail } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
+import { config } from "@/lib/config";
 import { render } from "@react-email/render";
 import React from "react";
-
-const BASE_URL =
-    process.env.BETTER_AUTH_URL ??
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
 
 /**
  * Send order completion email to customer with account/card info when order status becomes COMPLETED.
@@ -28,7 +25,7 @@ export async function sendOrderCompletionEmail(orderId: string): Promise<void> {
         return;
     }
 
-    const lookupUrl = `${BASE_URL}/orders/lookup`;
+    const lookupUrl = `${config.siteUrl}/orders/lookup`;
 
     const html = await render(
         React.createElement(OrderCompletion, {
@@ -37,12 +34,13 @@ export async function sendOrderCompletionEmail(orderId: string): Promise<void> {
             quantity: order.quantity,
             cards: order.cards.map((c) => ({ content: c.content })),
             lookupUrl,
+            brandName: config.siteName,
         }),
     );
 
     const result = await sendMail({
         to: order.email,
-        subject: "[Account Mall] 订单已完成：您的账号信息",
+        subject: `[${config.siteName}] 订单已完成：您的账号信息`,
         html,
     });
 

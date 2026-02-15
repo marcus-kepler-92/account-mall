@@ -24,6 +24,7 @@ import { DashboardOrderStatusChart } from "@/app/components/dashboard-order-stat
 import { DashboardTopProductsChart } from "@/app/components/dashboard-top-products-chart"
 import { DashboardInventoryAlerts } from "@/app/components/dashboard-inventory-alerts"
 import { DashboardRestockPending } from "@/app/components/dashboard-restock-pending"
+import { config } from "@/lib/config"
 
 export const dynamic = "force-dynamic"
 
@@ -95,7 +96,7 @@ export default async function AdminDashboardPage() {
             <header>
                 <h2 className="text-xl font-bold tracking-tight sm:text-2xl">概览</h2>
                 <p className="mt-1 text-sm text-muted-foreground sm:text-base">
-                    欢迎使用 Account Mall 管理后台
+                    欢迎使用 {config.siteName} {config.adminPanelLabel}
                 </p>
             </header>
 
