@@ -1,8 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { useSearchParams, useRouter } from "next/navigation"
-import Link from "next/link"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -41,14 +40,16 @@ function parseTagFromUrl(tagParam: string | null): string[] {
     return tagParam.split(",").map((s) => s.trim()).filter(Boolean)
 }
 
+/** 按 Next 推荐：URL 为单一数据源，仅在用户操作时更新 query（router.replace），不做 effect 双向同步。 */
 export function ProductCatalog() {
+    const pathname = usePathname()
     const router = useRouter()
     const searchParams = useSearchParams()
-    const tagFromUrl = parseTagFromUrl(searchParams.get("tag"))
+    const tagParam = searchParams.get("tag") ?? ""
+    const selectedTagSlugs = parseTagFromUrl(searchParams.get("tag"))
 
     const [searchInput, setSearchInput] = useState("")
     const [search, setSearch] = useState("")
-    const [selectedTagSlugs, setSelectedTagSlugs] = useState<string[]>(() => tagFromUrl)
     const [sort, setSort] = useState<SortOption>("default")
     const [currentPage, setCurrentPage] = useState(1)
     const [categoriesOpen, setCategoriesOpen] = useState(true)
@@ -77,7 +78,7 @@ export function ProductCatalog() {
         try {
             const params = new URLSearchParams()
             if (search.trim()) params.set("q", search.trim())
-            if (selectedTagSlugs.length > 0) params.set("tag", selectedTagSlugs.join(","))
+            if (tagParam) params.set("tag", tagParam)
             if (sort !== "default") params.set("sort", sort)
             params.set("page", String(currentPage))
             params.set("pageSize", String(PAGE_SIZE))
@@ -93,14 +94,7 @@ export function ProductCatalog() {
         } finally {
             setLoading(false)
         }
-    }, [search, selectedTagSlugs, sort, currentPage])
-
-    // Sync URL ?tag= to state when navigating (e.g. link to /?tag=xxx)
-    useEffect(() => {
-        if (tagFromUrl.length === 0 && selectedTagSlugs.length === 0) return
-        const same = tagFromUrl.length === selectedTagSlugs.length && tagFromUrl.every((t, i) => t === selectedTagSlugs[i])
-        if (!same) setSelectedTagSlugs(tagFromUrl)
-    }, [searchParams, tagFromUrl, selectedTagSlugs])
+    }, [search, tagParam, sort, currentPage])
 
     useEffect(() => {
         fetchTags()
@@ -109,23 +103,6 @@ export function ProductCatalog() {
     useEffect(() => {
         fetchProducts()
     }, [fetchProducts])
-
-    // Update URL when tag selection changes (GET /?tag={slug})
-    const updateTagInUrl = useCallback((slugs: string[]) => {
-        const params = new URLSearchParams(searchParams.toString())
-        if (slugs.length === 0) params.delete("tag")
-        else params.set("tag", slugs.join(","))
-        const q = params.toString()
-        const url = q ? `/?${q}` : "/"
-        router.replace(url, { scroll: false })
-    }, [router, searchParams])
-
-    useEffect(() => {
-        if (selectedTagSlugs.length === 0 && !searchParams.get("tag")) return
-        const current = parseTagFromUrl(searchParams.get("tag"))
-        const same = current.length === selectedTagSlugs.length && current.every((t, i) => t === selectedTagSlugs[i])
-        if (!same) updateTagInUrl(selectedTagSlugs)
-    }, [selectedTagSlugs, searchParams, updateTagInUrl])
 
     // Debounce search input
     useEffect(() => {
@@ -136,21 +113,32 @@ export function ProductCatalog() {
         return () => clearTimeout(t)
     }, [searchInput])
 
+    const createQueryStringWithTag = useCallback(
+        (tagSlugs: string[]) => {
+            const params = new URLSearchParams(searchParams.toString())
+            if (tagSlugs.length === 0) params.delete("tag")
+            else params.set("tag", tagSlugs.join(","))
+            return params.toString()
+        },
+        [searchParams]
+    )
+
     const toggleTag = (tagSlug: string) => {
-        setSelectedTagSlugs((prev) =>
-            prev.includes(tagSlug)
-                ? prev.filter((s) => s !== tagSlug)
-                : [...prev, tagSlug]
-        )
+        const next = selectedTagSlugs.includes(tagSlug)
+            ? selectedTagSlugs.filter((s) => s !== tagSlug)
+            : [...selectedTagSlugs, tagSlug]
+        const q = createQueryStringWithTag(next)
+        router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false })
         setCurrentPage(1)
     }
 
     const clearFilters = () => {
         setSearchInput("")
         setSearch("")
-        setSelectedTagSlugs([])
         setSort("default")
         setCurrentPage(1)
+        const q = createQueryStringWithTag([])
+        router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false })
     }
 
     const hasActiveFilters = searchInput || selectedTagSlugs.length > 0 || sort !== "default"

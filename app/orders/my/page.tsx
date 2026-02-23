@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, Suspense } from "react"
+import { useState, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import {
@@ -46,24 +46,17 @@ function formatAmount(amount: unknown): string {
     return "—"
 }
 
+/** URL → state 单向同步；若后续需把选中 orderNo 写回 URL，仅在本机用户操作时 router.replace，勿用 effect 根据 state 写 URL。 */
 function MyOrdersPageContent() {
     const searchParams = useSearchParams()
     const orderNoFromUrl = searchParams.get("orderNo")
 
-    const [orders, setOrders] = useState<OrderHistoryItem[]>([])
-    const [selectedOrderNo, setSelectedOrderNo] = useState<string | null>(null)
+    const [orders, setOrders] = useState<OrderHistoryItem[]>(() => getOrderHistory())
+    const [userSelectedOrderNo, setUserSelectedOrderNo] = useState<string | null>(null)
 
     const refreshOrders = () => setOrders(getOrderHistory())
 
-    useEffect(() => {
-        refreshOrders()
-    }, [])
-
-    useEffect(() => {
-        if (orderNoFromUrl) setSelectedOrderNo(orderNoFromUrl)
-        else if (orders.length > 0 && !selectedOrderNo) setSelectedOrderNo(orders[0].orderNo)
-    }, [orderNoFromUrl, orders, selectedOrderNo])
-
+    const selectedOrderNo = orderNoFromUrl ?? userSelectedOrderNo ?? orders[0]?.orderNo ?? null
     const selected = orders.find((o) => o.orderNo === selectedOrderNo)
 
     const handleRemoveOrder = (orderNo: string, e: React.MouseEvent) => {
@@ -74,7 +67,7 @@ function MyOrdersPageContent() {
         refreshOrders()
         if (selectedOrderNo === orderNo) {
             const rest = orders.filter((o) => o.orderNo !== orderNo)
-            setSelectedOrderNo(rest[0]?.orderNo ?? null)
+            setUserSelectedOrderNo(rest[0]?.orderNo ?? null)
         }
         toast.success("已从列表移除")
     }
@@ -113,11 +106,11 @@ function MyOrdersPageContent() {
                                                 <div
                                                     role="button"
                                                     tabIndex={0}
-                                                    onClick={() => setSelectedOrderNo(o.orderNo)}
+                                                    onClick={() => setUserSelectedOrderNo(o.orderNo)}
                                                     onKeyDown={(e) => {
                                                         if (e.key === "Enter" || e.key === " ") {
                                                             e.preventDefault()
-                                                            setSelectedOrderNo(o.orderNo)
+                                                            setUserSelectedOrderNo(o.orderNo)
                                                         }
                                                     }}
                                                     className={`flex w-full cursor-pointer items-center gap-2 px-4 py-3 text-left text-sm hover:bg-accent/50 ${

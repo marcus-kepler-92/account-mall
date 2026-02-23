@@ -1,0 +1,39 @@
+---
+description: URL 与 React state 同步的约定，避免死循环、振荡与无限请求
+globs: **/*.tsx
+---
+
+# URL 与 state 同步（最佳实践）
+
+## 推荐模式：URL 为单一数据源
+
+适用于列表筛选、分类、分页等「可分享链接 + 即时 UI」场景。
+
+1. **只读 URL，不维护重复 state**
+   - 用 `useSearchParams()` 读当前 query；展示用值**直接从 URL 派生**，例如 `const selectedTagSlugs = parseTagFromUrl(searchParams.get("tag"))`。
+   - 不要用 `useState` 存一份「和 URL 同含义」的数据，避免需要 effect 双向同步。
+
+2. **只写 URL，且仅在用户操作时**
+   - 用 `usePathname()` + `useRouter()`，在**事件处理函数**里根据用户操作计算新 query，再 `router.replace(pathname + '?' + createQueryString(...), { scroll: false })`。
+   - 不要用 `useEffect` 根据 state 去写 URL（易与读 URL 的 effect 形成死循环或振荡）。
+
+3. **依赖 URL 的 effect：用稳定原始值做依赖**
+   - 若某 effect（如拉列表）依赖「从 URL 解析出的值」，依赖项必须用**稳定原始类型**（如 `searchParams.get("tag") ?? ""`），不要用解析后的**引用类型**（如 `parseTagFromUrl(...)` 返回的数组）。
+   - 否则每次渲染都会得到新引用，effect 依赖变化 → 无限执行（如请求死循环）。示例：
+     - 正确：`const tagParam = searchParams.get("tag") ?? ""`，`useCallback(..., [search, tagParam, sort, currentPage])`，请求里用 `tagParam`。
+     - 错误：`const selectedTagSlugs = parseTagFromUrl(...)`，`useCallback(..., [..., selectedTagSlugs, ...])`。
+
+4. **实现参考**
+   - [app/components/product-catalog.tsx](app/components/product-catalog.tsx)：分类 tag 从 `searchParams.get("tag")` 派生；`createQueryStringWithTag` + `toggleTag`/`clearFilters` 里 `router.replace`；请求用 `tagParam` 作依赖与入参。
+
+## 若必须「双向同步」（不推荐）
+
+仅在无法改为「仅用户操作写 URL」时考虑：
+
+- URL → state：仅当 URL 中**确有该参数**时才覆盖 state；URL 参数为空时绝不清空 state（防止 `router.replace` 未生效前的短暂空 URL 导致振荡）。
+- State → URL：仅当「将要写入的参数字符串」与当前 URL 对应参数**按字符串不等**时才 `router.replace`；effect 不依赖会随 `searchParams` 变化的 callback。
+- 仍须注意：依赖 URL 的 effect 用稳定原始值做依赖，避免无限请求。
+
+## 可选方案
+
+新功能或复杂 query 可考虑 [nuqs](https://github.com/47ng/nuqs)，由库统一处理解析与 URL 更新，减少手写 effect 和依赖错误。

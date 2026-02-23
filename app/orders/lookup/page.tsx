@@ -62,21 +62,15 @@ function OrderLookupPageContent() {
     const passwordInputRef = useRef<HTMLInputElement>(null)
     const prefillAttemptedRef = useRef(false)
 
-    // Type from URL: ?type=email | ?type=orderNo (default)
+    // URL → state：从 searchParams 同步 type 与 orderNo（仅读 URL，不写 URL，无循环风险）
     useEffect(() => {
         const typeParam = searchParams.get("type")
-        setLookupMode(typeParam === "email" ? "email" : "orderNo")
-    }, [searchParams])
-
-    // Auto-fill orderNo from URL params and focus password input
-    useEffect(() => {
         const orderNoParam = searchParams.get("orderNo")
+        setLookupMode(typeParam === "email" ? "email" : "orderNo")
         if (orderNoParam) {
             setOrderNo(orderNoParam)
             setLookupMode("orderNo")
-            setTimeout(() => {
-                passwordInputRef.current?.focus()
-            }, 100)
+            setTimeout(() => passwordInputRef.current?.focus(), 100)
         }
     }, [searchParams])
 
