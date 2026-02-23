@@ -23,6 +23,12 @@ jest.mock("@/lib/order-success-token", () => ({
   createOrderSuccessToken: jest.fn().mockReturnValue(null),
 }))
 
+jest.mock("@/lib/config", () => ({
+  __esModule: true,
+  config: { pendingOrderTimeoutMs: 15 * 60 * 1000 },
+  getConfig: () => ({ pendingOrderTimeoutMs: 15 * 60 * 1000 }),
+}))
+
 import { verifyPassword } from "better-auth/crypto"
 
 function createJsonRequest(body: unknown): NextRequest {
@@ -118,7 +124,8 @@ expect(data.code).toBe("VALIDATION_FAILED")
       fn(prismaMock),
     )
 
-    const createdAt = new Date("2024-02-13T00:00:00.000Z")
+    // Within timeout so canPay is true
+    const createdAt = new Date(Date.now() - 5 * 60 * 1000)
 
     prismaMock.order.findUnique.mockResolvedValueOnce({
       id: "order_1",
@@ -153,8 +160,49 @@ expect(data.code).toBe("VALIDATION_FAILED")
       status: "PENDING",
       cards: [],
       isPending: true,
+      canPay: true,
     })
     expect(data.createdAt).toBe(createdAt.toISOString())
+    expect(typeof data.expiresAt).toBe("string")
+    expect(new Date(data.expiresAt).getTime()).toBe(
+      createdAt.getTime() + 15 * 60 * 1000,
+    )
+  })
+
+  it("returns PENDING order with canPay false when past timeout", async () => {
+    ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: any) =>
+      fn(prismaMock),
+    )
+
+    // 20 min ago, past 15 min timeout
+    const createdAt = new Date(Date.now() - 20 * 60 * 1000)
+    prismaMock.order.findUnique.mockResolvedValueOnce({
+      id: "order_1",
+      orderNo: "FAK202402130002",
+      passwordHash: "hash",
+      status: "PENDING",
+      amount: 99,
+      product: { name: "Test Product" },
+      cards: [],
+      createdAt,
+    } as any)
+
+    verifyPasswordMock.mockResolvedValueOnce(true)
+
+    const req = createJsonRequest({ orderNo: "FAK202402130002", password: "secret123" })
+    const res = await POST(req)
+    const data = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(data).toMatchObject({
+      orderNo: "FAK202402130002",
+      status: "PENDING",
+      isPending: true,
+      canPay: false,
+    })
+    expect(data.expiresAt).toBe(
+      new Date(createdAt.getTime() + 15 * 60 * 1000).toISOString(),
+    )
   })
 
   it("returns existing COMPLETED order without changing status on lookup", async () => {

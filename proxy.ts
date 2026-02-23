@@ -14,6 +14,7 @@ const PUBLIC_API_EXACT = [
     "/api/orders/by-email",
     "/api/orders/lookup",
     "/api/orders/lookup-by-email",
+    "/api/orders/get-payment-url",
 ];
 
 // Protected API routes that require admin authentication

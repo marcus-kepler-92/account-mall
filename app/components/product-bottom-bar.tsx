@@ -1,7 +1,11 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
+import { Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+
+const ORDER_FORM_LOADING_EVENT = "product-order-loading"
 
 type ProductBottomBarProps = {
     price: number
@@ -18,9 +22,18 @@ export function ProductBottomBar({
     restockSectionId,
     formId,
 }: ProductBottomBarProps) {
+    const [isSubmitting, setIsSubmitting] = useState(false)
+
+    useEffect(() => {
+        const handler = (e: CustomEvent<{ loading: boolean }>) => {
+            setIsSubmitting(e.detail.loading)
+        }
+        document.addEventListener(ORDER_FORM_LOADING_EVENT, handler as EventListener)
+        return () => document.removeEventListener(ORDER_FORM_LOADING_EVENT, handler as EventListener)
+    }, [])
+
     const handleClick = () => {
-        if (inStock && formId) {
-            // Submit the form directly when in stock
+        if (inStock && formId && !isSubmitting) {
             const form = document.getElementById(formId) as HTMLFormElement
             if (form) {
                 form.requestSubmit()
@@ -28,7 +41,8 @@ export function ProductBottomBar({
             }
         }
 
-        // Fallback: scroll to target section (for restock or if form not found)
+        if (isSubmitting) return
+
         const targetId = inStock ? orderSectionId : restockSectionId ?? orderSectionId
         if (!targetId) return
 
@@ -37,6 +51,8 @@ export function ProductBottomBar({
 
         el.scrollIntoView({ behavior: "smooth", block: "start" })
     }
+
+    const showSubmitState = inStock && isSubmitting
 
     return (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 backdrop-blur lg:hidden">
@@ -64,11 +80,14 @@ export function ProductBottomBar({
                 <Button
                     type="button"
                     size="lg"
-                    className="min-w-[112px]"
+                    className="min-w-28 gap-2"
                     onClick={handleClick}
-                    disabled={!inStock && !restockSectionId}
+                    disabled={(!inStock && !restockSectionId) || isSubmitting}
                 >
-                    {inStock ? "立即购买" : "补货提醒"}
+                    {showSubmitState && (
+                        <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
+                    )}
+                    {showSubmitState ? "提交中…" : inStock ? "立即购买" : "补货提醒"}
                 </Button>
             </div>
         </div>

@@ -10,6 +10,14 @@ import { Label } from "@/components/ui/label"
 import { Eye, EyeOff, Loader2 } from "lucide-react"
 import { addOrUpdateOrder } from "@/lib/order-history-storage"
 
+const ORDER_FORM_LOADING_EVENT = "product-order-loading"
+
+function dispatchOrderFormLoading(loading: boolean) {
+    if (typeof document !== "undefined") {
+        document.dispatchEvent(new CustomEvent(ORDER_FORM_LOADING_EVENT, { detail: { loading } }))
+    }
+}
+
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? ""
 
 type ProductOrderFormProps = {
@@ -53,6 +61,7 @@ export function ProductOrderForm({
         if (!inStock) return
 
         setLoading(true)
+        dispatchOrderFormLoading(true)
         try {
             const res = await fetch("/api/orders", {
                 method: "POST",
@@ -69,7 +78,6 @@ export function ProductOrderForm({
             const data = await res.json()
 
             if (res.ok) {
-                toast.success("订单创建成功")
                 addOrUpdateOrder({
                     orderNo: data.orderNo,
                     productName: productName ?? "商品",
@@ -78,9 +86,12 @@ export function ProductOrderForm({
                     status: "PENDING",
                 })
                 if (data.paymentUrl) {
+                    toast.success("订单已创建，正在跳转至支付页面…")
                     window.location.href = data.paymentUrl
-                } else if (data.orderNo) {
-                    toast.success(`订单号: ${data.orderNo}，请妥善保管订单号和密码`)
+                    return
+                }
+                if (data.orderNo) {
+                    toast.success(`订单已创建，订单号: ${data.orderNo}，请妥善保管订单号和密码`)
                     try {
                         sessionStorage.setItem(`lookup_prefill_${data.orderNo}`, orderPassword)
                     } catch {
@@ -96,6 +107,7 @@ export function ProductOrderForm({
             toast.error("下单失败，请稍后重试")
         } finally {
             setLoading(false)
+            dispatchOrderFormLoading(false)
         }
     }
 
@@ -188,10 +200,10 @@ export function ProductOrderForm({
                 <Button
                     type="submit"
                     disabled={!inStock || loading || (requireTurnstile && !turnstileToken)}
-                    className="hidden lg:flex"
+                    className="hidden lg:flex gap-2"
                 >
-                    {loading && <Loader2 className="size-4 animate-spin" />}
-                    {inStock ? "立即购买" : "售罄"}
+                    {loading && <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />}
+                    {loading ? "提交中…" : inStock ? "立即购买" : "售罄"}
                 </Button>
             </div>
         </form>

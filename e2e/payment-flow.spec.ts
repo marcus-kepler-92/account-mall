@@ -75,6 +75,53 @@ test.describe.serial("Payment flow", () => {
         await page.getByRole("button", { name: "查询订单" }).click()
 
         await expect(page.getByText("待支付", { exact: true })).toBeVisible({ timeout: 10_000 })
+        // 未超时时应显示「继续支付」入口
+        await expect(page.getByRole("button", { name: "继续支付" })).toBeVisible({ timeout: 5_000 })
+    })
+
+    test("get-payment-url returns payment URL or 503 when order is PENDING and not expired", async ({
+        page,
+        request,
+    }) => {
+        const productPath = await getE2EProductPath()
+        await page.goto(`${baseURL}${productPath}`)
+        await expect(page.getByRole("main")).toBeVisible()
+        await expect(page.getByLabel(/邮箱/)).toBeEnabled({ timeout: 10_000 })
+
+        let orderNo: string | undefined
+        await page.route((url) => url.pathname === "/api/orders", async (route) => {
+            if (route.request().method() !== "POST") {
+                await route.continue()
+                return
+            }
+            const res = await route.fetch()
+            const raw = await res.text()
+            const body = raw ? JSON.parse(raw) : {}
+            if (body.orderNo) orderNo = body.orderNo
+            await route.fulfill({ status: res.status(), contentType: "application/json", body: raw })
+        })
+
+        await page.getByLabel(/邮箱/).fill("e2e-getpay@example.com")
+        await page.getByLabel(/订单密码/).fill("e2e-getpay-789")
+        await page.getByLabel(/购买数量/).fill("1")
+        await page.getByRole("button", { name: "立即购买" }).click()
+
+        await expect(async () => {
+            expect(orderNo).toBeTruthy()
+        }).toPass({ timeout: 15_000 })
+
+        const payRes = await request.post(`${baseURL}/api/orders/get-payment-url`, {
+            data: { orderNo, password: "e2e-getpay-789" },
+        })
+        const payData = await payRes.json().catch(() => ({}))
+        expect([200, 503]).toContain(payRes.status())
+        if (payRes.status() === 200) {
+            expect(payData.paymentUrl).toBeDefined()
+            expect(typeof payData.paymentUrl).toBe("string")
+            expect(payData.paymentUrl.length).toBeGreaterThan(0)
+        } else {
+            expect(payData.error).toBeDefined()
+        }
     })
 
     test("full payment flow: order → notify → lookup shows COMPLETED and cards", async ({

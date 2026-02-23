@@ -7,6 +7,7 @@ import { verifyPassword } from "better-auth/crypto"
 import { createOrderSuccessToken } from "@/lib/order-success-token"
 import { checkOrderQueryRateLimit } from "@/lib/rate-limit"
 import { invalidJsonBody, validationError, badRequest, internalServerError } from "@/lib/api-response"
+import { config } from "@/lib/config"
 
 type LookupBody = z.infer<typeof publicOrderLookupSchema>
 type OrderStatus = z.infer<typeof orderStatusSchema>
@@ -27,6 +28,10 @@ interface LookupResponseBase {
 interface LookupResponsePending extends LookupResponseBase {
     cards: []
     isPending: true
+    /** 未超时且可继续支付时为 true */
+    canPay: boolean
+    /** 支付截止时间（ISO），便于前端展示「请在 xx 前完成支付」 */
+    expiresAt?: string
 }
 
 interface LookupResponseCompleted extends LookupResponseBase {
@@ -90,8 +95,11 @@ export async function POST(request: NextRequest) {
             return existing
         })
 
-        // For PENDING orders, return order info without cards
+        // For PENDING orders, return order info without cards + canPay/expiresAt
         if (order.status === "PENDING") {
+            const elapsed = Date.now() - order.createdAt.getTime()
+            const canPay = elapsed < config.pendingOrderTimeoutMs
+            const expiresAt = new Date(order.createdAt.getTime() + config.pendingOrderTimeoutMs).toISOString()
             const payload: LookupResponsePending = {
                 orderNo: order.orderNo,
                 productName: order.product.name,
@@ -100,6 +108,8 @@ export async function POST(request: NextRequest) {
                 amount: Number(order.amount),
                 cards: [],
                 isPending: true,
+                canPay,
+                expiresAt,
             }
             return NextResponse.json(payload)
         }

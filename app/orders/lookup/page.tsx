@@ -11,7 +11,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { Skeleton } from "@/components/ui/skeleton"
 import { SiteHeader } from "@/app/components/site-header"
 import { useSiteName } from "@/app/components/site-name-provider"
-import { Copy, Check, Eye, EyeOff, Loader2, Mail, Hash, AlertCircle, Package, Search, Zap } from "lucide-react"
+import { Copy, Check, Eye, EyeOff, Loader2, Mail, Hash, AlertCircle, Package, Search, Zap, CreditCard } from "lucide-react"
 import { toast } from "sonner"
 import { addOrUpdateOrder } from "@/lib/order-history-storage"
 
@@ -24,6 +24,10 @@ interface OrderResult {
     status: "PENDING" | "COMPLETED" | "CLOSED"
     cards: Array<{ content: string }>
     isPending?: boolean
+    /** 未超时、可继续支付（仅 PENDING 时有意义） */
+    canPay?: boolean
+    /** 支付截止时间 ISO（仅 PENDING 时可能有） */
+    expiresAt?: string
 }
 
 interface OrderListItem {
@@ -54,6 +58,7 @@ function OrderLookupPageContent() {
     const [sheetOpen, setSheetOpen] = useState(false)
     const [loadingOrderNo, setLoadingOrderNo] = useState<string | null>(null)
     const [sheetLoading, setSheetLoading] = useState(false)
+    const [continuePaymentLoading, setContinuePaymentLoading] = useState(false)
     const passwordInputRef = useRef<HTMLInputElement>(null)
     const prefillAttemptedRef = useRef(false)
 
@@ -326,6 +331,32 @@ function OrderLookupPageContent() {
                 return <Badge variant="outline">已关闭</Badge>
             default:
                 return <Badge variant="outline">{status}</Badge>
+        }
+    }
+
+    const handleContinuePayment = async () => {
+        if (!result || !password.trim() || result.isPending !== true || result.canPay !== true) return
+        setContinuePaymentLoading(true)
+        try {
+            const res = await fetch("/api/orders/get-payment-url", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ orderNo: result.orderNo, password: password.trim() }),
+            })
+            const data = await res.json().catch(() => ({}))
+            if (!res.ok) {
+                toast.error(data?.error ?? "无法继续支付，请稍后重试")
+                return
+            }
+            if (data?.paymentUrl) {
+                window.location.href = data.paymentUrl
+                return
+            }
+            toast.error("获取支付链接失败")
+        } catch {
+            toast.error("网络错误，请稍后重试")
+        } finally {
+            setContinuePaymentLoading(false)
         }
     }
 
@@ -636,21 +667,68 @@ function OrderLookupPageContent() {
                                     )}
                                 </div>
 
-                                {/* Pending payment notice */}
-                                {result.isPending && (
+                                {/* 状态描述：PENDING 可继续支付 */}
+                                {result.isPending && result.canPay && (
                                     <div className="rounded-lg border border-orange-200 bg-orange-50 p-3 text-sm text-orange-900 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-200">
                                         <p className="font-medium mb-1.5">订单待支付</p>
                                         <p className="text-xs mb-2">
                                             该订单尚未完成支付，完成支付后即可查看卡密内容。
                                         </p>
-                                        <p className="text-xs text-muted-foreground">
+                                        {result.expiresAt && (
+                                            <p className="text-xs mb-3">
+                                                请在{" "}
+                                                {new Date(result.expiresAt).toLocaleString("zh-CN", {
+                                                    month: "numeric",
+                                                    day: "numeric",
+                                                    hour: "2-digit",
+                                                    minute: "2-digit",
+                                                })}{" "}
+                                                前完成支付。
+                                            </p>
+                                        )}
+                                        <Button
+                                            className="w-full gap-2"
+                                            onClick={handleContinuePayment}
+                                            disabled={continuePaymentLoading}
+                                        >
+                                            {continuePaymentLoading ? (
+                                                <>
+                                                    <Loader2 className="size-4 animate-spin" />
+                                                    跳转中...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <CreditCard className="size-4" />
+                                                    继续支付
+                                                </>
+                                            )}
+                                        </Button>
+                                        <p className="text-xs text-muted-foreground mt-2">
                                             如已完成支付但仍显示此提示，请联系客服处理。
                                         </p>
                                     </div>
                                 )}
 
-                                {/* Empty cards notice */}
-                                {!result.isPending && result.cards.length === 0 && (
+                                {/* 状态描述：PENDING 已超时 */}
+                                {result.isPending && !result.canPay && (
+                                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+                                        <p className="font-medium mb-1.5">订单待支付（已超时）</p>
+                                        <p className="text-xs">
+                                            该订单已超过支付时间，无法继续支付。请重新下单。
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* 状态描述：已关闭且无卡密 */}
+                                {!result.isPending && result.status === "CLOSED" && result.cards.length === 0 && (
+                                    <div className="rounded-lg border border-muted bg-muted/50 p-3 text-sm text-muted-foreground">
+                                        <p className="font-medium mb-0.5">订单已关闭</p>
+                                        <p className="text-xs">该订单已关闭，无卡密内容。</p>
+                                    </div>
+                                )}
+
+                                {/* Empty cards notice（仅已完成且无卡密时显示） */}
+                                {!result.isPending && result.status !== "CLOSED" && result.cards.length === 0 && (
                                     <div className="rounded-lg border border-muted bg-muted/50 p-4 text-center">
                                         <Package className="size-8 mx-auto mb-2 text-muted-foreground" />
                                         <p className="text-sm text-muted-foreground">暂无卡密内容</p>
