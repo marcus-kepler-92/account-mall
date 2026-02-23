@@ -1,10 +1,38 @@
 import { NextRequest, NextResponse } from "next/server"
+import { PrismaClient } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
-import { publicOrderLookupSchema } from "@/lib/validations/order"
+import { publicOrderLookupSchema, orderStatusSchema } from "@/lib/validations/order"
+import type { z } from "zod"
 import { verifyPassword } from "better-auth/crypto"
 import { createOrderSuccessToken } from "@/lib/order-success-token"
 import { checkOrderQueryRateLimit } from "@/lib/rate-limit"
 import { invalidJsonBody, validationError, badRequest, internalServerError } from "@/lib/api-response"
+
+type LookupBody = z.infer<typeof publicOrderLookupSchema>
+type OrderStatus = z.infer<typeof orderStatusSchema>
+
+type TransactionClient = Omit<
+    PrismaClient,
+    "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
+>
+
+interface LookupResponseBase {
+    orderNo: string
+    productName: string
+    createdAt: Date
+    status: OrderStatus
+    amount: number
+}
+
+interface LookupResponsePending extends LookupResponseBase {
+    cards: []
+    isPending: true
+}
+
+interface LookupResponseCompleted extends LookupResponseBase {
+    cards: Array<{ content: string }>
+    successToken?: string
+}
 
 /**
  * POST /api/orders/lookup
@@ -27,10 +55,10 @@ export async function POST(request: NextRequest) {
         return validationError()
     }
 
-    const { orderNo, password } = parsed.data
+    const { orderNo, password }: LookupBody = parsed.data
 
     try {
-        const order = await prisma.$transaction(async (tx) => {
+        const order = await prisma.$transaction(async (tx: TransactionClient) => {
             const existing = await tx.order.findUnique({
                 where: { orderNo: orderNo.trim() },
                 include: {
@@ -64,31 +92,35 @@ export async function POST(request: NextRequest) {
 
         // For PENDING orders, return order info without cards
         if (order.status === "PENDING") {
-            return NextResponse.json({
+            const payload: LookupResponsePending = {
                 orderNo: order.orderNo,
                 productName: order.product.name,
                 createdAt: order.createdAt,
                 status: order.status,
+                amount: Number(order.amount),
                 cards: [],
                 isPending: true,
-            })
+            }
+            return NextResponse.json(payload)
         }
 
         // For COMPLETED/CLOSED orders, return cards and optional successToken for redirect to success page
-        const cards = order.cards
-            .filter((card) => card.status === "SOLD" || card.status === "RESERVED")
-            .map((card) => ({ content: card.content }))
+        type CardRow = { content: string; status: string }
+        const cards: Array<{ content: string }> = (order.cards as CardRow[])
+            .filter((card: CardRow) => card.status === "SOLD" || card.status === "RESERVED")
+            .map((card: CardRow) => ({ content: card.content }))
 
         const successToken = createOrderSuccessToken(order.orderNo)
-
-        return NextResponse.json({
+        const payload: LookupResponseCompleted = {
             orderNo: order.orderNo,
             productName: order.product.name,
             createdAt: order.createdAt,
             status: order.status,
+            amount: Number(order.amount),
             cards,
             ...(successToken && { successToken }),
-        })
+        }
+        return NextResponse.json(payload)
     } catch (error) {
         if (error instanceof Error && error.message === "LOOKUP_FAILED") {
             return badRequest("Order not found or password incorrect")

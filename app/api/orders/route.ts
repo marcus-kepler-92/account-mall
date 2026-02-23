@@ -5,6 +5,7 @@ import { hashPassword } from "better-auth/crypto"
 import { getAdminSession } from "@/lib/auth-guard"
 import { createOrderSchema, orderListQuerySchema } from "@/lib/validations/order"
 import { getAlipayPagePayUrl } from "@/lib/alipay"
+import { isYipayConfigured, getYipayPagePayUrl } from "@/lib/yipay"
 import {
     checkOrderCreateRateLimit,
     getClientIp,
@@ -210,7 +211,7 @@ export async function POST(request: NextRequest) {
     if (rateLimitRes) return rateLimitRes
 
     const clientIp = getClientIp(request)
-    if (clientIp !== "unknown") {
+    if (config.nodeEnv !== "development" && clientIp !== "unknown") {
         const pendingCount = await prisma.order.count({
             where: { status: "PENDING", clientIp },
         })
@@ -325,11 +326,9 @@ export async function POST(request: NextRequest) {
 
     const amountStr = Number(order.amount).toFixed(2)
     const subject = product.name ?? `订单 ${order.orderNo}`
-    const paymentUrl = getAlipayPagePayUrl({
-        orderNo: order.orderNo,
-        totalAmount: amountStr,
-        subject,
-    })
+    const paymentUrl = isYipayConfigured()
+        ? getYipayPagePayUrl({ orderNo: order.orderNo, totalAmount: amountStr, subject })
+        : getAlipayPagePayUrl({ orderNo: order.orderNo, totalAmount: amountStr, subject })
 
     return NextResponse.json({
         orderNo: order.orderNo,

@@ -139,10 +139,11 @@ Complete list and semantics: [lib/config.ts](lib/config.ts).
 | `npm run db:migrate` | Run database migrations |
 | `npm run db:studio` | Open Prisma Studio (database GUI) |
 | `npm run db:seed` | Seed database with initial data |
+| `SEED_E2E=1 npm run db:seed` | Seed + E2E 用商品与卡密（跑 E2E 前需执行一次） |
 | `npm run test` | Run tests |
 | `npm run test:watch` | Run tests in watch mode |
 | `npm run test:coverage` | Run tests with coverage report |
-| `npm run test:e2e` | Run Playwright E2E tests |
+| `npm run test:e2e` | Run Playwright E2E tests（需先 migrate 且 `SEED_E2E=1 npm run db:seed`；完整支付流程需配置 YIPAY_*） |
 | `npm run audit` | Check dependencies for high/critical vulnerabilities |
 
 ## Project Structure

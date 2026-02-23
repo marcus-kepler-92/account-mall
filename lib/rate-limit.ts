@@ -31,8 +31,10 @@ export function getClientIp(request: NextRequest): string {
 /**
  * Check order create rate limit (e.g. 5 per minute per IP).
  * Returns null if allowed, or Response (429) if rate limited.
+ * Skipped in development (no 风控).
  */
 export async function checkOrderCreateRateLimit(request: NextRequest): Promise<Response | null> {
+    if (config.nodeEnv === "development") return null
     const key = getClientIp(request)
     if (key === "unknown") return null
     try {
@@ -48,8 +50,10 @@ export async function checkOrderCreateRateLimit(request: NextRequest): Promise<R
 
 /**
  * Check order query (by-email / lookup) rate limit.
+ * Skipped in development (no 风控).
  */
 export async function checkOrderQueryRateLimit(request: NextRequest): Promise<Response | null> {
+    if (config.nodeEnv === "development") return null
     const key = getClientIp(request)
     if (key === "unknown") return null
     try {

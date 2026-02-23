@@ -2,10 +2,13 @@ import { z } from "zod"
 
 const envSchema = z
     .object({
-        databaseUrl: z.string().min(1, "DATABASE_URL is required"),
-        betterAuthSecret: z
-            .string()
-            .min(32, "BETTER_AUTH_SECRET must be at least 32 characters"),
+        databaseUrl: z.string().optional(),
+        postgresUser: z.string().optional(),
+        postgresPassword: z.string().optional(),
+        postgresDb: z.string().optional(),
+        postgresHost: z.string().optional(),
+        postgresPort: z.string().optional(),
+        betterAuthSecret: z.string().optional(),
         betterAuthUrl: z.string().optional(),
         vercelUrl: z.string().optional(),
         nodeEnv: z.enum(["development", "production", "test"]).default("development"),
@@ -22,6 +25,10 @@ const envSchema = z
         alipayAppId: z.string().optional(),
         alipayPrivateKey: z.string().optional(),
         alipayPublicKey: z.string().optional(),
+        yipayPid: z.string().optional(),
+        yipayKey: z.string().optional(),
+        yipaySubmitUrl: z.string().optional(),
+        yipaySiteName: z.string().optional(),
         cronSecret: z.string().optional(),
         pendingOrderTimeoutMs: z.coerce.number().int().positive().default(900000),
         orderRateLimitPoints: z.coerce.number().int().positive().default(10),
@@ -32,16 +39,54 @@ const envSchema = z
         turnstileSecretKey: z.string().optional(),
     })
     .transform((data) => {
+        const urlFromEnv = data.databaseUrl?.trim()
+        const user = data.postgresUser?.trim()
+        const password = data.postgresPassword
+        const db = data.postgresDb?.trim()
+        const host = data.postgresHost?.trim() || "localhost"
+        const port = data.postgresPort?.trim() || "5432"
+        const databaseUrl =
+            urlFromEnv ||
+            (user && db
+                ? `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password ?? "")}@${host}:${port}/${encodeURIComponent(db)}`
+                : "")
+        if (!databaseUrl) {
+            throw new Error(
+                "Set DATABASE_URL or (POSTGRES_USER + POSTGRES_DB and optionally POSTGRES_PASSWORD, POSTGRES_HOST, POSTGRES_PORT)",
+            )
+        }
+
+        const secret = data.betterAuthSecret?.trim()
+        const minLen = 32
+        if (data.nodeEnv === "production") {
+            if (!secret || secret.length < minLen) {
+                throw new Error("BETTER_AUTH_SECRET must be at least 32 characters in production")
+            }
+        }
+        const betterAuthSecret =
+            secret && secret.length >= minLen
+                ? secret
+                : "dev-secret-at-least-32-characters-long"
+        if (data.nodeEnv === "development" && (!secret || secret.length < minLen)) {
+            console.warn(
+                "[config] BETTER_AUTH_SECRET missing or too short; using dev default. Set a 32+ character secret in .env for production.",
+            )
+        }
         const siteUrl =
             data.betterAuthUrl?.trim() ||
             (data.vercelUrl ? `https://${data.vercelUrl}` : "http://localhost:3000")
-        return { ...data, siteUrl }
+        return { ...data, databaseUrl, betterAuthSecret, siteUrl }
     })
 
 function getEnvInput() {
     const e = process.env
     return {
         databaseUrl: e.DATABASE_URL,
+        postgresUser: e.POSTGRES_USER,
+        postgresPassword: e.POSTGRES_PASSWORD,
+        postgresDb: e.POSTGRES_DB,
+        postgresHost: e.POSTGRES_HOST,
+        postgresPort: e.POSTGRES_PORT,
         betterAuthSecret: e.BETTER_AUTH_SECRET,
         betterAuthUrl: e.BETTER_AUTH_URL,
         vercelUrl: e.VERCEL_URL,
@@ -59,6 +104,10 @@ function getEnvInput() {
         alipayAppId: e.ALIPAY_APP_ID,
         alipayPrivateKey: e.ALIPAY_PRIVATE_KEY,
         alipayPublicKey: e.ALIPAY_PUBLIC_KEY,
+        yipayPid: e.YIPAY_PID,
+        yipayKey: e.YIPAY_KEY,
+        yipaySubmitUrl: e.YIPAY_SUBMIT_URL,
+        yipaySiteName: e.YIPAY_SITE_NAME,
         cronSecret: e.CRON_SECRET,
         pendingOrderTimeoutMs: e.PENDING_ORDER_TIMEOUT_MS,
         orderRateLimitPoints: e.ORDER_RATE_LIMIT_POINTS,

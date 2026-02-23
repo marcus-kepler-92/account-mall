@@ -2,6 +2,9 @@ import type { MetadataRoute } from "next"
 import { prisma } from "@/lib/prisma"
 import { config } from "@/lib/config"
 
+/** Avoid prerender at build time (no DB in Docker build); generate on request. */
+export const dynamic = "force-dynamic"
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const base = config.siteUrl
 

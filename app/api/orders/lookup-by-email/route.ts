@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { config } from "@/lib/config"
 import { publicOrderLookupByEmailSchema } from "@/lib/validations/order"
 import { verifyPassword } from "better-auth/crypto"
 import { checkOrderQueryRateLimit } from "@/lib/rate-limit"
@@ -36,100 +35,69 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-        // Maximum orders to check for password match (performance limit)
         const MAX_ORDERS_TO_CHECK = 20
 
-        const result = await prisma.$transaction(async (tx) => {
-            // Find all orders matching the email (limit to recent ones for performance)
-            const allOrders = await tx.order.findMany({
-                where: {
-                    email: email.trim().toLowerCase(),
-                },
-                select: {
-                    id: true,
-                    orderNo: true,
-                    email: true,
-                    passwordHash: true,
-                    status: true,
-                    createdAt: true,
-                    quantity: true,
-                    amount: true,
-                    product: {
-                        select: {
-                            name: true,
-                        },
-                    },
-                    cards: {
-                        select: {
-                            id: true,
-                            content: true,
-                            status: true,
-                        },
+        const allOrders = await prisma.order.findMany({
+            where: {
+                email: email.trim().toLowerCase(),
+            },
+            select: {
+                id: true,
+                orderNo: true,
+                email: true,
+                passwordHash: true,
+                status: true,
+                createdAt: true,
+                quantity: true,
+                amount: true,
+                product: {
+                    select: {
+                        name: true,
                     },
                 },
-                orderBy: {
-                    createdAt: "desc",
+                cards: {
+                    select: {
+                        id: true,
+                        content: true,
+                        status: true,
+                    },
                 },
-                take: MAX_ORDERS_TO_CHECK,
-            })
-
-            if (allOrders.length === 0) {
-                throw new Error("LOOKUP_FAILED")
-            }
-
-            // Debug logging in development
-            if (config.nodeEnv === "development") {
-                console.log("[lookup-by-email] Found orders:", {
-                    count: allOrders.length,
-                    email: email.trim().toLowerCase(),
-                })
-            }
-
-            // Verify password for each order and collect matching ones
-            const matchingOrders = []
-            for (const order of allOrders) {
-                if (!order.passwordHash || typeof order.passwordHash !== "string") {
-                    if (config.nodeEnv === "development") {
-                        console.warn("[lookup-by-email] Skipping order with invalid passwordHash:", order.orderNo)
-                    }
-                    continue
-                }
-
-                try {
-                    const passwordOk = await verifyPassword({
-                        hash: order.passwordHash,
-                        password: password.trim(),
-                    })
-                    if (passwordOk) {
-                        matchingOrders.push(order)
-                    }
-                } catch (err) {
-                    if (config.nodeEnv === "development") {
-                        console.error("[lookup-by-email] Password verification error for order:", order.orderNo, err)
-                    }
-                }
-            }
-
-            if (matchingOrders.length === 0) {
-                throw new Error("LOOKUP_FAILED")
-            }
-
-            // If only one order matches, return full details
-            if (matchingOrders.length === 1) {
-                const order = matchingOrders[0]
-
-                return {
-                    type: "single" as const,
-                    data: order,
-                }
-            }
-
-            // Multiple orders match - return list without cards
-            return {
-                type: "multiple" as const,
-                data: matchingOrders,
-            }
+            },
+            orderBy: {
+                createdAt: "desc",
+            },
+            take: MAX_ORDERS_TO_CHECK,
         })
+
+        if (allOrders.length === 0) {
+            return badRequest("Order not found or password incorrect")
+        }
+
+        const matchingOrders = []
+        for (const order of allOrders) {
+            if (!order.passwordHash || typeof order.passwordHash !== "string") {
+                continue
+            }
+            try {
+                const passwordOk = await verifyPassword({
+                    hash: order.passwordHash,
+                    password: password.trim(),
+                })
+                if (passwordOk) {
+                    matchingOrders.push(order)
+                }
+            } catch {
+                // skip orders with corrupt hash
+            }
+        }
+
+        if (matchingOrders.length === 0) {
+            return badRequest("Order not found or password incorrect")
+        }
+
+        const result = matchingOrders.length === 1
+            ? { type: "single" as const, data: matchingOrders[0] }
+            : { type: "multiple" as const, data: matchingOrders }
 
         // Format response based on result type
         if (result.type === "single") {
@@ -179,20 +147,7 @@ export async function POST(request: NextRequest) {
                 orders,
             })
         }
-    } catch (error) {
-        if (error instanceof Error && error.message === "LOOKUP_FAILED") {
-            return badRequest("Order not found or password incorrect")
-        }
-
-        // Log error details in development for debugging
-        if (config.nodeEnv === "development") {
-            console.error("[lookup-by-email] Error:", error)
-            if (error instanceof Error) {
-                console.error("[lookup-by-email] Error message:", error.message)
-                console.error("[lookup-by-email] Error stack:", error.stack)
-            }
-        }
-
+    } catch {
         return internalServerError()
     }
 }

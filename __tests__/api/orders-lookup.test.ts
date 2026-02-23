@@ -125,6 +125,7 @@ expect(data.code).toBe("VALIDATION_FAILED")
       orderNo: "FAK202402130001",
       passwordHash: "hash",
       status: "PENDING",
+      amount: 99,
       product: {
         name: "Test Product",
       },
@@ -168,6 +169,7 @@ expect(data.code).toBe("VALIDATION_FAILED")
       orderNo: "FAK202402130001",
       passwordHash: "hash",
       status: "COMPLETED",
+      amount: 99,
       product: {
         name: "Test Product",
       },
@@ -192,6 +194,7 @@ expect(data.code).toBe("VALIDATION_FAILED")
       productName: "Test Product",
       createdAt: createdAt.toISOString(),
       status: "COMPLETED",
+      amount: 99,
       cards: [{ content: "code-1" }],
     })
   })

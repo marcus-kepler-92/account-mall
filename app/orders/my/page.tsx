@@ -10,12 +10,9 @@ import {
 } from "@/lib/order-history-storage"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Package, CreditCard, Loader2, Trash2 } from "lucide-react"
+import { Package, Search, Trash2 } from "lucide-react"
 import { SiteHeader } from "@/app/components/site-header"
 import { toast } from "sonner"
-
-const PENDING_TIMEOUT_MS = 15 * 60 * 1000 // 15 分钟，与后端一致
 
 function formatDate(s: string) {
     try {
@@ -31,23 +28,22 @@ function formatDate(s: string) {
     }
 }
 
-function statusLabel(status: string) {
-    switch (status) {
-        case "PENDING":
-            return "待支付"
-        case "COMPLETED":
-            return "已完成"
-        case "CLOSED":
-            return "已关闭"
-        default:
-            return status
+function formatDateShort(s: string) {
+    try {
+        return new Date(s).toLocaleString("zh-CN", {
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+        })
+    } catch {
+        return ""
     }
 }
 
-function isPendingAndNotExpired(item: OrderHistoryItem): boolean {
-    if (item.status !== "PENDING") return false
-    const created = new Date(item.createdAt).getTime()
-    return Date.now() - created < PENDING_TIMEOUT_MS
+function formatAmount(amount: unknown): string {
+    if (typeof amount === "number" && !Number.isNaN(amount)) return amount.toFixed(2)
+    return "—"
 }
 
 function MyOrdersPageContent() {
@@ -56,7 +52,6 @@ function MyOrdersPageContent() {
 
     const [orders, setOrders] = useState<OrderHistoryItem[]>([])
     const [selectedOrderNo, setSelectedOrderNo] = useState<string | null>(null)
-    const [payingOrderNo, setPayingOrderNo] = useState<string | null>(null)
 
     const refreshOrders = () => setOrders(getOrderHistory())
 
@@ -82,28 +77,6 @@ function MyOrdersPageContent() {
             setSelectedOrderNo(rest[0]?.orderNo ?? null)
         }
         toast.success("已从列表移除")
-    }
-
-    const handleContinuePay = async () => {
-        if (!selected || !isPendingAndNotExpired(selected)) return
-        setPayingOrderNo(selected.orderNo)
-        try {
-            const res = await fetch("/api/payment/alipay/create", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ orderNo: selected.orderNo, clientType: "pc" }),
-            })
-            const data = await res.json()
-            if (res.ok && data.paymentUrl) {
-                window.location.href = data.paymentUrl
-                return
-            }
-            toast.error(data.error || "获取支付链接失败")
-        } catch {
-            toast.error("网络错误，请稍后重试")
-        } finally {
-            setPayingOrderNo(null)
-        }
     }
 
     return (
@@ -152,17 +125,22 @@ function MyOrdersPageContent() {
                                                     }`}
                                                 >
                                                     <div className="min-w-0 flex-1">
-                                                        <p className="truncate font-medium text-foreground">
-                                                            {o.productName}
+                                                        <p className="flex items-baseline justify-between gap-2">
+                                                            <span
+                                                                className="min-w-0 truncate font-mono text-xs text-foreground"
+                                                                title={o.orderNo}
+                                                            >
+                                                                {o.orderNo}
+                                                            </span>
+                                                            <span className="shrink-0 font-medium tabular-nums">
+                                                                ¥{formatAmount(o.amount)}
+                                                            </span>
                                                         </p>
-                                                        <p className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-                                                            <span className="font-mono">{o.orderNo.slice(0, 8)}…</span>
-                                                            <span>¥{o.amount.toFixed(2)}</span>
+                                                        <p className="mt-1 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                                                            <span className="min-w-0 truncate">{o.productName}</span>
+                                                            <span className="shrink-0">{formatDateShort(o.createdAt)}</span>
                                                         </p>
                                                     </div>
-                                                    <Badge variant="outline" className="shrink-0 text-[10px]">
-                                                        {statusLabel(o.status)}
-                                                    </Badge>
                                                     <Button
                                                         type="button"
                                                         variant="ghost"
@@ -193,8 +171,8 @@ function MyOrdersPageContent() {
                                     </CardTitle>
                                     <CardDescription>
                                         {selected
-                                            ? "仅展示本地记录，查看卡密请使用「订单查询」输入密码"
-                                            : "在左侧选择订单查看详情"}
+                                            ? "本地历史记录，点击下方按钮跳转订单查询（输入密码查看卡密）"
+                                            : "在左侧选择订单"}
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
@@ -211,45 +189,19 @@ function MyOrdersPageContent() {
                                                 </div>
                                                 <div className="flex justify-between gap-4">
                                                     <dt className="text-muted-foreground">金额</dt>
-                                                    <dd>¥{selected.amount.toFixed(2)}</dd>
+                                                    <dd>¥{formatAmount(selected.amount)}</dd>
                                                 </div>
                                                 <div className="flex justify-between gap-4">
                                                     <dt className="text-muted-foreground">创建时间</dt>
                                                     <dd>{formatDate(selected.createdAt)}</dd>
                                                 </div>
-                                                <div className="flex justify-between gap-4">
-                                                    <dt className="text-muted-foreground">状态</dt>
-                                                    <dd>
-                                                        <Badge variant="outline">
-                                                            {statusLabel(selected.status)}
-                                                        </Badge>
-                                                    </dd>
-                                                </div>
                                             </dl>
-                                            {isPendingAndNotExpired(selected) ? (
-                                                <Button
-                                                    className="w-full gap-2"
-                                                    onClick={handleContinuePay}
-                                                    disabled={!!payingOrderNo}
-                                                >
-                                                    {payingOrderNo === selected.orderNo ? (
-                                                        <Loader2 className="size-4 animate-spin" />
-                                                    ) : (
-                                                        <CreditCard className="size-4" />
-                                                    )}
-                                                    继续支付
-                                                </Button>
-                                            ) : selected.status === "PENDING" ? (
-                                                <p className="text-xs text-muted-foreground">
-                                                    订单已超时关闭，如需购买请重新下单
-                                                </p>
-                                            ) : selected.status === "COMPLETED" ? (
-                                                <Button variant="outline" asChild className="w-full">
-                                                    <Link href={`/orders/lookup?orderNo=${encodeURIComponent(selected.orderNo)}`}>
-                                                        输入密码查看卡密
-                                                    </Link>
-                                                </Button>
-                                            ) : null}
+                                            <Button asChild className="w-full gap-2">
+                                                <Link href={`/orders/lookup?orderNo=${encodeURIComponent(selected.orderNo)}`}>
+                                                    <Search className="size-4" />
+                                                    去订单查询
+                                                </Link>
+                                            </Button>
                                         </>
                                     ) : (
                                         <p className="text-sm text-muted-foreground">

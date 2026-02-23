@@ -24,7 +24,7 @@
 - **Lint**：`npm run lint`（提交前请确保通过）
 - **单元 / 集成测试**：`npm run test`
 - **覆盖率**：`npm run test:coverage`
-- **E2E**：`npm run test:e2e`（需先启动 DB 并完成 migrate + seed，再在本地跑 `npm run dev` 或由 Playwright 自动启动）
+- **E2E**：`npm run test:e2e`（需先启动 DB 并完成 migrate，再执行 **`SEED_E2E=1 npm run db:seed`** 以创建 E2E 用商品与卡密；本地可先 `npm run dev` 或由 Playwright 自动启动。其中「完整支付流程」用例需配置易支付四件套：`YIPAY_PID`、`YIPAY_KEY`、`YIPAY_SUBMIT_URL`、`YIPAY_SITE_NAME`，未配置时该用例会自动 skip。）
 - **依赖安全**：`npm run audit`（CI 会以 `--audit-level=high` 检查）
 
 ## 分支与 PR

@@ -11,9 +11,11 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { Skeleton } from "@/components/ui/skeleton"
 import { SiteHeader } from "@/app/components/site-header"
 import { useSiteName } from "@/app/components/site-name-provider"
-import { Copy, Check, Loader2, Mail, Hash, AlertCircle, Package, Search, Zap } from "lucide-react"
+import { Copy, Check, Eye, EyeOff, Loader2, Mail, Hash, AlertCircle, Package, Search, Zap } from "lucide-react"
 import { toast } from "sonner"
 import { addOrUpdateOrder } from "@/lib/order-history-storage"
+
+const LOOKUP_PREFILL_KEY_PREFIX = "lookup_prefill_"
 
 interface OrderResult {
     orderNo: string
@@ -43,6 +45,7 @@ function OrderLookupPageContent() {
     const [orderNo, setOrderNo] = useState("")
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
+    const [showPassword, setShowPassword] = useState(false)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [result, setResult] = useState<OrderResult | null>(null)
@@ -52,6 +55,13 @@ function OrderLookupPageContent() {
     const [loadingOrderNo, setLoadingOrderNo] = useState<string | null>(null)
     const [sheetLoading, setSheetLoading] = useState(false)
     const passwordInputRef = useRef<HTMLInputElement>(null)
+    const prefillAttemptedRef = useRef(false)
+
+    // Type from URL: ?type=email | ?type=orderNo (default)
+    useEffect(() => {
+        const typeParam = searchParams.get("type")
+        setLookupMode(typeParam === "email" ? "email" : "orderNo")
+    }, [searchParams])
 
     // Auto-fill orderNo from URL params and focus password input
     useEffect(() => {
@@ -59,12 +69,71 @@ function OrderLookupPageContent() {
         if (orderNoParam) {
             setOrderNo(orderNoParam)
             setLookupMode("orderNo")
-            // Focus password input after a short delay
             setTimeout(() => {
                 passwordInputRef.current?.focus()
             }, 100)
         }
     }, [searchParams])
+
+    // Pre-query: when orderNo in URL and we have prefill password in sessionStorage, run lookup once then clear
+    useEffect(() => {
+        const orderNoParam = searchParams.get("orderNo")
+        if (!orderNoParam || prefillAttemptedRef.current) return
+
+        const prefillKey = LOOKUP_PREFILL_KEY_PREFIX + orderNoParam
+        const prefillPassword = typeof sessionStorage !== "undefined" ? sessionStorage.getItem(prefillKey) : null
+        if (!prefillPassword) return
+
+        prefillAttemptedRef.current = true
+        setError(null)
+        setResult(null)
+        setOrderList(null)
+        setLoading(true)
+        setSheetOpen(true)
+        setSheetLoading(true)
+
+        fetch("/api/orders/lookup", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ orderNo: orderNoParam.trim(), password: prefillPassword.trim() }),
+        })
+            .then((res) => {
+                if (!res.ok) return res.json().then((data) => Promise.reject(new Error(data?.error ?? "查询失败")))
+                return res.json()
+            })
+            .then((data) => {
+                if (data.orders && Array.isArray(data.orders)) {
+                    setOrderList(data.orders)
+                    toast.success(`找到 ${data.orders.length} 个相关订单`)
+                } else if (data?.orderNo) {
+                    setResult(data)
+                    toast.success("查询成功")
+                    addOrUpdateOrder({
+                        orderNo: data.orderNo,
+                        productName: data.productName ?? "商品",
+                        amount: data.amount ?? 0,
+                        createdAt: typeof data.createdAt === "string" ? data.createdAt : new Date().toISOString(),
+                        status: data.status ?? "PENDING",
+                    })
+                    if (data.successToken && data.orderNo) {
+                        router.replace(
+                            `/orders/${encodeURIComponent(data.orderNo)}/success?token=${encodeURIComponent(data.successToken)}`,
+                        )
+                    }
+                } else {
+                    setError("订单不存在或密码错误")
+                }
+                sessionStorage.removeItem(prefillKey)
+            })
+            .catch((err) => {
+                setError(err?.message ?? "查询失败，请稍后重试")
+                sessionStorage.removeItem(prefillKey)
+            })
+            .finally(() => {
+                setLoading(false)
+                setSheetLoading(false)
+            })
+    }, [searchParams, router])
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
@@ -370,17 +439,35 @@ function OrderLookupPageContent() {
                                     <label className="text-sm font-medium" htmlFor="password">
                                         查询密码
                                     </label>
-                                    <Input
-                                        ref={passwordInputRef}
-                                        id="password"
-                                        name="password"
-                                        type="password"
-                                        placeholder="下单时设置的查询密码"
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        disabled={loading}
-                                        required
-                                    />
+                                    <div className="relative">
+                                        <Input
+                                            ref={passwordInputRef}
+                                            id="password"
+                                            name="password"
+                                            type={showPassword ? "text" : "password"}
+                                            placeholder="下单时设置的查询密码"
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            disabled={loading}
+                                            required
+                                            className="pr-10"
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                                            onClick={() => setShowPassword((v) => !v)}
+                                            tabIndex={-1}
+                                            aria-label={showPassword ? "隐藏密码" : "显示密码"}
+                                        >
+                                            {showPassword ? (
+                                                <EyeOff className="size-4 text-muted-foreground" />
+                                            ) : (
+                                                <Eye className="size-4 text-muted-foreground" />
+                                            )}
+                                        </Button>
+                                    </div>
                                 </div>
                                 <Button type="submit" className="w-full" disabled={loading}>
                                     {loading ? (

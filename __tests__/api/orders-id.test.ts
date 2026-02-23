@@ -48,6 +48,25 @@ describe("/api/orders/[orderId] admin detail & status", () => {
     expect(data).toEqual({ error: "Unauthorized" })
   })
 
+  it("PATCH returns 401 when admin is not authenticated", async () => {
+    adminSessionMock.mockResolvedValueOnce(null)
+    const req = createJsonRequest({ status: "PENDING" })
+    const ctx: RouteContext = { params: { orderId: "order_1" } }
+    const res = await PATCH(req, ctx as any)
+    const data = await res.json()
+    expect(res.status).toBe(401)
+    expect(data).toEqual({ error: "Unauthorized" })
+  })
+
+  it("DELETE returns 401 when admin is not authenticated", async () => {
+    adminSessionMock.mockResolvedValueOnce(null)
+    const ctx: RouteContext = { params: { orderId: "order_1" } }
+    const res = await DELETE({} as NextRequest, ctx as any)
+    const data = await res.json()
+    expect(res.status).toBe(401)
+    expect(data).toEqual({ error: "Unauthorized" })
+  })
+
   it("GET returns 404 when order does not exist", async () => {
     adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
     prismaMock.order.findUnique.mockResolvedValueOnce(null)
@@ -165,7 +184,10 @@ describe("/api/orders/[orderId] admin detail & status", () => {
   })
 
   it("PATCH PENDING -> COMPLETED updates order and cards", async () => {
-    adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
+    adminSessionMock.mockResolvedValueOnce({
+      id: "admin_1",
+      user: { id: "admin_1", email: "admin@test.com" },
+    })
 
     ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: any) =>
       fn(prismaMock),

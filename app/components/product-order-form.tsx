@@ -7,7 +7,7 @@ import { Turnstile } from "@marsidev/react-turnstile"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Loader2 } from "lucide-react"
+import { Eye, EyeOff, Loader2 } from "lucide-react"
 import { addOrUpdateOrder } from "@/lib/order-history-storage"
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? ""
@@ -31,6 +31,7 @@ export function ProductOrderForm({
 }: ProductOrderFormProps) {
     const [email, setEmail] = useState("")
     const [orderPassword, setOrderPassword] = useState("")
+    const [showOrderPassword, setShowOrderPassword] = useState(false)
     const [quantity, setQuantity] = useState(1)
     const [loading, setLoading] = useState(false)
     const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
@@ -80,6 +81,11 @@ export function ProductOrderForm({
                     window.location.href = data.paymentUrl
                 } else if (data.orderNo) {
                     toast.success(`订单号: ${data.orderNo}，请妥善保管订单号和密码`)
+                    try {
+                        sessionStorage.setItem(`lookup_prefill_${data.orderNo}`, orderPassword)
+                    } catch {
+                        // ignore quota or disabled storage
+                    }
                     router.push(`/orders/lookup?orderNo=${encodeURIComponent(data.orderNo)}`)
                 }
                 return
@@ -121,16 +127,34 @@ export function ProductOrderForm({
 
             <div className="space-y-2">
                 <Label htmlFor="orderPassword">订单密码</Label>
-                <Input
-                    id="orderPassword"
-                    type="password"
-                    placeholder="用于查询订单，请妥善保管"
-                    value={orderPassword}
-                    onChange={(e) => setOrderPassword(e.target.value)}
-                    required
-                    minLength={6}
-                    disabled={!inStock}
-                />
+                <div className="relative">
+                    <Input
+                        id="orderPassword"
+                        type={showOrderPassword ? "text" : "password"}
+                        placeholder="用于查询订单，请妥善保管"
+                        value={orderPassword}
+                        onChange={(e) => setOrderPassword(e.target.value)}
+                        required
+                        minLength={6}
+                        disabled={!inStock}
+                        className="pr-10"
+                    />
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                        onClick={() => setShowOrderPassword((v) => !v)}
+                        tabIndex={-1}
+                        aria-label={showOrderPassword ? "隐藏密码" : "显示密码"}
+                    >
+                        {showOrderPassword ? (
+                            <EyeOff className="size-4 text-muted-foreground" />
+                        ) : (
+                            <Eye className="size-4 text-muted-foreground" />
+                        )}
+                    </Button>
+                </div>
                 <p className="text-xs text-muted-foreground">
                     6 位以上，用于后续查询订单和卡密
                 </p>

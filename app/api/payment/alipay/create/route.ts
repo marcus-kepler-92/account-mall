@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getAlipayPagePayUrl, getAlipayWapPayUrl } from "@/lib/alipay"
+import { isYipayConfigured, getYipayPagePayUrl } from "@/lib/yipay"
 import { invalidJsonBody, badRequest, notFound } from "@/lib/api-response"
 
 /**
@@ -44,10 +45,11 @@ export async function POST(request: NextRequest) {
     const totalAmount = Number(order.amount).toFixed(2)
     const subject = order.product?.name ?? `订单 ${orderNo}`
 
-    const paymentUrl =
-        clientType === "wap"
-            ? getAlipayWapPayUrl({ orderNo, totalAmount, subject })
-            : getAlipayPagePayUrl({ orderNo, totalAmount, subject })
+    const paymentUrl = isYipayConfigured()
+        ? getYipayPagePayUrl({ orderNo, totalAmount, subject })
+        : clientType === "wap"
+          ? getAlipayWapPayUrl({ orderNo, totalAmount, subject })
+          : getAlipayPagePayUrl({ orderNo, totalAmount, subject })
 
     if (!paymentUrl) {
         return NextResponse.json(

@@ -7,6 +7,11 @@ COPY package.json package-lock.json* ./
 RUN npm ci
 
 COPY . .
+# Build-time env so config parse passes (NODE_ENV=production); runtime uses real env from compose/run
+ENV POSTGRES_USER=build
+ENV POSTGRES_PASSWORD=build
+ENV POSTGRES_DB=build
+ENV BETTER_AUTH_SECRET="build-time-placeholder-minimum-32-characters"
 RUN npx prisma generate && npm run build
 
 # Stage 2: run
