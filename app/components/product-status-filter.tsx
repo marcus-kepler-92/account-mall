@@ -84,12 +84,16 @@ export function ProductStatusFilter({
                         </Badge>
                     ))}
                     {currentTag && (
-                        <button
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="ml-1 size-7 text-muted-foreground hover:text-foreground"
                             onClick={() => setFilter("tag", null)}
-                            className="ml-1 text-muted-foreground hover:text-foreground"
+                            aria-label="清除标签筛选"
                         >
                             <X className="size-3" />
-                        </button>
+                        </Button>
                     )}
                 </div>
             )}

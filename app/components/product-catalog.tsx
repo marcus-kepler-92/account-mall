@@ -256,31 +256,42 @@ export function ProductCatalog() {
                         {selectedTagSlugs.map((slug) => (
                             <Badge key={slug} variant="secondary" className="gap-1 pr-1">
                                 {tags.find((t) => t.slug === slug)?.name ?? slug}
-                                <button
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="ml-0.5 size-5 rounded-full p-0 hover:bg-muted-foreground/20"
                                     onClick={() => toggleTag(slug)}
-                                    className="ml-0.5 rounded-full p-0.5 hover:bg-muted-foreground/20 transition-colors"
+                                    aria-label="移除标签"
                                 >
                                     <X className="size-3" />
-                                </button>
+                                </Button>
                             </Badge>
                         ))}
                         {searchInput && (
                             <Badge variant="secondary" className="gap-1 pr-1">
                                 &quot;{searchInput}&quot;
-                                <button
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="ml-0.5 size-5 rounded-full p-0 hover:bg-muted-foreground/20"
                                     onClick={() => { setSearchInput(""); setSearch(""); setCurrentPage(1) }}
-                                    className="ml-0.5 rounded-full p-0.5 hover:bg-muted-foreground/20 transition-colors"
+                                    aria-label="移除搜索"
                                 >
                                     <X className="size-3" />
-                                </button>
+                                </Button>
                             </Badge>
                         )}
-                        <button
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs text-muted-foreground hover:text-foreground"
                             onClick={clearFilters}
-                            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
                         >
                             清除全部
-                        </button>
+                        </Button>
                     </div>
                 )}
 

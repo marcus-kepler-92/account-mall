@@ -3,6 +3,13 @@
 import { useState } from "react"
 import { DashboardChart } from "@/app/components/dashboard-chart"
 import type { DashboardTrendPoint } from "@/app/admin/(main)/dashboard/types"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
 
 export function DashboardTrendSection({
     trend7,
@@ -17,14 +24,18 @@ export function DashboardTrendSection({
         <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
                 <span className="text-sm text-muted-foreground">时间范围</span>
-                <select
-                    value={days}
-                    onChange={(e) => setDays(Number(e.target.value) as 7 | 30)}
-                    className="rounded-md border bg-background px-2 py-1 text-sm"
+                <Select
+                    value={String(days)}
+                    onValueChange={(v) => setDays(Number(v) as 7 | 30)}
                 >
-                    <option value={7}>近 7 日</option>
-                    <option value={30}>近 30 日</option>
-                </select>
+                    <SelectTrigger className="w-[7rem]">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="7">近 7 日</SelectItem>
+                        <SelectItem value="30">近 30 日</SelectItem>
+                    </SelectContent>
+                </Select>
             </div>
             <DashboardChart data={data} />
         </div>

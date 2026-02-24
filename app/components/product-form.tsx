@@ -442,19 +442,22 @@ export function ProductForm({
                                                     />
                                                     <span className="truncate">{tag.name}</span>
                                                 </label>
-                                                <button
+                                                <Button
                                                     type="button"
-                                                    onClick={(e) => handleDeleteTagClick(e, tag.id)}
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="shrink-0 size-7 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                                                     disabled={deletingTagId === tag.id}
-                                                    className="shrink-0 rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
+                                                    onClick={(e) => handleDeleteTagClick(e, tag.id)}
                                                     title="删除标签"
+                                                    aria-label="删除标签"
                                                 >
                                                     {deletingTagId === tag.id ? (
                                                         <Loader2 className="size-3.5 animate-spin" />
                                                     ) : (
                                                         <Trash2 className="size-3.5" />
                                                     )}
-                                                </button>
+                                                </Button>
                                             </div>
                                         ))}
                                     </div>
@@ -471,13 +474,16 @@ export function ProductForm({
                                                     className="gap-1 pr-1"
                                                 >
                                                     {tag.name}
-                                                    <button
+                                                    <Button
                                                         type="button"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="ml-0.5 size-5 rounded-full p-0 hover:bg-muted-foreground/20"
                                                         onClick={() => toggleTag(id)}
-                                                        className="ml-0.5 rounded-full p-0.5 hover:bg-muted-foreground/20"
+                                                        aria-label="移除标签"
                                                     >
                                                         <X className="size-3" />
-                                                    </button>
+                                                    </Button>
                                                 </Badge>
                                             ) : null
                                         })}

@@ -399,40 +399,36 @@ function OrderLookupPageContent() {
 
                             {/* Lookup mode selector */}
                             <div className="flex gap-2 rounded-lg border p-1">
-                                <button
+                                <Button
                                     type="button"
+                                    variant={lookupMode === "orderNo" ? "default" : "ghost"}
+                                    size="sm"
+                                    className="flex flex-1 gap-2"
                                     onClick={() => {
                                         setLookupMode("orderNo")
                                         setError(null)
                                         setResult(null)
                                         setOrderList(null)
                                     }}
-                                    className={`flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                                        lookupMode === "orderNo"
-                                            ? "bg-primary text-primary-foreground"
-                                            : "text-muted-foreground hover:bg-accent"
-                                    }`}
                                 >
                                     <Hash className="size-4" />
                                     订单号查询
-                                </button>
-                                <button
+                                </Button>
+                                <Button
                                     type="button"
+                                    variant={lookupMode === "email" ? "default" : "ghost"}
+                                    size="sm"
+                                    className="flex flex-1 gap-2"
                                     onClick={() => {
                                         setLookupMode("email")
                                         setError(null)
                                         setResult(null)
                                         setOrderList(null)
                                     }}
-                                    className={`flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                                        lookupMode === "email"
-                                            ? "bg-primary text-primary-foreground"
-                                            : "text-muted-foreground hover:bg-accent"
-                                    }`}
                                 >
                                     <Mail className="size-4" />
                                     邮箱查询
-                                </button>
+                                </Button>
                             </div>
 
                             {/* Query form */}
@@ -536,19 +532,21 @@ function OrderLookupPageContent() {
                                             const isLoading = loadingOrderNo === order.orderNo
                                             const isSelected = result?.orderNo === order.orderNo && sheetOpen
                                             return (
-                                                <button
+                                                <Button
                                                     key={order.orderNo}
-                                                    onClick={() => handleOrderClick(order.orderNo)}
-                                                    disabled={!!loadingOrderNo}
-                                                    className={`w-full rounded-lg border p-3 text-left transition-all ${
+                                                    type="button"
+                                                    variant="outline"
+                                                    className={`w-full h-auto rounded-lg border p-3 text-left transition-all ${
                                                         isSelected
                                                             ? "border-primary bg-primary/5 ring-1 ring-primary"
                                                             : isLoading
                                                               ? "border-muted bg-muted/50"
                                                               : "bg-card hover:bg-accent hover:border-accent-foreground/20"
                                                     } ${loadingOrderNo && !isLoading ? "opacity-50" : ""}`}
+                                                    onClick={() => handleOrderClick(order.orderNo)}
+                                                    disabled={!!loadingOrderNo}
                                                 >
-                                                    <div className="space-y-1.5">
+                                                    <div className="space-y-1.5 w-full">
                                                         <div className="flex items-center gap-2">
                                                             {isLoading ? (
                                                                 <Loader2 className="size-3 animate-spin shrink-0" />
@@ -567,7 +565,7 @@ function OrderLookupPageContent() {
                                                             {formatDate(order.createdAt)}
                                                         </div>
                                                     </div>
-                                                </button>
+                                                </Button>
                                             )
                                         })}
                                     </div>
