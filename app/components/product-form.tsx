@@ -5,13 +5,23 @@ import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { generateSlug } from "@/lib/utils"
 import { RichTextEditor } from "@/app/components/rich-text-editor"
 import { productFormSchema, type ProductFormSchema } from "@/lib/validations/product"
@@ -50,6 +60,7 @@ export function ProductForm({
     const [tags, setTags] = useState<Tag[]>(allTags)
     const [creatingTag, setCreatingTag] = useState(false)
     const [deletingTagId, setDeletingTagId] = useState<string | null>(null)
+    const [confirmDeleteTagId, setConfirmDeleteTagId] = useState<string | null>(null)
     const [slugManuallyEdited, setSlugManuallyEdited] = useState(false)
 
     const form = useForm<ProductFormSchema>({
@@ -107,10 +118,7 @@ export function ProductForm({
         setValue("tagIds", next)
     }
 
-    const handleDeleteTag = async (e: React.MouseEvent, tagId: string) => {
-        e.preventDefault()
-        e.stopPropagation()
-        if (!confirm("确定要删除该标签吗？删除后使用该标签的商品将不再关联此标签。")) return
+    const doDeleteTag = async (tagId: string) => {
         setDeletingTagId(tagId)
         try {
             const res = await fetch(`/api/tags/${tagId}`, { method: "DELETE" })
@@ -130,6 +138,18 @@ export function ProductForm({
         } finally {
             setDeletingTagId(null)
         }
+    }
+
+    const handleDeleteTagClick = (e: React.MouseEvent, tagId: string) => {
+        e.preventDefault()
+        e.stopPropagation()
+        setConfirmDeleteTagId(tagId)
+    }
+
+    const handleConfirmDeleteTag = () => {
+        const tagId = confirmDeleteTagId
+        setConfirmDeleteTagId(null)
+        if (tagId) doDeleteTag(tagId)
     }
 
     const handleCreateTag = async () => {
@@ -197,6 +217,23 @@ export function ProductForm({
 
     return (
         <div className="space-y-6">
+            <AlertDialog open={confirmDeleteTagId !== null} onOpenChange={(open) => !open && setConfirmDeleteTagId(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>删除标签</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            确定要删除该标签吗？删除后使用该标签的商品将不再关联此标签。
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>取消</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleConfirmDeleteTag} className={buttonVariants({ variant: "destructive" })}>
+                            确定删除
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
             <div className="flex items-center gap-4">
                 <Button variant="ghost" size="icon" asChild>
                     <Link href="/admin/products">
@@ -407,7 +444,7 @@ export function ProductForm({
                                                 </label>
                                                 <button
                                                     type="button"
-                                                    onClick={(e) => handleDeleteTag(e, tag.id)}
+                                                    onClick={(e) => handleDeleteTagClick(e, tag.id)}
                                                     disabled={deletingTagId === tag.id}
                                                     className="shrink-0 rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
                                                     title="删除标签"

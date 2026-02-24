@@ -10,6 +10,16 @@ import {
 } from "@/lib/order-history-storage"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Package, Search, Trash2 } from "lucide-react"
 import { SiteHeader } from "@/app/components/site-header"
 import { toast } from "sonner"
@@ -53,16 +63,23 @@ function MyOrdersPageContent() {
 
     const [orders, setOrders] = useState<OrderHistoryItem[]>(() => getOrderHistory())
     const [userSelectedOrderNo, setUserSelectedOrderNo] = useState<string | null>(null)
+    const [confirmRemoveOrderNo, setConfirmRemoveOrderNo] = useState<string | null>(null)
 
     const refreshOrders = () => setOrders(getOrderHistory())
 
     const selectedOrderNo = orderNoFromUrl ?? userSelectedOrderNo ?? orders[0]?.orderNo ?? null
     const selected = orders.find((o) => o.orderNo === selectedOrderNo)
 
-    const handleRemoveOrder = (orderNo: string, e: React.MouseEvent) => {
+    const handleRemoveOrderClick = (orderNo: string, e: React.MouseEvent) => {
         e.preventDefault()
         e.stopPropagation()
-        if (!window.confirm("确定从列表中移除该订单记录？仅清除本机记录，不影响订单本身。")) return
+        setConfirmRemoveOrderNo(orderNo)
+    }
+
+    const handleConfirmRemoveOrder = () => {
+        const orderNo = confirmRemoveOrderNo
+        setConfirmRemoveOrderNo(null)
+        if (!orderNo) return
         removeOrderFromHistory(orderNo)
         refreshOrders()
         if (selectedOrderNo === orderNo) {
@@ -74,6 +91,23 @@ function MyOrdersPageContent() {
 
     return (
         <div className="flex min-h-screen flex-col">
+            <AlertDialog open={confirmRemoveOrderNo !== null} onOpenChange={(open) => !open && setConfirmRemoveOrderNo(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>从列表移除订单</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            确定从列表中移除该订单记录？仅清除本机记录，不影响订单本身。
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>取消</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleConfirmRemoveOrder}>
+                            确定移除
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
             <SiteHeader />
 
             <main className="flex-1 px-4 py-6">
@@ -139,7 +173,7 @@ function MyOrdersPageContent() {
                                                         variant="ghost"
                                                         size="icon"
                                                         className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
-                                                        onClick={(e) => handleRemoveOrder(o.orderNo, e)}
+                                                        onClick={(e) => handleRemoveOrderClick(o.orderNo, e)}
                                                         title="从列表移除"
                                                     >
                                                         <Trash2 className="size-4" />
