@@ -49,6 +49,7 @@ export function ProductForm({
     const [newTagName, setNewTagName] = useState("")
     const [tags, setTags] = useState<Tag[]>(allTags)
     const [creatingTag, setCreatingTag] = useState(false)
+    const [deletingTagId, setDeletingTagId] = useState<string | null>(null)
     const [slugManuallyEdited, setSlugManuallyEdited] = useState(false)
 
     const form = useForm<ProductFormSchema>({
@@ -104,6 +105,31 @@ export function ProductForm({
             ? current.filter((id) => id !== tagId)
             : [...current, tagId]
         setValue("tagIds", next)
+    }
+
+    const handleDeleteTag = async (e: React.MouseEvent, tagId: string) => {
+        e.preventDefault()
+        e.stopPropagation()
+        if (!confirm("确定要删除该标签吗？删除后使用该标签的商品将不再关联此标签。")) return
+        setDeletingTagId(tagId)
+        try {
+            const res = await fetch(`/api/tags/${tagId}`, { method: "DELETE" })
+            if (!res.ok) {
+                const data = await res.json()
+                toast.error(data.error || "删除标签失败")
+                return
+            }
+            setTags((prev) => prev.filter((t) => t.id !== tagId))
+            setValue(
+                "tagIds",
+                (tagIds as string[]).filter((id) => id !== tagId)
+            )
+            toast.success("标签已删除")
+        } catch {
+            toast.error("删除标签失败")
+        } finally {
+            setDeletingTagId(null)
+        }
     }
 
     const handleCreateTag = async () => {
@@ -368,16 +394,31 @@ export function ProductForm({
                                 {tags.length > 0 && (
                                     <div className="space-y-2 max-h-48 overflow-y-auto">
                                         {tags.map((tag) => (
-                                            <label
+                                            <div
                                                 key={tag.id}
                                                 className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent transition-colors"
                                             >
-                                                <Checkbox
-                                                    checked={(tagIds as string[]).includes(tag.id)}
-                                                    onCheckedChange={() => toggleTag(tag.id)}
-                                                />
-                                                <span className="flex-1">{tag.name}</span>
-                                            </label>
+                                                <label className="flex flex-1 cursor-pointer items-center gap-2 min-w-0">
+                                                    <Checkbox
+                                                        checked={(tagIds as string[]).includes(tag.id)}
+                                                        onCheckedChange={() => toggleTag(tag.id)}
+                                                    />
+                                                    <span className="truncate">{tag.name}</span>
+                                                </label>
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => handleDeleteTag(e, tag.id)}
+                                                    disabled={deletingTagId === tag.id}
+                                                    className="shrink-0 rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
+                                                    title="删除标签"
+                                                >
+                                                    {deletingTagId === tag.id ? (
+                                                        <Loader2 className="size-3.5 animate-spin" />
+                                                    ) : (
+                                                        <Trash2 className="size-3.5" />
+                                                    )}
+                                                </button>
+                                            </div>
                                         ))}
                                     </div>
                                 )}
