@@ -82,6 +82,10 @@ export function DashboardTopProductsChart({
                 barMaxWidth: 20,
                 itemStyle: { color: primary },
                 encode: { x: "value", y: "name" },
+                emphasis: {
+                    itemStyle: { color: primary },
+                    scale: true,
+                },
             },
         ],
     }

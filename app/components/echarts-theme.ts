@@ -4,31 +4,34 @@ import { useEffect, useState } from "react"
 import { useTheme } from "next-themes"
 
 /**
- * 从当前文档的 CSS 变量读取颜色，供 ECharts 使用，避免图表全是黑灰色。
- * 在客户端读取，随主题（亮/暗）自动切换。
+ * Resolve a CSS variable to computed color (e.g. rgb/rgba). ECharts/Canvas does not
+ * support oklch(), so we must resolve theme variables to a format they understand.
  */
-function getCssVar(name: string): string {
+function getComputedColor(cssVarName: string): string {
     if (typeof document === "undefined") return ""
-    const value = getComputedStyle(document.documentElement)
-        .getPropertyValue(name)
-        .trim()
+    const el = document.createElement("div")
+    el.style.setProperty("background", `var(${cssVarName})`)
+    el.style.setProperty("border", "none")
+    document.body.appendChild(el)
+    const value = getComputedStyle(el).backgroundColor
+    document.body.removeChild(el)
     return value || ""
 }
 
 export function getEChartsThemeColors() {
     return {
-        primary: getCssVar("--primary"),
-        chart1: getCssVar("--chart-1"),
-        chart2: getCssVar("--chart-2"),
-        chart3: getCssVar("--chart-3"),
-        chart4: getCssVar("--chart-4"),
-        chart5: getCssVar("--chart-5"),
-        foreground: getCssVar("--foreground"),
-        mutedForeground: getCssVar("--muted-foreground"),
-        border: getCssVar("--border"),
-        popover: getCssVar("--popover"),
-        popoverForeground: getCssVar("--popover-foreground"),
-        background: getCssVar("--background"),
+        primary: getComputedColor("--primary"),
+        chart1: getComputedColor("--chart-1"),
+        chart2: getComputedColor("--chart-2"),
+        chart3: getComputedColor("--chart-3"),
+        chart4: getComputedColor("--chart-4"),
+        chart5: getComputedColor("--chart-5"),
+        foreground: getComputedColor("--foreground"),
+        mutedForeground: getComputedColor("--muted-foreground"),
+        border: getComputedColor("--border"),
+        popover: getComputedColor("--popover"),
+        popoverForeground: getComputedColor("--popover-foreground"),
+        background: getComputedColor("--background"),
     }
 }
 

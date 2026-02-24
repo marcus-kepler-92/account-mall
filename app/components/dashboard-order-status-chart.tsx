@@ -59,12 +59,26 @@ export function DashboardOrderStatusChart({ data }: { data: OrderStatusCount[] }
                     color: colors.foreground,
                     formatter: "{b} {d}%",
                 },
-                emphasis: { label: { show: true } },
-                data: filtered.map((d, i) => ({
-                    value: d.count,
-                    name: d.label,
-                    itemStyle: { color: pieColors[i % pieColors.length] },
-                })),
+                emphasis: {
+                    label: { show: true },
+                    itemStyle: {
+                        borderColor: colors.background || "#fff",
+                        borderWidth: 2,
+                        shadowBlur: 8,
+                        shadowColor: "rgba(0,0,0,0.2)",
+                    },
+                    scale: true,
+                    scaleSize: 5,
+                },
+                data: filtered.map((d, i) => {
+                    const color = pieColors[i % pieColors.length]
+                    return {
+                        value: d.count,
+                        name: d.label,
+                        itemStyle: { color },
+                        emphasis: { itemStyle: { color } },
+                    }
+                }),
             },
         ],
     }

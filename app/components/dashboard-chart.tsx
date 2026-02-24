@@ -83,6 +83,10 @@ export function DashboardChart({
                 data: data.map((d) => d.订单),
                 itemStyle: { color: chart2 },
                 barMaxWidth: 24,
+                emphasis: {
+                    itemStyle: { color: chart2 },
+                    scale: true,
+                },
             },
             {
                 name: "营收",
@@ -93,6 +97,11 @@ export function DashboardChart({
                 lineStyle: { color: primary },
                 itemStyle: { color: primary },
                 areaStyle: { color: primary, opacity: 0.2 },
+                emphasis: {
+                    lineStyle: { color: primary, width: 3 },
+                    itemStyle: { color: primary },
+                    areaStyle: { color: primary, opacity: 0.3 },
+                },
             },
         ],
     }
