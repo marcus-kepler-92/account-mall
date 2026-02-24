@@ -15,7 +15,7 @@ export type SendMailOptions = {
 };
 
 /**
- * Send email via Resend. No-op when RESEND_API_KEY is not configured.
+ * Send email via Resend. No-op when RESEND_API_KEY is not configured or in development.
  */
 export async function sendMail({
     to,
@@ -27,6 +27,11 @@ export async function sendMail({
     if (toList.length === 0) {
         console.warn("[email] No recipients, skip send");
         return { success: false, error: "No recipients" };
+    }
+
+    if (config.nodeEnv === "development") {
+        console.log("[email] Development: skip send", { to: toList, subject });
+        return { success: true };
     }
 
     if (!resend) {

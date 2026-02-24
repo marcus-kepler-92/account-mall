@@ -187,7 +187,8 @@ export async function POST(request: NextRequest) {
     const { productId, email, orderPassword, quantity, turnstileToken } = parsed.data
 
     const secretKey = config.turnstileSecretKey
-    if (secretKey) {
+    const turnstileEnabled = secretKey && config.nodeEnv !== "development"
+    if (turnstileEnabled) {
         if (!turnstileToken || !turnstileToken.trim()) {
             return badRequest("请完成安全验证后再提交订单。")
         }
@@ -326,9 +327,15 @@ export async function POST(request: NextRequest) {
 
     const amountStr = Number(order.amount).toFixed(2)
     const subject = product.name ?? `订单 ${order.orderNo}`
-    const paymentUrl = isYipayConfigured()
+    let paymentUrl = isYipayConfigured()
         ? getYipayPagePayUrl({ orderNo: order.orderNo, totalAmount: amountStr, subject })
         : getAlipayPagePayUrl({ orderNo: order.orderNo, totalAmount: amountStr, subject })
+
+    // When no real payment is configured, use mock payment page in development so "click buy" still goes to a payment step
+    if (!paymentUrl && config.nodeEnv === "development") {
+        const base = config.siteUrl ?? "http://localhost:3000"
+        paymentUrl = `${base}/orders/mock-pay?orderNo=${encodeURIComponent(order.orderNo)}&amount=${encodeURIComponent(amountStr)}`
+    }
 
     return NextResponse.json({
         orderNo: order.orderNo,

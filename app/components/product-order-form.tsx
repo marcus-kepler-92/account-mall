@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Eye, EyeOff, Loader2 } from "lucide-react"
 import { addOrUpdateOrder } from "@/lib/order-history-storage"
+import { Skeleton } from "@/components/ui/skeleton"
 
 const ORDER_FORM_LOADING_EVENT = "product-order-loading"
 
@@ -19,6 +20,7 @@ function dispatchOrderFormLoading(loading: boolean) {
 }
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? ""
+const IS_DEV = process.env.NODE_ENV === "development"
 
 type ProductOrderFormProps = {
     productId: string
@@ -43,9 +45,10 @@ export function ProductOrderForm({
     const [quantity, setQuantity] = useState(1)
     const [loading, setLoading] = useState(false)
     const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
+    const [turnstileWidgetReady, setTurnstileWidgetReady] = useState(false)
 
     const router = useRouter()
-    const requireTurnstile = Boolean(TURNSTILE_SITE_KEY)
+    const requireTurnstile = Boolean(TURNSTILE_SITE_KEY) && !IS_DEV
 
     const totalPrice = (price * quantity).toFixed(2)
 
@@ -62,6 +65,7 @@ export function ProductOrderForm({
 
         setLoading(true)
         dispatchOrderFormLoading(true)
+        let willRedirect = false
         try {
             const res = await fetch("/api/orders", {
                 method: "POST",
@@ -86,7 +90,13 @@ export function ProductOrderForm({
                     status: "PENDING",
                 })
                 if (data.paymentUrl) {
+                    try {
+                        sessionStorage.setItem(`lookup_prefill_${data.orderNo}`, orderPassword)
+                    } catch {
+                        // ignore quota or disabled storage
+                    }
                     toast.success("订单已创建，正在跳转至支付页面…")
+                    willRedirect = true
                     window.location.href = data.paymentUrl
                     return
                 }
@@ -97,6 +107,7 @@ export function ProductOrderForm({
                     } catch {
                         // ignore quota or disabled storage
                     }
+                    willRedirect = true
                     router.push(`/orders/lookup?orderNo=${encodeURIComponent(data.orderNo)}`)
                 }
                 return
@@ -106,8 +117,10 @@ export function ProductOrderForm({
         } catch {
             toast.error("下单失败，请稍后重试")
         } finally {
-            setLoading(false)
-            dispatchOrderFormLoading(false)
+            if (!willRedirect) {
+                setLoading(false)
+                dispatchOrderFormLoading(false)
+            }
         }
     }
 
@@ -186,11 +199,23 @@ export function ProductOrderForm({
             </div>
 
             {requireTurnstile && (
-                <div className="flex justify-center">
+                <div className="relative flex min-h-[76px] justify-center">
+                    {!turnstileWidgetReady && (
+                        <div
+                            className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/30 bg-muted/40 px-4 py-3"
+                            aria-hidden
+                        >
+                            <Skeleton className="h-10 w-[200px] rounded-full" />
+                            <p className="text-xs text-muted-foreground">
+                                安全验证加载中… 完成后即可点击「立即购买」
+                            </p>
+                        </div>
+                    )}
                     <Turnstile
                         siteKey={TURNSTILE_SITE_KEY}
                         onSuccess={(token) => setTurnstileToken(token)}
                         onExpire={() => setTurnstileToken(null)}
+                        onWidgetLoad={() => setTurnstileWidgetReady(true)}
                     />
                 </div>
             )}

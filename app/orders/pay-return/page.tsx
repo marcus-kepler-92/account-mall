@@ -37,6 +37,9 @@ export default async function PayReturnPage({
         if (result?.ok && orderNo) {
             const token = createOrderSuccessToken(orderNo)
             if (token) redirect(`/orders/${encodeURIComponent(orderNo)}/success?token=${encodeURIComponent(token)}`)
+            // No token (e.g. secret not configured): redirect to lookup so user lands on query step;
+            // if same browser, sessionStorage prefill from order form will auto-run and show 卡密
+            redirect(`/orders/lookup?orderNo=${encodeURIComponent(orderNo)}&fromPay=1`)
         }
     }
 

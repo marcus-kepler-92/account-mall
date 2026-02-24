@@ -91,6 +91,10 @@ function OrderLookupPageContent() {
         setSheetOpen(true)
         setSheetLoading(true)
 
+        if (searchParams.get("fromPay") === "1") {
+            toast.success("支付已完成，正在为您查询订单…")
+        }
+
         fetch("/api/orders/lookup", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -378,6 +382,11 @@ function OrderLookupPageContent() {
                             <CardDescription>
                                 请输入下单时生成的订单号和查询密码，我们会展示该订单下的卡密内容。
                             </CardDescription>
+                            {searchParams.get("fromPay") === "1" && searchParams.get("orderNo") && (
+                                <div className="mt-3 rounded-lg border border-green-500/50 bg-green-500/10 p-3 text-sm text-green-700 dark:text-green-400">
+                                    支付已完成！若未自动展示卡密，请输入下方查询密码并点击「查询订单」。
+                                </div>
+                            )}
                         </CardHeader>
                         <CardContent className="space-y-4">
                             {/* Error message */}
