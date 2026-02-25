@@ -95,4 +95,21 @@ describe("GET /api/cron/close-expired-orders", () => {
     expect(data.closed).toBe(2)
     expect(data.total).toBe(2)
   })
+
+  it("continues and reports closed when one order fails to close", async () => {
+    config.cronSecret = "correct-secret"
+    prismaMock.order.findMany.mockResolvedValue([{ id: "ord_1" }, { id: "ord_2" }])
+    let callCount = 0
+    prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => {
+      callCount++
+      if (callCount === 1) throw new Error("DB error")
+      await fn(prismaMock)
+    })
+    const req = createRequest("Bearer correct-secret")
+    const res = await GET(req)
+    const data = await res.json()
+    expect(res.status).toBe(200)
+    expect(data.closed).toBe(1)
+    expect(data.total).toBe(2)
+  })
 })

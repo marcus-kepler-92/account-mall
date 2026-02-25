@@ -344,4 +344,112 @@ expect(data.code).toBe("VALIDATION_FAILED")
     ])
     expect(data.cards).not.toContainEqual({ content: "code-3" })
   })
+
+  it("returns 400 when password length is less than 6 after parse", async () => {
+    const req = createJsonRequest({ email: "user@example.com", password: "12345" })
+    const res = await POST(req)
+    const data = await res.json()
+    expect(res.status).toBe(400)
+    expect(data.error).toBe("Validation failed")
+    expect(prismaMock.order.findMany).not.toHaveBeenCalled()
+  })
+
+  it("returns multiple orders list when more than one order matches email and password", async () => {
+    prismaMock.order.findMany.mockResolvedValueOnce([
+      {
+        id: "order_1",
+        orderNo: "FAK001",
+        email: "user@example.com",
+        passwordHash: "hash1",
+        status: "COMPLETED",
+        product: { name: "Product A" },
+        cards: [],
+        createdAt: new Date("2024-02-13T00:00:00.000Z"),
+        quantity: 1,
+        amount: 50,
+      },
+      {
+        id: "order_2",
+        orderNo: "FAK002",
+        email: "user@example.com",
+        passwordHash: "hash2",
+        status: "PENDING",
+        product: { name: "Product B" },
+        cards: [],
+        createdAt: new Date("2024-02-12T00:00:00.000Z"),
+        quantity: 2,
+        amount: 100,
+      },
+    ] as any)
+    verifyPasswordMock.mockResolvedValueOnce(true).mockResolvedValueOnce(true)
+
+    const req = createJsonRequest({ email: "user@example.com", password: "secret123" })
+    const res = await POST(req)
+    const data = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(data.orders).toHaveLength(2)
+    expect(data.orders[0]).toMatchObject({
+      orderNo: "FAK001",
+      productName: "Product A",
+      status: "COMPLETED",
+      quantity: 1,
+      amount: 50,
+    })
+    expect(data.orders[1]).toMatchObject({
+      orderNo: "FAK002",
+      productName: "Product B",
+      status: "PENDING",
+      quantity: 2,
+      amount: 100,
+    })
+  })
+
+  it("returns 500 when single order has no product (LOOKUP_FAILED)", async () => {
+    prismaMock.order.findMany.mockResolvedValueOnce([
+      {
+        id: "order_1",
+        orderNo: "FAK001",
+        email: "user@example.com",
+        passwordHash: "hash",
+        status: "COMPLETED",
+        product: null,
+        cards: [],
+        createdAt: new Date("2024-02-13T00:00:00.000Z"),
+        quantity: 1,
+        amount: 50,
+      },
+    ] as any)
+    verifyPasswordMock.mockResolvedValueOnce(true)
+    const req = createJsonRequest({ email: "user@example.com", password: "secret123" })
+    const res = await POST(req)
+    const data = await res.json()
+    expect(res.status).toBe(500)
+    expect(data.error).toBeDefined()
+  })
+
+  it("skips order with corrupt password hash and continues to next", async () => {
+    prismaMock.order.findMany.mockResolvedValueOnce([
+      {
+        id: "order_1",
+        orderNo: "FAK001",
+        email: "user@example.com",
+        passwordHash: "hash1",
+        status: "COMPLETED",
+        product: { name: "Product A" },
+        cards: [],
+        createdAt: new Date("2024-02-13T00:00:00.000Z"),
+        quantity: 1,
+        amount: 50,
+      },
+    ] as any)
+    verifyPasswordMock.mockRejectedValueOnce(new Error("corrupt hash"))
+
+    const req = createJsonRequest({ email: "user@example.com", password: "secret123" })
+    const res = await POST(req)
+    const data = await res.json()
+
+    expect(res.status).toBe(400)
+    expect(data.error).toBe("Order not found or password incorrect")
+  })
 })

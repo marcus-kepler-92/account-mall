@@ -171,6 +171,26 @@ describe("GET /api/orders (admin list)", () => {
     )
   })
 
+  it("applies productId filter when productId is provided", async () => {
+    adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
+    prismaMock.order.findMany.mockResolvedValue([])
+    prismaMock.order.count.mockResolvedValue(0)
+
+    const req = createUrlRequest(
+      "http://localhost/api/orders?page=1&pageSize=20&productId=prod_123",
+    )
+    const res = await GET(req)
+
+    expect(res.status).toBe(200)
+    expect(prismaMock.order.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          productId: "prod_123",
+        }),
+      }),
+    )
+  })
+
   it("does not apply status filter when status is ALL", async () => {
     adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
 
@@ -219,6 +239,19 @@ describe("GET /api/orders (admin list)", () => {
 
     expect(res.status).toBe(400)
     expect(data.error).toContain("Invalid dateFrom format")
+  })
+
+  it("returns 400 when dateTo is invalid", async () => {
+    adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
+
+    const req = createUrlRequest(
+      "http://localhost/api/orders?dateFrom=2024-02-01&dateTo=invalid-date",
+    )
+    const res = await GET(req)
+    const data = await res.json()
+
+    expect(res.status).toBe(400)
+    expect(data.error).toContain("Invalid dateTo format")
   })
 })
 

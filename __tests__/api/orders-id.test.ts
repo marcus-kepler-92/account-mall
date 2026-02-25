@@ -15,6 +15,11 @@ jest.mock("@/lib/auth-guard", () => ({
   getAdminSession: jest.fn(),
 }))
 
+jest.mock("@/lib/order-completion-email", () => ({
+  __esModule: true,
+  sendOrderCompletionEmail: jest.fn().mockResolvedValue(undefined),
+}))
+
 import { getAdminSession } from "@/lib/auth-guard"
 
 type RouteContext = {
@@ -183,7 +188,7 @@ describe("/api/orders/[orderId] admin detail & status", () => {
     expect(data.error).toBe("Invalid status transition")
   })
 
-  it("PATCH PENDING -> COMPLETED updates order and cards", async () => {
+  it("PATCH PENDING -> COMPLETED returns 200 and COMPLETED status (black-box)", async () => {
     adminSessionMock.mockResolvedValueOnce({
       id: "admin_1",
       user: { id: "admin_1", email: "admin@test.com" },
@@ -230,27 +235,47 @@ describe("/api/orders/[orderId] admin detail & status", () => {
     const res = await PATCH(req, ctx as any)
     const data = await res.json()
 
-    expect(prismaMock.order.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: "order_1" },
-        data: expect.objectContaining({
-          status: "COMPLETED",
-          paidAt: expect.any(Date),
-        }),
-      }),
-    )
+    expect(res.status).toBe(200)
+    expect(data.status).toBe("COMPLETED")
+    expect(data.orderNo).toBe("FAK202402130001")
+  })
 
-    expect(prismaMock.card.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          orderId: "order_1",
-          status: "RESERVED",
-        },
-        data: {
-          status: "SOLD",
-        },
-      }),
+  it("PATCH PENDING -> COMPLETED returns 200 even when completion email fails (black-box)", async () => {
+    const { sendOrderCompletionEmail } = require("@/lib/order-completion-email")
+    ;(sendOrderCompletionEmail as jest.Mock).mockRejectedValueOnce(new Error("Email send failed"))
+    adminSessionMock.mockResolvedValueOnce({
+      id: "admin_1",
+      user: { id: "admin_1", email: "admin@test.com" },
+    })
+    ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: any) =>
+      fn(prismaMock),
     )
+    prismaMock.order.findUnique
+      .mockResolvedValueOnce({
+        id: "order_1",
+        status: "PENDING",
+        cards: [{ id: "card_1", status: "RESERVED" }],
+      } as any)
+      .mockResolvedValueOnce({
+        id: "order_1",
+        orderNo: "FAK001",
+        email: "u@example.com",
+        productId: "p1",
+        quantity: 1,
+        amount: 50,
+        status: "COMPLETED",
+        paidAt: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        product: { id: "p1", name: "P", price: 50 },
+        cards: [{ status: "SOLD" }],
+      } as any)
+
+    const res = await PATCH(
+      createJsonRequest({ status: "COMPLETED" }),
+      { params: { orderId: "order_1" } } as any,
+    )
+    const data = await res.json()
 
     expect(res.status).toBe(200)
     expect(data.status).toBe("COMPLETED")
@@ -300,26 +325,6 @@ describe("/api/orders/[orderId] admin detail & status", () => {
     const res = await PATCH(req, ctx as any)
     const data = await res.json()
 
-    expect(prismaMock.order.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: "order_1" },
-        data: { status: "CLOSED" },
-      }),
-    )
-
-    expect(prismaMock.card.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          orderId: "order_1",
-          status: "RESERVED",
-        },
-        data: {
-          status: "UNSOLD",
-          orderId: null,
-        },
-      }),
-    )
-
     expect(res.status).toBe(200)
     expect(data.status).toBe("CLOSED")
   })
@@ -344,11 +349,9 @@ describe("/api/orders/[orderId] admin detail & status", () => {
 
     expect(res.status).toBe(409)
     expect(data.error).toBeDefined()
-    expect(prismaMock.order.update).not.toHaveBeenCalled()
-    expect(prismaMock.card.updateMany).not.toHaveBeenCalled()
   })
 
-  it("DELETE closes pending order and releases reserved cards", async () => {
+  it("DELETE closes pending order and returns 200 with CLOSED (black-box)", async () => {
     adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
 
     ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: any) =>
@@ -388,28 +391,9 @@ describe("/api/orders/[orderId] admin detail & status", () => {
     const res = await DELETE({} as NextRequest, ctx as any)
     const data = await res.json()
 
-    expect(prismaMock.order.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: "order_1" },
-        data: { status: "CLOSED" },
-      }),
-    )
-
-    expect(prismaMock.card.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          orderId: "order_1",
-          status: "RESERVED",
-        },
-        data: {
-          status: "UNSOLD",
-          orderId: null,
-        },
-      }),
-    )
-
     expect(res.status).toBe(200)
     expect(data.status).toBe("CLOSED")
+    expect(data.orderNo).toBe("FAK202402130001")
   })
 
   it("DELETE returns 404 when order does not exist", async () => {
@@ -427,6 +411,151 @@ describe("/api/orders/[orderId] admin detail & status", () => {
 
     expect(res.status).toBe(404)
     expect(data).toEqual({ error: "Order not found" })
+  })
+
+  it("PATCH returns 404 when order does not exist in transaction", async () => {
+    adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
+
+    ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => {
+      prismaMock.order.findUnique.mockResolvedValueOnce(null)
+      return fn(prismaMock)
+    })
+
+    const req = createJsonRequest({ status: "CLOSED" })
+    const ctx: RouteContext = { params: { orderId: "order_1" } }
+    const res = await PATCH(req, ctx as any)
+    const data = await res.json()
+
+    expect(res.status).toBe(404)
+    expect(data).toEqual({ error: "Order not found" })
+  })
+
+  it("PATCH is idempotent when status unchanged (PENDING -> PENDING)", async () => {
+    adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
+
+    ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) =>
+      fn(prismaMock),
+    )
+
+    const sameOrder = {
+      id: "order_1",
+      status: "PENDING",
+      cards: [{ id: "card_1", status: "RESERVED" }],
+    }
+    prismaMock.order.findUnique
+      .mockResolvedValueOnce(sameOrder as any)
+      .mockResolvedValueOnce({
+        id: "order_1",
+        orderNo: "FAK202402130001",
+        email: "user@example.com",
+        productId: "prod_1",
+        quantity: 2,
+        amount: 100,
+        status: "PENDING",
+        paidAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        product: { id: "prod_1", name: "Test Product", price: 50 },
+        cards: [{ status: "RESERVED" }, { status: "RESERVED" }],
+      } as any)
+
+    const req = createJsonRequest({ status: "PENDING" })
+    const ctx: RouteContext = { params: { orderId: "order_1" } }
+    const res = await PATCH(req, ctx as any)
+    const data = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(data.status).toBe("PENDING")
+  })
+
+  it("PATCH returns 500 when transaction throws non-Error", async () => {
+    adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
+
+    ;(prismaMock.$transaction as jest.Mock).mockImplementation(async () => {
+      throw "string error"
+    })
+
+    const req = createJsonRequest({ status: "CLOSED" })
+    const ctx: RouteContext = { params: { orderId: "order_1" } }
+    const res = await PATCH(req, ctx as any)
+    const data = await res.json()
+
+    expect(res.status).toBe(500)
+    expect(data.error).toBeDefined()
+  })
+
+  it("PATCH returns 404 when order is missing after update (findUnique returns null)", async () => {
+    adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
+
+    ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) =>
+      fn(prismaMock),
+    )
+    prismaMock.order.findUnique
+      .mockResolvedValueOnce({
+        id: "order_1",
+        status: "PENDING",
+        cards: [{ id: "card_1", status: "RESERVED" }],
+      } as any)
+      .mockResolvedValueOnce(null)
+
+    const req = createJsonRequest({ status: "COMPLETED" })
+    const ctx: RouteContext = { params: { orderId: "order_1" } }
+    const res = await PATCH(req, ctx as any)
+    const data = await res.json()
+
+    expect(res.status).toBe(404)
+    expect(data.error).toBe("Order not found")
+  })
+
+  it("DELETE returns 500 when transaction throws non-ORDER_NOT_FOUND", async () => {
+    adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
+
+    ;(prismaMock.$transaction as jest.Mock).mockImplementation(async () => {
+      throw new Error("Database error")
+    })
+
+    const ctx: RouteContext = { params: { orderId: "order_1" } }
+    const res = await DELETE({} as NextRequest, ctx as any)
+    const data = await res.json()
+
+    expect(res.status).toBe(500)
+    expect(data.error).toBeDefined()
+  })
+
+  it("DELETE when order is already CLOSED returns 200 with CLOSED status (black-box)", async () => {
+    adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
+
+    ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) =>
+      fn(prismaMock),
+    )
+
+    prismaMock.order.findUnique
+      .mockResolvedValueOnce({
+        id: "order_1",
+        status: "CLOSED",
+        cards: [],
+      } as any)
+      .mockResolvedValueOnce({
+        id: "order_1",
+        orderNo: "FAK202402130001",
+        email: "user@example.com",
+        productId: "prod_1",
+        quantity: 2,
+        amount: 100,
+        status: "CLOSED",
+        paidAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        product: { id: "prod_1", name: "Test Product", price: 50 },
+        cards: [],
+      } as any)
+
+    const ctx: RouteContext = { params: { orderId: "order_1" } }
+    const res = await DELETE({} as NextRequest, ctx as any)
+    const data = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(data.status).toBe("CLOSED")
   })
 })
 

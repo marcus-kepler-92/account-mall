@@ -72,6 +72,17 @@ describe("POST /api/orders/get-payment-url", () => {
     expect(data.code).toBe("VALIDATION_FAILED")
   })
 
+  it("returns 500 when transaction throws unexpected error", async () => {
+    ;(prismaMock.$transaction as jest.Mock).mockImplementation(async () => {
+      throw new Error("Unexpected DB error")
+    })
+    const req = createJsonRequest({ orderNo: "FAK202402130001", password: "secret123" })
+    const res = await POST(req)
+    const data = await res.json()
+    expect(res.status).toBe(500)
+    expect(data.error).toBeDefined()
+  })
+
   it("returns 400 when order does not exist", async () => {
     ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: any) =>
       fn(prismaMock),

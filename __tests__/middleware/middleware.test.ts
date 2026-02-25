@@ -161,8 +161,22 @@ describe("Public APIs (no auth required)", () => {
     expect(response.status).toBe(200);
   });
 
+  it("should allow POST /api/orders (create order)", async () => {
+    const request = createRequest("/api/orders", { method: "POST" });
+    const response = await middleware(request);
+
+    expect(response.status).toBe(200);
+  });
+
   it("should allow POST /api/orders/get-payment-url", async () => {
     const request = createRequest("/api/orders/get-payment-url", { method: "POST" });
+    const response = await middleware(request);
+
+    expect(response.status).toBe(200);
+  });
+
+  it("should allow /api/restock-subscriptions", async () => {
+    const request = createRequest("/api/restock-subscriptions", { method: "POST" });
     const response = await middleware(request);
 
     expect(response.status).toBe(200);
@@ -175,6 +189,22 @@ describe("Public APIs (no auth required)", () => {
     const response = await middleware(request);
 
     expect(response.status).toBe(200);
+  });
+});
+
+// ─── Admin login page with session ───────────────────────────────
+
+describe("Admin login page with session cookie", () => {
+  it("should redirect to /admin/dashboard when already authenticated", async () => {
+    mockValidSession();
+
+    const request = createRequest("/admin/login", {
+      cookies: { "better-auth.session_token": "valid_token" },
+    });
+    const response = await middleware(request);
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toContain("/admin/dashboard");
   });
 });
 
@@ -274,6 +304,42 @@ describe("Protected APIs", () => {
     expect(response.status).toBe(401);
   });
 
+  it("should return 401 for GET /api/orders/:id without session", async () => {
+    const request = createRequest("/api/orders/order_123");
+    const response = await middleware(request);
+
+    expect(response.status).toBe(401);
+  });
+
+  it("should return 401 when session fetch fails for protected API", async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false });
+
+    const request = createRequest("/api/orders", {
+      cookies: { "better-auth.session_token": "token" },
+    });
+    const response = await middleware(request);
+
+    expect(response.status).toBe(401);
+    const body = await response.json();
+    expect(body.error).toBe("Unauthorized");
+  });
+
+  it("should return 401 when session is empty for protected API", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({}),
+    });
+
+    const request = createRequest("/api/orders", {
+      cookies: { "better-auth.session_token": "token" },
+    });
+    const response = await middleware(request);
+
+    expect(response.status).toBe(401);
+    const body = await response.json();
+    expect(body.error).toBe("Unauthorized");
+  });
+
   it("should allow POST /api/products with valid session", async () => {
     mockValidSession();
 
@@ -296,5 +362,25 @@ describe("Protected APIs", () => {
     const response = await middleware(request);
 
     expect(response.status).toBe(200);
+  });
+
+  it("should redirect to login when session fetch fails for protected page", async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false });
+
+    const request = createRequest("/admin/dashboard", {
+      cookies: { "better-auth.session_token": "token" },
+    });
+    const response = await middleware(request);
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toContain("/admin/login");
+  });
+
+  it("should pass through for non-public non-protected path", async () => {
+    const request = createRequest("/api/some-other-route", { method: "GET" });
+    const response = await middleware(request);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-middleware-next")).toBe("1");
   });
 });

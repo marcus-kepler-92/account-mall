@@ -56,6 +56,29 @@ describe("sendOrderCompletionEmail", () => {
     expect(sendMail).not.toHaveBeenCalled()
   })
 
+  it("logs error when sendMail returns success false", async () => {
+    const consoleSpy = jest.spyOn(console, "error").mockImplementation(() => {})
+    ;(sendMail as jest.Mock).mockResolvedValueOnce({ success: false })
+    ;(prismaMock as DeepMockPrisma).order.findUnique.mockResolvedValue({
+      id: "order_1",
+      orderNo: "ORD001",
+      email: "buyer@example.com",
+      status: "COMPLETED",
+      quantity: 1,
+      product: { name: "Test Product" },
+      cards: [{ content: "card1" }],
+    } as any)
+
+    await sendOrderCompletionEmail("order_1")
+
+    expect(sendMail).toHaveBeenCalled()
+    expect(consoleSpy).toHaveBeenCalledWith(
+      "[order-completion-email] Send failed",
+      expect.objectContaining({ orderId: "order_1", orderNo: "ORD001" })
+    )
+    consoleSpy.mockRestore()
+  })
+
   it("sends email with order and card info when order is COMPLETED", async () => {
     ;(prismaMock as DeepMockPrisma).order.findUnique.mockResolvedValue({
       id: "order_1",

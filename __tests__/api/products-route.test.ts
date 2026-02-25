@@ -98,6 +98,43 @@ describe("GET /api/products", () => {
         expect(data.data).toEqual([])
     })
 
+    it("applies ACTIVE filter when admin and status=ACTIVE", async () => {
+        adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
+        prismaMock.product.findMany.mockResolvedValueOnce([])
+        prismaMock.product.count.mockResolvedValueOnce(0)
+        const res = await GET(
+            createUrlRequest("http://localhost/api/products?admin=true&status=ACTIVE")
+        )
+        expect(res.status).toBe(200)
+        expect(prismaMock.product.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { status: "ACTIVE" },
+            })
+        )
+    })
+
+    it("applies sort price-desc when sort=price-desc", async () => {
+        prismaMock.product.findMany.mockResolvedValueOnce([])
+        prismaMock.product.count.mockResolvedValueOnce(0)
+        await GET(createUrlRequest("http://localhost/api/products?sort=price-desc"))
+        expect(prismaMock.product.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                orderBy: { price: "desc" },
+            })
+        )
+    })
+
+    it("applies sort newest when sort=newest", async () => {
+        prismaMock.product.findMany.mockResolvedValueOnce([])
+        prismaMock.product.count.mockResolvedValueOnce(0)
+        await GET(createUrlRequest("http://localhost/api/products?sort=newest"))
+        expect(prismaMock.product.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                orderBy: { createdAt: "desc" },
+            })
+        )
+    })
+
     it("applies tag filter when tag param is provided", async () => {
         prismaMock.product.findMany.mockResolvedValueOnce([])
         prismaMock.product.count.mockResolvedValueOnce(0)
@@ -211,6 +248,38 @@ describe("POST /api/products", () => {
         expect(res.status).toBe(409)
         expect(data).toEqual({
             error: "A product with this slug already exists",
+        })
+    })
+
+    it("creates product without tags when tagIds empty", async () => {
+        adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
+        prismaMock.product.findUnique.mockResolvedValueOnce(null)
+        prismaMock.product.create.mockResolvedValueOnce({
+            id: "p1",
+            name: "No Tags",
+            slug: "no-tags",
+            description: null,
+            image: null,
+            price: 50,
+            maxQuantity: 10,
+            status: "ACTIVE",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            tags: [],
+        } as any)
+        const res = await POST(
+            createJsonRequest({
+                name: "No Tags",
+                slug: "no-tags",
+                price: 50,
+            })
+        )
+        expect(res.status).toBe(201)
+        expect(prismaMock.product.create).toHaveBeenCalledWith({
+            data: expect.not.objectContaining({
+                tags: expect.anything(),
+            }),
+            include: expect.any(Object),
         })
     })
 

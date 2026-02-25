@@ -209,6 +209,24 @@ describe("/api/products/[productId]/cards POST restock trigger", () => {
     ;(notifyRestockSubscribers as jest.Mock).mockClear()
   })
 
+  it("returns 201 when notifyRestockSubscribers rejects (catch branch)", async () => {
+    prismaMock.product.findUnique.mockResolvedValue({
+      id: productId,
+      name: "Test Product",
+      slug: "test-product",
+      price: 19.9,
+    } as any)
+    prismaMock.card.count.mockResolvedValue(0)
+    prismaMock.card.createMany.mockResolvedValue({ count: 1 } as any)
+    ;(notifyRestockSubscribers as jest.Mock).mockRejectedValueOnce(new Error("Email send failed"))
+    const req = createJsonRequest({ contents: ["card1"] })
+    const res = await POST(req, context as any)
+    const data = await res.json()
+    expect(res.status).toBe(201)
+    expect(data).toEqual({ imported: 1, total: 1 })
+    expect(notifyRestockSubscribers).toHaveBeenCalled()
+  })
+
   it("calls notifyRestockSubscribers when old stock is 0 and new cards are imported", async () => {
     prismaMock.product.findUnique.mockResolvedValue({
       id: productId,

@@ -65,5 +65,13 @@ describe("cards-filters", () => {
         expect(query).toContain("orderNo=NO")
         expect(query).toContain("codeLike=1234")
     })
+
+    it("should include pageSize in query when not default", () => {
+        const query = buildCardFiltersQuery({
+            ...DEFAULT_CARD_FILTERS,
+            pageSize: 50,
+        })
+        expect(query).toContain("pageSize=50")
+    })
 })
 

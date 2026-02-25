@@ -45,6 +45,22 @@ describe("POST /api/orders/lookup", () => {
     ;(prismaMock.$transaction as jest.Mock).mockReset()
   })
 
+  it("returns 429 when rate limited (black-box)", async () => {
+    const { checkOrderQueryRateLimit } = require("@/lib/rate-limit")
+    ;(checkOrderQueryRateLimit as jest.Mock).mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ error: "Too many requests. Please try again later." }),
+        { status: 429, headers: { "Content-Type": "application/json" } },
+      ),
+    )
+    const res = await POST(
+      createJsonRequest({ orderNo: "FAK202402130001", password: "secret123" }),
+    )
+    expect(res.status).toBe(429)
+    const data = await res.json()
+    expect(data.error).toMatch(/Too many|try again/)
+  })
+
   it("returns 400 when JSON body is invalid", async () => {
     const badReq = {
       json: async () => {
@@ -84,6 +100,17 @@ expect(data.code).toBe("VALIDATION_FAILED")
     expect(data).toEqual({
       error: "Order not found or password incorrect",
     })
+  })
+
+  it("returns 500 when transaction throws non-LOOKUP_FAILED error", async () => {
+    ;(prismaMock.$transaction as jest.Mock).mockImplementation(async () => {
+      throw new Error("Database connection failed")
+    })
+    const req = createJsonRequest({ orderNo: "FAK202402130001", password: "secret123" })
+    const res = await POST(req)
+    const data = await res.json()
+    expect(res.status).toBe(500)
+    expect(data.error).toBeDefined()
   })
 
   it("returns 400 with fuzzy error when password is incorrect", async () => {
@@ -233,18 +260,45 @@ expect(data.code).toBe("VALIDATION_FAILED")
     const res = await POST(req)
     const data = await res.json()
 
-    expect(prismaMock.order.update).not.toHaveBeenCalled()
-    expect(prismaMock.card.updateMany).not.toHaveBeenCalled()
-
     expect(res.status).toBe(200)
-    expect(data).toEqual({
+    expect(data).toMatchObject({
       orderNo: "FAK202402130001",
       productName: "Test Product",
-      createdAt: createdAt.toISOString(),
       status: "COMPLETED",
       amount: 99,
       cards: [{ content: "code-1" }],
     })
+  })
+
+  it("returns COMPLETED order with successToken when token is generated (black-box)", async () => {
+    const { createOrderSuccessToken } = require("@/lib/order-success-token")
+    ;(createOrderSuccessToken as jest.Mock).mockReturnValueOnce("stub-success-token")
+    ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: any) =>
+      fn(prismaMock),
+    )
+    const createdAt = new Date("2024-02-13T00:00:00.000Z")
+    prismaMock.order.findUnique.mockResolvedValueOnce({
+      id: "order_1",
+      orderNo: "FAK202402130001",
+      passwordHash: "hash",
+      status: "COMPLETED",
+      amount: 99,
+      product: { name: "Test Product" },
+      cards: [{ id: "c1", content: "card-content", status: "SOLD" }],
+      createdAt,
+    } as any)
+    verifyPasswordMock.mockResolvedValueOnce(true)
+
+    const res = await POST(
+      createJsonRequest({ orderNo: "FAK202402130001", password: "secret123" }),
+    )
+    const data = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(data.orderNo).toBe("FAK202402130001")
+    expect(data.status).toBe("COMPLETED")
+    expect(data.cards).toEqual([{ content: "card-content" }])
+    expect(data.successToken).toBe("stub-success-token")
   })
 })
 

@@ -167,6 +167,43 @@ describe("PUT /api/products/[productId]", () => {
         })
     })
 
+    it("updates product with tagIds and returns 200", async () => {
+        adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
+        prismaMock.product.findUnique.mockResolvedValueOnce({
+            id: "prod_1",
+            slug: "test",
+        })
+        const updated = {
+            id: "prod_1",
+            name: "Prod",
+            slug: "test",
+            price: 50,
+            tags: [
+                { id: "tag_1", name: "T1", slug: "t1" },
+                { id: "tag_2", name: "T2", slug: "t2" },
+            ],
+        }
+        prismaMock.product.update.mockResolvedValueOnce(updated)
+
+        const res = await PUT(
+            createJsonRequest({ tagIds: ["tag_1", "tag_2"] }),
+            createContext("prod_1")
+        )
+        const data = await res.json()
+
+        expect(res.status).toBe(200)
+        expect(prismaMock.product.update).toHaveBeenCalledWith({
+            where: { id: "prod_1" },
+            data: expect.objectContaining({
+                tags: {
+                    set: [{ id: "tag_1" }, { id: "tag_2" }],
+                },
+            }),
+            include: expect.any(Object),
+        })
+        expect(data.tags).toHaveLength(2)
+    })
+
     it("updates product and returns 200", async () => {
         adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
         prismaMock.product.findUnique.mockResolvedValueOnce({

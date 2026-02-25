@@ -14,12 +14,17 @@ jest.mock("@/lib/prisma", () => {
 function createJsonRequest(
   body: unknown,
   ip = "192.168.1.1",
+  useRealIp = false,
 ): NextRequest {
+  const headers = new Headers()
+  if (useRealIp) {
+    headers.set("x-real-ip", ip)
+  } else {
+    headers.set("x-forwarded-for", ip)
+  }
   return {
     json: async () => body,
-    headers: new Headers({
-      "x-forwarded-for": ip,
-    }),
+    headers,
   } as unknown as NextRequest
 }
 
@@ -51,6 +56,35 @@ describe("/api/restock-subscriptions POST", () => {
     tags: [],
     restockSubscriptions: [],
   } as any
+
+  it("uses x-real-ip when x-forwarded-for is absent", async () => {
+    prismaMock.product.findUnique.mockResolvedValue(activeProductOutOfStock)
+    prismaMock.card.count.mockResolvedValue(0)
+    prismaMock.restockSubscription.count.mockResolvedValue(0)
+    prismaMock.restockSubscription.upsert.mockResolvedValue({
+      id: "sub_1",
+      productId: "prod_1",
+      email: "user@example.com",
+      status: "PENDING",
+      notifiedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      product: undefined as any,
+    })
+    const req = createJsonRequest(baseBody, "10.0.0.99", true)
+    const res = await POST(req)
+    expect(res.status).toBe(200)
+    expect(prismaMock.restockSubscription.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          productId_ip: {
+            productId: "prod_1",
+            ip: "10.0.0.99",
+          },
+        },
+      }),
+    )
+  })
 
   it("creates subscription successfully when product is active and out of stock", async () => {
     prismaMock.product.findUnique.mockResolvedValue(activeProductOutOfStock)
