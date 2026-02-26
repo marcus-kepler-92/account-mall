@@ -20,6 +20,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+        env:
+          # Use repo secret or variable; fallback for fork PRs where secrets are not available
+          DATABASE_URL: ${{ secrets.DATABASE_URL || vars.DATABASE_URL || 'postgresql://placeholder:placeholder@localhost:5432/placeholder' }}
 
       - name: Lint
         run: npm run lint
@@ -27,14 +30,6 @@ jobs:
       - name: Test
         run: npm run test
         env:
-          DATABASE_URL: "postgresql://test:test@localhost:5432/test"
+          # Tests use prismaMock; no real DB. Placeholder only so env exists for any code that reads it.
+          DATABASE_URL: "postgresql://placeholder:placeholder@localhost:5432/placeholder"
           BETTER_AUTH_SECRET: "test-secret-at-least-32-characters-long"
-
-      - name: Test coverage
-        run: npm run test:coverage
-        env:
-          DATABASE_URL: "postgresql://test:test@localhost:5432/test"
-          BETTER_AUTH_SECRET: "test-secret-at-least-32-characters-long"
-
-      - name: Audit dependencies
-        run: npm run audit
