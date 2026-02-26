@@ -61,7 +61,7 @@ export function CardsHeaderActions() {
                 const data = await res.json()
                 if (cancelled) return
 
-                const items: ProductOption[] = (data.data ?? []).map((p: any) => ({
+                const items: ProductOption[] = (data.data ?? []).map((p: ProductOption) => ({
                     id: p.id,
                     name: p.name,
                     slug: p.slug,

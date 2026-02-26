@@ -51,7 +51,7 @@ const statusLabel: Record<string, string> = {
     SOLD: "已售",
 }
 
-export function CardsList({ productId, cards, stats }: CardsListProps) {
+export function CardsList({ productId: _productId, cards, stats: _stats }: CardsListProps) {
     const router = useRouter()
     const [statusFilter, setStatusFilter] = useState<"all" | "UNSOLD" | "RESERVED" | "SOLD">("all")
     const [deleteTarget, setDeleteTarget] = useState<CardItem | null>(null)

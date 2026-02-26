@@ -53,7 +53,7 @@ export function getYipayPagePayUrl(params: {
     const base = config.siteUrl
     const pid = config.yipayPid!
     const key = config.yipayKey!
-    const submitUrl = config.yipaySubmitUrl!
+    const _submitUrl = config.yipaySubmitUrl!
     const siteName = config.yipaySiteName!
 
     const requestParams: Record<string, string> = {

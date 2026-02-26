@@ -19,7 +19,6 @@ import {
     heading,
     main,
     text,
-    textMuted,
     headerBrand,
 } from "./theme";
 

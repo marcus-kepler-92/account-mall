@@ -9,8 +9,7 @@ import { unauthorized, invalidJsonBody, validationError, conflict } from "@/lib/
  * Public: returns only ACTIVE products with tags and stock count
  * Admin (with ?admin=true): returns all products with full details
  */
-const SORT_OPTIONS = ["default", "price-asc", "price-desc", "newest"] as const;
-type SortOption = (typeof SORT_OPTIONS)[number];
+type SortOption = "default" | "price-asc" | "price-desc" | "newest";
 
 export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);

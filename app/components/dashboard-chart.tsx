@@ -18,7 +18,7 @@ export function DashboardChart({
     const colors = useEChartsTheme()
 
     useEffect(() => {
-        setMounted(true)
+        queueMicrotask(() => setMounted(true))
     }, [])
     const tooltipStyle = getEChartsTooltip(colors)
     const primary = colors.primary || "#5B8FF9"
@@ -85,7 +85,6 @@ export function DashboardChart({
                 barMaxWidth: 24,
                 emphasis: {
                     itemStyle: { color: chart2 },
-                    scale: true,
                 },
             },
             {

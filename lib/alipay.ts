@@ -52,7 +52,7 @@ export function getAlipayPagePayUrl(params: {
                 },
                 returnUrl: `${base}/orders/pay-return`,
                 notifyUrl: `${base}/api/payment/alipay/notify`,
-            } as any,
+            } as Parameters<AlipaySdk["pageExecute"]>[2],
         )
         return typeof url === "string" ? url : null
     } catch {
@@ -86,7 +86,7 @@ export function getAlipayWapPayUrl(params: {
                 },
                 returnUrl: `${base}/orders/pay-return`,
                 notifyUrl: `${base}/api/payment/alipay/notify`,
-            } as any,
+            } as Parameters<AlipaySdk["pageExecute"]>[2],
         )
         return typeof url === "string" ? url : null
     } catch {
@@ -101,7 +101,7 @@ export function verifyAlipayNotifySign(postData: Record<string, unknown>): boole
     const sdk = getAlipaySdk()
     if (!sdk) return false
     try {
-        return sdk.checkNotifySignV2(postData as any) ?? false
+        return sdk.checkNotifySignV2(postData as Record<string, string>) ?? false
     } catch {
         return false
     }

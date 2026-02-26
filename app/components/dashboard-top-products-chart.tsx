@@ -23,7 +23,7 @@ export function DashboardTopProductsChart({
     const colors = useEChartsTheme()
 
     useEffect(() => {
-        setMounted(true)
+        queueMicrotask(() => setMounted(true))
     }, [])
     const tooltipStyle = getEChartsTooltip(colors)
     const primary = colors.primary || "#5B8FF9"
@@ -84,7 +84,6 @@ export function DashboardTopProductsChart({
                 encode: { x: "value", y: "name" },
                 emphasis: {
                     itemStyle: { color: primary },
-                    scale: true,
                 },
             },
         ],

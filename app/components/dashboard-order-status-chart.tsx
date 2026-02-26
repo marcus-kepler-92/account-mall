@@ -14,7 +14,7 @@ export function DashboardOrderStatusChart({ data }: { data: OrderStatusCount[] }
     const colors = useEChartsTheme()
 
     useEffect(() => {
-        setMounted(true)
+        queueMicrotask(() => setMounted(true))
     }, [])
     const tooltipStyle = getEChartsTooltip(colors)
     const palette = [colors.chart1, colors.chart2, colors.chart3].filter(Boolean)

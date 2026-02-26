@@ -9,13 +9,10 @@ import {
     CreditCard,
     LogOut,
     Store,
-    Moon,
-    Sun,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { authClient } from "@/lib/auth-client"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
 
 import {
     Sidebar,
@@ -59,11 +56,9 @@ const navItems = [
 export function AdminSidebar() {
     const pathname = usePathname()
     const router = useRouter()
-    const { theme, setTheme } = useTheme()
+    useTheme()
     const siteName = useSiteName()
     const adminPanelLabel = useAdminPanelLabel()
-    const [mounted, setMounted] = useState(false)
-    useEffect(() => setMounted(true), [])
 
     const handleSignOut = async () => {
         await authClient.signOut({

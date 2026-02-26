@@ -23,7 +23,7 @@ type RestockReminderFormProps = {
 
 export function RestockReminderForm({
     productId,
-    productName,
+    productName: _productName,
     defaultEmail,
 }: RestockReminderFormProps) {
     const searchParams = useSearchParams()

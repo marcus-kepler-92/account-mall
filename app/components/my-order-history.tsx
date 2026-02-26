@@ -11,7 +11,7 @@ export function MyOrderHistory() {
     const [count, setCount] = useState(0)
 
     useEffect(() => {
-        setCount(getOrderHistory().length)
+        queueMicrotask(() => setCount(getOrderHistory().length))
     }, [])
 
     if (count === 0) return null

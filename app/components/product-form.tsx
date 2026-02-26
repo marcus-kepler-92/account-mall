@@ -79,7 +79,7 @@ export function ProductForm({
 
     const { register, handleSubmit, formState: { errors }, watch, setValue, control } = form
     const name = watch("name")
-    const slug = watch("slug")
+    watch("slug")
     const imageValue = watch("image")
     const isActive = watch("isActive")
     const tagIds = watch("tagIds") ?? []

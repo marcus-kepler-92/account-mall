@@ -38,7 +38,6 @@ export function getEChartsThemeColors() {
 /** ECharts 全局 textStyle、轴线、分割线等使用前景色，避免默认灰导致看不清 */
 export function getEChartsBaseOption(colors: ReturnType<typeof getEChartsThemeColors>) {
     const textColor = colors.foreground || "#333"
-    const axisColor = colors.border || colors.mutedForeground || "#999"
     return {
         backgroundColor: "transparent",
         textStyle: {

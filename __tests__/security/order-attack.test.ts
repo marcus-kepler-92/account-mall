@@ -264,7 +264,7 @@ describe("Security: Injection and malicious input", () => {
                 quantity: 0,
             }),
         )
-        const data = await res.json()
+        await res.json()
         expect(res.status).toBe(400)
     })
 
@@ -465,7 +465,7 @@ describe("Security: Input length and format", () => {
         const res = await POSTLookup(
             createJsonRequest({ orderNo: "ORD-1", password: "12345" }),
         )
-        const data = await res.json()
+        await res.json()
         expect(res.status).toBe(400)
     })
 

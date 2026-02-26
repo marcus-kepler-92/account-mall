@@ -17,9 +17,13 @@ export async function POST(request: NextRequest) {
         return invalidJsonBody()
     }
 
-    const raw = body && typeof body === "object" && "orderNo" in body
-        ? { orderNo: (body as any).orderNo, clientType: (body as any).clientType }
-        : { orderNo: undefined, clientType: undefined }
+    const raw =
+        body && typeof body === "object" && "orderNo" in body
+            ? {
+                  orderNo: (body as { orderNo?: unknown; clientType?: unknown }).orderNo,
+                  clientType: (body as { orderNo?: unknown; clientType?: unknown }).clientType,
+              }
+            : { orderNo: undefined, clientType: undefined }
     const orderNo = typeof raw.orderNo === "string" ? raw.orderNo.trim() : ""
     const clientType = raw.clientType === "wap" ? "wap" : "pc"
 

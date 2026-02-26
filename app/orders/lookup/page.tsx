@@ -217,7 +217,7 @@ function OrderLookupPageContent() {
             setSheetOpen(true)
             setLoading(false)
             toast.success("查询成功")
-        } catch (err) {
+        } catch {
             setError("网络错误，请稍后重试")
             setLoading(false)
         }
@@ -288,7 +288,7 @@ function OrderLookupPageContent() {
                     `/orders/${encodeURIComponent(data.orderNo)}/success?token=${encodeURIComponent(data.successToken)}`,
                 )
             }
-        } catch (err) {
+        } catch {
             toast.error("网络错误，请稍后重试")
             setSheetOpen(false)
             setSheetLoading(false)
@@ -302,7 +302,7 @@ function OrderLookupPageContent() {
             setCopiedIndex(index)
             toast.success("卡密已复制")
             setTimeout(() => setCopiedIndex(null), 2000)
-        } catch (err) {
+        } catch {
             toast.error("复制失败，请手动复制")
         }
     }
@@ -314,7 +314,7 @@ function OrderLookupPageContent() {
         try {
             await navigator.clipboard.writeText(allCards)
             toast.success(`已复制 ${result.cards.length} 条卡密`)
-        } catch (err) {
+        } catch {
             toast.error("复制失败，请手动复制")
         }
     }
