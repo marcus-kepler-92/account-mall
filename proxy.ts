@@ -90,13 +90,21 @@ function isProtectedRoute(pathname: string, method: string): boolean {
     return false;
 }
 
+/** Session cookie name: dev uses "better-auth.session_token", production uses "__Secure-better-auth.session_token". */
+function getSessionCookie(request: NextRequest) {
+    return (
+        request.cookies.get("better-auth.session_token") ??
+        request.cookies.get("__Secure-better-auth.session_token")
+    );
+}
+
 export async function proxy(request: NextRequest) {
     const { pathname } = request.nextUrl;
     const method = request.method;
 
     // 1. Admin login page: redirect to dashboard if already authenticated
     if (pathname === "/admin/login") {
-        const sessionCookie = request.cookies.get("better-auth.session_token");
+        const sessionCookie = getSessionCookie(request);
         if (sessionCookie) {
             try {
                 const response = await fetch(
@@ -134,7 +142,7 @@ export async function proxy(request: NextRequest) {
 
     // 4. For protected routes, validate session
     if (isProtectedRoute(pathname, method)) {
-        const sessionCookie = request.cookies.get("better-auth.session_token");
+        const sessionCookie = getSessionCookie(request);
 
         // No cookie -> redirect pages or 401 for APIs
         if (!sessionCookie) {

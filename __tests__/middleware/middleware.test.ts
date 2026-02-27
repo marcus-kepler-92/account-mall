@@ -206,6 +206,18 @@ describe("Admin login page with session cookie", () => {
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toContain("/admin/dashboard");
   });
+
+  it("should redirect to /admin/dashboard when authenticated with __Secure- cookie (production)", async () => {
+    mockValidSession();
+
+    const request = createRequest("/admin/login", {
+      cookies: { "__Secure-better-auth.session_token": "valid_token" },
+    });
+    const response = await middleware(request);
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toContain("/admin/dashboard");
+  });
 });
 
 // ─── Protected Admin Pages ───────────────────────────────────────
@@ -240,6 +252,18 @@ describe("Protected admin pages", () => {
 
     const request = createRequest("/admin/dashboard", {
       cookies: { "better-auth.session_token": "valid_token" },
+    });
+    const response = await middleware(request);
+
+    expect(response.status).toBe(200);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("should allow admin page access with __Secure- session cookie (production)", async () => {
+    mockValidSession();
+
+    const request = createRequest("/admin/dashboard", {
+      cookies: { "__Secure-better-auth.session_token": "valid_token" },
     });
     const response = await middleware(request);
 
