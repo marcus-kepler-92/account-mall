@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/app/components/theme-provider";
 import { SiteNameProvider } from "@/app/components/site-name-provider";
 import { config } from "@/lib/config";
+import { KEYWORDS_META } from "@/lib/seo-keywords";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -18,29 +19,35 @@ const geistMono = Geist_Mono({
   display: "swap",
 });
 
-export async function generateMetadata(): Promise<Metadata> {
-  const title = config.siteName;
-  const description = config.siteDescription;
-  const url = config.siteUrl;
-  return {
-    title,
-    description,
-    metadataBase: new URL(url),
-    openGraph: {
-      title,
-      description,
-      url,
-      siteName: title,
-      locale: "zh_CN",
-      type: "website",
-    },
-    twitter: {
-      card: "summary_large_image",
-      title,
-      description,
-    },
-  };
-}
+const siteTitle = config.siteName;
+const siteDescription = config.siteDescription;
+const siteKeywords = config.siteKeywords ?? KEYWORDS_META;
+const siteUrl = config.siteUrl;
+
+export const metadata: Metadata = {
+  title: {
+    default: siteTitle,
+    template: `%s | ${siteTitle}`,
+  },
+  description: siteDescription,
+  keywords: siteKeywords
+    ? siteKeywords.split(/[,，]/).map((k) => k.trim()).filter(Boolean)
+    : undefined,
+  metadataBase: new URL(siteUrl),
+  openGraph: {
+    title: siteTitle,
+    description: siteDescription,
+    url: siteUrl,
+    siteName: siteTitle,
+    locale: "zh_CN",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: siteTitle,
+    description: siteDescription,
+  },
+};
 
 export default function RootLayout({
   children,

@@ -42,14 +42,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
         ? String(product.description).replace(/<[^>]+>/g, "").slice(0, 160)
         : `${product.name} - ¥${Number(product.price).toFixed(2)}`
     const productUrl = `${config.siteUrl}/products/${product.id}-${product.slug}`
-    const title = `${product.name} - ${config.siteName}`
     const ogImages = product.image ? [{ url: product.image }] : undefined
     return {
-        title,
+        title: product.name,
         description: desc,
         alternates: { canonical: productUrl },
         openGraph: {
-            title,
+            title: product.name,
             description: desc,
             url: productUrl,
             siteName: config.siteName,
@@ -58,7 +57,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
         },
         twitter: {
             card: "summary_large_image",
-            title,
+            title: product.name,
             description: desc,
             ...(ogImages && { images: ogImages }),
         },
