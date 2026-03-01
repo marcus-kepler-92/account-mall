@@ -29,7 +29,7 @@ export function MarkdownEditor({
     const colorMode = resolvedTheme === "dark" ? "dark" : "light"
 
     return (
-        <div data-color-mode={colorMode} className={cn("w-full min-w-0", className)}>
+        <div data-color-mode={colorMode} className={cn("md-editor-wrapper w-full min-w-0", className)}>
             <MDEditor
                 value={value}
                 onChange={(v) => onChange(v ?? "")}

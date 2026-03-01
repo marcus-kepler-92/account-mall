@@ -134,6 +134,79 @@
   }
 }
 
+/* MD 编辑器：覆盖库内 CSS 变量，使左右同背景、字体可读 */
+.md-editor-wrapper {
+  --color-canvas-default: var(--card);
+  --color-canvas-subtle: var(--muted);
+  --color-fg-default: var(--card-foreground);
+  --color-fg-muted: var(--muted-foreground);
+  --color-fg-accent: var(--primary);
+  --color-border-default: var(--border);
+  --color-border-muted: var(--border);
+  --color-accent-fg: var(--primary-foreground);
+  --color-accent-emphasis: var(--primary);
+}
+.md-editor-wrapper .w-md-editor,
+.md-editor-wrapper .w-md-editor-toolbar,
+.md-editor-wrapper .w-md-editor-content,
+.md-editor-wrapper .w-md-editor-area,
+.md-editor-wrapper .w-md-editor-text,
+.md-editor-wrapper .w-md-editor-text-input,
+.md-editor-wrapper .w-md-editor-text-pre,
+.md-editor-wrapper .w-md-editor-text-pre code,
+.md-editor-wrapper .w-md-editor-preview,
+.md-editor-wrapper .w-md-editor-preview .wmde-markdown,
+.md-editor-wrapper .w-md-editor-preview .wmde-markdown-var {
+  background-color: var(--card) !important;
+}
+.md-editor-wrapper .w-md-editor {
+  border-color: var(--border);
+  color: var(--card-foreground);
+}
+.md-editor-wrapper .w-md-editor-toolbar {
+  border-bottom-color: var(--border);
+  background-color: var(--muted) !important;
+  color: var(--foreground);
+}
+.md-editor-wrapper .w-md-editor-toolbar button,
+.md-editor-wrapper .w-md-editor-toolbar li,
+.md-editor-wrapper .w-md-editor-toolbar svg {
+  color: var(--foreground);
+}
+.md-editor-wrapper .w-md-editor-toolbar svg {
+  fill: currentColor;
+}
+/* 左侧编辑区：强制前景色（含 textarea 与镜像层） */
+.md-editor-wrapper .w-md-editor-text,
+.md-editor-wrapper .w-md-editor-text-input,
+.md-editor-wrapper .w-md-editor-text-pre,
+.md-editor-wrapper .w-md-editor-text-pre code,
+.md-editor-wrapper .w-md-editor-text-pre .token {
+  color: var(--card-foreground) !important;
+}
+.md-editor-wrapper textarea.w-md-editor-text-input {
+  color: var(--card-foreground) !important;
+  -webkit-text-fill-color: var(--card-foreground) !important;
+}
+.md-editor-wrapper .w-md-editor-text-input::placeholder {
+  color: var(--muted-foreground) !important;
+}
+/* 右侧预览区：同背景、同前景色 */
+.md-editor-wrapper .w-md-editor-preview,
+.md-editor-wrapper .w-md-editor-preview .wmde-markdown,
+.md-editor-wrapper .w-md-editor-preview .wmde-markdown-var {
+  color: var(--card-foreground) !important;
+}
+.md-editor-wrapper .w-md-editor-preview .wmde-markdown p,
+.md-editor-wrapper .w-md-editor-preview .wmde-markdown h1,
+.md-editor-wrapper .w-md-editor-preview .wmde-markdown h2,
+.md-editor-wrapper .w-md-editor-preview .wmde-markdown h3,
+.md-editor-wrapper .w-md-editor-preview .wmde-markdown li,
+.md-editor-wrapper .w-md-editor-preview .wmde-markdown code,
+.md-editor-wrapper .w-md-editor-preview .wmde-markdown pre {
+  color: var(--card-foreground) !important;
+}
+
 /* 商品详情 Markdown 深色下与卡片背景一致，消除色差 */
 .product-description-markdown[data-color-mode="dark"],
 .product-description-markdown[data-color-mode="dark"] .wmde-markdown-var,

@@ -384,9 +384,51 @@ export function ProductForm({
                                 </div>
                             </CardContent>
                         </Card>
+
+                        <Card className="w-full">
+                            <CardHeader>
+                                <CardTitle>商品简介</CardTitle>
+                                <p className="text-sm font-normal text-muted-foreground">用于首页商品卡片下方展示，建议 1～2 句；留空则使用商品描述前 80 字</p>
+                            </CardHeader>
+                            <CardContent>
+                                <Input
+                                    {...register("summary")}
+                                    placeholder="简短介绍商品，最多 300 字"
+                                    maxLength={300}
+                                    className="w-full"
+                                />
+                                {errors.summary && (
+                                    <p className="mt-2 text-sm text-destructive">{errors.summary.message}</p>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        <Card className="w-full">
+                            <CardHeader>
+                                <CardTitle>商品描述</CardTitle>
+                                <p className="text-sm font-normal text-muted-foreground">支持 Markdown，用于商品详情页展示</p>
+                            </CardHeader>
+                            <CardContent>
+                                <Controller
+                                    name="description"
+                                    control={control}
+                                    render={({ field }) => (
+                                        <MarkdownEditor
+                                            value={field.value ?? ""}
+                                            onChange={field.onChange}
+                                            placeholder="描述你的商品，支持 Markdown…"
+                                            height={480}
+                                        />
+                                    )}
+                                />
+                                {errors.description && (
+                                    <p className="mt-2 text-sm text-destructive">{errors.description.message}</p>
+                                )}
+                            </CardContent>
+                        </Card>
                     </div>
 
-                    <div className="space-y-6">
+                    <div className="space-y-6 lg:sticky lg:top-20 lg:self-start">
                         <Card>
                             <CardHeader>
                                 <CardTitle>状态</CardTitle>
@@ -506,47 +548,6 @@ export function ProductForm({
                         </Card>
                     </div>
                 </div>
-
-                <Card className="w-full">
-                    <CardHeader>
-                        <CardTitle>商品简介</CardTitle>
-                        <p className="text-sm font-normal text-muted-foreground">用于首页商品卡片下方展示，建议 1～2 句；留空则使用商品描述前 80 字</p>
-                    </CardHeader>
-                    <CardContent>
-                        <Input
-                            {...register("summary")}
-                            placeholder="简短介绍商品，最多 300 字"
-                            maxLength={300}
-                            className="max-w-xl"
-                        />
-                        {errors.summary && (
-                            <p className="mt-2 text-sm text-destructive">{errors.summary.message}</p>
-                        )}
-                    </CardContent>
-                </Card>
-
-                <Card className="w-full">
-                    <CardHeader>
-                        <CardTitle>商品描述</CardTitle>
-                        <p className="text-sm font-normal text-muted-foreground">支持 Markdown，用于商品详情页展示</p>
-                    </CardHeader>
-                    <CardContent>
-                        <Controller
-                            name="description"
-                            control={control}
-                            render={({ field }) => (
-                                <MarkdownEditor
-                                    value={field.value ?? ""}
-                                    onChange={field.onChange}
-                                    placeholder="描述你的商品，支持 Markdown…"
-                                />
-                            )}
-                        />
-                        {errors.description && (
-                            <p className="mt-2 text-sm text-destructive">{errors.description.message}</p>
-                        )}
-                    </CardContent>
-                </Card>
 
                 <div className="flex items-center gap-4">
                     <Button type="submit" disabled={form.formState.isSubmitting}>

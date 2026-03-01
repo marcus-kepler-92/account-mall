@@ -13,7 +13,7 @@ export default function AdminMainLayout({
             <AdminSidebar />
             <SidebarInset>
                 {/* Top bar with sidebar trigger */}
-                <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
+                <header className="sticky top-0 z-50 flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4">
                     <SidebarTrigger className="-ml-1" />
                     <AdminBreadcrumb />
                     <AdminTopbarActions />
