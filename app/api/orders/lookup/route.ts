@@ -126,7 +126,8 @@ export async function POST(request: NextRequest) {
             return NextResponse.json(payload)
         }
 
-        // For COMPLETED/CLOSED orders, return cards and optional successToken for redirect to success page
+        // For COMPLETED/CLOSED orders, return cards and optional successToken for redirect to success page.
+        // Free orders (FREE_SHARED or amount 0) must not get successToken so user stays on lookup page.
         type CardRow = { content: string; status: string }
         const cards = (order.cards as CardRow[])
             .filter((card: CardRow) => card.status === "SOLD" || card.status === "RESERVED")
@@ -138,7 +139,9 @@ export async function POST(request: NextRequest) {
                 return { content: card.content }
             })
 
-        const successToken = createOrderSuccessToken(order.orderNo)
+        // Free orders are created with amount 0; do not issue successToken so user stays on lookup page
+        const isFreeOrder = Number(order.amount) === 0
+        const successToken = isFreeOrder ? undefined : createOrderSuccessToken(order.orderNo)
         const payload: LookupResponseCompleted = {
             orderNo: order.orderNo,
             productName: order.product.name,

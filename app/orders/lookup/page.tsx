@@ -121,11 +121,7 @@ function OrderLookupPageContent() {
                         createdAt: typeof data.createdAt === "string" ? data.createdAt : new Date().toISOString(),
                         status: data.status ?? "PENDING",
                     })
-                    if (data.successToken && data.orderNo) {
-                        router.replace(
-                            `/orders/${encodeURIComponent(data.orderNo)}/success?token=${encodeURIComponent(data.successToken)}`,
-                        )
-                    }
+                    // Prefill 仅为自动填密并查单，不跳转成功页；成功页仅由支付回跳（pay-return）进入
                 } else {
                     setError("订单不存在或密码错误")
                 }
