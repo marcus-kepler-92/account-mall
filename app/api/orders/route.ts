@@ -326,16 +326,6 @@ export async function POST(request: NextRequest) {
 
     const product = await prisma.product.findUnique({
         where: { id: productId },
-        select: {
-            id: true,
-            name: true,
-            price: true,
-            maxQuantity: true,
-            status: true,
-            // @ts-expect-error - productType/sourceUrl in schema; run npx prisma generate if types are stale
-            productType: true,
-            sourceUrl: true,
-        },
     })
 
     if (!product || product.status !== "ACTIVE") {
