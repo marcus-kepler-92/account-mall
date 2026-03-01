@@ -11,7 +11,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { Skeleton } from "@/components/ui/skeleton"
 import { SiteHeader } from "@/app/components/site-header"
 import { useSiteName } from "@/app/components/site-name-provider"
-import { Copy, Check, Eye, EyeOff, Loader2, Mail, Hash, AlertCircle, Package, Search, Zap, CreditCard } from "lucide-react"
+import { Copy, Check, Eye, EyeOff, Loader2, Mail, Hash, AlertCircle, Package, Search, Zap, CreditCard, KeyRound, Globe, Clock, Info } from "lucide-react"
 import { toast } from "sonner"
 import { addOrUpdateOrder } from "@/lib/order-history-storage"
 import { type FreeSharedCardPayload, isFreeSharedCard } from "@/lib/free-shared-card"
@@ -57,7 +57,7 @@ function OrderLookupPageContent() {
     const [error, setError] = useState<string | null>(null)
     const [result, setResult] = useState<OrderResult | null>(null)
     const [orderList, setOrderList] = useState<OrderListItem[] | null>(null)
-    const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
+    const [copiedId, setCopiedId] = useState<string | null>(null)
     const [sheetOpen, setSheetOpen] = useState(false)
     const [loadingOrderNo, setLoadingOrderNo] = useState<string | null>(null)
     const [sheetLoading, setSheetLoading] = useState(false)
@@ -295,12 +295,12 @@ function OrderLookupPageContent() {
         }
     }
 
-    const copyCard = async (content: string, index: number) => {
+    const copyCard = async (content: string, id: string) => {
         try {
             await navigator.clipboard.writeText(content)
-            setCopiedIndex(index)
+            setCopiedId(id)
             toast.success("卡密已复制")
-            setTimeout(() => setCopiedIndex(null), 2000)
+            setTimeout(() => setCopiedId(null), 2000)
         } catch {
             toast.error("复制失败，请手动复制")
         }
@@ -766,54 +766,85 @@ function OrderLookupPageContent() {
                                                 isFreeSharedCard(card) ? (
                                                     <div
                                                         key={index}
-                                                        className="rounded-lg border bg-background p-3 space-y-2"
+                                                        className="rounded-lg border border-border/80 bg-card shadow-sm overflow-hidden"
                                                     >
-                                                        <div className="flex items-center justify-between gap-2">
-                                                            <span className="text-xs text-muted-foreground">账号</span>
-                                                            <code className="flex-1 min-w-0 truncate font-mono text-xs text-right">
-                                                                {card.account}
-                                                            </code>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                className="shrink-0 h-7"
-                                                                onClick={() => copyCard(card.account, index)}
-                                                            >
-                                                                复制
-                                                            </Button>
-                                                        </div>
-                                                        <div className="flex items-center justify-between gap-2">
-                                                            <span className="text-xs text-muted-foreground">密码</span>
-                                                            <code className="flex-1 min-w-0 truncate font-mono text-xs text-right">
-                                                                {card.password}
-                                                            </code>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                className="shrink-0 h-7"
-                                                                onClick={() => copyCard(card.password, index)}
-                                                            >
-                                                                复制
-                                                            </Button>
-                                                        </div>
-                                                        <div className="flex items-center justify-between gap-2">
-                                                            <span className="text-xs text-muted-foreground">地区</span>
-                                                            <span className="text-sm">{card.region}</span>
-                                                        </div>
-                                                        {card.lastCheckedAt != null && card.lastCheckedAt !== "" && (
-                                                            <div className="flex items-center justify-between gap-2">
-                                                                <span className="text-xs text-muted-foreground">上次检查</span>
-                                                                <span className="text-sm">{card.lastCheckedAt}</span>
+                                                        <div className="divide-y divide-border/60">
+                                                            <div className="flex items-center justify-between gap-4 px-4 py-3.5 bg-muted/30">
+                                                                <div className="flex items-center gap-2.5 min-w-0">
+                                                                    <Mail className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                                                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">账号</span>
+                                                                </div>
+                                                                <div className="flex items-center gap-2 min-w-0 flex-1 justify-end">
+                                                                    <code className="truncate font-mono text-sm text-foreground" title={card.account}>
+                                                                        {card.account}
+                                                                    </code>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+className="size-8 shrink-0 rounded-full hover:bg-background cursor-pointer"
+                                                                        onClick={() => copyCard(card.account, `card-${index}-account`)}
+                                                            aria-label="复制账号"
+                                                                    >
+                                                                        {copiedId === `card-${index}-account` ? (
+                                                                            <Check className="size-4 text-emerald-600" />
+                                                                        ) : (
+                                                                            <Copy className="size-4" />
+                                                                        )}
+                                                                    </Button>
+                                                                </div>
                                                             </div>
-                                                        )}
-                                                        {card.installStatus != null && card.installStatus !== "" && (
-                                                            <div className="flex items-center justify-between gap-2">
-                                                                <span className="text-xs text-muted-foreground">装好状态</span>
-                                                                <span className="text-sm">{card.installStatus}</span>
+                                                            <div className="flex items-center justify-between gap-4 px-4 py-3.5 bg-muted/30">
+                                                                <div className="flex items-center gap-2.5 min-w-0">
+                                                                    <KeyRound className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                                                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">密码</span>
+                                                                </div>
+                                                                <div className="flex items-center gap-2 min-w-0 flex-1 justify-end">
+                                                                    <code className="truncate font-mono text-sm text-foreground" title={card.password}>
+                                                                        {card.password}
+                                                                    </code>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+className="size-8 shrink-0 rounded-full hover:bg-background cursor-pointer"
+                                                                        onClick={() => copyCard(card.password, `card-${index}-password`)}
+                                                                    aria-label="复制密码"
+                                                                    >
+                                                                        {copiedId === `card-${index}-password` ? (
+                                                                            <Check className="size-4 text-emerald-600" />
+                                                                        ) : (
+                                                                            <Copy className="size-4" />
+                                                                        )}
+                                                                    </Button>
+                                                                </div>
                                                             </div>
-                                                        )}
-                                                        <div className="mt-2 rounded border border-amber-500/20 bg-amber-500/5 px-2 py-1.5 text-[11px] text-muted-foreground">
-                                                            若无法使用可返回商品页重新领取；仅用于 App Store，请勿在设置或 iCloud 登录。
+                                                            <div className="flex items-center justify-between gap-4 px-4 py-3">
+                                                                <div className="flex items-center gap-2.5">
+                                                                    <Globe className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                                                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">地区</span>
+                                                                </div>
+                                                                <span className="text-sm font-medium text-foreground">{card.region}</span>
+                                                            </div>
+                                                            {card.lastCheckedAt != null && card.lastCheckedAt !== "" && (
+                                                                <div className="flex items-center justify-between gap-4 px-4 py-3">
+                                                                    <div className="flex items-center gap-2.5">
+                                                                        <Clock className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                                                                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">上次检查</span>
+                                                                    </div>
+                                                                    <span className="text-sm text-muted-foreground tabular-nums">{card.lastCheckedAt}</span>
+                                                                </div>
+                                                            )}
+                                                            {card.installStatus != null && card.installStatus !== "" && (
+                                                                <div className="flex items-center justify-between gap-4 px-4 py-3">
+                                                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">装好状态</span>
+                                                                    <span className="text-sm text-foreground">{card.installStatus}</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex gap-2.5 px-4 py-3 rounded-b-lg bg-amber-500/5 border-t border-amber-500/10 text-xs text-muted-foreground">
+                                                            <Info className="size-4 shrink-0 text-amber-600 dark:text-amber-500 mt-0.5" aria-hidden />
+                                                            <p className="leading-relaxed">
+                                                                若无法使用可返回商品页重新领取；仅用于 App Store，请勿在设置或 iCloud 登录。
+                                                            </p>
                                                         </div>
                                                     </div>
                                                 ) : (
@@ -827,11 +858,11 @@ function OrderLookupPageContent() {
                                                         <Button
                                                             variant="ghost"
                                                             size="icon"
-                                                            className="size-7 shrink-0 opacity-60 group-hover:opacity-100 transition-opacity"
-                                                            onClick={() => copyCard(card.content, index)}
+                                                            className="size-7 shrink-0 cursor-pointer"
+                                                            onClick={() => copyCard(card.content, `card-${index}`)}
                                                             aria-label={`复制第 ${index + 1} 条卡密`}
                                                         >
-                                                            {copiedIndex === index ? (
+                                                            {copiedId === `card-${index}` ? (
                                                                 <Check className="size-3.5 text-green-600" />
                                                             ) : (
                                                                 <Copy className="size-3.5" />
