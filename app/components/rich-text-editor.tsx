@@ -113,7 +113,14 @@ export function RichTextEditor({
             </div>
             <EditorContent
                 editor={editor}
-                className="min-h-[120px] px-3 py-2 [&_.ProseMirror]:min-h-[100px] [&_.ProseMirror]:outline-none [&_.ProseMirror_p.is-editor-empty:first-child::before]:text-muted-foreground [&_.ProseMirror_p.is-editor-empty:first-child::before]:content-[attr(data-placeholder)]"
+                className={cn(
+                    "min-h-[120px] px-3 py-2",
+                    "[&_.ProseMirror]:min-h-[100px] [&_.ProseMirror]:outline-none",
+                    "[&_.ProseMirror_p.is-editor-empty:first-child::before]:text-muted-foreground [&_.ProseMirror_p.is-editor-empty:first-child::before]:content-[attr(data-placeholder)]",
+                    "[&_.ProseMirror_ol]:list-decimal [&_.ProseMirror_ol]:pl-6 [&_.ProseMirror_ol]:my-2",
+                    "[&_.ProseMirror_ul]:list-disc [&_.ProseMirror_ul]:pl-6 [&_.ProseMirror_ul]:my-2",
+                    "[&_.ProseMirror_li]:ml-1"
+                )}
             />
         </div>
     )

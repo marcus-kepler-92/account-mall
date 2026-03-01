@@ -1,11 +1,28 @@
 import Link from "next/link"
 import { Suspense } from "react"
 import { Zap } from "lucide-react"
+import { prisma } from "@/lib/prisma"
 import { ProductCatalog } from "@/app/components/product-catalog"
 import { SiteHeader } from "@/app/components/site-header"
+import { AnnouncementsBlock } from "@/app/components/announcements-block"
 import { config } from "@/lib/config"
 
-export default function HomePage() {
+const ANNOUNCEMENTS_LIMIT = 20
+
+export default async function HomePage() {
+    const announcements = await prisma.announcement.findMany({
+        where: { status: "PUBLISHED" },
+        orderBy: [{ sortOrder: "desc" }, { publishedAt: "desc" }, { createdAt: "desc" }],
+        take: ANNOUNCEMENTS_LIMIT,
+    })
+
+    const frontAnnouncements = announcements.map((a) => ({
+        id: a.id,
+        title: a.title,
+        content: a.content,
+        publishedAt: a.publishedAt?.toISOString() ?? null,
+    }))
+
     return (
         <div className="flex min-h-screen flex-col">
             <SiteHeader />
@@ -22,6 +39,7 @@ export default function HomePage() {
                             {config.siteSubtitle}
                         </p>
                     </section>
+                    <AnnouncementsBlock announcements={frontAnnouncements} />
                     <Suspense fallback={<div className="min-h-[400px]" />}>
                         <ProductCatalog />
                     </Suspense>

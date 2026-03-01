@@ -9,6 +9,7 @@ import {
     CreditCard,
     LogOut,
     Store,
+    Megaphone,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { authClient } from "@/lib/auth-client"
@@ -50,6 +51,11 @@ const navItems = [
         title: "卡密管理",
         href: "/admin/cards",
         icon: CreditCard,
+    },
+    {
+        title: "公告管理",
+        href: "/admin/announcements",
+        icon: Megaphone,
     },
 ]
 

@@ -19,8 +19,8 @@ export default function AdminMainLayout({
                     <AdminTopbarActions />
                 </header>
 
-                {/* Page content */}
-                <div className="flex-1 p-6">
+                {/* Page content: min-w-0 防止 flex 子项撑破宽度 */}
+                <div className="flex-1 min-w-0 p-6">
                     {children}
                 </div>
             </SidebarInset>

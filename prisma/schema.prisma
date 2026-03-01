@@ -160,3 +160,22 @@ model RestockSubscription {
   @@unique([productId, ip])
   @@index([productId, status])
 }
+
+enum AnnouncementStatus {
+  DRAFT
+  PUBLISHED
+}
+
+model Announcement {
+  id          String              @id @default(cuid())
+  title       String
+  content     String?             @db.Text
+  status      AnnouncementStatus  @default(DRAFT)
+  sortOrder   Int                 @default(0)
+  publishedAt DateTime?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@index([status])
+  @@index([status, sortOrder])
+}

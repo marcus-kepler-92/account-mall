@@ -13,6 +13,8 @@ type MarkdownEditorProps = {
     placeholder?: string
     className?: string
     disabled?: boolean
+    /** 编辑器区域高度（像素），默认 320 */
+    height?: number
 }
 
 export function MarkdownEditor({
@@ -21,6 +23,7 @@ export function MarkdownEditor({
     placeholder = "描述你的商品，支持 Markdown…",
     className,
     disabled,
+    height = 320,
 }: MarkdownEditorProps) {
     const { resolvedTheme } = useTheme()
     const colorMode = resolvedTheme === "dark" ? "dark" : "light"
@@ -30,7 +33,7 @@ export function MarkdownEditor({
             <MDEditor
                 value={value}
                 onChange={(v) => onChange(v ?? "")}
-                height={320}
+                height={height}
                 visibleDragbar={false}
                 preview="live"
                 textareaProps={{
