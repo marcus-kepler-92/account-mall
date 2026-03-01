@@ -11,6 +11,8 @@ import { SiteHeader } from "@/app/components/site-header"
 import { SoldOutOverlay } from "@/app/components/sold-out-overlay"
 import { RestockReminderForm } from "@/app/components/restock-reminder-form"
 import { ProductBottomBar } from "../../components/product-bottom-bar"
+import { ProductDescriptionView } from "@/app/components/product-description-view"
+import { descriptionToPlainText } from "@/lib/description"
 
 export const dynamic = "force-dynamic"
 
@@ -39,7 +41,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     if (!product || product.status !== "ACTIVE") return { title: "商品" }
 
     const desc = product.description
-        ? String(product.description).replace(/<[^>]+>/g, "").slice(0, 160)
+        ? descriptionToPlainText(product.description, 160)
         : `${product.name} - ¥${Number(product.price).toFixed(2)}`
     const productUrl = `${config.siteUrl}/products/${product.id}-${product.slug}`
     const ogImages = product.image ? [{ url: product.image }] : undefined
@@ -99,7 +101,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
 
     const productUrl = `${config.siteUrl}/products/${product.id}-${product.slug}`
     const descriptionPlain = product.description
-        ? String(product.description).replace(/<[^>]+>/g, "").slice(0, 160)
+        ? descriptionToPlainText(product.description, 160)
         : `${product.name} - ¥${priceNumber.toFixed(2)}`
     const jsonLd = {
         "@context": "https://schema.org",
@@ -141,7 +143,12 @@ export default async function ProductDetailPage({ params }: PageProps) {
                             isSoldOut={isSoldOut}
                         />
                         {product.description && (
-                            <ProductDetailDescriptionSection description={product.description} />
+                            <section aria-label="商品详情">
+                                <div className="rounded-xl border bg-card p-4 shadow-sm sm:p-5">
+                                    <h2 className="mb-3 text-sm font-semibold text-muted-foreground">商品详情</h2>
+                                    <ProductDescriptionView description={product.description} />
+                                </div>
+                            </section>
                         )}
                     </div>
 
@@ -299,24 +306,6 @@ function ProductMetaNoticeSection() {
             <div className="space-y-1.5">
                 <p>虚拟商品自动发货，购买后可通过邮箱接收卡密信息。</p>
                 <p>下单前请仔细阅读商品说明，确认无误后再提交订单。</p>
-            </div>
-        </section>
-    )
-}
-
-type ProductDetailDescriptionSectionProps = {
-    description: string
-}
-
-function ProductDetailDescriptionSection({ description }: ProductDetailDescriptionSectionProps) {
-    return (
-        <section aria-label="商品详情">
-            <div className="rounded-xl border bg-card p-4 shadow-sm sm:p-5">
-                <h2 className="mb-3 text-sm font-semibold text-muted-foreground">商品详情</h2>
-                <div
-                    className="prose prose-sm max-w-none dark:prose-invert [&_ol]:list-decimal [&_li]:ml-4 [&_ul]:list-disc"
-                    dangerouslySetInnerHTML={{ __html: description }}
-                />
             </div>
         </section>
     )

@@ -23,7 +23,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { generateSlug } from "@/lib/utils"
-import { RichTextEditor } from "@/app/components/rich-text-editor"
+import { MarkdownEditor } from "@/app/components/markdown-editor"
 import { productFormSchema, type ProductFormSchema } from "@/lib/validations/product"
 import { Loader2, Plus, X, ArrowLeft, Upload, Trash2 } from "lucide-react"
 import Link from "next/link"
@@ -292,24 +292,6 @@ export function ProductForm({
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="description">描述</Label>
-                                    <Controller
-                                        name="description"
-                                        control={control}
-                                        render={({ field }) => (
-                                            <RichTextEditor
-                                                value={field.value ?? ""}
-                                                onChange={field.onChange}
-                                                placeholder="描述你的商品..."
-                                            />
-                                        )}
-                                    />
-                                    {errors.description && (
-                                        <p className="text-sm text-destructive">{errors.description.message}</p>
-                                    )}
-                                </div>
-
-                                <div className="space-y-2">
                                     <Label>商品图片</Label>
                                     {imageValue ? (
                                         <div className="relative inline-block">
@@ -521,6 +503,29 @@ export function ProductForm({
                         </Card>
                     </div>
                 </div>
+
+                <Card className="w-full">
+                    <CardHeader>
+                        <CardTitle>商品描述</CardTitle>
+                        <p className="text-sm font-normal text-muted-foreground">支持 Markdown，用于商品详情页展示</p>
+                    </CardHeader>
+                    <CardContent>
+                        <Controller
+                            name="description"
+                            control={control}
+                            render={({ field }) => (
+                                <MarkdownEditor
+                                    value={field.value ?? ""}
+                                    onChange={field.onChange}
+                                    placeholder="描述你的商品，支持 Markdown…"
+                                />
+                            )}
+                        />
+                        {errors.description && (
+                            <p className="mt-2 text-sm text-destructive">{errors.description.message}</p>
+                        )}
+                    </CardContent>
+                </Card>
 
                 <div className="flex items-center gap-4">
                     <Button type="submit" disabled={form.formState.isSubmitting}>

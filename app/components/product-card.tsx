@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ImageIcon, Bell } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { descriptionToPlainText } from "@/lib/description"
 import { SoldOutOverlay } from "@/app/components/sold-out-overlay"
 
 // Primary-based gradients for theme consistency
@@ -45,9 +46,7 @@ type ProductCardProps = {
  */
 export function ProductCard({ product, gradientIndex = 0, className }: ProductCardProps) {
     const gradient = CARD_GRADIENTS[gradientIndex % CARD_GRADIENTS.length]
-    const description = product.description
-        ? String(product.description).replace(/<[^>]+>/g, "").slice(0, 80)
-        : ""
+    const description = descriptionToPlainText(product.description, 80)
     const isSoldOut = product.stock === 0
     const productSlug = `${product.id}-${product.slug}`
 

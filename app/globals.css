@@ -133,3 +133,19 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* 商品详情 Markdown 深色下与卡片背景一致，消除色差 */
+.product-description-markdown[data-color-mode="dark"],
+.product-description-markdown[data-color-mode="dark"] .wmde-markdown-var,
+.product-description-markdown[data-color-mode="dark"] .wmde-markdown {
+  --color-canvas-default: var(--card);
+  --color-canvas-subtle: var(--muted);
+  --color-fg-default: var(--card-foreground);
+  --color-fg-muted: var(--muted-foreground);
+  --color-border-default: var(--border);
+  --color-border-muted: var(--border);
+}
+.product-description-markdown[data-color-mode="dark"] .wmde-markdown {
+  background-color: var(--card);
+  color: var(--card-foreground);
+}
