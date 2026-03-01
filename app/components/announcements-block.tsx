@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import {
     Collapsible,
     CollapsibleContent,
@@ -8,6 +9,8 @@ import {
 import { ChevronDown, Megaphone } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ProductDescriptionView } from "@/app/components/product-description-view"
+
+const STORAGE_KEY = "announcements-expanded"
 
 export type FrontAnnouncement = {
     id: string
@@ -30,7 +33,50 @@ function formatDate(iso: string | null) {
     })
 }
 
+function getDefaultExpandedId(announcements: FrontAnnouncement[]): string | null {
+    const firstWithContent = announcements.find((x) => x.content?.trim())
+    return firstWithContent?.id ?? null
+}
+
 export function AnnouncementsBlock({ announcements }: AnnouncementsBlockProps) {
+    const [expandedIds, setExpandedIds] = useState<string[]>([])
+    const [hydrated, setHydrated] = useState(false)
+
+    useEffect(() => {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY)
+            if (raw) {
+                const parsed = JSON.parse(raw) as unknown
+                if (Array.isArray(parsed) && parsed.every((x) => typeof x === "string")) {
+                    setExpandedIds(parsed)
+                    setHydrated(true)
+                    return
+                }
+            }
+        } catch {
+            // ignore
+        }
+        const defaultId = getDefaultExpandedId(announcements)
+        setExpandedIds(defaultId ? [defaultId] : [])
+        setHydrated(true)
+    }, [announcements])
+
+    const setExpanded = (id: string, open: boolean) => {
+        setExpandedIds((prev) => {
+            const next = open
+                ? prev.includes(id)
+                    ? prev
+                    : [...prev, id]
+                : prev.filter((x) => x !== id)
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+            } catch {
+                // ignore
+            }
+            return next
+        })
+    }
+
     if (!announcements.length) return null
 
     return (
@@ -42,13 +88,14 @@ export function AnnouncementsBlock({ announcements }: AnnouncementsBlockProps) {
                 <Megaphone className="size-5 text-primary" aria-hidden />
                 公告
             </h2>
-            {/* 列表已按 sortOrder 降序、publishedAt 降序，第一条即优先级最高；仅对「优先级最高且含正文」的那条默认展开 */}
             <ul className="space-y-3">
                 {announcements.map((a, index) => {
                     const hasContent = !!a.content?.trim()
                     const isHighestPriorityWithContent =
                         hasContent &&
                         index === announcements.findIndex((x) => x.content?.trim())
+                    // Before hydration: default (first with content open). After: use stored state.
+                    const open = hydrated ? expandedIds.includes(a.id) : isHighestPriorityWithContent
                     return (
                         <li
                             key={a.id}
@@ -60,21 +107,22 @@ export function AnnouncementsBlock({ announcements }: AnnouncementsBlockProps) {
                             {hasContent ? (
                                 <Collapsible
                                     className="group"
-                                    defaultOpen={isHighestPriorityWithContent}
+                                    open={open}
+                                    onOpenChange={(openState) => setExpanded(a.id, openState)}
                                 >
                                     <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-muted/50 rounded-lg transition-colors">
-                                    <span className="font-medium text-foreground">
-                                        {a.title}
-                                    </span>
-                                    <div className="flex shrink-0 items-center gap-2">
-                                        {a.publishedAt && (
-                                            <span className="text-xs text-muted-foreground">
-                                                {formatDate(a.publishedAt)}
-                                            </span>
-                                        )}
-                                        <ChevronDown className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
-                                    </div>
-                                </CollapsibleTrigger>
+                                        <span className="font-medium text-foreground">
+                                            {a.title}
+                                        </span>
+                                        <div className="flex shrink-0 items-center gap-2">
+                                            {a.publishedAt && (
+                                                <span className="text-xs text-muted-foreground">
+                                                    {formatDate(a.publishedAt)}
+                                                </span>
+                                            )}
+                                            <ChevronDown className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+                                        </div>
+                                    </CollapsibleTrigger>
                                     <CollapsibleContent>
                                         <div className="border-t border-border bg-card px-4 py-3 text-sm text-muted-foreground rounded-b-lg">
                                             <ProductDescriptionView description={a.content!} />

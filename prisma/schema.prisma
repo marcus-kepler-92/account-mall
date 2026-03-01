@@ -100,6 +100,7 @@ model Product {
   status      ProductStatus @default(ACTIVE)
   productType ProductType   @default(NORMAL)
   sourceUrl   String?       @db.Text
+  pinnedAt    DateTime?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
   cards              Card[]

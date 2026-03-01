@@ -45,6 +45,7 @@ export const updateProductSchema = z.object({
     productType: productTypeEnum.optional(),
     sourceUrl: z.string().url().optional().nullable().or(z.literal("")),
     tagIds: z.array(z.string()).optional(),
+    pinned: z.boolean().optional(),
 }).refine(
     (data) => data.productType !== "FREE_SHARED" || (data.price === undefined || data.price === 0),
     { message: "Free shared product must have price 0", path: ["price"] }

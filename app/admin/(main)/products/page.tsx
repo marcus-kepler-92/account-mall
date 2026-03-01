@@ -36,7 +36,10 @@ export default async function AdminProductsPage({
                     select: { id: true, name: true, slug: true },
                 },
             },
-            orderBy: { createdAt: "desc" },
+            orderBy: [
+                { pinnedAt: { sort: "desc", nulls: "last" } },
+                { createdAt: "desc" },
+            ],
         }),
         prisma.tag.findMany({
             orderBy: { name: "asc" },
@@ -59,6 +62,7 @@ export default async function AdminProductsPage({
     const serializedProducts = products.map((p) => ({
         ...p,
         price: Number(p.price),
+        pinnedAt: p.pinnedAt?.toISOString() ?? null,
     }))
     const stockMapPlain = Object.fromEntries(stockMap)
 

@@ -19,6 +19,8 @@ import {
     Archive,
     RotateCcw,
     ExternalLink,
+    Pin,
+    PinOff,
 } from "lucide-react"
 import {
     Dialog,
@@ -37,6 +39,7 @@ type ProductRowActionsProps = {
     productName: string
     slug: string
     status: string
+    pinnedAt: string | null
 }
 
 export function ProductRowActions({
@@ -44,11 +47,14 @@ export function ProductRowActions({
     productName,
     slug,
     status,
+    pinnedAt,
 }: ProductRowActionsProps) {
     const router = useRouter()
     const [open, setOpen] = useState(false)
     const [loading, setLoading] = useState(false)
+    const [pinLoading, setPinLoading] = useState(false)
     const isActive = status === "ACTIVE"
+    const isPinned = !!pinnedAt
 
     const copyLink = async () => {
         const url = `${window.location.origin}/products/${productId}-${slug}`
@@ -77,6 +83,25 @@ export function ProductRowActions({
             toast.error("操作失败")
         } finally {
             setLoading(false)
+        }
+    }
+
+    const handleTogglePin = async () => {
+        setPinLoading(true)
+        try {
+            const res = await fetch(`/api/products/${productId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ pinned: !isPinned }),
+            })
+            if (res.ok) {
+                toast.success(isPinned ? "已取消置顶" : "已置顶")
+                router.refresh()
+            }
+        } catch {
+            toast.error("操作失败")
+        } finally {
+            setPinLoading(false)
         }
     }
 
@@ -110,6 +135,19 @@ export function ProductRowActions({
                 <DropdownMenuItem onClick={copyLink}>
                     <Copy className="size-4" />
                     复制链接
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleTogglePin} disabled={pinLoading}>
+                    {isPinned ? (
+                        <>
+                            <PinOff className="size-4" />
+                            取消置顶
+                        </>
+                    ) : (
+                        <>
+                            <Pin className="size-4" />
+                            置顶
+                        </>
+                    )}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <Dialog open={open} onOpenChange={setOpen}>

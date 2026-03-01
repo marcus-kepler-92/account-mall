@@ -81,7 +81,7 @@ export async function PUT(
         return notFound("Product not found");
     }
 
-    const { tagIds, productType, sourceUrl, price, ...rest } = parsed.data;
+    const { tagIds, productType, sourceUrl, price, pinned, ...rest } = parsed.data;
 
     // Check slug uniqueness if updating slug
     if (rest.slug && rest.slug !== existing.slug) {
@@ -104,6 +104,8 @@ export async function PUT(
         ...(tagIds !== undefined && {
             tags: { set: tagIds.map((id) => ({ id })) },
         }),
+        ...(pinned === true && { pinnedAt: new Date() }),
+        ...(pinned === false && { pinnedAt: null }),
     };
     if (isFreeShared && updateData.price !== 0) {
         updateData.price = 0;

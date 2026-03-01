@@ -58,15 +58,17 @@ export async function GET(request: NextRequest) {
         };
     }
 
-    // Order
-    const orderBy: { price?: "asc" | "desc"; createdAt?: "desc" } =
+    // Order: pinned first, then by sort option
+    const sortOrder =
         sort === "price-asc"
-            ? { price: "asc" }
+            ? { price: "asc" as const }
             : sort === "price-desc"
-              ? { price: "desc" }
-              : sort === "newest"
-                ? { createdAt: "desc" }
-                : { createdAt: "desc" };
+              ? { price: "desc" as const }
+              : { createdAt: "desc" as const };
+    const orderBy = [
+        { pinnedAt: { sort: "desc" as const, nulls: "last" as const } },
+        sortOrder,
+    ];
 
     const [products, total] = await Promise.all([
         prisma.product.findMany({

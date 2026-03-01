@@ -19,6 +19,7 @@ type Product = {
     slug: string
     status: string
     price: number
+    pinnedAt: string | null
     tags: { id: string; name: string; slug: string }[]
 }
 
@@ -47,12 +48,19 @@ export function ProductsList({ products, stockMap }: ProductsListProps) {
                         {products.map((product) => (
                             <TableRow key={product.id}>
                                 <TableCell className="font-medium">
-                                    <Link
-                                        href={`/admin/products/${product.id}`}
-                                        className="hover:underline"
-                                    >
-                                        {product.name}
-                                    </Link>
+                                    <div className="flex items-center gap-2">
+                                        <Link
+                                            href={`/admin/products/${product.id}`}
+                                            className="hover:underline"
+                                        >
+                                            {product.name}
+                                        </Link>
+                                        {product.pinnedAt && (
+                                            <Badge variant="secondary" className="text-xs">
+                                                置顶
+                                            </Badge>
+                                        )}
+                                    </div>
                                     <div className="text-xs text-muted-foreground mt-0.5">
                                         /{product.slug}
                                     </div>
@@ -91,6 +99,7 @@ export function ProductsList({ products, stockMap }: ProductsListProps) {
                                         productName={product.name}
                                         slug={product.slug}
                                         status={product.status}
+                                        pinnedAt={product.pinnedAt}
                                     />
                                 </TableCell>
                             </TableRow>
@@ -115,6 +124,11 @@ export function ProductsList({ products, stockMap }: ProductsListProps) {
                                     <p className="text-xs text-muted-foreground mt-0.5">
                                         /{product.slug}
                                     </p>
+                                    {product.pinnedAt && (
+                                        <Badge variant="secondary" className="text-xs mt-1">
+                                            置顶
+                                        </Badge>
+                                    )}
                                     <div className="mt-2 flex flex-wrap gap-1">
                                         {product.tags.map((tag) => (
                                             <Badge
@@ -147,6 +161,7 @@ export function ProductsList({ products, stockMap }: ProductsListProps) {
                                     productName={product.name}
                                     slug={product.slug}
                                     status={product.status}
+                                    pinnedAt={product.pinnedAt}
                                 />
                             </div>
                         </CardContent>
