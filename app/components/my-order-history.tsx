@@ -17,11 +17,20 @@ export function MyOrderHistory() {
     if (count === 0) return null
 
     return (
-        <Button variant="ghost" size="sm" className="gap-2" asChild>
-            <Link href="/orders/my">
-                <Package className="size-4" />
-                我的订单
-                <span className="text-muted-foreground">({count})</span>
+        <Button
+            variant="ghost"
+            size="sm"
+            className="size-9 shrink-0 gap-1.5 p-0 sm:size-auto sm:px-3 sm:gap-2"
+            asChild
+        >
+            <Link
+                href="/orders/my"
+                title={`我的订单 (${count})`}
+                aria-label={`我的订单，共 ${count} 笔`}
+                className="gap-1.5 sm:gap-2"
+            >
+                <Package className="size-4 shrink-0" aria-hidden />
+                <span className="hidden text-muted-foreground sm:inline">我的订单 ({count})</span>
             </Link>
         </Button>
     )
