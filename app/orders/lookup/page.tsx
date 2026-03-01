@@ -16,8 +16,6 @@ import { toast } from "sonner"
 import { addOrUpdateOrder } from "@/lib/order-history-storage"
 import { type FreeSharedCardPayload, isFreeSharedCard } from "@/lib/free-shared-card"
 
-const LOOKUP_PREFILL_KEY_PREFIX = "lookup_prefill_"
-
 type CardItem = { content: string } | (FreeSharedCardPayload & { content: string })
 
 interface OrderResult {
@@ -63,7 +61,6 @@ function OrderLookupPageContent() {
     const [sheetLoading, setSheetLoading] = useState(false)
     const [continuePaymentLoading, setContinuePaymentLoading] = useState(false)
     const passwordInputRef = useRef<HTMLInputElement>(null)
-    const prefillAttemptedRef = useRef(false)
 
     // URL → state：从 searchParams 同步 type 与 orderNo（仅读 URL，不写 URL，无循环风险）
     useEffect(() => {
@@ -76,66 +73,6 @@ function OrderLookupPageContent() {
             setTimeout(() => passwordInputRef.current?.focus(), 100)
         }
     }, [searchParams])
-
-    // Pre-query: when orderNo in URL and we have prefill password in sessionStorage, run lookup once then clear
-    useEffect(() => {
-        const orderNoParam = searchParams.get("orderNo")
-        if (!orderNoParam || prefillAttemptedRef.current) return
-
-        const prefillKey = LOOKUP_PREFILL_KEY_PREFIX + orderNoParam
-        const prefillPassword = typeof sessionStorage !== "undefined" ? sessionStorage.getItem(prefillKey) : null
-        if (!prefillPassword) return
-
-        prefillAttemptedRef.current = true
-        setError(null)
-        setResult(null)
-        setOrderList(null)
-        setLoading(true)
-        setSheetOpen(true)
-        setSheetLoading(true)
-
-        if (searchParams.get("fromPay") === "1") {
-            toast.success("支付已完成，正在为您查询订单…")
-        }
-
-        fetch("/api/orders/lookup", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ orderNo: orderNoParam.trim(), password: prefillPassword.trim() }),
-        })
-            .then((res) => {
-                if (!res.ok) return res.json().then((data) => Promise.reject(new Error(data?.error ?? "查询失败")))
-                return res.json()
-            })
-            .then((data) => {
-                if (data.orders && Array.isArray(data.orders)) {
-                    setOrderList(data.orders)
-                    toast.success(`找到 ${data.orders.length} 个相关订单`)
-                } else if (data?.orderNo) {
-                    setResult(data)
-                    toast.success("查询成功")
-                    addOrUpdateOrder({
-                        orderNo: data.orderNo,
-                        productName: data.productName ?? "商品",
-                        amount: data.amount ?? 0,
-                        createdAt: typeof data.createdAt === "string" ? data.createdAt : new Date().toISOString(),
-                        status: data.status ?? "PENDING",
-                    })
-                    // Prefill 仅为自动填密并查单，不跳转成功页；成功页仅由支付回跳（pay-return）进入
-                } else {
-                    setError("订单不存在或密码错误")
-                }
-                sessionStorage.removeItem(prefillKey)
-            })
-            .catch((err) => {
-                setError(err?.message ?? "查询失败，请稍后重试")
-                sessionStorage.removeItem(prefillKey)
-            })
-            .finally(() => {
-                setLoading(false)
-                setSheetLoading(false)
-            })
-    }, [searchParams, router])
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()

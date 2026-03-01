@@ -2,7 +2,7 @@
 
 import { useState, Suspense } from "react"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import {
     getOrderHistory,
     removeOrderFromHistory,
@@ -56,9 +56,11 @@ function formatAmount(amount: unknown): string {
     return "—"
 }
 
-/** URL → state 单向同步；若后续需把选中 orderNo 写回 URL，仅在本机用户操作时 router.replace，勿用 effect 根据 state 写 URL。 */
+/** URL 为选中订单单一数据源；用户点击列表时写回 URL（router.replace），保证预填与点击一致。 */
 function MyOrdersPageContent() {
     const searchParams = useSearchParams()
+    const router = useRouter()
+    const pathname = usePathname()
     const orderNoFromUrl = searchParams.get("orderNo")
 
     const [orders, setOrders] = useState<OrderHistoryItem[]>(() => getOrderHistory())
@@ -67,8 +69,18 @@ function MyOrdersPageContent() {
 
     const refreshOrders = () => setOrders(getOrderHistory())
 
-    const selectedOrderNo = orderNoFromUrl ?? userSelectedOrderNo ?? orders[0]?.orderNo ?? null
+    // URL 预填的 orderNo 若不在当前列表中则回退，避免选中“空”
+    const orderNoInList = orderNoFromUrl && orders.some((o) => o.orderNo === orderNoFromUrl) ? orderNoFromUrl : null
+    const selectedOrderNo = orderNoInList ?? userSelectedOrderNo ?? orders[0]?.orderNo ?? null
     const selected = orders.find((o) => o.orderNo === selectedOrderNo)
+
+    const syncUrlToOrderNo = (orderNo: string | null) => {
+        if (orderNo) {
+            router.replace(`${pathname}?orderNo=${encodeURIComponent(orderNo)}`, { scroll: false })
+        } else {
+            router.replace(pathname, { scroll: false })
+        }
+    }
 
     const handleRemoveOrderClick = (orderNo: string, e: React.MouseEvent) => {
         e.preventDefault()
@@ -84,7 +96,9 @@ function MyOrdersPageContent() {
         refreshOrders()
         if (selectedOrderNo === orderNo) {
             const rest = orders.filter((o) => o.orderNo !== orderNo)
-            setUserSelectedOrderNo(rest[0]?.orderNo ?? null)
+            const nextOrderNo = rest[0]?.orderNo ?? null
+            setUserSelectedOrderNo(nextOrderNo)
+            syncUrlToOrderNo(nextOrderNo)
         }
         toast.success("已从列表移除")
     }
@@ -140,11 +154,15 @@ function MyOrdersPageContent() {
                                                 <div
                                                     role="button"
                                                     tabIndex={0}
-                                                    onClick={() => setUserSelectedOrderNo(o.orderNo)}
+                                                    onClick={() => {
+                                                        setUserSelectedOrderNo(o.orderNo)
+                                                        syncUrlToOrderNo(o.orderNo)
+                                                    }}
                                                     onKeyDown={(e) => {
                                                         if (e.key === "Enter" || e.key === " ") {
                                                             e.preventDefault()
                                                             setUserSelectedOrderNo(o.orderNo)
+                                                            syncUrlToOrderNo(o.orderNo)
                                                         }
                                                     }}
                                                     className={`flex w-full cursor-pointer items-center gap-2 px-4 py-3 text-left text-sm hover:bg-accent/50 ${

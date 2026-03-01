@@ -15,6 +15,7 @@ import { config } from "@/lib/config"
 import { verifyTurnstileToken } from "@/lib/turnstile"
 import { scrapeSharedAccounts } from "@/lib/scrape-shared-accounts"
 import { sharedAccountToCardPayload, toCardContentJson } from "@/lib/free-shared-card"
+import { createOrderSuccessToken } from "@/lib/order-success-token"
 import { unauthorized, validationError, badRequest, invalidJsonBody, notFound, internalServerError } from "@/lib/api-response"
 
 /**
@@ -116,11 +117,13 @@ async function createFreeSharedOrder(params: {
         return internalServerError("领取失败，请稍后重试。")
     }
 
+    const successToken = createOrderSuccessToken(freeOrder.orderNo)
     return NextResponse.json({
         orderNo: freeOrder.orderNo,
         amount: 0,
         paymentUrl: null,
         claimedAccount: payload,
+        ...(successToken && { successToken }),
     })
 }
 

@@ -120,7 +120,7 @@ docker compose exec app npm run db:seed
 | `ALIPAY_APP_ID`, `ALIPAY_PRIVATE_KEY`, `ALIPAY_PUBLIC_KEY` | Alipay payment | No | - |
 | `CRON_SECRET` | API secret for cron (close expired orders) | No | - |
 | `PENDING_ORDER_TIMEOUT_MS`, `ORDER_RATE_LIMIT_POINTS`, `ORDER_QUERY_RATE_LIMIT_POINTS`, `MAX_PENDING_ORDERS_PER_IP` | Order timeout and rate limits | No | See [lib/config.ts](lib/config.ts) |
-| `ORDER_SUCCESS_TOKEN_SECRET` | Token for order success page | No | - |
+| `ORDER_SUCCESS_TOKEN_SECRET` | 订单成功页 token 签名（≥16 位；不设则用 BETTER_AUTH_SECRET，开发环境有默认） | No | - |
 | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`, `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Cloudflare Turnstile | No | - |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME` | Seed admin (db:seed) | No | See [lib/config.ts](lib/config.ts) |
 

@@ -7,10 +7,9 @@ import { Turnstile } from "@marsidev/react-turnstile"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Eye, EyeOff, Loader2, Copy, Check, Mail, KeyRound, Globe, Clock, Info } from "lucide-react"
+import { Eye, EyeOff, Loader2 } from "lucide-react"
 import { addOrUpdateOrder } from "@/lib/order-history-storage"
 import { Skeleton } from "@/components/ui/skeleton"
-import type { FreeSharedCardPayload } from "@/lib/free-shared-card"
 
 const ORDER_FORM_LOADING_EVENT = "product-order-loading"
 
@@ -48,10 +47,7 @@ export function ProductOrderForm({
     const [quantity, setQuantity] = useState(1)
     const [loading, setLoading] = useState(false)
     const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
-    const [copiedField, setCopiedField] = useState<"account" | "password" | null>(null)
     const [turnstileWidgetReady, setTurnstileWidgetReady] = useState(false)
-    const [claimedAccount, setClaimedAccount] = useState<FreeSharedCardPayload | null>(null)
-    const [freeOrderNoOnly, setFreeOrderNoOnly] = useState<{ orderNo: string } | null>(null)
 
     const router = useRouter()
     const requireTurnstile = Boolean(TURNSTILE_SITE_KEY) && !IS_DEV
@@ -96,39 +92,15 @@ export function ProductOrderForm({
                     createdAt: new Date().toISOString(),
                     status: data.claimedAccount ? "COMPLETED" : "PENDING",
                 })
-                if (data.claimedAccount) {
-                    toast.success("领取成功，请复制保存账号信息")
-                    setFreeOrderNoOnly(null)
-                    setClaimedAccount(data.claimedAccount)
-                    try {
-                        sessionStorage.setItem(`lookup_prefill_${data.orderNo}`, orderPassword)
-                    } catch {
-                        /* ignore */
-                    }
-                    setLoading(false)
-                    dispatchOrderFormLoading(false)
-                    return
-                }
-                // 免费商品：禁止跳转，仅本页展示卡密或提示去订单查询
-                if (isFreeShared && data.orderNo) {
-                    toast.success("领取已记录")
-                    setClaimedAccount(null)
-                    setFreeOrderNoOnly({ orderNo: data.orderNo })
-                    try {
-                        sessionStorage.setItem(`lookup_prefill_${data.orderNo}`, orderPassword)
-                    } catch {
-                        /* ignore */
-                    }
-                    setLoading(false)
-                    dispatchOrderFormLoading(false)
+                if (data.successToken && data.orderNo) {
+                    toast.success(isFreeShared ? "领取成功" : "订单已创建")
+                    willRedirect = true
+                    router.push(
+                        `/orders/${encodeURIComponent(data.orderNo)}/success?token=${encodeURIComponent(data.successToken)}`,
+                    )
                     return
                 }
                 if (data.paymentUrl) {
-                    try {
-                        sessionStorage.setItem(`lookup_prefill_${data.orderNo}`, orderPassword)
-                    } catch {
-                        // ignore quota or disabled storage
-                    }
                     toast.success("订单已创建，正在跳转至支付页面…")
                     willRedirect = true
                     window.location.href = data.paymentUrl
@@ -136,11 +108,6 @@ export function ProductOrderForm({
                 }
                 if (data.orderNo) {
                     toast.success(`订单已创建，订单号: ${data.orderNo}，请妥善保管订单号和密码`)
-                    try {
-                        sessionStorage.setItem(`lookup_prefill_${data.orderNo}`, orderPassword)
-                    } catch {
-                        // ignore quota or disabled storage
-                    }
                     willRedirect = true
                     router.push(`/orders/lookup?orderNo=${encodeURIComponent(data.orderNo)}`)
                 }
@@ -155,23 +122,6 @@ export function ProductOrderForm({
                 setLoading(false)
                 dispatchOrderFormLoading(false)
             }
-        }
-    }
-
-    const copyToClipboard = async (
-        text: string,
-        label: string,
-        field?: "account" | "password"
-    ) => {
-        try {
-            await navigator.clipboard.writeText(text)
-            if (field) {
-                setCopiedField(field)
-                setTimeout(() => setCopiedField(null), 2000)
-            }
-            toast.success(`已复制${label}`)
-        } catch {
-            toast.error("复制失败")
         }
     }
 
@@ -298,117 +248,6 @@ export function ProductOrderForm({
                     </Button>
                 </div>
             </form>
-
-            {freeOrderNoOnly && (
-                <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 shadow-sm sm:p-5">
-                    <h3 className="mb-3 text-sm font-semibold text-foreground">领取已记录</h3>
-                    <p className="mb-3 text-xs text-muted-foreground">
-                        请使用订单号与查询密码在订单查询中查看卡密。
-                    </p>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                            router.push(
-                                `/orders/lookup?orderNo=${encodeURIComponent(freeOrderNoOnly.orderNo)}`
-                            )
-                        }
-                    >
-                        去订单查询
-                    </Button>
-                </div>
-            )}
-
-            {claimedAccount && (
-                <div className="rounded-xl border border-green-500/30 bg-green-500/5 p-4 shadow-sm sm:p-5">
-                    <h3 className="mb-1.5 text-sm font-semibold text-foreground">领取成功</h3>
-                    <p className="mb-4 text-xs text-muted-foreground">
-                        请复制保存以下信息，或通过订单查询（订单号+订单密码）再次查看。
-                    </p>
-                    <div className="rounded-lg border border-border/80 bg-card shadow-sm overflow-hidden">
-                        <div className="divide-y divide-border/60">
-                            <div className="flex items-center justify-between gap-4 px-4 py-3.5 bg-muted/30">
-                                <div className="flex items-center gap-2.5 min-w-0">
-                                    <Mail className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">账号</span>
-                                </div>
-                                <div className="flex items-center gap-2 min-w-0 flex-1 justify-end">
-                                    <code className="truncate font-mono text-sm text-foreground" title={claimedAccount.account}>
-                                        {claimedAccount.account}
-                                    </code>
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        className="size-8 shrink-0 rounded-full hover:bg-background cursor-pointer"
-                                        onClick={() => copyToClipboard(claimedAccount.account, "账号", "account")}
-                                        aria-label="复制账号"
-                                    >
-                                        {copiedField === "account" ? (
-                                            <Check className="size-4 text-emerald-600" />
-                                        ) : (
-                                            <Copy className="size-4" />
-                                        )}
-                                    </Button>
-                                </div>
-                            </div>
-                            <div className="flex items-center justify-between gap-4 px-4 py-3.5 bg-muted/30">
-                                <div className="flex items-center gap-2.5 min-w-0">
-                                    <KeyRound className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">密码</span>
-                                </div>
-                                <div className="flex items-center gap-2 min-w-0 flex-1 justify-end">
-                                    <code className="truncate font-mono text-sm text-foreground" title={claimedAccount.password}>
-                                        {claimedAccount.password}
-                                    </code>
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        className="size-8 shrink-0 rounded-full hover:bg-background cursor-pointer"
-                                        onClick={() => copyToClipboard(claimedAccount.password, "密码", "password")}
-                                        aria-label="复制密码"
-                                    >
-                                        {copiedField === "password" ? (
-                                            <Check className="size-4 text-emerald-600" />
-                                        ) : (
-                                            <Copy className="size-4" />
-                                        )}
-                                    </Button>
-                                </div>
-                            </div>
-                            <div className="flex items-center justify-between gap-4 px-4 py-3">
-                                <div className="flex items-center gap-2.5">
-                                    <Globe className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">地区</span>
-                                </div>
-                                <span className="text-sm font-medium text-foreground">{claimedAccount.region}</span>
-                            </div>
-                            {claimedAccount.lastCheckedAt != null && claimedAccount.lastCheckedAt !== "" && (
-                                <div className="flex items-center justify-between gap-4 px-4 py-3">
-                                    <div className="flex items-center gap-2.5">
-                                        <Clock className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">上次检查</span>
-                                    </div>
-                                    <span className="text-sm text-muted-foreground tabular-nums">{claimedAccount.lastCheckedAt}</span>
-                                </div>
-                            )}
-                            {claimedAccount.installStatus != null && claimedAccount.installStatus !== "" && (
-                                <div className="flex items-center justify-between gap-4 px-4 py-3">
-                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">装好状态</span>
-                                    <span className="text-sm text-foreground">{claimedAccount.installStatus}</span>
-                                </div>
-                            )}
-                        </div>
-                        <div className="flex gap-2.5 px-4 py-3 rounded-b-lg bg-amber-500/5 border-t border-amber-500/10 text-xs text-muted-foreground">
-                            <Info className="size-4 shrink-0 text-amber-600 dark:text-amber-500 mt-0.5" aria-hidden />
-                            <p className="leading-relaxed">
-                                若账号无法使用（如提示异常、无法登录），可返回本页重新领取一个。仅用于 App Store 下载，请勿在【设置】或 iCloud 中登录，以免锁机。
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     )
 }

@@ -35,6 +35,7 @@ const envSchema = z
         orderRateLimitPoints: z.coerce.number().int().positive().default(10),
         orderQueryRateLimitPoints: z.coerce.number().int().positive().default(30),
         maxPendingOrdersPerIp: z.coerce.number().int().positive().default(6),
+        /** 订单成功页 token 签名，至少 16 位；未配置时开发环境用默认值 */
         orderSuccessTokenSecret: z.string().optional(),
         turnstileSiteKey: z.string().optional(),
         turnstileSecretKey: z.string().optional(),
@@ -90,10 +91,25 @@ const envSchema = z
                 "[config] BETTER_AUTH_SECRET missing or too short; using dev default. Set a 32+ character secret in .env for production.",
             )
         }
+        const orderSuccessTokenRaw = data.orderSuccessTokenSecret?.trim()
+        const orderSuccessTokenSecret =
+            orderSuccessTokenRaw && orderSuccessTokenRaw.length >= 16
+                ? orderSuccessTokenRaw
+                : data.nodeEnv === "development"
+                  ? "dev-order-success-token-secret-32chars"
+                  : undefined
+        if (
+            data.nodeEnv === "development" &&
+            (!orderSuccessTokenRaw || orderSuccessTokenRaw.length < 16)
+        ) {
+            console.warn(
+                "[config] ORDER_SUCCESS_TOKEN_SECRET missing or too short; using dev default. Set 16+ chars in production.",
+            )
+        }
         const siteUrl =
             data.betterAuthUrl?.trim() ||
             (data.vercelUrl ? `https://${data.vercelUrl}` : "http://localhost:3000")
-        return { ...data, databaseUrl, betterAuthSecret, siteUrl }
+        return { ...data, databaseUrl, betterAuthSecret, siteUrl, orderSuccessTokenSecret }
     })
 
 function getEnvInput() {

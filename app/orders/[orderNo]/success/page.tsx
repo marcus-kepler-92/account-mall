@@ -38,7 +38,9 @@ export default async function OrderSuccessPage({ params, searchParams }: PagePro
                             </CardHeader>
                             <CardContent>
                                 <Button asChild className="w-full">
-                                    <Link href="/orders/lookup">去订单查询</Link>
+                                    <Link href={`/orders/lookup?orderNo=${encodeURIComponent(orderNo)}`}>
+                                        去订单查询
+                                    </Link>
                                 </Button>
                             </CardContent>
                         </Card>
@@ -95,7 +97,9 @@ export default async function OrderSuccessPage({ params, searchParams }: PagePro
             <main className="flex-1 px-4 py-8">
                 <div className="mx-auto max-w-2xl space-y-6">
                     <div className="text-center">
-                        <h1 className="text-2xl font-bold">支付成功</h1>
+                        <h1 className="text-2xl font-bold">
+                            {Number(order.amount) === 0 ? "领取成功" : "支付成功"}
+                        </h1>
                         <p className="mt-1 text-muted-foreground">
                             {productName} · 订单号 {orderNo}
                         </p>

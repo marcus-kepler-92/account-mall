@@ -1,5 +1,6 @@
 /**
  * Unit tests for order-success-token: create and verify token, expiry, tampering.
+ * Secret from config (ORDER_SUCCESS_TOKEN_SECRET / BETTER_AUTH_SECRET).
  */
 
 import {
@@ -25,8 +26,7 @@ describe("order-success-token", () => {
     it("verifyOrderSuccessToken returns true for valid token", () => {
         const token = createOrderSuccessToken("ORDER-002")
         expect(token).not.toBeNull()
-        const ok = verifyOrderSuccessToken("ORDER-002", token!)
-        expect(ok).toBe(true)
+        expect(verifyOrderSuccessToken("ORDER-002", token!)).toBe(true)
     })
 
     it("verifyOrderSuccessToken returns false for wrong orderNo", () => {
@@ -48,22 +48,24 @@ describe("order-success-token", () => {
 
     it("createOrderSuccessToken returns null when secret is not configured", () => {
         const config = require("@/lib/config").config
-        const orig = config.orderSuccessTokenSecret
+        const origOrder = config.orderSuccessTokenSecret
+        const origAuth = config.betterAuthSecret
         config.orderSuccessTokenSecret = undefined
         config.betterAuthSecret = "short"
         const token = createOrderSuccessToken("ORDER-006")
         expect(token).toBeNull()
-        config.orderSuccessTokenSecret = orig
-        config.betterAuthSecret = "fallback-secret"
+        config.orderSuccessTokenSecret = origOrder
+        config.betterAuthSecret = origAuth
     })
 
     it("verifyOrderSuccessToken returns false when secret is not configured", () => {
         const config = require("@/lib/config").config
-        const orig = config.orderSuccessTokenSecret
+        const origOrder = config.orderSuccessTokenSecret
+        const origAuth = config.betterAuthSecret
         config.orderSuccessTokenSecret = undefined
         config.betterAuthSecret = "short"
         expect(verifyOrderSuccessToken("ORDER-007", "123.abc")).toBe(false)
-        config.orderSuccessTokenSecret = orig
-        config.betterAuthSecret = "fallback-secret"
+        config.orderSuccessTokenSecret = origOrder
+        config.betterAuthSecret = origAuth
     })
 })

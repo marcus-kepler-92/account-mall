@@ -22,7 +22,7 @@ function base64UrlDecode(str: string): Buffer {
 
 /**
  * Create a short-lived token for viewing order success page (orderNo + cards).
- * Token is valid for 15 minutes. Returns null if secret is not configured.
+ * Token is valid for 15 minutes. Returns null if ORDER_SUCCESS_TOKEN_SECRET / BETTER_AUTH_SECRET not set or shorter than 16 chars.
  */
 export function createOrderSuccessToken(orderNo: string): string | null {
     const secret = getSecret()
