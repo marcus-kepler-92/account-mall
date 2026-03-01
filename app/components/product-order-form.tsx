@@ -50,6 +50,7 @@ export function ProductOrderForm({
     const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
     const [turnstileWidgetReady, setTurnstileWidgetReady] = useState(false)
     const [claimedAccount, setClaimedAccount] = useState<FreeSharedCardPayload | null>(null)
+    const [freeOrderNoOnly, setFreeOrderNoOnly] = useState<{ orderNo: string } | null>(null)
 
     const router = useRouter()
     const requireTurnstile = Boolean(TURNSTILE_SITE_KEY) && !IS_DEV
@@ -96,7 +97,22 @@ export function ProductOrderForm({
                 })
                 if (data.claimedAccount) {
                     toast.success("领取成功，请复制保存账号信息")
+                    setFreeOrderNoOnly(null)
                     setClaimedAccount(data.claimedAccount)
+                    try {
+                        sessionStorage.setItem(`lookup_prefill_${data.orderNo}`, orderPassword)
+                    } catch {
+                        /* ignore */
+                    }
+                    setLoading(false)
+                    dispatchOrderFormLoading(false)
+                    return
+                }
+                // 免费商品：禁止跳转，仅本页展示卡密或提示去订单查询
+                if (isFreeShared && data.orderNo) {
+                    toast.success("领取已记录")
+                    setClaimedAccount(null)
+                    setFreeOrderNoOnly({ orderNo: data.orderNo })
                     try {
                         sessionStorage.setItem(`lookup_prefill_${data.orderNo}`, orderPassword)
                     } catch {
@@ -273,6 +289,26 @@ export function ProductOrderForm({
                     </Button>
                 </div>
             </form>
+
+            {freeOrderNoOnly && (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 shadow-sm sm:p-5">
+                    <h3 className="mb-3 text-sm font-semibold text-foreground">领取已记录</h3>
+                    <p className="mb-3 text-xs text-muted-foreground">
+                        请使用订单号与查询密码在订单查询中查看卡密。
+                    </p>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                            router.push(
+                                `/orders/lookup?orderNo=${encodeURIComponent(freeOrderNoOnly.orderNo)}`
+                            )
+                        }
+                    >
+                        去订单查询
+                    </Button>
+                </div>
+            )}
 
             {claimedAccount && (
                 <div className="rounded-xl border border-green-500/30 bg-green-500/5 p-4 shadow-sm sm:p-5">
