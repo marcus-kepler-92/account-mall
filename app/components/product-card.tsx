@@ -33,6 +33,7 @@ export type ProductCardData = {
     image: string | null
     price: number
     stock: number
+    productType?: "NORMAL" | "FREE_SHARED"
     tags: { id: string; name: string; slug: string }[]
 }
 
@@ -50,7 +51,8 @@ export function ProductCard({ product, gradientIndex = 0, className }: ProductCa
     const descriptionFallback = descriptionToPlainText(product.description, 80)
     const briefRaw = product.summary?.trim() || descriptionFallback
     const brief = briefRaw.slice(0, 80)
-    const isSoldOut = product.stock === 0
+    const isFreeShared = product.productType === "FREE_SHARED"
+    const isSoldOut = !isFreeShared && product.stock === 0
     const productSlug = `${product.id}-${product.slug}`
 
     const detailHref = isSoldOut
@@ -131,22 +133,33 @@ export function ProductCard({ product, gradientIndex = 0, className }: ProductCa
                 <CardFooter className="shrink-0 border-t px-4 py-3">
                     <div className="flex w-full items-center justify-between gap-3">
                         <div className="min-w-0 flex-1">
-                            <span
-                                className={cn(
-                                    "text-lg font-bold tabular-nums",
-                                    isSoldOut && "text-muted-foreground line-through"
-                                )}
-                            >
-                                ¥{product.price.toFixed(2)}
-                            </span>
-                            {product.stock > 0 ? (
-                                <span className="ml-1.5 block text-[11px] text-muted-foreground">
-                                    库存 {product.stock}
-                                </span>
+                            {isFreeShared ? (
+                                <>
+                                    <span className="text-lg font-bold tabular-nums text-primary">免费</span>
+                                    <span className="ml-1.5 block text-[11px] text-muted-foreground">
+                                        可领取
+                                    </span>
+                                </>
                             ) : (
-                                <span className="ml-1.5 block text-[11px] text-muted-foreground">
-                                    已售罄
-                                </span>
+                                <>
+                                    <span
+                                        className={cn(
+                                            "text-lg font-bold tabular-nums",
+                                            isSoldOut && "text-muted-foreground line-through"
+                                        )}
+                                    >
+                                        ¥{product.price.toFixed(2)}
+                                    </span>
+                                    {product.stock > 0 ? (
+                                        <span className="ml-1.5 block text-[11px] text-muted-foreground">
+                                            库存 {product.stock}
+                                        </span>
+                                    ) : (
+                                        <span className="ml-1.5 block text-[11px] text-muted-foreground">
+                                            已售罄
+                                        </span>
+                                    )}
+                                </>
                             )}
                         </div>
                         <Button size="sm" className="shrink-0" disabled={false}>
@@ -155,6 +168,8 @@ export function ProductCard({ product, gradientIndex = 0, className }: ProductCa
                                     <Bell className="size-3.5" />
                                     补货提醒
                                 </>
+                            ) : isFreeShared ? (
+                                "领取"
                             ) : (
                                 "购买"
                             )}

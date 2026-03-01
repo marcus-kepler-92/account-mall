@@ -96,7 +96,8 @@ export default async function ProductDetailPage({ params }: PageProps) {
         where: { productId: product.id, status: "UNSOLD" },
     })
 
-    const isSoldOut = stockCount === 0
+    const isFreeShared = product.productType === "FREE_SHARED"
+    const isSoldOut = !isFreeShared && stockCount === 0
     const priceNumber = Number(product.price)
 
     const productUrl = `${config.siteUrl}/products/${product.id}-${product.slug}`
@@ -160,6 +161,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
                             price={priceNumber}
                             stockCount={stockCount}
                             isSoldOut={isSoldOut}
+                            isFreeShared={isFreeShared}
                         />
 
                         <ProductMetaNoticeSection />
@@ -168,10 +170,11 @@ export default async function ProductDetailPage({ params }: PageProps) {
                             <ProductOrderForm
                                 productId={product.id}
                                 productName={product.name}
-                                maxQuantity={product.maxQuantity}
+                                maxQuantity={isFreeShared ? 1 : product.maxQuantity}
                                 price={priceNumber}
                                 inStock={!isSoldOut}
                                 formId="product-order-form"
+                                productType={product.productType}
                             />
                         </section>
 
@@ -193,6 +196,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
                 orderSectionId="order-section"
                 restockSectionId={isSoldOut ? "restock-section" : undefined}
                 formId="product-order-form"
+                isFreeShared={isFreeShared}
             />
         </div>
     )
@@ -246,9 +250,10 @@ type ProductInfoSectionProps = {
     price: number
     stockCount: number
     isSoldOut: boolean
+    isFreeShared?: boolean
 }
 
-function ProductInfoSection({ name, tags, price, stockCount, isSoldOut }: ProductInfoSectionProps) {
+function ProductInfoSection({ name, tags, price, stockCount, isSoldOut, isFreeShared }: ProductInfoSectionProps) {
     return (
         <section
             aria-labelledby="product-info-heading"
@@ -276,22 +281,35 @@ function ProductInfoSection({ name, tags, price, stockCount, isSoldOut }: Produc
                 </h1>
                 <div className="flex items-end justify-between gap-3">
                     <div className="flex items-baseline gap-2">
-                        <span
-                            className={cn(
-                                "text-2xl font-bold tabular-nums lg:text-3xl",
-                                isSoldOut && "text-muted-foreground line-through"
-                            )}
-                        >
-                            ¥{price.toFixed(2)}
-                        </span>
-                        {isSoldOut ? (
-                            <Badge variant="outline" className="text-xs font-normal">
-                                已售罄
-                            </Badge>
+                        {isFreeShared ? (
+                            <>
+                                <span className="text-2xl font-bold tabular-nums text-primary lg:text-3xl">
+                                    免费
+                                </span>
+                                <Badge variant="secondary" className="text-xs font-normal">
+                                    免费共享
+                                </Badge>
+                            </>
                         ) : (
-                            <span className="text-xs text-muted-foreground">
-                                库存 {stockCount} 件
-                            </span>
+                            <>
+                                <span
+                                    className={cn(
+                                        "text-2xl font-bold tabular-nums lg:text-3xl",
+                                        isSoldOut && "text-muted-foreground line-through"
+                                    )}
+                                >
+                                    ¥{price.toFixed(2)}
+                                </span>
+                                {isSoldOut ? (
+                                    <Badge variant="outline" className="text-xs font-normal">
+                                        已售罄
+                                    </Badge>
+                                ) : (
+                                    <span className="text-xs text-muted-foreground">
+                                        库存 {stockCount} 件
+                                    </span>
+                                )}
+                            </>
                         )}
                     </div>
                 </div>

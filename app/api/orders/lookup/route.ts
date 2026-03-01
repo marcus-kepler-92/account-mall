@@ -8,6 +8,7 @@ import { createOrderSuccessToken } from "@/lib/order-success-token"
 import { checkOrderQueryRateLimit } from "@/lib/rate-limit"
 import { invalidJsonBody, validationError, badRequest, internalServerError } from "@/lib/api-response"
 import { config } from "@/lib/config"
+import { parseFreeSharedCardContent } from "@/lib/free-shared-card"
 
 type LookupBody = z.infer<typeof publicOrderLookupSchema>
 type OrderStatus = z.infer<typeof orderStatusSchema>
@@ -34,8 +35,19 @@ interface LookupResponsePending extends LookupResponseBase {
     expiresAt?: string
 }
 
+/** 卡密：普通为 content；免费共享为 content(JSON) + account/password/region/lastCheckedAt/installStatus */
 interface LookupResponseCompleted extends LookupResponseBase {
-    cards: Array<{ content: string }>
+    cards: Array<
+        | { content: string }
+        | {
+              content: string
+              account: string
+              password: string
+              region: string
+              lastCheckedAt?: string
+              installStatus?: string
+          }
+    >
     successToken?: string
 }
 
@@ -116,9 +128,15 @@ export async function POST(request: NextRequest) {
 
         // For COMPLETED/CLOSED orders, return cards and optional successToken for redirect to success page
         type CardRow = { content: string; status: string }
-        const cards: Array<{ content: string }> = (order.cards as CardRow[])
+        const cards = (order.cards as CardRow[])
             .filter((card: CardRow) => card.status === "SOLD" || card.status === "RESERVED")
-            .map((card: CardRow) => ({ content: card.content }))
+            .map((card: CardRow) => {
+                const payload = parseFreeSharedCardContent(card.content)
+                if (payload) {
+                    return { content: card.content, ...payload }
+                }
+                return { content: card.content }
+            })
 
         const successToken = createOrderSuccessToken(order.orderNo)
         const payload: LookupResponseCompleted = {

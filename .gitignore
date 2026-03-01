@@ -43,3 +43,6 @@ next-env.d.ts
 /app/generated/prisma
 playwright-report/index.html
 test-results/.last-run.json
+
+# scraper debug dump
+scripts/sample-share-page.html

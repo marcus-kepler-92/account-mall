@@ -13,6 +13,8 @@ import {
 } from "@/lib/rate-limit"
 import { config } from "@/lib/config"
 import { verifyTurnstileToken } from "@/lib/turnstile"
+import { scrapeSharedAccounts } from "@/lib/scrape-shared-accounts"
+import { sharedAccountToCardPayload, toCardContentJson } from "@/lib/free-shared-card"
 import { unauthorized, validationError, badRequest, invalidJsonBody, notFound, internalServerError } from "@/lib/api-response"
 
 /**
@@ -21,6 +23,104 @@ import { unauthorized, validationError, badRequest, invalidJsonBody, notFound, i
  */
 export function generateOrderNo(): string {
     return randomUUID()
+}
+
+type ProductForFreeShared = {
+    id: string
+    sourceUrl: string | null
+    productType: string | null
+}
+
+/**
+ * 免费共享领取：校验、限流、爬取、建单+卡密，返回 JSON 或错误 Response。
+ */
+async function createFreeSharedOrder(params: {
+    productId: string
+    product: ProductForFreeShared
+    email: string
+    orderPassword: string
+    clientIp: string
+}): Promise<NextResponse> {
+    const { productId, product, email, orderPassword, clientIp } = params
+    if (!product.sourceUrl?.trim()) {
+        return badRequest("该商品未配置爬取来源，无法领取。")
+    }
+    if (config.nodeEnv !== "development") {
+        const cooldownMs = config.freeSharedCooldownHours * 60 * 60 * 1000
+        const since = new Date(Date.now() - cooldownMs)
+        const emailLower = email.trim().toLowerCase()
+        const recentCount = await prisma.order.count({
+            where: {
+                productId,
+                status: "COMPLETED",
+                amount: { equals: 0 },
+                createdAt: { gte: since },
+                ...(clientIp !== "unknown"
+                    ? { OR: [{ clientIp }, { email: emailLower }] }
+                    : { email: emailLower }),
+            },
+        })
+        if (recentCount >= 1) {
+            return NextResponse.json(
+                {
+                    error: `免费领取限流：同一商品 ${config.freeSharedCooldownHours} 小时内仅可领取 1 次，请稍后再试。`,
+                },
+                { status: 429 }
+            )
+        }
+    }
+
+    const scrapedList = await scrapeSharedAccounts(product.sourceUrl)
+    if (config.nodeEnv === "development") {
+        console.log("[免费共享] 爬取到的全部账号数据:", JSON.stringify(scrapedList, null, 2))
+    }
+    if (scrapedList.length === 0) {
+        return badRequest("暂无可领取账号，请稍后再试。")
+    }
+
+    const picked = scrapedList[Math.floor(Math.random() * scrapedList.length)]
+    const payload = sharedAccountToCardPayload(picked)
+    const cardContent = toCardContentJson(payload)
+    const passwordHash = await hashPassword(orderPassword)
+
+    let freeOrder: { orderNo: string }
+    try {
+        freeOrder = await prisma.$transaction(async (tx) => {
+            const orderNo = generateOrderNo()
+            const newOrder = await tx.order.create({
+                data: {
+                    orderNo,
+                    productId,
+                    email: email.trim().toLowerCase(),
+                    passwordHash,
+                    quantity: 1,
+                    amount: 0,
+                    status: "COMPLETED",
+                    paidAt: new Date(),
+                    ...(clientIp !== "unknown" && { clientIp }),
+                },
+            })
+            await tx.card.create({
+                data: {
+                    productId,
+                    content: cardContent,
+                    status: "SOLD",
+                    orderId: newOrder.id,
+                },
+            })
+            return { orderNo: newOrder.orderNo }
+        })
+    } catch (err) {
+        console.error("[免费共享] 创建订单失败:", err)
+        return internalServerError("领取失败，请稍后重试。")
+    }
+
+    return NextResponse.json({
+        orderNo: freeOrder.orderNo,
+        amount: 0,
+        paymentUrl: null,
+        claimedAccount: payload,
+    })
 }
 
 /**
@@ -225,7 +325,16 @@ export async function POST(request: NextRequest) {
 
     const product = await prisma.product.findUnique({
         where: { id: productId },
-        select: { id: true, name: true, price: true, maxQuantity: true, status: true },
+        select: {
+            id: true,
+            name: true,
+            price: true,
+            maxQuantity: true,
+            status: true,
+            // @ts-expect-error - productType/sourceUrl in schema; run npx prisma generate if types are stale
+            productType: true,
+            sourceUrl: true,
+        },
     })
 
     if (!product || product.status !== "ACTIVE") {
@@ -236,6 +345,23 @@ export async function POST(request: NextRequest) {
         return badRequest(`Quantity must be between 1 and ${product.maxQuantity}`)
     }
 
+    // ─── 免费共享：实时爬取，随机取一个账号，单次领取；按 IP 限流防刷 ─────────────
+    const productWithType = product as unknown as ProductForFreeShared
+    const isFreeShared = productWithType.productType === "FREE_SHARED"
+    if (isFreeShared) {
+        if (quantity !== 1) {
+            return badRequest("免费共享账号每次只能领取 1 个。")
+        }
+        return createFreeSharedOrder({
+            productId,
+            product: productWithType,
+            email,
+            orderPassword,
+            clientIp,
+        })
+    }
+
+    // ─── 普通商品：校验库存与金额 ─────────────────────────────────────────────
     const unsoldCount = await prisma.card.count({
         where: { productId, status: "UNSOLD" },
     })

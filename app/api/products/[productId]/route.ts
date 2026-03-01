@@ -81,29 +81,37 @@ export async function PUT(
         return notFound("Product not found");
     }
 
-    const { tagIds, ...data } = parsed.data;
+    const { tagIds, productType, sourceUrl, price, ...rest } = parsed.data;
 
     // Check slug uniqueness if updating slug
-    if (data.slug && data.slug !== existing.slug) {
+    if (rest.slug && rest.slug !== existing.slug) {
         const slugExists = await prisma.product.findUnique({
-            where: { slug: data.slug },
+            where: { slug: rest.slug },
         });
         if (slugExists) {
             return conflict("A product with this slug already exists");
         }
     }
 
+    const isFreeShared = productType === "FREE_SHARED";
+    const updateData: Record<string, unknown> = {
+        ...rest,
+        ...(price !== undefined && { price: isFreeShared ? 0 : price }),
+        ...(productType !== undefined && { productType }),
+        ...(sourceUrl !== undefined && {
+            sourceUrl: isFreeShared && sourceUrl?.trim() ? sourceUrl.trim() : (isFreeShared ? null : sourceUrl ?? undefined),
+        }),
+        ...(tagIds !== undefined && {
+            tags: { set: tagIds.map((id) => ({ id })) },
+        }),
+    };
+    if (isFreeShared && updateData.price !== 0) {
+        updateData.price = 0;
+    }
+
     const product = await prisma.product.update({
         where: { id: productId },
-        data: {
-            ...data,
-            // If tagIds is provided, replace all tags
-            ...(tagIds !== undefined && {
-                tags: {
-                    set: tagIds.map((id) => ({ id })),
-                },
-            }),
-        },
+        data: updateData as Parameters<typeof prisma.product.update>[0]["data"],
         include: {
             tags: {
                 select: { id: true, name: true, slug: true },

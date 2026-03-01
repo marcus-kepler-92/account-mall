@@ -38,6 +38,14 @@ const envSchema = z
         orderSuccessTokenSecret: z.string().optional(),
         turnstileSiteKey: z.string().optional(),
         turnstileSecretKey: z.string().optional(),
+        /** 免费共享：爬取结果缓存时间（毫秒），同一 sourceUrl 在此时间内复用 */
+        freeSharedScrapeCacheTtlMs: z.coerce.number().int().min(0).default(60_000),
+        /** 免费共享：爬取请求超时（毫秒） */
+        freeSharedScrapeTimeoutMs: z.coerce.number().int().positive().default(15_000),
+        /** 免费共享：爬取请求 User-Agent（可选，默认常见 Chrome） */
+        freeSharedScrapeUserAgent: z.string().optional(),
+        /** 免费共享：同一 IP/邮箱 同一商品 领取冷却时间（小时），仅生产/测试环境生效 */
+        freeSharedCooldownHours: z.coerce.number().positive().default(1),
     })
     .transform((data) => {
         const urlFromEnv = data.databaseUrl?.trim()
@@ -118,6 +126,10 @@ function getEnvInput() {
         orderSuccessTokenSecret: e.ORDER_SUCCESS_TOKEN_SECRET,
         turnstileSiteKey: e.TURNSTILE_SITE_KEY,
         turnstileSecretKey: e.TURNSTILE_SECRET_KEY,
+        freeSharedScrapeCacheTtlMs: e.FREE_SHARED_SCRAPE_CACHE_TTL_MS,
+        freeSharedScrapeTimeoutMs: e.FREE_SHARED_SCRAPE_TIMEOUT_MS,
+        freeSharedScrapeUserAgent: e.FREE_SHARED_SCRAPE_USER_AGENT,
+        freeSharedCooldownHours: e.FREE_SHARED_COOLDOWN_HOURS,
     }
 }
 

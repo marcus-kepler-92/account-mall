@@ -14,15 +14,18 @@ import { useSiteName } from "@/app/components/site-name-provider"
 import { Copy, Check, Eye, EyeOff, Loader2, Mail, Hash, AlertCircle, Package, Search, Zap, CreditCard } from "lucide-react"
 import { toast } from "sonner"
 import { addOrUpdateOrder } from "@/lib/order-history-storage"
+import { type FreeSharedCardPayload, isFreeSharedCard } from "@/lib/free-shared-card"
 
 const LOOKUP_PREFILL_KEY_PREFIX = "lookup_prefill_"
+
+type CardItem = { content: string } | (FreeSharedCardPayload & { content: string })
 
 interface OrderResult {
     orderNo: string
     productName: string
     createdAt: string
     status: "PENDING" | "COMPLETED" | "CLOSED"
-    cards: Array<{ content: string }>
+    cards: CardItem[]
     isPending?: boolean
     /** 未超时、可继续支付（仅 PENDING 时有意义） */
     canPay?: boolean
@@ -310,9 +313,20 @@ function OrderLookupPageContent() {
     const copyAllCards = async () => {
         if (!result || result.cards.length === 0) return
 
-        const allCards = result.cards.map((card) => card.content).join("\n")
+        const lines = result.cards.map((card) =>
+            isFreeSharedCard(card)
+                ? [
+                      `账号: ${card.account}`,
+                      `密码: ${card.password}`,
+                      `地区: ${card.region}`,
+                      ...(card.lastCheckedAt ? [`上次检查: ${card.lastCheckedAt}`] : []),
+                      ...(card.installStatus ? [`装好状态: ${card.installStatus}`] : []),
+                  ].join("\n")
+                : card.content
+        )
+        const text = lines.join("\n\n")
         try {
-            await navigator.clipboard.writeText(allCards)
+            await navigator.clipboard.writeText(text)
             toast.success(`已复制 ${result.cards.length} 条卡密`)
         } catch {
             toast.error("复制失败，请手动复制")
@@ -752,29 +766,84 @@ function OrderLookupPageContent() {
                                             </Button>
                                         </div>
                                         <div className="space-y-1.5">
-                                            {result.cards.map((card, index) => (
-                                                <div
-                                                    key={index}
-                                                    className="group flex items-center gap-2 rounded-lg border bg-background p-2 transition-colors hover:bg-muted/50"
-                                                >
-                                                    <code className="flex-1 font-mono text-xs break-all select-all">
-                                                        {card.content}
-                                                    </code>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="size-7 shrink-0 opacity-60 group-hover:opacity-100 transition-opacity"
-                                                        onClick={() => copyCard(card.content, index)}
-                                                        aria-label={`复制第 ${index + 1} 条卡密`}
+                                            {result.cards.map((card, index) =>
+                                                isFreeSharedCard(card) ? (
+                                                    <div
+                                                        key={index}
+                                                        className="rounded-lg border bg-background p-3 space-y-2"
                                                     >
-                                                        {copiedIndex === index ? (
-                                                            <Check className="size-3.5 text-green-600" />
-                                                        ) : (
-                                                            <Copy className="size-3.5" />
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            <span className="text-xs text-muted-foreground">账号</span>
+                                                            <code className="flex-1 min-w-0 truncate font-mono text-xs text-right">
+                                                                {card.account}
+                                                            </code>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className="shrink-0 h-7"
+                                                                onClick={() => copyCard(card.account, index)}
+                                                            >
+                                                                复制
+                                                            </Button>
+                                                        </div>
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            <span className="text-xs text-muted-foreground">密码</span>
+                                                            <code className="flex-1 min-w-0 truncate font-mono text-xs text-right">
+                                                                {card.password}
+                                                            </code>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className="shrink-0 h-7"
+                                                                onClick={() => copyCard(card.password, index)}
+                                                            >
+                                                                复制
+                                                            </Button>
+                                                        </div>
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            <span className="text-xs text-muted-foreground">地区</span>
+                                                            <span className="text-sm">{card.region}</span>
+                                                        </div>
+                                                        {card.lastCheckedAt != null && card.lastCheckedAt !== "" && (
+                                                            <div className="flex items-center justify-between gap-2">
+                                                                <span className="text-xs text-muted-foreground">上次检查</span>
+                                                                <span className="text-sm">{card.lastCheckedAt}</span>
+                                                            </div>
                                                         )}
-                                                    </Button>
-                                                </div>
-                                            ))}
+                                                        {card.installStatus != null && card.installStatus !== "" && (
+                                                            <div className="flex items-center justify-between gap-2">
+                                                                <span className="text-xs text-muted-foreground">装好状态</span>
+                                                                <span className="text-sm">{card.installStatus}</span>
+                                                            </div>
+                                                        )}
+                                                        <div className="mt-2 rounded border border-amber-500/20 bg-amber-500/5 px-2 py-1.5 text-[11px] text-muted-foreground">
+                                                            若无法使用可返回商品页重新领取；仅用于 App Store，请勿在设置或 iCloud 登录。
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div
+                                                        key={index}
+                                                        className="group flex items-center gap-2 rounded-lg border bg-background p-2 transition-colors hover:bg-muted/50"
+                                                    >
+                                                        <code className="flex-1 font-mono text-xs break-all select-all">
+                                                            {card.content}
+                                                        </code>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="size-7 shrink-0 opacity-60 group-hover:opacity-100 transition-opacity"
+                                                            onClick={() => copyCard(card.content, index)}
+                                                            aria-label={`复制第 ${index + 1} 条卡密`}
+                                                        >
+                                                            {copiedIndex === index ? (
+                                                                <Check className="size-3.5 text-green-600" />
+                                                            ) : (
+                                                                <Copy className="size-3.5" />
+                                                            )}
+                                                        </Button>
+                                                    </div>
+                                                )
+                                            )}
                                         </div>
                                     </div>
                                 )}

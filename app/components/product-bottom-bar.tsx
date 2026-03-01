@@ -13,6 +13,7 @@ type ProductBottomBarProps = {
     orderSectionId: string
     restockSectionId?: string
     formId?: string
+    isFreeShared?: boolean
 }
 
 export function ProductBottomBar({
@@ -21,6 +22,7 @@ export function ProductBottomBar({
     orderSectionId,
     restockSectionId,
     formId,
+    isFreeShared,
 }: ProductBottomBarProps) {
     const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -68,7 +70,7 @@ export function ProductBottomBar({
                                 !inStock && "text-muted-foreground line-through"
                             )}
                         >
-                            ¥{price.toFixed(2)}
+                            {isFreeShared ? "免费" : `¥${price.toFixed(2)}`}
                         </span>
                         {!inStock && (
                             <span className="mt-0.5 text-[11px] text-muted-foreground">
@@ -87,7 +89,7 @@ export function ProductBottomBar({
                     {showSubmitState && (
                         <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
                     )}
-                    {showSubmitState ? "提交中…" : inStock ? "立即购买" : "补货提醒"}
+                    {showSubmitState ? "提交中…" : inStock ? (isFreeShared ? "领取" : "立即购买") : "补货提醒"}
                 </Button>
             </div>
         </div>

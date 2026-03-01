@@ -83,6 +83,11 @@ enum RestockSubscriptionStatus {
   CANCELLED
 }
 
+enum ProductType {
+  NORMAL
+  FREE_SHARED
+}
+
 model Product {
   id          String        @id @default(cuid())
   name        String
@@ -93,6 +98,8 @@ model Product {
   price       Decimal       @db.Decimal(10, 2)
   maxQuantity Int           @default(10)
   status      ProductStatus @default(ACTIVE)
+  productType ProductType   @default(NORMAL)
+  sourceUrl   String?       @db.Text
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
   cards              Card[]

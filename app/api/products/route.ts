@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
         prisma.product.count({ where }),
     ]);
 
-    // Also get unsold card counts for stock display
+    // Also get unsold card counts for stock display (FREE_SHARED 无预存卡密，stock 仅用于展示，前端按 productType 判断可领取)
     const productsWithStock = await Promise.all(
         products.map(async (product) => {
             const unsoldCount = await prisma.card.count({
@@ -95,11 +95,15 @@ export async function GET(request: NextRequest) {
                     status: "UNSOLD",
                 },
             });
-
+            const isFreeShared = product.productType === "FREE_SHARED";
             return {
                 ...product,
                 price: Number(product.price),
                 stock: unsoldCount,
+                productType: product.productType ?? "NORMAL",
+                sourceUrl: product.sourceUrl ?? null,
+                // 免费共享在列表里按「有货」展示，不依赖库存数
+                ...(isFreeShared && { stock: 1 }),
             };
         })
     );
@@ -140,7 +144,7 @@ export async function POST(request: NextRequest) {
         return validationError(parsed.error.flatten());
     }
 
-    const { name, slug, description, summary, image, price, maxQuantity, status, tagIds } =
+    const { name, slug, description, summary, image, price, maxQuantity, status, tagIds, productType, sourceUrl } =
         parsed.data;
 
     // Check slug uniqueness
@@ -151,6 +155,10 @@ export async function POST(request: NextRequest) {
         return conflict("A product with this slug already exists");
     }
 
+    const isFreeShared = productType === "FREE_SHARED";
+    const finalPrice = isFreeShared ? 0 : price;
+    const finalSourceUrl = isFreeShared && sourceUrl?.trim() ? sourceUrl.trim() : null;
+
     const product = await prisma.product.create({
         data: {
             name,
@@ -158,9 +166,11 @@ export async function POST(request: NextRequest) {
             description: description ?? null,
             summary: summary ?? null,
             image: image ?? null,
-            price,
+            price: finalPrice,
             maxQuantity: maxQuantity ?? 10,
             status: status ?? "ACTIVE",
+            productType: productType ?? "NORMAL",
+            sourceUrl: finalSourceUrl,
             tags:
                 tagIds && tagIds.length > 0
                     ? { connect: tagIds.map((id) => ({ id })) }

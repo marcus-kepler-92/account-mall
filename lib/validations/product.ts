@@ -3,6 +3,8 @@ import { z } from "zod";
 // Slug format: lowercase alphanumeric with hyphens
 const slugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
+const productTypeEnum = z.enum(["NORMAL", "FREE_SHARED"]);
+
 export const createProductSchema = z.object({
     name: z.string().min(1, "Name is required").max(200, "Name is too long"),
     slug: z
@@ -13,11 +15,18 @@ export const createProductSchema = z.object({
     description: z.string().max(5000).optional(),
     summary: z.string().max(300).optional(),
     image: z.string().nullable().optional(),
-    price: z.number().positive("Price must be positive"),
+    price: z.number().min(0, "Price must be non-negative"),
     maxQuantity: z.number().int().min(1, "Must be at least 1").max(1000).optional(),
     status: z.enum(["ACTIVE", "INACTIVE"]).optional(),
+    productType: productTypeEnum.optional(),
+    sourceUrl: z.string().url().optional().nullable().or(z.literal("")),
     tagIds: z.array(z.string()).optional(),
-});
+}).refine(
+    (data) =>
+        data.productType !== "FREE_SHARED" ||
+        (data.price === 0 && (data.sourceUrl?.trim()?.length ?? 0) > 0),
+    { message: "Free shared product must have price 0 and a source URL", path: ["sourceUrl"] }
+);
 
 export const updateProductSchema = z.object({
     name: z.string().min(1, "Name is required").max(200).optional(),
@@ -30,11 +39,16 @@ export const updateProductSchema = z.object({
     description: z.string().max(5000).nullable().optional(),
     summary: z.string().max(300).nullable().optional(),
     image: z.string().nullable().optional(),
-    price: z.number().positive("Price must be positive").optional(),
+    price: z.number().min(0, "Price must be non-negative").optional(),
     maxQuantity: z.number().int().min(1).max(1000).optional(),
     status: z.enum(["ACTIVE", "INACTIVE"]).optional(),
+    productType: productTypeEnum.optional(),
+    sourceUrl: z.string().url().optional().nullable().or(z.literal("")),
     tagIds: z.array(z.string()).optional(),
-});
+}).refine(
+    (data) => data.productType !== "FREE_SHARED" || (data.price === undefined || data.price === 0),
+    { message: "Free shared product must have price 0", path: ["price"] }
+);
 
 export const createTagSchema = z.object({
     name: z.string().min(1, "Tag name is required").max(50, "Tag name is too long"),
@@ -52,16 +66,21 @@ export const productFormSchema = z.object({
     summary: z.string().max(300).optional(),
     image: z.string().optional(),
     price: z.string().min(1, "请输入价格").refine(
-        (v) => !Number.isNaN(parseFloat(v)) && parseFloat(v) > 0,
-        "价格必须大于 0"
+        (v) => !Number.isNaN(parseFloat(v)) && parseFloat(v) >= 0,
+        "价格不能为负数"
     ),
     maxQuantity: z.string().refine(
         (v) => v === "" || (!Number.isNaN(parseInt(v, 10)) && parseInt(v, 10) >= 1 && parseInt(v, 10) <= 1000),
         "数量必须在 1-1000 之间"
     ),
     isActive: z.boolean(),
+    productType: z.enum(["NORMAL", "FREE_SHARED"]).optional(),
+    sourceUrl: z.string().optional(),
     tagIds: z.array(z.string()).optional(),
-});
+}).refine(
+    (data) => data.productType !== "FREE_SHARED" || (data.sourceUrl?.trim()?.length ?? 0) > 0,
+    { message: "免费共享商品必须填写爬取来源 URL", path: ["sourceUrl"] }
+);
 
 export type CreateProductInput = z.infer<typeof createProductSchema>;
 export type UpdateProductInput = z.infer<typeof updateProductSchema>;

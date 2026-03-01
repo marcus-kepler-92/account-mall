@@ -44,6 +44,8 @@ type ProductData = {
     price: number
     maxQuantity: number
     status: string
+    productType?: "NORMAL" | "FREE_SHARED"
+    sourceUrl?: string | null
     tags: Tag[]
 }
 
@@ -75,6 +77,8 @@ export function ProductForm({
             price: product ? String(product.price) : "",
             maxQuantity: product ? String(product.maxQuantity) : "10",
             isActive: product ? product.status === "ACTIVE" : true,
+            productType: product?.productType ?? "NORMAL",
+            sourceUrl: product?.sourceUrl ?? "",
             tagIds: product?.tags.map((t) => t.id) ?? [],
         },
     })
@@ -84,7 +88,9 @@ export function ProductForm({
     watch("slug")
     const imageValue = watch("image")
     const isActive = watch("isActive")
+    const productType = watch("productType") ?? "NORMAL"
     const tagIds = watch("tagIds") ?? []
+    const isFreeShared = productType === "FREE_SHARED"
 
     // Convert uploaded file to base64
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -186,9 +192,11 @@ export function ProductForm({
             description: data.description?.trim() || undefined,
             summary: data.summary?.trim() || null,
             image: data.image || null,
-            price: parseFloat(data.price),
+            price: isFreeShared ? 0 : parseFloat(data.price),
             maxQuantity: data.maxQuantity === "" ? 10 : parseInt(data.maxQuantity, 10),
             status: data.isActive ? "ACTIVE" : "INACTIVE",
+            productType: data.productType ?? "NORMAL",
+            sourceUrl: isFreeShared ? (data.sourceUrl?.trim() || null) : null,
             tagIds: data.tagIds ?? [],
         }
 
@@ -347,6 +355,51 @@ export function ProductForm({
                                 <CardTitle>价格与限制</CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label>商品类型</Label>
+                                    <div className="flex gap-4">
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input
+                                                type="radio"
+                                                value="NORMAL"
+                                                {...register("productType")}
+                                            />
+                                            <span>普通商品</span>
+                                        </label>
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input
+                                                type="radio"
+                                                value="FREE_SHARED"
+                                                {...register("productType")}
+                                                onChange={(e) => {
+                                                    register("productType").onChange(e)
+                                                    if (e.target.value === "FREE_SHARED") setValue("price", "0")
+                                                }}
+                                            />
+                                            <span>免费共享</span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                {isFreeShared && (
+                                    <div className="space-y-2">
+                                        <Label htmlFor="sourceUrl">
+                                            爬取来源 URL <span className="text-destructive">*</span>
+                                        </Label>
+                                        <Input
+                                            id="sourceUrl"
+                                            {...register("sourceUrl")}
+                                            placeholder="https://example.com/share/xxx"
+                                        />
+                                        {errors.sourceUrl && (
+                                            <p className="text-sm text-destructive">{errors.sourceUrl.message}</p>
+                                        )}
+                                        <p className="text-xs text-muted-foreground">
+                                            用户领取时从此地址爬取「状态:正常」的账号，随机分配一个
+                                        </p>
+                                    </div>
+                                )}
+
                                 <div className="grid gap-4 sm:grid-cols-2">
                                     <div className="space-y-2">
                                         <Label htmlFor="price">
@@ -356,10 +409,14 @@ export function ProductForm({
                                             id="price"
                                             type="number"
                                             step="0.01"
-                                            min="0.01"
+                                            min={isFreeShared ? "0" : "0.01"}
                                             {...register("price")}
                                             placeholder="0.00"
+                                            disabled={isFreeShared}
                                         />
+                                        {isFreeShared && (
+                                            <p className="text-xs text-muted-foreground">免费共享商品价格固定为 0</p>
+                                        )}
                                         {errors.price && (
                                             <p className="text-sm text-destructive">{errors.price.message}</p>
                                         )}
@@ -373,12 +430,13 @@ export function ProductForm({
                                             min="1"
                                             max="1000"
                                             {...register("maxQuantity")}
+                                            disabled={isFreeShared}
                                         />
                                         {errors.maxQuantity && (
                                             <p className="text-sm text-destructive">{errors.maxQuantity.message}</p>
                                         )}
                                         <p className="text-xs text-muted-foreground">
-                                            单笔订单最多可购买的数量
+                                            {isFreeShared ? "免费共享每次仅可领取 1 个" : "单笔订单最多可购买的数量"}
                                         </p>
                                     </div>
                                 </div>
