@@ -22,10 +22,8 @@ export const createProductSchema = z.object({
     sourceUrl: z.string().url().optional().nullable().or(z.literal("")),
     tagIds: z.array(z.string()).optional(),
 }).refine(
-    (data) =>
-        data.productType !== "FREE_SHARED" ||
-        (data.price === 0 && (data.sourceUrl?.trim()?.length ?? 0) > 0),
-    { message: "Free shared product must have price 0 and a source URL", path: ["sourceUrl"] }
+    (data) => data.productType !== "FREE_SHARED" || data.price === 0,
+    { message: "Free shared product must have price 0", path: ["price"] }
 );
 
 export const updateProductSchema = z.object({
@@ -56,32 +54,39 @@ export const createTagSchema = z.object({
 });
 
 // Form schema for product form (handles string inputs from form fields)
-export const productFormSchema = z.object({
-    name: z.string().min(1, "请输入商品名称").max(200, "商品名称过长"),
-    slug: z
-        .string()
-        .min(1, "请输入 URL 别名")
-        .max(200)
-        .regex(slugRegex, "仅支持小写字母、数字和连字符"),
-    description: z.string().max(5000).optional(),
-    summary: z.string().max(300).optional(),
-    image: z.string().optional(),
-    price: z.string().min(1, "请输入价格").refine(
-        (v) => !Number.isNaN(parseFloat(v)) && parseFloat(v) >= 0,
-        "价格不能为负数"
-    ),
-    maxQuantity: z.string().refine(
-        (v) => v === "" || (!Number.isNaN(parseInt(v, 10)) && parseInt(v, 10) >= 1 && parseInt(v, 10) <= 1000),
-        "数量必须在 1-1000 之间"
-    ),
-    isActive: z.boolean(),
-    productType: z.enum(["NORMAL", "FREE_SHARED"]).optional(),
-    sourceUrl: z.string().optional(),
-    tagIds: z.array(z.string()).optional(),
-}).refine(
-    (data) => data.productType !== "FREE_SHARED" || (data.sourceUrl?.trim()?.length ?? 0) > 0,
-    { message: "免费共享商品必须填写爬取来源 URL", path: ["sourceUrl"] }
-);
+// 免费共享时 price/maxQuantity/sourceUrl 由环境变量提供，表单可不填
+export const productFormSchema = z
+    .object({
+        name: z.string().min(1, "请输入商品名称").max(200, "商品名称过长"),
+        slug: z
+            .string()
+            .min(1, "请输入 URL 别名")
+            .max(200)
+            .regex(slugRegex, "仅支持小写字母、数字和连字符"),
+        description: z.string().max(5000).optional(),
+        summary: z.string().max(300).optional(),
+        image: z.string().optional(),
+        price: z.string().refine(
+            (v) => v === "" || (!Number.isNaN(parseFloat(v)) && parseFloat(v) >= 0),
+            "价格不能为负数"
+        ),
+        maxQuantity: z.string().refine(
+            (v) => v === "" || (!Number.isNaN(parseInt(v, 10)) && parseInt(v, 10) >= 1 && parseInt(v, 10) <= 1000),
+            "数量必须在 1-1000 之间"
+        ),
+        isActive: z.boolean(),
+        productType: z.enum(["NORMAL", "FREE_SHARED"]).optional(),
+        sourceUrl: z.string().optional(),
+        tagIds: z.array(z.string()).optional(),
+    })
+    .superRefine((data, ctx) => {
+        if (data.productType !== "FREE_SHARED") {
+            if (!data.price || data.price === "")
+                ctx.addIssue({ code: z.ZodIssueCode.custom, message: "请输入价格", path: ["price"] })
+            else if (Number.isNaN(parseFloat(data.price)) || parseFloat(data.price) < 0)
+                ctx.addIssue({ code: z.ZodIssueCode.custom, message: "价格不能为负数", path: ["price"] })
+        }
+    });
 
 export type CreateProductInput = z.infer<typeof createProductSchema>;
 export type UpdateProductInput = z.infer<typeof updateProductSchema>;

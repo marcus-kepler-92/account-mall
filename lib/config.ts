@@ -46,6 +46,15 @@ const envSchema = z
         freeSharedScrapeUserAgent: z.string().optional(),
         /** 免费共享：同一 IP/邮箱 同一商品 领取冷却时间（小时），仅生产/测试环境生效 */
         freeSharedCooldownHours: z.coerce.number().positive().default(1),
+        /** 免费共享：爬取来源 URL（环境变量配置，商品表不存；未配置时使用默认地址） */
+        freeSharedSourceUrl: z
+            .string()
+            .optional()
+            .or(z.literal(""))
+            .refine((s) => !s || s === "" || (() => { try { new URL(s); return true } catch { return false } })(), { message: "Invalid URL" })
+            .default("https://id.ali-door.top/share/yedamai"),
+        /** 免费共享：单笔领取数量（固定为 1，可配置） */
+        freeSharedMaxQuantityPerOrder: z.coerce.number().int().min(1).default(1),
     })
     .transform((data) => {
         const urlFromEnv = data.databaseUrl?.trim()
@@ -130,6 +139,8 @@ function getEnvInput() {
         freeSharedScrapeTimeoutMs: e.FREE_SHARED_SCRAPE_TIMEOUT_MS,
         freeSharedScrapeUserAgent: e.FREE_SHARED_SCRAPE_USER_AGENT,
         freeSharedCooldownHours: e.FREE_SHARED_COOLDOWN_HOURS,
+        freeSharedSourceUrl: e.FREE_SHARED_SOURCE_URL,
+        freeSharedMaxQuantityPerOrder: e.FREE_SHARED_MAX_QUANTITY_PER_ORDER,
     }
 }
 

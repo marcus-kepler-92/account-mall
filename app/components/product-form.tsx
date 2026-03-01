@@ -192,11 +192,11 @@ export function ProductForm({
             description: data.description?.trim() || undefined,
             summary: data.summary?.trim() || null,
             image: data.image || null,
-            price: isFreeShared ? 0 : parseFloat(data.price),
-            maxQuantity: data.maxQuantity === "" ? 10 : parseInt(data.maxQuantity, 10),
+            price: isFreeShared ? 0 : (data.price === "" ? undefined : parseFloat(data.price)),
+            maxQuantity: isFreeShared ? 1 : (data.maxQuantity === "" ? 10 : parseInt(data.maxQuantity, 10)),
             status: data.isActive ? "ACTIVE" : "INACTIVE",
             productType: data.productType ?? "NORMAL",
-            sourceUrl: isFreeShared ? (data.sourceUrl?.trim() || null) : null,
+            sourceUrl: isFreeShared ? null : (data.sourceUrl?.trim() || null),
             tagIds: data.tagIds ?? [],
         }
 
@@ -373,7 +373,11 @@ export function ProductForm({
                                                 {...register("productType")}
                                                 onChange={(e) => {
                                                     register("productType").onChange(e)
-                                                    if (e.target.value === "FREE_SHARED") setValue("price", "0")
+                                                    if (e.target.value === "FREE_SHARED") {
+                                                        setValue("price", "0")
+                                                        setValue("maxQuantity", "1")
+                                                        setValue("sourceUrl", "")
+                                                    }
                                                 }}
                                             />
                                             <span>免费共享</span>
@@ -381,65 +385,43 @@ export function ProductForm({
                                     </div>
                                 </div>
 
-                                {isFreeShared && (
-                                    <div className="space-y-2">
-                                        <Label htmlFor="sourceUrl">
-                                            爬取来源 URL <span className="text-destructive">*</span>
-                                        </Label>
-                                        <Input
-                                            id="sourceUrl"
-                                            {...register("sourceUrl")}
-                                            placeholder="https://example.com/share/xxx"
-                                        />
-                                        {errors.sourceUrl && (
-                                            <p className="text-sm text-destructive">{errors.sourceUrl.message}</p>
-                                        )}
-                                        <p className="text-xs text-muted-foreground">
-                                            用户领取时从此地址爬取「状态:正常」的账号，随机分配一个
-                                        </p>
+                                {!isFreeShared && (
+                                    <div className="grid gap-4 sm:grid-cols-2">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="price">
+                                                价格 (¥) <span className="text-destructive">*</span>
+                                            </Label>
+                                            <Input
+                                                id="price"
+                                                type="number"
+                                                step="0.01"
+                                                min="0.01"
+                                                {...register("price")}
+                                                placeholder="0.00"
+                                            />
+                                            {errors.price && (
+                                                <p className="text-sm text-destructive">{errors.price.message}</p>
+                                            )}
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label htmlFor="maxQuantity">单笔最大购买数量</Label>
+                                            <Input
+                                                id="maxQuantity"
+                                                type="number"
+                                                min="1"
+                                                max="1000"
+                                                {...register("maxQuantity")}
+                                            />
+                                            {errors.maxQuantity && (
+                                                <p className="text-sm text-destructive">{errors.maxQuantity.message}</p>
+                                            )}
+                                            <p className="text-xs text-muted-foreground">
+                                                单笔订单最多可购买的数量
+                                            </p>
+                                        </div>
                                     </div>
                                 )}
-
-                                <div className="grid gap-4 sm:grid-cols-2">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="price">
-                                            价格 (¥) <span className="text-destructive">*</span>
-                                        </Label>
-                                        <Input
-                                            id="price"
-                                            type="number"
-                                            step="0.01"
-                                            min={isFreeShared ? "0" : "0.01"}
-                                            {...register("price")}
-                                            placeholder="0.00"
-                                            disabled={isFreeShared}
-                                        />
-                                        {isFreeShared && (
-                                            <p className="text-xs text-muted-foreground">免费共享商品价格固定为 0</p>
-                                        )}
-                                        {errors.price && (
-                                            <p className="text-sm text-destructive">{errors.price.message}</p>
-                                        )}
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label htmlFor="maxQuantity">单笔最大购买数量</Label>
-                                        <Input
-                                            id="maxQuantity"
-                                            type="number"
-                                            min="1"
-                                            max="1000"
-                                            {...register("maxQuantity")}
-                                            disabled={isFreeShared}
-                                        />
-                                        {errors.maxQuantity && (
-                                            <p className="text-sm text-destructive">{errors.maxQuantity.message}</p>
-                                        )}
-                                        <p className="text-xs text-muted-foreground">
-                                            {isFreeShared ? "免费共享每次仅可领取 1 个" : "单笔订单最多可购买的数量"}
-                                        </p>
-                                    </div>
-                                </div>
                             </CardContent>
                         </Card>
 

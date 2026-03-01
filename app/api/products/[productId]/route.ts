@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAdminSession } from "@/lib/auth-guard";
 import { updateProductSchema } from "@/lib/validations/product";
+import { config } from "@/lib/config";
 import { notFound, unauthorized, invalidJsonBody, validationError, conflict } from "@/lib/api-response";
 
 type RouteContext = {
@@ -99,7 +100,7 @@ export async function PUT(
         ...(price !== undefined && { price: isFreeShared ? 0 : price }),
         ...(productType !== undefined && { productType }),
         ...(sourceUrl !== undefined && {
-            sourceUrl: isFreeShared && sourceUrl?.trim() ? sourceUrl.trim() : (isFreeShared ? null : sourceUrl ?? undefined),
+            sourceUrl: isFreeShared ? null : (sourceUrl?.trim() || undefined),
         }),
         ...(tagIds !== undefined && {
             tags: { set: tagIds.map((id) => ({ id })) },
@@ -107,8 +108,10 @@ export async function PUT(
         ...(pinned === true && { pinnedAt: new Date() }),
         ...(pinned === false && { pinnedAt: null }),
     };
-    if (isFreeShared && updateData.price !== 0) {
+    if (isFreeShared) {
         updateData.price = 0;
+        updateData.maxQuantity = config.freeSharedMaxQuantityPerOrder;
+        updateData.sourceUrl = null;
     }
 
     const product = await prisma.product.update({

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAdminSession } from "@/lib/auth-guard";
 import { createProductSchema } from "@/lib/validations/product";
+import { config } from "@/lib/config";
 import { unauthorized, invalidJsonBody, validationError, conflict } from "@/lib/api-response";
 
 /**
@@ -159,7 +160,8 @@ export async function POST(request: NextRequest) {
 
     const isFreeShared = productType === "FREE_SHARED";
     const finalPrice = isFreeShared ? 0 : price;
-    const finalSourceUrl = isFreeShared && sourceUrl?.trim() ? sourceUrl.trim() : null;
+    const finalMaxQuantity = isFreeShared ? config.freeSharedMaxQuantityPerOrder : (maxQuantity ?? 10);
+    const finalSourceUrl = isFreeShared ? null : (sourceUrl?.trim() || null);
 
     const product = await prisma.product.create({
         data: {
@@ -169,7 +171,7 @@ export async function POST(request: NextRequest) {
             summary: summary ?? null,
             image: image ?? null,
             price: finalPrice,
-            maxQuantity: maxQuantity ?? 10,
+            maxQuantity: finalMaxQuantity,
             status: status ?? "ACTIVE",
             productType: productType ?? "NORMAL",
             sourceUrl: finalSourceUrl,

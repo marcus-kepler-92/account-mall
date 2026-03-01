@@ -42,8 +42,9 @@ async function createFreeSharedOrder(params: {
     clientIp: string
 }): Promise<NextResponse> {
     const { productId, product, email, orderPassword, clientIp } = params
-    if (!product.sourceUrl?.trim()) {
-        return badRequest("该商品未配置爬取来源，无法领取。")
+    const sourceUrl = (product.sourceUrl?.trim() || config.freeSharedSourceUrl?.trim()) ?? ""
+    if (!sourceUrl) {
+        return badRequest("未配置免费共享爬取来源（环境变量 FREE_SHARED_SOURCE_URL），无法领取。")
     }
     if (config.nodeEnv !== "development") {
         const cooldownMs = config.freeSharedCooldownHours * 60 * 60 * 1000
@@ -70,7 +71,7 @@ async function createFreeSharedOrder(params: {
         }
     }
 
-    const scrapedList = await scrapeSharedAccounts(product.sourceUrl)
+    const scrapedList = await scrapeSharedAccounts(sourceUrl)
     if (config.nodeEnv === "development") {
         console.log("[免费共享] 爬取到的全部账号数据:", JSON.stringify(scrapedList, null, 2))
     }
@@ -341,17 +342,15 @@ export async function POST(request: NextRequest) {
         return notFound("Product not found or unavailable")
     }
 
-    if (quantity < 1 || quantity > product.maxQuantity) {
-        return badRequest(`Quantity must be between 1 and ${product.maxQuantity}`)
+    const productWithType = product as unknown as ProductForFreeShared
+    const isFreeShared = productWithType.productType === "FREE_SHARED"
+    const maxQty = isFreeShared ? config.freeSharedMaxQuantityPerOrder : product.maxQuantity
+    if (quantity < 1 || quantity > maxQty) {
+        return badRequest(`Quantity must be between 1 and ${maxQty}`)
     }
 
     // ─── 免费共享：实时爬取，随机取一个账号，单次领取；按 IP 限流防刷 ─────────────
-    const productWithType = product as unknown as ProductForFreeShared
-    const isFreeShared = productWithType.productType === "FREE_SHARED"
     if (isFreeShared) {
-        if (quantity !== 1) {
-            return badRequest("免费共享账号每次只能领取 1 个。")
-        }
         return createFreeSharedOrder({
             productId,
             product: productWithType,
