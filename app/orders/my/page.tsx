@@ -124,29 +124,29 @@ function MyOrdersPageContent() {
 
             <SiteHeader />
 
-            <main className="flex-1 px-4 py-6">
-                <div className="mx-auto max-w-4xl">
-                    <h1 className="mb-6 text-xl font-semibold">我的订单</h1>
+            <main className="flex-1 overflow-x-hidden px-4 py-8 sm:px-6">
+                <div className="mx-auto min-w-0 max-w-4xl">
+                    <h1 className="mb-8 text-2xl font-semibold tracking-tight">我的订单</h1>
 
                     {orders.length === 0 ? (
                         <Card>
-                            <CardContent className="flex flex-col items-center justify-center py-12">
+                            <CardContent className="flex flex-col items-center justify-center py-16">
                                 <Package className="size-12 text-muted-foreground" />
-                                <p className="mt-3 text-sm text-muted-foreground">
+                                <p className="mt-4 text-sm text-muted-foreground">
                                     暂无订单记录，下单后将显示在此
                                 </p>
-                                <Button asChild className="mt-4">
+                                <Button asChild className="mt-5">
                                     <Link href="/">去逛逛</Link>
                                 </Button>
                             </CardContent>
                         </Card>
                     ) : (
-                        <div className="grid gap-6 md:grid-cols-[280px_1fr]">
-                            {/* 订单列表 */}
-                            <Card>
-                                <CardHeader className="py-3">
-                                    <CardTitle className="text-sm">订单列表</CardTitle>
-                                </CardHeader>
+                        <div className="grid min-w-0 gap-6 md:grid-cols-[280px_1fr]">
+                            {/* 订单列表：仅标题，不用 CardHeader 的 grid，避免与默认样式冲突 */}
+                            <Card className="min-w-0">
+                                <div className="px-4 pt-4 pb-3 sm:px-5">
+                                    <h2 className="text-base font-semibold leading-none">订单列表</h2>
+                                </div>
                                 <CardContent className="p-0">
                                     <ul className="max-h-[360px] overflow-y-auto">
                                         {orders.map((o) => (
@@ -165,24 +165,24 @@ function MyOrdersPageContent() {
                                                             syncUrlToOrderNo(o.orderNo)
                                                         }
                                                     }}
-                                                    className={`flex w-full cursor-pointer items-center gap-2 px-4 py-3 text-left text-sm hover:bg-accent/50 ${
+                                                    className={`flex w-full cursor-pointer items-center gap-3 px-4 py-3.5 text-left hover:bg-accent/50 sm:px-5 ${
                                                         selectedOrderNo === o.orderNo ? "bg-accent" : ""
                                                     }`}
                                                 >
                                                     <div className="min-w-0 flex-1">
-                                                        <p className="flex items-baseline justify-between gap-2">
+                                                        <p className="flex items-baseline justify-between gap-2 text-sm">
                                                             <span
-                                                                className="min-w-0 truncate font-mono text-xs text-foreground"
+                                                                className="min-w-0 truncate font-mono text-[13px] text-foreground"
                                                                 title={o.orderNo}
                                                             >
                                                                 {o.orderNo}
                                                             </span>
-                                                            <span className="shrink-0 font-medium tabular-nums">
+                                                            <span className="shrink-0 font-semibold tabular-nums">
                                                                 ¥{formatAmount(o.amount)}
                                                             </span>
                                                         </p>
-                                                        <p className="mt-1 flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                                                            <span className="min-w-0 truncate">{o.productName}</span>
+                                                        <p className="mt-1.5 flex min-w-0 items-center justify-between gap-2 text-xs text-muted-foreground">
+                                                            <span className="min-w-0 truncate" title={o.productName}>{o.productName}</span>
                                                             <span className="shrink-0">{formatDateShort(o.createdAt)}</span>
                                                         </p>
                                                     </div>
@@ -204,44 +204,47 @@ function MyOrdersPageContent() {
                             </Card>
 
                             {/* 订单详情 */}
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
+                            <Card className="min-w-0">
+                                <CardHeader className="min-w-0 overflow-hidden px-4 sm:px-6">
+                                    <CardTitle className="flex min-w-0 items-center gap-2 text-base font-semibold">
                                         <Package className="size-5 shrink-0" />
-                                        <span className="min-w-0 truncate">
+                                        <span
+                                            className="min-w-0 truncate"
+                                            title={selected ? `${selected.productName} · ${selected.orderNo}` : undefined}
+                                        >
                                             {selected
                                                 ? `${selected.productName} · ${selected.orderNo}`
                                                 : "订单详情"}
                                         </span>
                                     </CardTitle>
-                                    <CardDescription>
+                                    <CardDescription className="mt-1">
                                         {selected
                                             ? "本地历史记录，点击下方按钮跳转订单查询（输入密码查看卡密）"
                                             : "在左侧选择订单"}
                                     </CardDescription>
                                 </CardHeader>
-                                <CardContent className="space-y-4">
+                                <CardContent className="space-y-5 px-4 sm:px-6">
                                     {selected ? (
                                         <>
-                                            <dl className="grid gap-2 text-sm">
-                                                <div className="flex justify-between gap-4">
-                                                    <dt className="text-muted-foreground">订单号</dt>
-                                                    <dd className="font-mono">{selected.orderNo}</dd>
+                                            <dl className="grid gap-3.5 text-sm">
+                                                <div className="flex flex-col gap-0.5 sm:flex-row sm:justify-between sm:gap-4">
+                                                    <dt className="shrink-0 text-muted-foreground">订单号</dt>
+                                                    <dd className="min-w-0 truncate font-mono" title={selected.orderNo}>{selected.orderNo}</dd>
                                                 </div>
-                                                <div className="flex justify-between gap-4">
-                                                    <dt className="text-muted-foreground">商品</dt>
-                                                    <dd>{selected.productName}</dd>
+                                                <div className="flex flex-col gap-0.5 sm:flex-row sm:justify-between sm:gap-4">
+                                                    <dt className="shrink-0 text-muted-foreground">商品</dt>
+                                                    <dd className="min-w-0 truncate" title={selected.productName}>{selected.productName}</dd>
                                                 </div>
-                                                <div className="flex justify-between gap-4">
-                                                    <dt className="text-muted-foreground">金额</dt>
-                                                    <dd>¥{formatAmount(selected.amount)}</dd>
+                                                <div className="flex flex-col gap-0.5 sm:flex-row sm:justify-between sm:gap-4">
+                                                    <dt className="shrink-0 text-muted-foreground">金额</dt>
+                                                    <dd className="font-medium tabular-nums">¥{formatAmount(selected.amount)}</dd>
                                                 </div>
-                                                <div className="flex justify-between gap-4">
-                                                    <dt className="text-muted-foreground">创建时间</dt>
+                                                <div className="flex flex-col gap-0.5 sm:flex-row sm:justify-between sm:gap-4">
+                                                    <dt className="shrink-0 text-muted-foreground">创建时间</dt>
                                                     <dd>{formatDate(selected.createdAt)}</dd>
                                                 </div>
                                             </dl>
-                                            <Button asChild className="w-full gap-2">
+                                            <Button asChild className="mt-1 w-full gap-2">
                                                 <Link href={`/orders/lookup?orderNo=${encodeURIComponent(selected.orderNo)}`}>
                                                     <Search className="size-4" />
                                                     去订单查询
