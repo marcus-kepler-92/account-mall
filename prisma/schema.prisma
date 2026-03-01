@@ -87,6 +87,7 @@ model Product {
   id          String        @id @default(cuid())
   name        String
   slug        String        @unique
+  summary     String?       @db.VarChar(300)
   description String?
   image       String?       @db.Text
   price       Decimal       @db.Decimal(10, 2)

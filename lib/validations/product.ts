@@ -11,6 +11,7 @@ export const createProductSchema = z.object({
         .max(200)
         .regex(slugRegex, "Slug must be lowercase alphanumeric with hyphens"),
     description: z.string().max(5000).optional(),
+    summary: z.string().max(300).optional(),
     image: z.string().nullable().optional(),
     price: z.number().positive("Price must be positive"),
     maxQuantity: z.number().int().min(1, "Must be at least 1").max(1000).optional(),
@@ -27,6 +28,7 @@ export const updateProductSchema = z.object({
         .regex(slugRegex, "Slug must be lowercase alphanumeric with hyphens")
         .optional(),
     description: z.string().max(5000).nullable().optional(),
+    summary: z.string().max(300).nullable().optional(),
     image: z.string().nullable().optional(),
     price: z.number().positive("Price must be positive").optional(),
     maxQuantity: z.number().int().min(1).max(1000).optional(),
@@ -47,6 +49,7 @@ export const productFormSchema = z.object({
         .max(200)
         .regex(slugRegex, "仅支持小写字母、数字和连字符"),
     description: z.string().max(5000).optional(),
+    summary: z.string().max(300).optional(),
     image: z.string().optional(),
     price: z.string().min(1, "请输入价格").refine(
         (v) => !Number.isNaN(parseFloat(v)) && parseFloat(v) > 0,

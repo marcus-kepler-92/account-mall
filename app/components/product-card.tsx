@@ -29,6 +29,7 @@ export type ProductCardData = {
     name: string
     slug: string
     description: string | null
+    summary?: string | null
     image: string | null
     price: number
     stock: number
@@ -46,7 +47,9 @@ type ProductCardProps = {
  */
 export function ProductCard({ product, gradientIndex = 0, className }: ProductCardProps) {
     const gradient = CARD_GRADIENTS[gradientIndex % CARD_GRADIENTS.length]
-    const description = descriptionToPlainText(product.description, 80)
+    const descriptionFallback = descriptionToPlainText(product.description, 80)
+    const briefRaw = product.summary?.trim() || descriptionFallback
+    const brief = briefRaw.slice(0, 80)
     const isSoldOut = product.stock === 0
     const productSlug = `${product.id}-${product.slug}`
 
@@ -117,10 +120,10 @@ export function ProductCard({ product, gradientIndex = 0, className }: ProductCa
                     <h3 className="line-clamp-2 text-base font-semibold leading-tight transition-colors group-hover:text-primary">
                         {product.name}
                     </h3>
-                    {description && (
+                    {brief && (
                         <p className="line-clamp-2 flex-1 text-sm text-muted-foreground">
-                            {description}
-                            {description.length >= 80 ? "…" : ""}
+                            {brief}
+                            {briefRaw.length > 80 ? "…" : ""}
                         </p>
                     )}
                 </CardContent>

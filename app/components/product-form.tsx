@@ -39,6 +39,7 @@ type ProductData = {
     name: string
     slug: string
     description: string | null
+    summary: string | null
     image: string | null
     price: number
     maxQuantity: number
@@ -69,6 +70,7 @@ export function ProductForm({
             name: product?.name ?? "",
             slug: product?.slug ?? "",
             description: product?.description ?? "",
+            summary: product?.summary ?? "",
             image: product?.image ?? "",
             price: product ? String(product.price) : "",
             maxQuantity: product ? String(product.maxQuantity) : "10",
@@ -182,6 +184,7 @@ export function ProductForm({
             name: data.name.trim(),
             slug: data.slug.trim(),
             description: data.description?.trim() || undefined,
+            summary: data.summary?.trim() || null,
             image: data.image || null,
             price: parseFloat(data.price),
             maxQuantity: data.maxQuantity === "" ? 10 : parseInt(data.maxQuantity, 10),
@@ -503,6 +506,24 @@ export function ProductForm({
                         </Card>
                     </div>
                 </div>
+
+                <Card className="w-full">
+                    <CardHeader>
+                        <CardTitle>商品简介</CardTitle>
+                        <p className="text-sm font-normal text-muted-foreground">用于首页商品卡片下方展示，建议 1～2 句；留空则使用商品描述前 80 字</p>
+                    </CardHeader>
+                    <CardContent>
+                        <Input
+                            {...register("summary")}
+                            placeholder="简短介绍商品，最多 300 字"
+                            maxLength={300}
+                            className="max-w-xl"
+                        />
+                        {errors.summary && (
+                            <p className="mt-2 text-sm text-destructive">{errors.summary.message}</p>
+                        )}
+                    </CardContent>
+                </Card>
 
                 <Card className="w-full">
                     <CardHeader>

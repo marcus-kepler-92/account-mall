@@ -140,7 +140,7 @@ export async function POST(request: NextRequest) {
         return validationError(parsed.error.flatten());
     }
 
-    const { name, slug, description, image, price, maxQuantity, status, tagIds } =
+    const { name, slug, description, summary, image, price, maxQuantity, status, tagIds } =
         parsed.data;
 
     // Check slug uniqueness
@@ -156,6 +156,7 @@ export async function POST(request: NextRequest) {
             name,
             slug,
             description: description ?? null,
+            summary: summary ?? null,
             image: image ?? null,
             price,
             maxQuantity: maxQuantity ?? 10,
