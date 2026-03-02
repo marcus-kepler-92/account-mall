@@ -1,3 +1,4 @@
+import type { Metadata } from "next"
 import Link from "next/link"
 import { Suspense } from "react"
 import { Zap } from "lucide-react"
@@ -6,8 +7,21 @@ import { ProductCatalog } from "@/app/components/product-catalog"
 import { SiteHeader } from "@/app/components/site-header"
 import { AnnouncementsBlock } from "@/app/components/announcements-block"
 import { config } from "@/lib/config"
+import { DEFAULT_SEO_TITLE, DEFAULT_SEO_DESCRIPTION, KEYWORDS_META } from "@/lib/seo-keywords"
 
 const ANNOUNCEMENTS_LIMIT = 20
+
+export const metadata: Metadata = {
+  title: DEFAULT_SEO_TITLE,
+  description: DEFAULT_SEO_DESCRIPTION,
+  keywords: KEYWORDS_META.split(/[,，]/).map((k) => k.trim()).filter(Boolean),
+  openGraph: {
+    title: DEFAULT_SEO_TITLE,
+    description: DEFAULT_SEO_DESCRIPTION,
+    url: config.siteUrl,
+  },
+  alternates: { canonical: config.siteUrl },
+}
 
 export default async function HomePage() {
     const announcements = await prisma.announcement.findMany({
