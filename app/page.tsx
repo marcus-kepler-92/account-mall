@@ -11,6 +11,9 @@ import { DEFAULT_SEO_TITLE, DEFAULT_SEO_DESCRIPTION, KEYWORDS_META } from "@/lib
 
 const ANNOUNCEMENTS_LIMIT = 20
 
+/** 首页需每次请求拉取最新公告与数据，避免生产环境静态化后公告不更新 */
+export const dynamic = "force-dynamic"
+
 export const metadata: Metadata = {
   title: DEFAULT_SEO_TITLE,
   description: DEFAULT_SEO_DESCRIPTION,
