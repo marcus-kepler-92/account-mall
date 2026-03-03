@@ -69,6 +69,7 @@ enum CardStatus {
   UNSOLD
   RESERVED
   SOLD
+  DISABLED
 }
 
 enum OrderStatus {

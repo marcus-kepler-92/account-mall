@@ -22,7 +22,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog"
-import { Eye, EyeOff, Loader2, Trash2 } from "lucide-react"
+import { Eye, EyeOff, Loader2, Trash2, PowerOff, CircleDot } from "lucide-react"
 
 type CardItem = {
     id: string
@@ -35,7 +35,7 @@ type CardItem = {
 type CardsListProps = {
     productId: string
     cards: CardItem[]
-    stats: { UNSOLD: number; RESERVED: number; SOLD: number }
+    stats: { UNSOLD: number; RESERVED: number; SOLD: number; DISABLED: number }
 }
 
 const MASK_LEN = 8
@@ -49,13 +49,15 @@ const statusLabel: Record<string, string> = {
     UNSOLD: "未售",
     RESERVED: "预占中",
     SOLD: "已售",
+    DISABLED: "停用",
 }
 
 export function CardsList({ productId: _productId, cards, stats: _stats }: CardsListProps) {
     const router = useRouter()
-    const [statusFilter, setStatusFilter] = useState<"all" | "UNSOLD" | "RESERVED" | "SOLD">("all")
+    const [statusFilter, setStatusFilter] = useState<"all" | "UNSOLD" | "RESERVED" | "SOLD" | "DISABLED">("all")
     const [deleteTarget, setDeleteTarget] = useState<CardItem | null>(null)
     const [deleteLoading, setDeleteLoading] = useState(false)
+    const [actionLoadingId, setActionLoadingId] = useState<string | null>(null)
     const [revealedIds, setRevealedIds] = useState<Set<string>>(new Set())
 
     const filteredCards = useMemo(() => {
@@ -92,11 +94,56 @@ export function CardsList({ productId: _productId, cards, stats: _stats }: Cards
         }
     }
 
+    const handleDisable = async (c: CardItem) => {
+        setActionLoadingId(c.id)
+        try {
+            const res = await fetch(`/api/cards/${c.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "DISABLED" }),
+            })
+            const data = await res.json()
+            if (!res.ok) {
+                toast.error(data.error || "停用失败")
+                return
+            }
+            toast.success("已停用")
+            router.refresh()
+        } catch {
+            toast.error("停用失败")
+        } finally {
+            setActionLoadingId(null)
+        }
+    }
+
+    const handleEnable = async (c: CardItem) => {
+        setActionLoadingId(c.id)
+        try {
+            const res = await fetch(`/api/cards/${c.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "UNSOLD" }),
+            })
+            const data = await res.json()
+            if (!res.ok) {
+                toast.error(data.error || "启用失败")
+                return
+            }
+            toast.success("已启用")
+            router.refresh()
+        } catch {
+            toast.error("启用失败")
+        } finally {
+            setActionLoadingId(null)
+        }
+    }
+
     const filterOptions = [
         { label: "全部", value: "all" as const },
         { label: "未售", value: "UNSOLD" as const },
         { label: "预占中", value: "RESERVED" as const },
         { label: "已售", value: "SOLD" as const },
+        { label: "停用", value: "DISABLED" as const },
     ]
 
     return (
@@ -160,8 +207,11 @@ export function CardsList({ productId: _productId, cards, stats: _stats }: Cards
                                                         ? "secondary"
                                                         : c.status === "RESERVED"
                                                           ? "outline"
-                                                          : "default"
+                                                          : c.status === "DISABLED"
+                                                            ? "outline"
+                                                            : "default"
                                                 }
+                                                className={c.status === "DISABLED" ? "text-muted-foreground" : undefined}
                                             >
                                                 {statusLabel[c.status] ?? c.status}
                                             </Badge>
@@ -173,17 +223,39 @@ export function CardsList({ productId: _productId, cards, stats: _stats }: Cards
                                             {new Date(c.createdAt).toLocaleString("zh-CN")}
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            {c.status === "UNSOLD" && (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="size-8 text-destructive hover:text-destructive"
-                                                    onClick={() => setDeleteTarget(c)}
-                                                    aria-label="删除"
-                                                >
-                                                    <Trash2 className="size-4" />
-                                                </Button>
-                                            )}
+                                            <div className="flex items-center justify-end gap-0.5">
+                                                {(c.status === "UNSOLD" || c.status === "DISABLED") && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="size-8 shrink-0 text-muted-foreground hover:text-foreground"
+                                                        onClick={() =>
+                                                            c.status === "UNSOLD" ? handleDisable(c) : handleEnable(c)
+                                                        }
+                                                        disabled={actionLoadingId === c.id}
+                                                        aria-label={c.status === "UNSOLD" ? "停用" : "启用"}
+                                                    >
+                                                        {actionLoadingId === c.id ? (
+                                                            <Loader2 className="size-4 animate-spin" />
+                                                        ) : c.status === "UNSOLD" ? (
+                                                            <PowerOff className="size-4" />
+                                                        ) : (
+                                                            <CircleDot className="size-4" />
+                                                        )}
+                                                    </Button>
+                                                )}
+                                                {c.status === "UNSOLD" && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="size-8 shrink-0 text-muted-foreground hover:text-destructive"
+                                                        onClick={() => setDeleteTarget(c)}
+                                                        aria-label="删除"
+                                                    >
+                                                        <Trash2 className="size-4" />
+                                                    </Button>
+                                                )}
+                                            </div>
                                         </TableCell>
                                     </TableRow>
                                 )
@@ -231,8 +303,11 @@ export function CardsList({ productId: _productId, cards, stats: _stats }: Cards
                                                             ? "secondary"
                                                             : c.status === "RESERVED"
                                                               ? "outline"
-                                                              : "default"
+                                                              : c.status === "DISABLED"
+                                                                ? "outline"
+                                                                : "default"
                                                     }
+                                                    className={c.status === "DISABLED" ? "text-muted-foreground" : undefined}
                                                 >
                                                     {statusLabel[c.status] ?? c.status}
                                                 </Badge>
@@ -246,16 +321,37 @@ export function CardsList({ productId: _productId, cards, stats: _stats }: Cards
                                                 </span>
                                             </div>
                                         </div>
-                                        {c.status === "UNSOLD" && (
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="size-8 shrink-0 text-destructive"
-                                                onClick={() => setDeleteTarget(c)}
-                                            >
-                                                <Trash2 className="size-4" />
-                                            </Button>
-                                        )}
+                                        <div className="flex items-center gap-0.5 shrink-0">
+                                            {(c.status === "UNSOLD" || c.status === "DISABLED") && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="size-8 shrink-0 text-muted-foreground hover:text-foreground"
+                                                    onClick={() =>
+                                                        c.status === "UNSOLD" ? handleDisable(c) : handleEnable(c)
+                                                    }
+                                                    disabled={actionLoadingId === c.id}
+                                                >
+                                                    {actionLoadingId === c.id ? (
+                                                        <Loader2 className="size-4 animate-spin" />
+                                                    ) : c.status === "UNSOLD" ? (
+                                                        <PowerOff className="size-4" />
+                                                    ) : (
+                                                        <CircleDot className="size-4" />
+                                                    )}
+                                                </Button>
+                                            )}
+                                            {c.status === "UNSOLD" && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="size-8 shrink-0 text-muted-foreground hover:text-destructive"
+                                                    onClick={() => setDeleteTarget(c)}
+                                                >
+                                                    <Trash2 className="size-4" />
+                                                </Button>
+                                            )}
+                                        </div>
                                     </div>
                                 </CardContent>
                             </Card>

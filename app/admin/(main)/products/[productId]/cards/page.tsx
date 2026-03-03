@@ -32,7 +32,7 @@ export default async function AdminProductCardsPage({ params, searchParams }: Pa
             include: {
                 order: { select: { orderNo: true } },
             },
-            orderBy: { createdAt: "desc" },
+            orderBy: [{ status: "asc" }, { createdAt: "desc" }],
         }),
         prisma.card.groupBy({
             by: ["status"],
@@ -45,6 +45,7 @@ export default async function AdminProductCardsPage({ params, searchParams }: Pa
         UNSOLD: counts.find((c) => c.status === "UNSOLD")?._count.id ?? 0,
         RESERVED: counts.find((c) => c.status === "RESERVED")?._count.id ?? 0,
         SOLD: counts.find((c) => c.status === "SOLD")?._count.id ?? 0,
+        DISABLED: counts.find((c) => c.status === "DISABLED")?._count.id ?? 0,
     }
 
     const serializedCards = cards.map((c) => ({
@@ -75,7 +76,7 @@ export default async function AdminProductCardsPage({ params, searchParams }: Pa
             </div>
 
             {/* Stats */}
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">
                 <Card>
                     <CardContent className="pt-4">
                         <div className="flex items-center gap-2">
@@ -101,6 +102,15 @@ export default async function AdminProductCardsPage({ params, searchParams }: Pa
                             <span className="text-sm font-medium text-muted-foreground">已售</span>
                         </div>
                         <p className="text-2xl font-bold mt-2">{stats.SOLD}</p>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardContent className="pt-4">
+                        <div className="flex items-center gap-2">
+                            <CreditCard className="size-5 text-muted-foreground" />
+                            <span className="text-sm font-medium text-muted-foreground">停用</span>
+                        </div>
+                        <p className="text-2xl font-bold mt-2">{stats.DISABLED}</p>
                     </CardContent>
                 </Card>
             </div>

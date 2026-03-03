@@ -11,7 +11,7 @@ import {
     TableRow,
 } from "@/components/ui/table"
 import Link from "next/link"
-import { CreditCard, ChevronLeft, ChevronRight, CircleDot, Clock, CheckCircle2 } from "lucide-react"
+import { CreditCard, ChevronLeft, ChevronRight, CircleDot, Clock, CheckCircle2, Ban } from "lucide-react"
 import {
     DEFAULT_CARD_FILTERS,
     parseCardFilters,
@@ -108,7 +108,7 @@ export default async function AdminCardsPage({
                     },
                 },
             },
-            orderBy: { createdAt: "desc" },
+            orderBy: [{ status: "asc" }, { createdAt: "desc" }],
             skip: (page - 1) * pageSize,
             take: pageSize,
         }),
@@ -123,8 +123,9 @@ export default async function AdminCardsPage({
         UNSOLD: statusCounts.find((c) => c.status === "UNSOLD")?._count.id ?? 0,
         RESERVED: statusCounts.find((c) => c.status === "RESERVED")?._count.id ?? 0,
         SOLD: statusCounts.find((c) => c.status === "SOLD")?._count.id ?? 0,
+        DISABLED: statusCounts.find((c) => c.status === "DISABLED")?._count.id ?? 0,
     }
-    const statsTotal = stats.UNSOLD + stats.RESERVED + stats.SOLD
+    const statsTotal = stats.UNSOLD + stats.RESERVED + stats.SOLD + stats.DISABLED
 
     const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
@@ -226,6 +227,15 @@ export default async function AdminCardsPage({
             borderColor: "border-l-muted-foreground",
             active: filters.status === "SOLD",
         },
+        {
+            key: "DISABLED",
+            label: "停用",
+            value: stats.DISABLED,
+            icon: Ban,
+            color: "text-muted-foreground",
+            borderColor: "border-l-muted-foreground",
+            active: filters.status === "DISABLED",
+        },
     ]
 
     return (
@@ -242,7 +252,7 @@ export default async function AdminCardsPage({
             </div>
 
             {/* Stats cards - clickable to filter by status */}
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">
                 {statCards.map((stat) => (
                     <Link key={stat.key} href={buildStatusLink(stat.active ? "ALL" : stat.key)}>
                         <Card className={`border-l-4 ${stat.borderColor} transition-colors hover:bg-accent/50 cursor-pointer ${stat.active ? "ring-2 ring-primary/20 bg-accent/30" : ""}`}>
@@ -349,14 +359,18 @@ export default async function AdminCardsPage({
                                                     ? "border-success/50 bg-success/10 text-success"
                                                     : card.status === "RESERVED"
                                                         ? "border-warning/50 bg-warning/10 text-warning"
-                                                        : "border-muted-foreground/30 bg-muted text-muted-foreground"
+                                                        : card.status === "DISABLED"
+                                                            ? "border-muted-foreground/30 bg-muted/50 text-muted-foreground"
+                                                            : "border-muted-foreground/30 bg-muted text-muted-foreground"
                                             }
                                         >
                                             {card.status === "UNSOLD"
                                                 ? "未售"
                                                 : card.status === "RESERVED"
                                                     ? "预占中"
-                                                    : "已售"}
+                                                    : card.status === "DISABLED"
+                                                        ? "停用"
+                                                        : "已售"}
                                         </Badge>
                                     </TableCell>
                                     <TableCell>
@@ -371,6 +385,7 @@ export default async function AdminCardsPage({
                                     </TableCell>
                                     <TableCell className="text-right pr-4">
                                         <CardRowActions
+                                            cardId={card.id}
                                             content={card.content}
                                             status={card.status}
                                             productId={card.product.id}

@@ -99,7 +99,7 @@ describe("GET /api/products/[productId]/cards", () => {
       status: "UNSOLD",
       orderNo: null,
     })
-    expect(data.stats).toEqual({ UNSOLD: 5, RESERVED: 2, SOLD: 3 })
+    expect(data.stats).toEqual({ UNSOLD: 5, RESERVED: 2, SOLD: 3, DISABLED: 0 })
   })
 
   it("applies status filter when status param is provided", async () => {

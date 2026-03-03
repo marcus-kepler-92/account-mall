@@ -180,7 +180,7 @@ export function CardsHeaderActions() {
                                     placeholder={`每行一条卡密，例如：\n账号1|密码1\n账号2|密码2`}
                                     value={text}
                                     onChange={(e) => setText(e.target.value)}
-                                    className="min-h-[160px] font-mono text-sm"
+                                    className="min-h-[160px] font-mono text-sm max-h-[60vh] overflow-y-auto"
                                     disabled={importLoading}
                                 />
                                 <div className="flex justify-between text-sm text-muted-foreground">

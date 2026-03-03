@@ -189,14 +189,18 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
                                                             ? "border-success/50 bg-success/10 text-success"
                                                             : card.status === "RESERVED"
                                                               ? "border-warning/50 bg-warning/10 text-warning"
-                                                              : "border-muted-foreground/30 bg-muted text-muted-foreground"
+                                                              : card.status === "DISABLED"
+                                                                ? "border-muted-foreground/30 bg-muted/50 text-muted-foreground"
+                                                                : "border-muted-foreground/30 bg-muted text-muted-foreground"
                                                     }
                                                 >
                                                     {card.status === "UNSOLD"
                                                         ? "未售"
                                                         : card.status === "RESERVED"
                                                           ? "预占中"
-                                                          : "已售"}
+                                                          : card.status === "DISABLED"
+                                                            ? "停用"
+                                                            : "已售"}
                                                 </Badge>
                                             </TableCell>
                                             <TableCell className="text-right text-muted-foreground text-xs">
@@ -204,6 +208,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
                                             </TableCell>
                                             <TableCell className="text-right pr-4">
                                                 <CardRowActions
+                                                    cardId={card.id}
                                                     content={card.content}
                                                     status={card.status}
                                                     productId={card.productId}

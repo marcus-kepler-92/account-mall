@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
 
     const { email, password, page, pageSize } = parsed.data
 
-    const orders = await prisma.order.findMany({
+    const ordersResult = await prisma.order.findMany({
         where: { email: email.trim().toLowerCase() },
         select: {
             orderNo: true,
@@ -44,6 +44,7 @@ export async function POST(request: NextRequest) {
         orderBy: { createdAt: "desc" },
         take: MAX_ORDERS_TO_CHECK,
     })
+    const orders = Array.isArray(ordersResult) ? ordersResult : []
 
     const matching: typeof orders = []
     for (const order of orders) {

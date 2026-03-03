@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useForm, Controller } from "react-hook-form"
+import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
@@ -13,6 +13,15 @@ import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
+    Form,
+    FormControl,
+    FormDescription,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
+} from "@/components/ui/form"
+import {
     AlertDialog,
     AlertDialogAction,
     AlertDialogCancel,
@@ -23,6 +32,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { generateSlug } from "@/lib/utils"
+import { applyFieldErrors } from "@/lib/form-utils"
 import { MarkdownEditor } from "@/app/components/markdown-editor"
 import { productFormSchema, type ProductFormSchema } from "@/lib/validations/product"
 import { Loader2, Plus, X, ArrowLeft, Upload, Trash2 } from "lucide-react"
@@ -68,6 +78,7 @@ export function ProductForm({
 
     const form = useForm<ProductFormSchema>({
         resolver: zodResolver(productFormSchema),
+        mode: "onTouched",
         defaultValues: {
             name: product?.name ?? "",
             slug: product?.slug ?? "",
@@ -83,7 +94,7 @@ export function ProductForm({
         },
     })
 
-    const { register, handleSubmit, formState: { errors }, watch, setValue, control } = form
+    const { register, handleSubmit, watch, setValue, control } = form
     const name = watch("name")
     watch("slug")
     const imageValue = watch("image")
@@ -214,6 +225,7 @@ export function ProductForm({
 
             if (!res.ok) {
                 const data = await res.json()
+                applyFieldErrors(data, form.setError)
                 toast.error(data.error || "保存商品失败")
                 return
             }
@@ -261,94 +273,106 @@ export function ProductForm({
                 </div>
             </div>
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-                <div className="grid gap-6 lg:grid-cols-3">
-                    <div className="lg:col-span-2 space-y-6">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>基本信息</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="name">
-                                        商品名称 <span className="text-destructive">*</span>
-                                    </Label>
-                                    <Input
-                                        id="name"
-                                        {...register("name")}
-                                        placeholder="例如：ChatGPT Plus 账号"
+            <Form {...form}>
+                <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+                    <div className="grid gap-6 lg:grid-cols-3">
+                        <div className="lg:col-span-2 space-y-6">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>基本信息</CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <FormField
+                                        control={form.control}
+                                        name="name"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>
+                                                    商品名称 <span className="text-destructive">*</span>
+                                                </FormLabel>
+                                                <FormControl>
+                                                    <Input placeholder="例如：ChatGPT Plus 账号" {...field} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
                                     />
-                                    {errors.name && (
-                                        <p className="text-sm text-destructive">{errors.name.message}</p>
-                                    )}
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="slug">
-                                        URL 别名 <span className="text-destructive">*</span>
-                                    </Label>
-                                    <Input
-                                        id="slug"
-                                        {...register("slug", {
-                                            onChange: () => setSlugManuallyEdited(true),
-                                        })}
-                                        placeholder="chatgpt-plus-account"
+                                    <FormField
+                                        control={form.control}
+                                        name="slug"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>
+                                                    URL 别名 <span className="text-destructive">*</span>
+                                                </FormLabel>
+                                                <FormControl>
+                                                    <Input
+                                                        placeholder="chatgpt-plus-account"
+                                                        {...field}
+                                                        onChange={(e) => {
+                                                            field.onChange(e)
+                                                            setSlugManuallyEdited(true)
+                                                        }}
+                                                    />
+                                                </FormControl>
+                                                <FormDescription>用于商品 URL，仅支持小写字母、数字和连字符</FormDescription>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
                                     />
-                                    {errors.slug && (
-                                        <p className="text-sm text-destructive">{errors.slug.message}</p>
-                                    )}
-                                    <p className="text-xs text-muted-foreground">
-                                        用于商品 URL，仅支持小写字母、数字和连字符
-                                    </p>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label>商品图片</Label>
-                                    {imageValue ? (
-                                        <div className="relative inline-block">
-                                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                                            <img
-                                                src={imageValue}
-                                                alt="商品图片预览"
-                                                className="h-[200px] w-[200px] rounded-md border object-cover"
-                                            />
-                                            <Button
-                                                type="button"
-                                                variant="destructive"
-                                                size="icon"
-                                                className="absolute -right-2 -top-2 size-6"
-                                                onClick={() => setValue("image", "")}
-                                            >
-                                                <Trash2 className="size-3" />
-                                            </Button>
-                                        </div>
-                                    ) : (
-                                        <label
-                                            htmlFor="image-upload"
-                                            className="flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed p-6 transition-colors hover:border-foreground/30 hover:bg-accent/50"
-                                        >
-                                            <Upload className="mb-2 size-6 text-muted-foreground" />
-                                            <span className="text-sm text-muted-foreground">
-                                                点击上传图片
-                                            </span>
-                                            <span className="mt-1 text-xs text-muted-foreground">
-                                                支持 JPG、PNG、GIF，最大 2MB
-                                            </span>
-                                        </label>
-                                    )}
-                                    <input
-                                        id="image-upload"
-                                        type="file"
-                                        accept="image/*"
-                                        className="hidden"
-                                        onChange={handleImageUpload}
+                                    <FormField
+                                        control={form.control}
+                                        name="image"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>商品图片</FormLabel>
+                                                <div className="space-y-2">
+                                                    {field.value ? (
+                                                            <div className="relative inline-block">
+                                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                                <img
+                                                                    src={field.value}
+                                                                    alt="商品图片预览"
+                                                                    className="h-[200px] w-[200px] rounded-md border object-cover"
+                                                                />
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="destructive"
+                                                                    size="icon"
+                                                                    className="absolute -right-2 -top-2 size-6"
+                                                                    onClick={() => field.onChange("")}
+                                                                >
+                                                                    <Trash2 className="size-3" />
+                                                                </Button>
+                                                            </div>
+                                                        ) : (
+                                                            <label
+                                                                htmlFor="image-upload"
+                                                                className="flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed p-6 transition-colors hover:border-foreground/30 hover:bg-accent/50"
+                                                            >
+                                                                <Upload className="mb-2 size-6 text-muted-foreground" />
+                                                                <span className="text-sm text-muted-foreground">
+                                                                    点击上传图片
+                                                                </span>
+                                                                <span className="mt-1 text-xs text-muted-foreground">
+                                                                    支持 JPG、PNG、GIF，最大 2MB
+                                                                </span>
+                                                            </label>
+                                                        )}
+                                                        <input
+                                                            id="image-upload"
+                                                            type="file"
+                                                            accept="image/*"
+                                                            className="hidden"
+                                                            onChange={handleImageUpload}
+                                                        />
+                                                </div>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
                                     />
-                                    {errors.image && (
-                                        <p className="text-sm text-destructive">{errors.image.message}</p>
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
+                                </CardContent>
+                            </Card>
 
                         <Card>
                             <CardHeader>
@@ -387,39 +411,41 @@ export function ProductForm({
 
                                 {!isFreeShared && (
                                     <div className="grid gap-4 sm:grid-cols-2">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="price">
-                                                价格 (¥) <span className="text-destructive">*</span>
-                                            </Label>
-                                            <Input
-                                                id="price"
-                                                type="number"
-                                                step="0.01"
-                                                min="0.01"
-                                                {...register("price")}
-                                                placeholder="0.00"
-                                            />
-                                            {errors.price && (
-                                                <p className="text-sm text-destructive">{errors.price.message}</p>
+                                        <FormField
+                                            control={form.control}
+                                            name="price"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>
+                                                        价格 (¥) <span className="text-destructive">*</span>
+                                                    </FormLabel>
+                                                    <FormControl>
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            min="0.01"
+                                                            placeholder="0.00"
+                                                            {...field}
+                                                        />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
                                             )}
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <Label htmlFor="maxQuantity">单笔最大购买数量</Label>
-                                            <Input
-                                                id="maxQuantity"
-                                                type="number"
-                                                min="1"
-                                                max="1000"
-                                                {...register("maxQuantity")}
-                                            />
-                                            {errors.maxQuantity && (
-                                                <p className="text-sm text-destructive">{errors.maxQuantity.message}</p>
+                                        />
+                                        <FormField
+                                            control={form.control}
+                                            name="maxQuantity"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>单笔最大购买数量</FormLabel>
+                                                    <FormControl>
+                                                        <Input type="number" min={1} max={1000} {...field} />
+                                                    </FormControl>
+                                                    <FormDescription>单笔订单最多可购买的数量</FormDescription>
+                                                    <FormMessage />
+                                                </FormItem>
                                             )}
-                                            <p className="text-xs text-muted-foreground">
-                                                单笔订单最多可购买的数量
-                                            </p>
-                                        </div>
+                                        />
                                     </div>
                                 )}
                             </CardContent>
@@ -430,16 +456,23 @@ export function ProductForm({
                                 <CardTitle>商品简介</CardTitle>
                                 <p className="text-sm font-normal text-muted-foreground">用于首页商品卡片下方展示，建议 1～2 句；留空则使用商品描述前 80 字</p>
                             </CardHeader>
-                            <CardContent>
-                                <Input
-                                    {...register("summary")}
-                                    placeholder="简短介绍商品，最多 300 字"
-                                    maxLength={300}
-                                    className="w-full"
+                            <CardContent className="space-y-2">
+                                <FormField
+                                    control={form.control}
+                                    name="summary"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormControl>
+                                                <Input
+                                                    placeholder="简短介绍商品，最多 300 字"
+                                                    className="w-full"
+                                                    {...field}
+                                                />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
                                 />
-                                {errors.summary && (
-                                    <p className="mt-2 text-sm text-destructive">{errors.summary.message}</p>
-                                )}
                             </CardContent>
                         </Card>
 
@@ -449,21 +482,23 @@ export function ProductForm({
                                 <p className="text-sm font-normal text-muted-foreground">支持 Markdown，用于商品详情页展示</p>
                             </CardHeader>
                             <CardContent>
-                                <Controller
+                                <FormField
+                                    control={form.control}
                                     name="description"
-                                    control={control}
                                     render={({ field }) => (
-                                        <MarkdownEditor
-                                            value={field.value ?? ""}
-                                            onChange={field.onChange}
-                                            placeholder="描述你的商品，支持 Markdown…"
-                                            height={480}
-                                        />
+                                        <FormItem>
+                                            <FormControl>
+                                                <MarkdownEditor
+                                                    value={field.value ?? ""}
+                                                    onChange={field.onChange}
+                                                    placeholder="描述你的商品，支持 Markdown…"
+                                                    height={480}
+                                                />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
                                     )}
                                 />
-                                {errors.description && (
-                                    <p className="mt-2 text-sm text-destructive">{errors.description.message}</p>
-                                )}
                             </CardContent>
                         </Card>
                     </div>
@@ -600,7 +635,8 @@ export function ProductForm({
                         <Link href="/admin/products">取消</Link>
                     </Button>
                 </div>
-            </form>
+                </form>
+            </Form>
         </div>
     )
 }

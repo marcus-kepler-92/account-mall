@@ -31,10 +31,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
         return notFound("Product not found");
     }
 
-    const where: { productId: string; status?: "UNSOLD" | "RESERVED" | "SOLD" } = {
+    const where: { productId: string; status?: "UNSOLD" | "RESERVED" | "SOLD" | "DISABLED" } = {
         productId,
     };
-    if (status === "UNSOLD" || status === "RESERVED" || status === "SOLD") {
+    if (status === "UNSOLD" || status === "RESERVED" || status === "SOLD" || status === "DISABLED") {
         where.status = status;
     }
 
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
             include: {
                 order: { select: { orderNo: true } },
             },
-            orderBy: { createdAt: "desc" },
+            orderBy: [{ status: "asc" }, { createdAt: "desc" }],
         }),
         prisma.card.groupBy({
             by: ["status"],
@@ -57,6 +57,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
         UNSOLD: counts.find((c) => c.status === "UNSOLD")?._count.id ?? 0,
         RESERVED: counts.find((c) => c.status === "RESERVED")?._count.id ?? 0,
         SOLD: counts.find((c) => c.status === "SOLD")?._count.id ?? 0,
+        DISABLED: counts.find((c) => c.status === "DISABLED")?._count.id ?? 0,
     };
 
     const serialized = cards.map((c) => ({

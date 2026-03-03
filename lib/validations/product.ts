@@ -13,7 +13,7 @@ export const createProductSchema = z.object({
         .max(200)
         .regex(slugRegex, "Slug must be lowercase alphanumeric with hyphens"),
     description: z.string().max(5000).optional(),
-    summary: z.string().max(300).optional(),
+    summary: z.string().max(300, "商品简介最多 300 字").nullable().optional(),
     image: z.string().nullable().optional(),
     price: z.number().min(0, "Price must be non-negative"),
     maxQuantity: z.number().int().min(1, "Must be at least 1").max(1000).optional(),
@@ -35,7 +35,7 @@ export const updateProductSchema = z.object({
         .regex(slugRegex, "Slug must be lowercase alphanumeric with hyphens")
         .optional(),
     description: z.string().max(5000).nullable().optional(),
-    summary: z.string().max(300).nullable().optional(),
+    summary: z.string().max(300, "商品简介最多 300 字").nullable().optional(),
     image: z.string().nullable().optional(),
     price: z.number().min(0, "Price must be non-negative").optional(),
     maxQuantity: z.number().int().min(1).max(1000).optional(),
@@ -64,7 +64,7 @@ export const productFormSchema = z
             .max(200)
             .regex(slugRegex, "仅支持小写字母、数字和连字符"),
         description: z.string().max(5000).optional(),
-        summary: z.string().max(300).optional(),
+        summary: z.string().max(300, "商品简介最多 300 字").optional(),
         image: z.string().optional(),
         price: z.string().refine(
             (v) => v === "" || (!Number.isNaN(parseFloat(v)) && parseFloat(v) >= 0),
@@ -82,9 +82,11 @@ export const productFormSchema = z
     .superRefine((data, ctx) => {
         if (data.productType !== "FREE_SHARED") {
             if (!data.price || data.price === "")
-                ctx.addIssue({ code: z.ZodIssueCode.custom, message: "请输入价格", path: ["price"] })
+                ctx.addIssue({ code: "custom", message: "请输入价格", path: ["price"] })
             else if (Number.isNaN(parseFloat(data.price)) || parseFloat(data.price) < 0)
-                ctx.addIssue({ code: z.ZodIssueCode.custom, message: "价格不能为负数", path: ["price"] })
+                ctx.addIssue({ code: "custom", message: "价格不能为负数", path: ["price"] })
+            else if (parseFloat(data.price) <= 0)
+                ctx.addIssue({ code: "custom", message: "价格必须大于 0", path: ["price"] })
         }
     });
 

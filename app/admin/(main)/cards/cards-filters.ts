@@ -1,7 +1,7 @@
 export type CardFiltersState = {
     page: number
     pageSize: number
-    status: "ALL" | "UNSOLD" | "RESERVED" | "SOLD"
+    status: "ALL" | "UNSOLD" | "RESERVED" | "SOLD" | "DISABLED"
     productKeyword: string
     orderNo: string
     codeLike: string
@@ -33,7 +33,7 @@ export function parseCardFilters(input: CardFiltersInput): CardFiltersState {
 
     const statusRaw = input.status ?? DEFAULT_CARD_FILTERS.status
     const status: CardFiltersState["status"] =
-        statusRaw === "UNSOLD" || statusRaw === "RESERVED" || statusRaw === "SOLD"
+        statusRaw === "UNSOLD" || statusRaw === "RESERVED" || statusRaw === "SOLD" || statusRaw === "DISABLED"
             ? statusRaw
             : "ALL"
 

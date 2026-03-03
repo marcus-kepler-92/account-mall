@@ -15,3 +15,13 @@ export const bulkImportCardsSchema = z.object({
 });
 
 export type BulkImportCardsInput = z.infer<typeof bulkImportCardsSchema>;
+
+/**
+ * Schema for PATCH /api/cards/[cardId] (disable/enable).
+ * status: DISABLED = 停用, UNSOLD = 启用
+ */
+export const patchCardStatusSchema = z.object({
+    status: z.enum(["DISABLED", "UNSOLD"]),
+});
+
+export type PatchCardStatusInput = z.infer<typeof patchCardStatusSchema>;

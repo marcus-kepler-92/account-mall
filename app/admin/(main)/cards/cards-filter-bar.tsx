@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, FormEvent } from "react"
+import { useState, useEffect, FormEvent } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { ChevronDown, ChevronUp, Search } from "lucide-react"
@@ -29,6 +29,12 @@ export function CardsFilterBar({ initialFilters }: CardsFilterBarProps) {
     const [advancedOpen, setAdvancedOpen] = useState(
         Boolean(initialFilters.orderNo || initialFilters.productKeyword)
     )
+
+    // 与 URL 同步：导航后（如停用后跳到 status=DISABLED）让筛选栏显示当前查询条件
+    useEffect(() => {
+        setFilters(initialFilters)
+        setAdvancedOpen(Boolean(initialFilters.orderNo || initialFilters.productKeyword))
+    }, [initialFilters.status, initialFilters.page, initialFilters.pageSize, initialFilters.codeLike, initialFilters.orderNo, initialFilters.productKeyword])
 
     const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault()
@@ -87,6 +93,7 @@ export function CardsFilterBar({ initialFilters }: CardsFilterBarProps) {
                         <SelectItem value="UNSOLD">未售</SelectItem>
                         <SelectItem value="RESERVED">预占中</SelectItem>
                         <SelectItem value="SOLD">已售</SelectItem>
+                        <SelectItem value="DISABLED">停用</SelectItem>
                     </SelectContent>
                 </Select>
                 <Button type="submit" variant="outline">

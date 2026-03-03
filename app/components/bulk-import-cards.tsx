@@ -89,7 +89,7 @@ export function BulkImportCards({ productId, trigger, defaultOpen = false }: Bul
                     </Button>
                 )}
             </DialogTrigger>
-            <DialogContent className="sm:max-w-lg">
+            <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>批量导入卡密</DialogTitle>
                     <DialogDescription>
@@ -104,7 +104,7 @@ export function BulkImportCards({ productId, trigger, defaultOpen = false }: Bul
 ...`}
                         value={text}
                         onChange={(e) => setText(e.target.value)}
-                        className="min-h-[180px] font-mono text-sm"
+                        className="min-h-[180px] font-mono text-sm max-h-[80vh]"
                         disabled={loading}
                     />
                     <div className="flex justify-between text-sm text-muted-foreground">

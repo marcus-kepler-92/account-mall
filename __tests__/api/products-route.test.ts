@@ -119,7 +119,7 @@ describe("GET /api/products", () => {
         await GET(createUrlRequest("http://localhost/api/products?sort=price-desc"))
         expect(prismaMock.product.findMany).toHaveBeenCalledWith(
             expect.objectContaining({
-                orderBy: { price: "desc" },
+                orderBy: expect.arrayContaining([expect.objectContaining({ price: "desc" })]),
             })
         )
     })
@@ -130,7 +130,7 @@ describe("GET /api/products", () => {
         await GET(createUrlRequest("http://localhost/api/products?sort=newest"))
         expect(prismaMock.product.findMany).toHaveBeenCalledWith(
             expect.objectContaining({
-                orderBy: { createdAt: "desc" },
+                orderBy: expect.arrayContaining([expect.objectContaining({ createdAt: "desc" })]),
             })
         )
     })

@@ -27,9 +27,11 @@ describe("cards-filters", () => {
     it("should only accept known status values", () => {
         const all = parseCardFilters({ status: "UNKNOWN" })
         const unsold = parseCardFilters({ status: "UNSOLD" })
+        const disabled = parseCardFilters({ status: "DISABLED" })
 
         expect(all.status).toBe("ALL")
         expect(unsold.status).toBe("UNSOLD")
+        expect(disabled.status).toBe("DISABLED")
     })
 
     it("should trim string filters", () => {
@@ -72,6 +74,14 @@ describe("cards-filters", () => {
             pageSize: 50,
         })
         expect(query).toContain("pageSize=50")
+    })
+
+    it("should build query string with status DISABLED", () => {
+        const query = buildCardFiltersQuery({
+            ...DEFAULT_CARD_FILTERS,
+            status: "DISABLED",
+        })
+        expect(query).toContain("status=DISABLED")
     })
 })
 

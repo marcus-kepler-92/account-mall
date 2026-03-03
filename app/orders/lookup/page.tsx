@@ -1,20 +1,36 @@
 "use client"
 
-import { useState, useEffect, useRef, Suspense } from "react"
+import { useState, useEffect, useRef, useCallback, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
+import { useForm, type UseFormReturn } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import {
+    Form,
+    FormControl,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
+} from "@/components/ui/form"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import { SiteHeader } from "@/app/components/site-header"
 import { useSiteName } from "@/app/components/site-name-provider"
-import { Copy, Check, Eye, EyeOff, Loader2, Mail, Hash, AlertCircle, Package, Search, Zap, CreditCard, KeyRound, Globe, Clock, Info } from "lucide-react"
+import { Copy, Check, Eye, EyeOff, Loader2, Mail, Hash, Package, Search, Zap, CreditCard, KeyRound, Globe, Clock, Info } from "lucide-react"
 import { toast } from "sonner"
 import { addOrUpdateOrder } from "@/lib/order-history-storage"
+import { applyFieldErrors } from "@/lib/form-utils"
+import { orderNoLookupSchema, emailLookupSchema, type OrderLookupFormValues } from "@/lib/validations/lookup"
 import { type FreeSharedCardPayload, isFreeSharedCard } from "@/lib/free-shared-card"
+
+/* ------------------------------------------------------------------ */
+/*  Types                                                              */
+/* ------------------------------------------------------------------ */
 
 type CardItem = { content: string } | (FreeSharedCardPayload & { content: string })
 
@@ -25,9 +41,7 @@ interface OrderResult {
     status: "PENDING" | "COMPLETED" | "CLOSED"
     cards: CardItem[]
     isPending?: boolean
-    /** 未超时、可继续支付（仅 PENDING 时有意义） */
     canPay?: boolean
-    /** 支付截止时间 ISO（仅 PENDING 时可能有） */
     expiresAt?: string
 }
 
@@ -42,16 +56,393 @@ interface OrderListItem {
 
 type LookupMode = "orderNo" | "email"
 
+/* ------------------------------------------------------------------ */
+/*  Shared utilities (no component deps → hoist outside)               */
+/* ------------------------------------------------------------------ */
+
+const STATUS_CONFIG: Record<string, { label: string; variant: "default" | "secondary" | "outline" }> = {
+    COMPLETED: { label: "已完成", variant: "default" },
+    PENDING: { label: "待支付", variant: "secondary" },
+    CLOSED: { label: "已关闭", variant: "outline" },
+}
+
+function formatDate(dateString: string) {
+    return new Date(dateString).toLocaleString("zh-CN", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+    })
+}
+
+type ApiOk = { ok: true; data: Record<string, any> }  // eslint-disable-line @typescript-eslint/no-explicit-any
+type ApiErr = { ok: false; error: string; raw: Record<string, any> }  // eslint-disable-line @typescript-eslint/no-explicit-any
+type ApiResult = ApiOk | ApiErr
+
+async function fetchApi(
+    endpoint: string,
+    body: Record<string, string>,
+): Promise<ApiResult> {
+    const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) return { ok: false, error: data?.error ?? "", raw: data }
+    return { ok: true, data }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Sub-components                                                     */
+/* ------------------------------------------------------------------ */
+
+function StatusBadge({ status }: { status: string }) {
+    const cfg = STATUS_CONFIG[status]
+    return <Badge variant={cfg?.variant ?? "outline"}>{cfg?.label ?? status}</Badge>
+}
+
+function FreeSharedCardItem({
+    card,
+    index,
+    copiedId,
+    onCopy,
+}: {
+    card: FreeSharedCardPayload
+    index: number
+    copiedId: string | null
+    onCopy: (content: string, id: string) => void
+}) {
+    return (
+        <div className="rounded-lg border border-border/80 bg-card shadow-sm overflow-hidden">
+            <div className="divide-y divide-border/60">
+                {/* 账号 */}
+                <div className="flex items-center justify-between gap-4 px-4 py-3.5 bg-muted/30">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                        <Mail className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">账号</span>
+                    </div>
+                    <div className="flex items-center gap-2 min-w-0 flex-1 justify-end">
+                        <code className="truncate font-mono text-sm text-foreground" title={card.account}>
+                            {card.account}
+                        </code>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-8 shrink-0 rounded-full hover:bg-background cursor-pointer"
+                            onClick={() => onCopy(card.account, `card-${index}-account`)}
+                            aria-label="复制账号"
+                        >
+                            {copiedId === `card-${index}-account` ? (
+                                <Check className="size-4 text-emerald-600" />
+                            ) : (
+                                <Copy className="size-4" />
+                            )}
+                        </Button>
+                    </div>
+                </div>
+
+                {/* 密码 */}
+                <div className="flex items-center justify-between gap-4 px-4 py-3.5 bg-muted/30">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                        <KeyRound className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">密码</span>
+                    </div>
+                    <div className="flex items-center gap-2 min-w-0 flex-1 justify-end">
+                        <code className="truncate font-mono text-sm text-foreground" title={card.password}>
+                            {card.password}
+                        </code>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-8 shrink-0 rounded-full hover:bg-background cursor-pointer"
+                            onClick={() => onCopy(card.password, `card-${index}-password`)}
+                            aria-label="复制密码"
+                        >
+                            {copiedId === `card-${index}-password` ? (
+                                <Check className="size-4 text-emerald-600" />
+                            ) : (
+                                <Copy className="size-4" />
+                            )}
+                        </Button>
+                    </div>
+                </div>
+
+                {/* 地区 */}
+                <div className="flex items-center justify-between gap-4 px-4 py-3">
+                    <div className="flex items-center gap-2.5">
+                        <Globe className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">地区</span>
+                    </div>
+                    <span className="text-sm font-medium text-foreground">{card.region}</span>
+                </div>
+
+                {card.lastCheckedAt != null && card.lastCheckedAt !== "" && (
+                    <div className="flex items-center justify-between gap-4 px-4 py-3">
+                        <div className="flex items-center gap-2.5">
+                            <Clock className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">上次检查</span>
+                        </div>
+                        <span className="text-sm text-muted-foreground tabular-nums">{card.lastCheckedAt}</span>
+                    </div>
+                )}
+
+                {card.installStatus != null && card.installStatus !== "" && (
+                    <div className="flex items-center justify-between gap-4 px-4 py-3">
+                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">装好状态</span>
+                        <span className="text-sm text-foreground">{card.installStatus}</span>
+                    </div>
+                )}
+            </div>
+
+            <div className="flex gap-2.5 px-4 py-3 rounded-b-lg bg-amber-500/5 border-t border-amber-500/10 text-xs text-muted-foreground">
+                <Info className="size-4 shrink-0 text-amber-600 dark:text-amber-500 mt-0.5" aria-hidden />
+                <p className="leading-relaxed">
+                    若无法使用可返回商品页重新领取；仅用于 App Store，请勿在设置或 iCloud 登录。
+                </p>
+            </div>
+        </div>
+    )
+}
+
+function SimpleCardItem({
+    card,
+    index,
+    copiedId,
+    onCopy,
+}: {
+    card: { content: string }
+    index: number
+    copiedId: string | null
+    onCopy: (content: string, id: string) => void
+}) {
+    return (
+        <div className="group flex items-center gap-2 rounded-lg border bg-background p-2 transition-colors hover:bg-muted/50">
+            <code className="flex-1 font-mono text-xs break-all select-all">
+                {card.content}
+            </code>
+            <Button
+                variant="ghost"
+                size="icon"
+                className="size-7 shrink-0 cursor-pointer"
+                onClick={() => onCopy(card.content, `card-${index}`)}
+                aria-label={`复制第 ${index + 1} 条卡密`}
+            >
+                {copiedId === `card-${index}` ? (
+                    <Check className="size-3.5 text-green-600" />
+                ) : (
+                    <Copy className="size-3.5" />
+                )}
+            </Button>
+        </div>
+    )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Main page content                                                  */
+/* ------------------------------------------------------------------ */
+
+interface OrderLookupFormProps {
+    lookupMode: LookupMode
+    formRef: React.MutableRefObject<UseFormReturn<OrderLookupFormValues> | null>
+    initialOrderNo: string | null
+    loading: boolean
+    showPassword: boolean
+    setShowPassword: React.Dispatch<React.SetStateAction<boolean>>
+    setResult: React.Dispatch<React.SetStateAction<OrderResult | null>>
+    setOrderList: React.Dispatch<React.SetStateAction<OrderListItem[] | null>>
+    setLoading: React.Dispatch<React.SetStateAction<boolean>>
+    setSheetOpen: React.Dispatch<React.SetStateAction<boolean>>
+}
+
+function OrderLookupForm({
+    lookupMode,
+    formRef,
+    initialOrderNo,
+    loading,
+    showPassword,
+    setShowPassword,
+    setResult,
+    setOrderList,
+    setLoading,
+    setSheetOpen,
+}: OrderLookupFormProps) {
+    const passwordInputRef = useRef<HTMLInputElement>(null)
+
+    const form = useForm<OrderLookupFormValues>({
+        resolver: zodResolver(lookupMode === "orderNo" ? orderNoLookupSchema : emailLookupSchema),
+        mode: "onTouched",
+        shouldUnregister: false,
+        defaultValues: { orderNo: "", email: "", password: "" },
+    })
+
+    useEffect(() => {
+        formRef.current = form
+        return () => {
+            formRef.current = null
+        }
+    }, [form, formRef])
+
+    useEffect(() => {
+        if (initialOrderNo) {
+            form.setValue("orderNo", initialOrderNo)
+            setTimeout(() => passwordInputRef.current?.focus(), 100)
+        }
+    }, [initialOrderNo, form])
+
+    const onSubmit = async (data: OrderLookupFormValues) => {
+        const isOrderMode = lookupMode === "orderNo"
+        setResult(null)
+        setOrderList(null)
+        form.clearErrors()
+        setLoading(true)
+
+        try {
+            const res = await fetchApi(
+                isOrderMode ? "/api/orders/lookup" : "/api/orders/lookup-by-email",
+                isOrderMode
+                    ? { orderNo: data.orderNo.trim(), password: data.password.trim() }
+                    : { email: data.email.trim().toLowerCase(), password: data.password.trim() },
+            )
+
+            if (!res.ok) {
+                applyFieldErrors(res.raw, form.setError)
+                form.setError("password", {
+                    message: res.error === "Order not found or password incorrect"
+                        ? "订单不存在或密码错误"
+                        : res.error || "查询失败，请稍后重试",
+                })
+                return
+            }
+
+            if (Array.isArray(res.data.orders)) {
+                setOrderList(res.data.orders)
+                toast.success(`找到 ${res.data.orders.length} 个相关订单`)
+                return
+            }
+
+            if (!res.data.orderNo) {
+                form.setError("password", { message: "订单不存在或密码错误" })
+                return
+            }
+
+            setResult(res.data as OrderResult)
+            setSheetOpen(true)
+            toast.success("查询成功")
+        } catch {
+            form.setError("password", { message: "网络错误，请稍后重试" })
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    return (
+        <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
+                {lookupMode === "orderNo" ? (
+                    <FormField
+                        control={form.control}
+                        name="orderNo"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>订单号</FormLabel>
+                                <FormControl>
+                                    <Input
+                                        placeholder="例如：FAK2024021300001"
+                                        disabled={loading}
+                                        {...field}
+                                    />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                ) : (
+                    <FormField
+                        control={form.control}
+                        name="email"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>邮箱地址</FormLabel>
+                                <FormControl>
+                                    <Input
+                                        type="email"
+                                        placeholder="例如：user@example.com"
+                                        disabled={loading}
+                                        {...field}
+                                    />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                )}
+                <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field: { ref: fieldRef, ...fieldRest } }) => (
+                        <FormItem>
+                            <FormLabel>查询密码</FormLabel>
+                            <div className="relative">
+                                <FormControl>
+                                    <Input
+                                        ref={(el) => {
+                                            fieldRef(el)
+                                            ;(passwordInputRef as React.MutableRefObject<HTMLInputElement | null>).current = el
+                                        }}
+                                        type={showPassword ? "text" : "password"}
+                                        placeholder="下单时设置的查询密码"
+                                        disabled={loading}
+                                        className="pr-10"
+                                        {...fieldRest}
+                                    />
+                                </FormControl>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                                    onClick={() => setShowPassword((v) => !v)}
+                                    tabIndex={-1}
+                                    aria-label={showPassword ? "隐藏密码" : "显示密码"}
+                                >
+                                    {showPassword ? (
+                                        <EyeOff className="size-4 text-muted-foreground" />
+                                    ) : (
+                                        <Eye className="size-4 text-muted-foreground" />
+                                    )}
+                                </Button>
+                            </div>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                <Button type="submit" className="w-full" disabled={loading}>
+                    {loading ? (
+                        <>
+                            <Loader2 className="mr-2 size-4 animate-spin" />
+                            查询中...
+                        </>
+                    ) : (
+                        <>
+                            <Search className="mr-2 size-4" />
+                            查询订单
+                        </>
+                    )}
+                </Button>
+            </form>
+        </Form>
+    )
+}
+
 function OrderLookupPageContent() {
     const searchParams = useSearchParams()
     const siteName = useSiteName()
+
     const [lookupMode, setLookupMode] = useState<LookupMode>("orderNo")
-    const [orderNo, setOrderNo] = useState("")
-    const [email, setEmail] = useState("")
-    const [password, setPassword] = useState("")
     const [showPassword, setShowPassword] = useState(false)
     const [loading, setLoading] = useState(false)
-    const [error, setError] = useState<string | null>(null)
     const [result, setResult] = useState<OrderResult | null>(null)
     const [orderList, setOrderList] = useState<OrderListItem[] | null>(null)
     const [copiedId, setCopiedId] = useState<string | null>(null)
@@ -59,180 +450,36 @@ function OrderLookupPageContent() {
     const [loadingOrderNo, setLoadingOrderNo] = useState<string | null>(null)
     const [sheetLoading, setSheetLoading] = useState(false)
     const [continuePaymentLoading, setContinuePaymentLoading] = useState(false)
-    const passwordInputRef = useRef<HTMLInputElement>(null)
 
-    // URL → state：从 searchParams 同步 type 与 orderNo（仅读 URL，不写 URL，无循环风险）
+    const formRef = useRef<UseFormReturn<OrderLookupFormValues> | null>(null)
+    const copiedTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
+
+    useEffect(() => () => clearTimeout(copiedTimerRef.current), [])
+
     useEffect(() => {
         const typeParam = searchParams.get("type")
         const orderNoParam = searchParams.get("orderNo")
         setLookupMode(typeParam === "email" ? "email" : "orderNo")
         if (orderNoParam) {
-            setOrderNo(orderNoParam)
             setLookupMode("orderNo")
-            setTimeout(() => passwordInputRef.current?.focus(), 100)
         }
     }, [searchParams])
 
-    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault()
-        setError(null)
+    const switchMode = useCallback((mode: LookupMode) => {
+        setLookupMode(mode)
         setResult(null)
         setOrderList(null)
+    }, [])
 
-        if (lookupMode === "orderNo") {
-            if (!orderNo.trim() || !password.trim()) {
-                setError("订单号和查询密码不能为空")
-                return
-            }
-        } else {
-            if (!email.trim() || !password.trim()) {
-                setError("邮箱和查询密码不能为空")
-                return
-            }
-        }
-
-        setLoading(true)
-
-        try {
-            const apiEndpoint = lookupMode === "orderNo" ? "/api/orders/lookup" : "/api/orders/lookup-by-email"
-            const requestBody =
-                lookupMode === "orderNo"
-                    ? {
-                          orderNo: orderNo.trim(),
-                          password: password.trim(),
-                      }
-                    : {
-                          email: email.trim().toLowerCase(),
-                          password: password.trim(),
-                      }
-
-            const res = await fetch(apiEndpoint, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(requestBody),
-            })
-
-            if (!res.ok) {
-                let message = "查询失败，请稍后重试"
-                try {
-                    const data = await res.json()
-                    if (data?.error === "Order not found or password incorrect") {
-                        message = "订单不存在或密码错误"
-                    } else if (data?.error) {
-                        message = data.error
-                    }
-                } catch {
-                    // ignore JSON parse errors
-                }
-                setError(message)
-                setLoading(false)
-                return
-            }
-
-            const data = await res.json()
-
-            // Check if response is a list of orders (multiple matches)
-            if (data.orders && Array.isArray(data.orders)) {
-                setOrderList(data.orders)
-                setLoading(false)
-                toast.success(`找到 ${data.orders.length} 个相关订单`)
-                return
-            }
-
-            // Single order result
-            if (!data || !data.orderNo) {
-                setError("订单不存在或密码错误")
-                setLoading(false)
-                return
-            }
-
-            setResult(data)
-            setSheetOpen(true)
-            setLoading(false)
-            toast.success("查询成功")
-        } catch {
-            setError("网络错误，请稍后重试")
-            setLoading(false)
-        }
-    }
-
-    const handleOrderClick = async (clickedOrderNo: string) => {
-        setError(null)
-        setLoadingOrderNo(clickedOrderNo)
-        setSheetLoading(true)
-        setSheetOpen(true)
-        setResult(null)
-
-        try {
-            const res = await fetch("/api/orders/lookup", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    orderNo: clickedOrderNo.trim(),
-                    password: password.trim(),
-                }),
-            })
-
-            if (!res.ok) {
-                let message = "查询失败，请稍后重试"
-                try {
-                    const data = await res.json()
-                    if (data?.error === "Order not found or password incorrect") {
-                        message = "订单详情获取失败"
-                    } else if (data?.error) {
-                        message = data.error
-                    }
-                } catch {
-                    // ignore JSON parse errors
-                }
-                toast.error(message)
-                setSheetOpen(false)
-                setSheetLoading(false)
-                setLoadingOrderNo(null)
-                return
-            }
-
-            const data = await res.json()
-
-            if (!data || !data.orderNo) {
-                toast.error("订单详情获取失败")
-                setSheetOpen(false)
-                setSheetLoading(false)
-                setLoadingOrderNo(null)
-                return
-            }
-
-            setResult(data)
-            if (data?.orderNo) {
-                addOrUpdateOrder({
-                    orderNo: data.orderNo,
-                    productName: data.productName ?? "商品",
-                    amount: data.amount ?? 0,
-                    createdAt: typeof data.createdAt === "string" ? data.createdAt : new Date().toISOString(),
-                    status: data.status ?? "PENDING",
-                })
-            }
-            setSheetLoading(false)
-            setLoadingOrderNo(null)
-            // 从订单列表点击仅打开详情抽屉，不跳转成功页
-        } catch {
-            toast.error("网络错误，请稍后重试")
-            setSheetOpen(false)
-            setSheetLoading(false)
-            setLoadingOrderNo(null)
-        }
-    }
+    /* ---- Clipboard helpers ---- */
 
     const copyCard = async (content: string, id: string) => {
         try {
             await navigator.clipboard.writeText(content)
             setCopiedId(id)
             toast.success("卡密已复制")
-            setTimeout(() => setCopiedId(null), 2000)
+            clearTimeout(copiedTimerRef.current)
+            copiedTimerRef.current = setTimeout(() => setCopiedId(null), 2000)
         } catch {
             toast.error("复制失败，请手动复制")
         }
@@ -240,7 +487,6 @@ function OrderLookupPageContent() {
 
     const copyAllCards = async () => {
         if (!result || result.cards.length === 0) return
-
         const lines = result.cards.map((card) =>
             isFreeSharedCard(card)
                 ? [
@@ -252,44 +498,77 @@ function OrderLookupPageContent() {
                   ].join("\n")
                 : card.content
         )
-        const text = lines.join("\n\n")
         try {
-            await navigator.clipboard.writeText(text)
+            await navigator.clipboard.writeText(lines.join("\n\n"))
             toast.success(`已复制 ${result.cards.length} 条卡密`)
         } catch {
             toast.error("复制失败，请手动复制")
         }
     }
 
-    const getStatusBadge = (status: string) => {
-        switch (status) {
-            case "COMPLETED":
-                return <Badge variant="default">已完成</Badge>
-            case "PENDING":
-                return <Badge variant="secondary">待支付</Badge>
-            case "CLOSED":
-                return <Badge variant="outline">已关闭</Badge>
-            default:
-                return <Badge variant="outline">{status}</Badge>
+    /* ---- API handlers ---- */
+
+    const handleOrderClick = async (clickedOrderNo: string) => {
+        const password = formRef.current?.getValues("password") ?? ""
+        setLoadingOrderNo(clickedOrderNo)
+        setSheetLoading(true)
+        setSheetOpen(true)
+        setResult(null)
+
+        try {
+            const res = await fetchApi("/api/orders/lookup", {
+                orderNo: clickedOrderNo.trim(),
+                password: password.trim(),
+            })
+
+            if (!res.ok) {
+                toast.error(
+                    res.error === "Order not found or password incorrect"
+                        ? "订单详情获取失败"
+                        : res.error || "查询失败，请稍后重试",
+                )
+                setSheetOpen(false)
+                return
+            }
+
+            if (!res.data.orderNo) {
+                toast.error("订单详情获取失败")
+                setSheetOpen(false)
+                return
+            }
+
+            setResult(res.data as OrderResult)
+            addOrUpdateOrder({
+                orderNo: res.data.orderNo,
+                productName: res.data.productName ?? "商品",
+                amount: res.data.amount ?? 0,
+                createdAt: typeof res.data.createdAt === "string" ? res.data.createdAt : new Date().toISOString(),
+                status: res.data.status ?? "PENDING",
+            })
+        } catch {
+            toast.error("网络错误，请稍后重试")
+            setSheetOpen(false)
+        } finally {
+            setSheetLoading(false)
+            setLoadingOrderNo(null)
         }
     }
 
     const handleContinuePayment = async () => {
+        const password = formRef.current?.getValues("password") ?? ""
         if (!result || !password.trim() || result.isPending !== true || result.canPay !== true) return
         setContinuePaymentLoading(true)
         try {
-            const res = await fetch("/api/orders/get-payment-url", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ orderNo: result.orderNo, password: password.trim() }),
+            const res = await fetchApi("/api/orders/get-payment-url", {
+                orderNo: result.orderNo,
+                password: password.trim(),
             })
-            const data = await res.json().catch(() => ({}))
             if (!res.ok) {
-                toast.error(data?.error ?? "无法继续支付，请稍后重试")
+                toast.error(res.error || "无法继续支付，请稍后重试")
                 return
             }
-            if (data?.paymentUrl) {
-                window.location.href = data.paymentUrl
+            if (res.data.paymentUrl) {
+                window.location.href = res.data.paymentUrl as string
                 return
             }
             toast.error("获取支付链接失败")
@@ -300,22 +579,12 @@ function OrderLookupPageContent() {
         }
     }
 
-    const formatDate = (dateString: string) => {
-        const date = new Date(dateString)
-        return date.toLocaleString("zh-CN", {
-            year: "numeric",
-            month: "2-digit",
-            day: "2-digit",
-            hour: "2-digit",
-            minute: "2-digit",
-        })
-    }
+    /* ---- Render ---- */
 
     return (
         <div className="flex min-h-screen flex-col">
             <SiteHeader />
 
-            {/* Main content */}
             <main className="flex-1">
                 <div className="mx-auto max-w-5xl px-4 py-6 md:py-8">
                     <Card>
@@ -331,14 +600,6 @@ function OrderLookupPageContent() {
                             )}
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            {/* Error message */}
-                            {error && (
-                                <div className="flex items-center gap-2 rounded-lg border border-destructive bg-destructive/10 p-3 text-sm text-destructive">
-                                    <AlertCircle className="size-4 shrink-0" />
-                                    <span>{error}</span>
-                                </div>
-                            )}
-
                             {/* Lookup mode selector */}
                             <div className="flex gap-2 rounded-lg border p-1">
                                 <Button
@@ -346,12 +607,7 @@ function OrderLookupPageContent() {
                                     variant={lookupMode === "orderNo" ? "default" : "ghost"}
                                     size="sm"
                                     className="flex flex-1 gap-2"
-                                    onClick={() => {
-                                        setLookupMode("orderNo")
-                                        setError(null)
-                                        setResult(null)
-                                        setOrderList(null)
-                                    }}
+                                    onClick={() => switchMode("orderNo")}
                                 >
                                     <Hash className="size-4" />
                                     订单号查询
@@ -361,100 +617,27 @@ function OrderLookupPageContent() {
                                     variant={lookupMode === "email" ? "default" : "ghost"}
                                     size="sm"
                                     className="flex flex-1 gap-2"
-                                    onClick={() => {
-                                        setLookupMode("email")
-                                        setError(null)
-                                        setResult(null)
-                                        setOrderList(null)
-                                    }}
+                                    onClick={() => switchMode("email")}
                                 >
                                     <Mail className="size-4" />
                                     邮箱查询
                                 </Button>
                             </div>
 
-                            {/* Query form */}
-                            <form onSubmit={handleSubmit} className="space-y-3">
-                                {lookupMode === "orderNo" ? (
-                                    <div className="space-y-1.5">
-                                        <label className="text-sm font-medium" htmlFor="orderNo">
-                                            订单号
-                                        </label>
-                                        <Input
-                                            id="orderNo"
-                                            name="orderNo"
-                                            placeholder="例如：FAK2024021300001"
-                                            value={orderNo}
-                                            onChange={(e) => setOrderNo(e.target.value)}
-                                            disabled={loading}
-                                            required
-                                        />
-                                    </div>
-                                ) : (
-                                    <div className="space-y-1.5">
-                                        <label className="text-sm font-medium" htmlFor="email">
-                                            邮箱地址
-                                        </label>
-                                        <Input
-                                            id="email"
-                                            name="email"
-                                            type="email"
-                                            placeholder="例如：user@example.com"
-                                            value={email}
-                                            onChange={(e) => setEmail(e.target.value)}
-                                            disabled={loading}
-                                            required
-                                        />
-                                    </div>
-                                )}
-                                <div className="space-y-1.5">
-                                    <label className="text-sm font-medium" htmlFor="password">
-                                        查询密码
-                                    </label>
-                                    <div className="relative">
-                                        <Input
-                                            ref={passwordInputRef}
-                                            id="password"
-                                            name="password"
-                                            type={showPassword ? "text" : "password"}
-                                            placeholder="下单时设置的查询密码"
-                                            value={password}
-                                            onChange={(e) => setPassword(e.target.value)}
-                                            disabled={loading}
-                                            required
-                                            className="pr-10"
-                                        />
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="icon"
-                                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                                            onClick={() => setShowPassword((v) => !v)}
-                                            tabIndex={-1}
-                                            aria-label={showPassword ? "隐藏密码" : "显示密码"}
-                                        >
-                                            {showPassword ? (
-                                                <EyeOff className="size-4 text-muted-foreground" />
-                                            ) : (
-                                                <Eye className="size-4 text-muted-foreground" />
-                                            )}
-                                        </Button>
-                                    </div>
-                                </div>
-                                <Button type="submit" className="w-full" disabled={loading}>
-                                    {loading ? (
-                                        <>
-                                            <Loader2 className="mr-2 size-4 animate-spin" />
-                                            查询中...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Search className="mr-2 size-4" />
-                                            查询订单
-                                        </>
-                                    )}
-                                </Button>
-                            </form>
+                            {/* Query form — key by lookupMode so resolver matches schema */}
+                            <OrderLookupForm
+                                key={lookupMode}
+                                lookupMode={lookupMode}
+                                formRef={formRef}
+                                initialOrderNo={searchParams.get("orderNo")}
+                                loading={loading}
+                                showPassword={showPassword}
+                                setShowPassword={setShowPassword}
+                                setResult={setResult}
+                                setOrderList={setOrderList}
+                                setLoading={setLoading}
+                                setSheetOpen={setSheetOpen}
+                            />
 
                             {/* Order list */}
                             {orderList && orderList.length > 0 && (
@@ -496,7 +679,7 @@ function OrderLookupPageContent() {
                                                             <span className="font-mono text-xs font-medium truncate flex-1">
                                                                 {order.orderNo}
                                                             </span>
-                                                            {getStatusBadge(order.status)}
+                                                            <StatusBadge status={order.status} />
                                                         </div>
                                                         <div className="text-sm font-medium truncate">{order.productName}</div>
                                                         <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -545,7 +728,6 @@ function OrderLookupPageContent() {
             {/* Order Detail Sheet */}
             <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
                 <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
-                    {/* Loading skeleton */}
                     {sheetLoading && (
                         <>
                             <SheetHeader>
@@ -567,13 +749,12 @@ function OrderLookupPageContent() {
                         </>
                     )}
 
-                    {/* Order detail content */}
                     {!sheetLoading && result && (
                         <>
                             <SheetHeader>
                                 <div className="flex items-center justify-between pr-6">
                                     <SheetTitle>订单详情</SheetTitle>
-                                    {getStatusBadge(result.status)}
+                                    <StatusBadge status={result.status} />
                                 </div>
                                 <SheetDescription className="flex items-center gap-1">
                                     <span className="font-mono text-xs">{result.orderNo}</span>
@@ -610,7 +791,7 @@ function OrderLookupPageContent() {
                                     )}
                                 </div>
 
-                                {/* 状态描述：PENDING 可继续支付 */}
+                                {/* PENDING + canPay */}
                                 {result.isPending && result.canPay && (
                                     <div className="rounded-lg border border-orange-200 bg-orange-50 p-3 text-sm text-orange-900 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-200">
                                         <p className="font-medium mb-1.5">订单待支付</p>
@@ -652,7 +833,7 @@ function OrderLookupPageContent() {
                                     </div>
                                 )}
 
-                                {/* 状态描述：PENDING 已超时 */}
+                                {/* PENDING + expired */}
                                 {result.isPending && !result.canPay && (
                                     <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
                                         <p className="font-medium mb-1.5">订单待支付（已超时）</p>
@@ -662,7 +843,7 @@ function OrderLookupPageContent() {
                                     </div>
                                 )}
 
-                                {/* 状态描述：已关闭且无卡密 */}
+                                {/* CLOSED with no cards */}
                                 {!result.isPending && result.status === "CLOSED" && result.cards.length === 0 && (
                                     <div className="rounded-lg border border-muted bg-muted/50 p-3 text-sm text-muted-foreground">
                                         <p className="font-medium mb-0.5">订单已关闭</p>
@@ -670,7 +851,7 @@ function OrderLookupPageContent() {
                                     </div>
                                 )}
 
-                                {/* Empty cards notice（仅已完成且无卡密时显示） */}
+                                {/* COMPLETED but empty cards */}
                                 {!result.isPending && result.status !== "CLOSED" && result.cards.length === 0 && (
                                     <div className="rounded-lg border border-muted bg-muted/50 p-4 text-center">
                                         <Package className="size-8 mx-auto mb-2 text-muted-foreground" />
@@ -696,111 +877,21 @@ function OrderLookupPageContent() {
                                         <div className="space-y-1.5">
                                             {result.cards.map((card, index) =>
                                                 isFreeSharedCard(card) ? (
-                                                    <div
+                                                    <FreeSharedCardItem
                                                         key={index}
-                                                        className="rounded-lg border border-border/80 bg-card shadow-sm overflow-hidden"
-                                                    >
-                                                        <div className="divide-y divide-border/60">
-                                                            <div className="flex items-center justify-between gap-4 px-4 py-3.5 bg-muted/30">
-                                                                <div className="flex items-center gap-2.5 min-w-0">
-                                                                    <Mail className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                                                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">账号</span>
-                                                                </div>
-                                                                <div className="flex items-center gap-2 min-w-0 flex-1 justify-end">
-                                                                    <code className="truncate font-mono text-sm text-foreground" title={card.account}>
-                                                                        {card.account}
-                                                                    </code>
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        className="size-8 shrink-0 rounded-full hover:bg-background cursor-pointer"
-                                                                        onClick={() => copyCard(card.account, `card-${index}-account`)}
-                                                                        aria-label="复制账号"
-                                                                    >
-                                                                        {copiedId === `card-${index}-account` ? (
-                                                                            <Check className="size-4 text-emerald-600" />
-                                                                        ) : (
-                                                                            <Copy className="size-4" />
-                                                                        )}
-                                                                    </Button>
-                                                                </div>
-                                                            </div>
-                                                            <div className="flex items-center justify-between gap-4 px-4 py-3.5 bg-muted/30">
-                                                                <div className="flex items-center gap-2.5 min-w-0">
-                                                                    <KeyRound className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                                                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">密码</span>
-                                                                </div>
-                                                                <div className="flex items-center gap-2 min-w-0 flex-1 justify-end">
-                                                                    <code className="truncate font-mono text-sm text-foreground" title={card.password}>
-                                                                        {card.password}
-                                                                    </code>
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        className="size-8 shrink-0 rounded-full hover:bg-background cursor-pointer"
-                                                                        onClick={() => copyCard(card.password, `card-${index}-password`)}
-                                                                        aria-label="复制密码"
-                                                                    >
-                                                                        {copiedId === `card-${index}-password` ? (
-                                                                            <Check className="size-4 text-emerald-600" />
-                                                                        ) : (
-                                                                            <Copy className="size-4" />
-                                                                        )}
-                                                                    </Button>
-                                                                </div>
-                                                            </div>
-                                                            <div className="flex items-center justify-between gap-4 px-4 py-3">
-                                                                <div className="flex items-center gap-2.5">
-                                                                    <Globe className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                                                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">地区</span>
-                                                                </div>
-                                                                <span className="text-sm font-medium text-foreground">{card.region}</span>
-                                                            </div>
-                                                            {card.lastCheckedAt != null && card.lastCheckedAt !== "" && (
-                                                                <div className="flex items-center justify-between gap-4 px-4 py-3">
-                                                                    <div className="flex items-center gap-2.5">
-                                                                        <Clock className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                                                                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">上次检查</span>
-                                                                    </div>
-                                                                    <span className="text-sm text-muted-foreground tabular-nums">{card.lastCheckedAt}</span>
-                                                                </div>
-                                                            )}
-                                                            {card.installStatus != null && card.installStatus !== "" && (
-                                                                <div className="flex items-center justify-between gap-4 px-4 py-3">
-                                                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">装好状态</span>
-                                                                    <span className="text-sm text-foreground">{card.installStatus}</span>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                        <div className="flex gap-2.5 px-4 py-3 rounded-b-lg bg-amber-500/5 border-t border-amber-500/10 text-xs text-muted-foreground">
-                                                            <Info className="size-4 shrink-0 text-amber-600 dark:text-amber-500 mt-0.5" aria-hidden />
-                                                            <p className="leading-relaxed">
-                                                                若无法使用可返回商品页重新领取；仅用于 App Store，请勿在设置或 iCloud 登录。
-                                                            </p>
-                                                        </div>
-                                                    </div>
+                                                        card={card}
+                                                        index={index}
+                                                        copiedId={copiedId}
+                                                        onCopy={copyCard}
+                                                    />
                                                 ) : (
-                                                    <div
+                                                    <SimpleCardItem
                                                         key={index}
-                                                        className="group flex items-center gap-2 rounded-lg border bg-background p-2 transition-colors hover:bg-muted/50"
-                                                    >
-                                                        <code className="flex-1 font-mono text-xs break-all select-all">
-                                                            {card.content}
-                                                        </code>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="size-7 shrink-0 cursor-pointer"
-                                                            onClick={() => copyCard(card.content, `card-${index}`)}
-                                                            aria-label={`复制第 ${index + 1} 条卡密`}
-                                                        >
-                                                            {copiedId === `card-${index}` ? (
-                                                                <Check className="size-3.5 text-green-600" />
-                                                            ) : (
-                                                                <Copy className="size-3.5" />
-                                                            )}
-                                                        </Button>
-                                                    </div>
+                                                        card={card}
+                                                        index={index}
+                                                        copiedId={copiedId}
+                                                        onCopy={copyCard}
+                                                    />
                                                 )
                                             )}
                                         </div>
