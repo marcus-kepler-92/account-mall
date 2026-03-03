@@ -4,6 +4,7 @@ import { publicOrderLookupByEmailSchema } from "@/lib/validations/order"
 import { verifyPassword } from "better-auth/crypto"
 import { checkOrderQueryRateLimit } from "@/lib/rate-limit"
 import { invalidJsonBody, validationError, badRequest, internalServerError } from "@/lib/api-response"
+import { parseFreeSharedCardContent } from "@/lib/free-shared-card"
 
 /**
  * POST /api/orders/lookup-by-email
@@ -118,12 +119,16 @@ export async function POST(request: NextRequest) {
                 })
             }
 
-            // For COMPLETED/CLOSED orders, return cards
+            // For COMPLETED/CLOSED orders, return cards（免费共享卡密解析为 account/password/region 等，避免前端显示 JSON 字符串）
             const cards = order.cards
                 .filter((card) => card.status === "SOLD" || card.status === "RESERVED")
-                .map((card) => ({
-                    content: card.content,
-                }))
+                .map((card) => {
+                    const payload = parseFreeSharedCardContent(card.content)
+                    if (payload) {
+                        return { content: card.content, ...payload }
+                    }
+                    return { content: card.content }
+                })
 
             return NextResponse.json({
                 orderNo: order.orderNo,

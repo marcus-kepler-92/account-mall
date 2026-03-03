@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, Suspense } from "react"
-import { useSearchParams, useRouter } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -43,7 +43,6 @@ interface OrderListItem {
 type LookupMode = "orderNo" | "email"
 
 function OrderLookupPageContent() {
-    const router = useRouter()
     const searchParams = useSearchParams()
     const siteName = useSiteName()
     const [lookupMode, setLookupMode] = useState<LookupMode>("orderNo")
@@ -219,11 +218,7 @@ function OrderLookupPageContent() {
             }
             setSheetLoading(false)
             setLoadingOrderNo(null)
-            if (data?.successToken && data?.orderNo) {
-                router.replace(
-                    `/orders/${encodeURIComponent(data.orderNo)}/success?token=${encodeURIComponent(data.successToken)}`,
-                )
-            }
+            // 从订单列表点击仅打开详情抽屉，不跳转成功页
         } catch {
             toast.error("网络错误，请稍后重试")
             setSheetOpen(false)
@@ -718,9 +713,9 @@ function OrderLookupPageContent() {
                                                                     <Button
                                                                         variant="ghost"
                                                                         size="icon"
-className="size-8 shrink-0 rounded-full hover:bg-background cursor-pointer"
+                                                                        className="size-8 shrink-0 rounded-full hover:bg-background cursor-pointer"
                                                                         onClick={() => copyCard(card.account, `card-${index}-account`)}
-                                                            aria-label="复制账号"
+                                                                        aria-label="复制账号"
                                                                     >
                                                                         {copiedId === `card-${index}-account` ? (
                                                                             <Check className="size-4 text-emerald-600" />
@@ -742,9 +737,9 @@ className="size-8 shrink-0 rounded-full hover:bg-background cursor-pointer"
                                                                     <Button
                                                                         variant="ghost"
                                                                         size="icon"
-className="size-8 shrink-0 rounded-full hover:bg-background cursor-pointer"
+                                                                        className="size-8 shrink-0 rounded-full hover:bg-background cursor-pointer"
                                                                         onClick={() => copyCard(card.password, `card-${index}-password`)}
-                                                                    aria-label="复制密码"
+                                                                        aria-label="复制密码"
                                                                     >
                                                                         {copiedId === `card-${index}-password` ? (
                                                                             <Check className="size-4 text-emerald-600" />
