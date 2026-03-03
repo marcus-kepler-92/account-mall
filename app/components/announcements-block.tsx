@@ -124,7 +124,7 @@ export function AnnouncementsBlock({ announcements }: AnnouncementsBlockProps) {
                                         </div>
                                     </CollapsibleTrigger>
                                     <CollapsibleContent>
-                                        <div className="border-t border-border bg-card px-4 py-3 text-sm text-muted-foreground rounded-b-lg">
+                                        <div className="border-t border-border bg-card px-8 py-3 text-sm text-muted-foreground rounded-b-lg">
                                             <ProductDescriptionView description={a.content!} />
                                         </div>
                                     </CollapsibleContent>
