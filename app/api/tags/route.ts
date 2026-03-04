@@ -7,19 +7,38 @@ import { unauthorized, invalidJsonBody, validationError, conflict } from "@/lib/
 
 /**
  * GET /api/tags
- * Public: returns all tags with product counts
+ * Public: returns all tags with product counts.
+ * Optional ?code=xxx filters counts to only ACTIVE products visible with that secret code (same as product list).
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+    const { searchParams } = new URL(request.url);
+    const code = searchParams.get("code");
+
+    const productWhere: { status: "ACTIVE"; secretCode?: null; OR?: { secretCode: null }[] | { secretCode: string }[] } = {
+        status: "ACTIVE",
+    };
+    if (code) {
+        productWhere.OR = [{ secretCode: null }, { secretCode: code }];
+    } else {
+        productWhere.secretCode = null;
+    }
+
     const tags = await prisma.tag.findMany({
         include: {
-            _count: {
-                select: { products: true },
+            products: {
+                where: productWhere,
+                select: { id: true },
             },
         },
         orderBy: { name: "asc" },
     });
 
-    return NextResponse.json(tags);
+    return NextResponse.json(
+        tags.map(({ products, ...tag }) => ({
+            ...tag,
+            _count: { products: products.length },
+        }))
+    );
 }
 
 /**

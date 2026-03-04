@@ -41,12 +41,13 @@ type ProductCardProps = {
     product: ProductCardData
     gradientIndex?: number
     className?: string
+    code?: string
 }
 
 /**
  * Product card with equal height in grid, cover maintains aspect ratio (1:1).
  */
-export function ProductCard({ product, gradientIndex = 0, className }: ProductCardProps) {
+export function ProductCard({ product, gradientIndex = 0, className, code }: ProductCardProps) {
     const gradient = CARD_GRADIENTS[gradientIndex % CARD_GRADIENTS.length]
     const descriptionFallback = descriptionToPlainText(product.description, 80)
     const briefRaw = product.summary?.trim() || descriptionFallback
@@ -55,9 +56,14 @@ export function ProductCard({ product, gradientIndex = 0, className }: ProductCa
     const isSoldOut = !isFreeShared && product.stock === 0
     const productSlug = `${product.id}-${product.slug}`
 
-    const detailHref = isSoldOut
-        ? `/products/${productSlug}?restock=1`
-        : `/products/${productSlug}`
+    const buildDetailHref = () => {
+        const params = new URLSearchParams()
+        if (isSoldOut) params.set("restock", "1")
+        if (code) params.set("code", code)
+        const query = params.toString()
+        return `/products/${productSlug}${query ? `?${query}` : ""}`
+    }
+    const detailHref = buildDetailHref()
 
     return (
         <Link href={detailHref} className={cn("group block h-full", className)}>

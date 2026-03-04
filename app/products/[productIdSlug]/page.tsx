@@ -18,6 +18,7 @@ export const dynamic = "force-dynamic"
 
 type PageProps = {
     params: Promise<{ productIdSlug: string }>
+    searchParams: Promise<{ code?: string }>
 }
 
 function parseProductIdSlug(segment: string): { productId: string; slug: string } | null {
@@ -29,16 +30,20 @@ function parseProductIdSlug(segment: string): { productId: string; slug: string 
     }
 }
 
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: PageProps): Promise<Metadata> {
     const { productIdSlug } = await params
+    const { code } = await searchParams
     const parsed = parseProductIdSlug(productIdSlug)
     if (!parsed) return { title: "商品" }
 
     const product = await prisma.product.findUnique({
         where: { id: parsed.productId },
-        select: { name: true, description: true, price: true, status: true, image: true, id: true, slug: true },
+        select: { name: true, description: true, price: true, status: true, image: true, id: true, slug: true, secretCode: true },
     })
     if (!product || product.status !== "ACTIVE") return { title: "商品" }
+
+    // Secret code check: if product has secretCode, verify it matches
+    if (product.secretCode && product.secretCode !== code) return { title: "商品" }
 
     const desc = product.description
         ? descriptionToPlainText(product.description, 160)
@@ -66,8 +71,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     }
 }
 
-export default async function ProductDetailPage({ params }: PageProps) {
+export default async function ProductDetailPage({ params, searchParams }: PageProps) {
     const { productIdSlug } = await params
+    const { code } = await searchParams
 
     const parsed = parseProductIdSlug(productIdSlug)
     if (!parsed) notFound()
@@ -82,6 +88,11 @@ export default async function ProductDetailPage({ params }: PageProps) {
     })
 
     if (!product || product.status !== "ACTIVE") {
+        notFound()
+    }
+
+    // Secret code check: if product has secretCode, verify it matches
+    if (product.secretCode && product.secretCode !== code) {
         notFound()
     }
 

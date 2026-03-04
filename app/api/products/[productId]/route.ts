@@ -14,10 +14,12 @@ type RouteContext = {
  * Public: get product detail
  */
 export async function GET(
-    _request: NextRequest,
+    request: NextRequest,
     context: RouteContext
 ) {
     const { productId } = await context.params;
+    const { searchParams } = new URL(request.url);
+    const code = searchParams.get("code");
 
     const product = await prisma.product.findUnique({
         where: { id: productId },
@@ -29,6 +31,11 @@ export async function GET(
     });
 
     if (!product) {
+        return notFound("Product not found");
+    }
+
+    // Secret code check: if product has secretCode, verify it matches
+    if (product.secretCode && product.secretCode !== code) {
         return notFound("Product not found");
     }
 
@@ -82,7 +89,7 @@ export async function PUT(
         return notFound("Product not found");
     }
 
-    const { tagIds, productType, sourceUrl, price, pinned, ...rest } = parsed.data;
+    const { tagIds, productType, sourceUrl, price, pinned, secretCode, ...rest } = parsed.data;
 
     // Check slug uniqueness if updating slug
     if (rest.slug && rest.slug !== existing.slug) {
@@ -101,6 +108,9 @@ export async function PUT(
         ...(productType !== undefined && { productType }),
         ...(sourceUrl !== undefined && {
             sourceUrl: isFreeShared ? null : (sourceUrl?.trim() || undefined),
+        }),
+        ...(secretCode !== undefined && {
+            secretCode: secretCode?.trim() || null,
         }),
         ...(tagIds !== undefined && {
             tags: { set: tagIds.map((id) => ({ id })) },

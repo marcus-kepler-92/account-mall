@@ -23,6 +23,10 @@ function createContext(productId: string): RouteContext {
     return { params: Promise.resolve({ productId }) }
 }
 
+function createUrlRequest(url: string): NextRequest {
+    return { url } as unknown as NextRequest
+}
+
 function createJsonRequest(body: unknown): NextRequest {
     return {
         json: async () => body,
@@ -33,7 +37,10 @@ describe("GET /api/products/[productId]", () => {
     it("returns 404 when product does not exist", async () => {
         prismaMock.product.findUnique.mockResolvedValueOnce(null)
 
-        const res = await GET({} as NextRequest, createContext("prod_1"))
+        const res = await GET(
+            createUrlRequest("http://localhost/api/products/prod_1"),
+            createContext("prod_1")
+        )
         const data = await res.json()
 
         expect(res.status).toBe(404)
@@ -50,6 +57,7 @@ describe("GET /api/products/[productId]", () => {
             price: 50,
             maxQuantity: 5,
             status: "ACTIVE",
+            secretCode: null,
             createdAt: new Date(),
             updatedAt: new Date(),
             tags: [{ id: "t1", name: "Tag", slug: "tag" }],
@@ -57,7 +65,10 @@ describe("GET /api/products/[productId]", () => {
         prismaMock.product.findUnique.mockResolvedValueOnce(product)
         prismaMock.card.count.mockResolvedValueOnce(7)
 
-        const res = await GET({} as NextRequest, createContext("prod_1"))
+        const res = await GET(
+            createUrlRequest("http://localhost/api/products/prod_1"),
+            createContext("prod_1")
+        )
         const data = await res.json()
 
         expect(res.status).toBe(200)
@@ -73,6 +84,100 @@ describe("GET /api/products/[productId]", () => {
             include: {
                 tags: { select: { id: true, name: true, slug: true } },
             },
+        })
+    })
+
+    it("returns 404 when product has secretCode but no code param provided", async () => {
+        const product = {
+            id: "prod_secret",
+            name: "Secret",
+            slug: "secret",
+            secretCode: "hidden",
+            price: 50,
+            tags: [],
+        }
+        prismaMock.product.findUnique.mockResolvedValueOnce(product)
+
+        const res = await GET(
+            createUrlRequest("http://localhost/api/products/prod_secret"),
+            createContext("prod_secret")
+        )
+        const data = await res.json()
+
+        expect(res.status).toBe(404)
+        expect(data).toEqual({ error: "Product not found" })
+    })
+
+    it("returns 404 when product has secretCode and code param does not match", async () => {
+        const product = {
+            id: "prod_secret",
+            name: "Secret",
+            slug: "secret",
+            secretCode: "hidden",
+            price: 50,
+            tags: [],
+        }
+        prismaMock.product.findUnique.mockResolvedValueOnce(product)
+
+        const res = await GET(
+            createUrlRequest("http://localhost/api/products/prod_secret?code=wrong"),
+            createContext("prod_secret")
+        )
+        const data = await res.json()
+
+        expect(res.status).toBe(404)
+        expect(data).toEqual({ error: "Product not found" })
+    })
+
+    it("returns product when secretCode matches code param", async () => {
+        const product = {
+            id: "prod_secret",
+            name: "Secret Product",
+            slug: "secret",
+            secretCode: "correct",
+            price: 100,
+            tags: [],
+        }
+        prismaMock.product.findUnique.mockResolvedValueOnce(product)
+        prismaMock.card.count.mockResolvedValueOnce(5)
+
+        const res = await GET(
+            createUrlRequest("http://localhost/api/products/prod_secret?code=correct"),
+            createContext("prod_secret")
+        )
+        const data = await res.json()
+
+        expect(res.status).toBe(200)
+        expect(data).toMatchObject({
+            id: "prod_secret",
+            name: "Secret Product",
+            price: 100,
+            stock: 5,
+        })
+    })
+
+    it("returns product without secretCode when no code param", async () => {
+        const product = {
+            id: "prod_public",
+            name: "Public",
+            slug: "public",
+            secretCode: null,
+            price: 50,
+            tags: [],
+        }
+        prismaMock.product.findUnique.mockResolvedValueOnce(product)
+        prismaMock.card.count.mockResolvedValueOnce(3)
+
+        const res = await GET(
+            createUrlRequest("http://localhost/api/products/prod_public"),
+            createContext("prod_public")
+        )
+        const data = await res.json()
+
+        expect(res.status).toBe(200)
+        expect(data).toMatchObject({
+            id: "prod_public",
+            name: "Public",
         })
     })
 })
@@ -236,6 +341,68 @@ describe("PUT /api/products/[productId]", () => {
             data: expect.objectContaining({
                 name: "Updated Name",
                 price: 99,
+            }),
+            include: expect.any(Object),
+        })
+    })
+
+    it("updates product secretCode", async () => {
+        adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
+        prismaMock.product.findUnique.mockResolvedValueOnce({
+            id: "prod_1",
+            slug: "test",
+        })
+        const updated = {
+            id: "prod_1",
+            slug: "test",
+            secretCode: "newsecret",
+            price: 50,
+            tags: [],
+        }
+        prismaMock.product.update.mockResolvedValueOnce(updated)
+
+        const res = await PUT(
+            createJsonRequest({ secretCode: "newsecret" }),
+            createContext("prod_1")
+        )
+        const data = await res.json()
+
+        expect(res.status).toBe(200)
+        expect(prismaMock.product.update).toHaveBeenCalledWith({
+            where: { id: "prod_1" },
+            data: expect.objectContaining({
+                secretCode: "newsecret",
+            }),
+            include: expect.any(Object),
+        })
+    })
+
+    it("clears secretCode when set to empty string", async () => {
+        adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
+        prismaMock.product.findUnique.mockResolvedValueOnce({
+            id: "prod_1",
+            slug: "test",
+            secretCode: "oldsecret",
+        })
+        const updated = {
+            id: "prod_1",
+            slug: "test",
+            secretCode: null,
+            price: 50,
+            tags: [],
+        }
+        prismaMock.product.update.mockResolvedValueOnce(updated)
+
+        const res = await PUT(
+            createJsonRequest({ secretCode: "" }),
+            createContext("prod_1")
+        )
+
+        expect(res.status).toBe(200)
+        expect(prismaMock.product.update).toHaveBeenCalledWith({
+            where: { id: "prod_1" },
+            data: expect.objectContaining({
+                secretCode: null,
             }),
             include: expect.any(Object),
         })

@@ -8,7 +8,7 @@ import { ProductsList } from "@/app/components/products-list"
 import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card"
 import { ProductStatusFilter } from "@/app/components/product-status-filter"
 
-type SearchParams = Promise<{ status?: string; tag?: string }>
+type SearchParams = Promise<{ status?: string; tag?: string; hasSecretCode?: string }>
 
 export default async function AdminProductsPage({
     searchParams,
@@ -18,6 +18,7 @@ export default async function AdminProductsPage({
     const params = await searchParams
     const statusFilter = params.status
     const tagFilter = params.tag
+    const hasSecretCodeFilter = params.hasSecretCode
 
     // Build where clause
     const where: Record<string, unknown> = {}
@@ -26,6 +27,11 @@ export default async function AdminProductsPage({
     }
     if (tagFilter) {
         where.tags = { some: { slug: tagFilter } }
+    }
+    if (hasSecretCodeFilter === "true") {
+        where.secretCode = { not: null }
+    } else if (hasSecretCodeFilter === "false") {
+        where.secretCode = null
     }
 
     const [products, tags] = await Promise.all([
@@ -63,6 +69,7 @@ export default async function AdminProductsPage({
         ...p,
         price: Number(p.price),
         pinnedAt: p.pinnedAt?.toISOString() ?? null,
+        secretCode: p.secretCode ?? null,
     }))
     const stockMapPlain = Object.fromEntries(stockMap)
 
@@ -88,6 +95,7 @@ export default async function AdminProductsPage({
             <ProductStatusFilter
                 currentStatus={statusFilter}
                 currentTag={tagFilter}
+                currentHasSecretCode={hasSecretCodeFilter}
                 tags={tags.map((t) => ({ slug: t.slug, name: t.name }))}
             />
 

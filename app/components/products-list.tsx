@@ -20,6 +20,7 @@ type Product = {
     status: string
     price: number
     pinnedAt: string | null
+    secretCode: string | null
     tags: { id: string; name: string; slug: string }[]
 }
 
@@ -40,6 +41,7 @@ export function ProductsList({ products, stockMap }: ProductsListProps) {
                             <TableHead>价格</TableHead>
                             <TableHead>库存</TableHead>
                             <TableHead>状态</TableHead>
+                            <TableHead>暗号</TableHead>
                             <TableHead>标签</TableHead>
                             <TableHead className="text-right">操作</TableHead>
                         </TableRow>
@@ -79,6 +81,15 @@ export function ProductsList({ products, stockMap }: ProductsListProps) {
                                     >
                                         {product.status === "ACTIVE" ? "上架" : "下架"}
                                     </Badge>
+                                </TableCell>
+                                <TableCell>
+                                    {product.secretCode ? (
+                                        <Badge variant="outline" className="text-xs font-mono">
+                                            {product.secretCode}
+                                        </Badge>
+                                    ) : (
+                                        <span className="text-muted-foreground">-</span>
+                                    )}
                                 </TableCell>
                                 <TableCell>
                                     <div className="flex flex-wrap gap-1">
@@ -140,7 +151,7 @@ export function ProductsList({ products, stockMap }: ProductsListProps) {
                                             </Badge>
                                         ))}
                                     </div>
-                                    <div className="mt-3 flex items-center gap-3 text-sm">
+                                    <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
                                         <span>¥{Number(product.price).toFixed(2)}</span>
                                         <span className="text-muted-foreground">
                                             库存 {stockMap[product.id] ?? 0}
@@ -154,6 +165,11 @@ export function ProductsList({ products, stockMap }: ProductsListProps) {
                                         >
                                             {product.status === "ACTIVE" ? "上架" : "下架"}
                                         </Badge>
+                                        {product.secretCode && (
+                                            <Badge variant="outline" className="text-xs font-mono">
+                                                暗号: {product.secretCode}
+                                            </Badge>
+                                        )}
                                     </div>
                                 </div>
                                 <ProductRowActions

@@ -20,6 +20,7 @@ export const createProductSchema = z.object({
     status: z.enum(["ACTIVE", "INACTIVE"]).optional(),
     productType: productTypeEnum.optional(),
     sourceUrl: z.string().url().optional().nullable().or(z.literal("")),
+    secretCode: z.string().max(64).nullable().optional(),
     tagIds: z.array(z.string()).optional(),
 }).refine(
     (data) => data.productType !== "FREE_SHARED" || data.price === 0,
@@ -42,6 +43,7 @@ export const updateProductSchema = z.object({
     status: z.enum(["ACTIVE", "INACTIVE"]).optional(),
     productType: productTypeEnum.optional(),
     sourceUrl: z.string().url().optional().nullable().or(z.literal("")),
+    secretCode: z.string().max(64).nullable().optional(),
     tagIds: z.array(z.string()).optional(),
     pinned: z.boolean().optional(),
 }).refine(
@@ -77,6 +79,7 @@ export const productFormSchema = z
         isActive: z.boolean(),
         productType: z.enum(["NORMAL", "FREE_SHARED"]).optional(),
         sourceUrl: z.string().optional(),
+        secretCode: z.string().max(64).optional(),
         tagIds: z.array(z.string()).optional(),
     })
     .superRefine((data, ctx) => {

@@ -17,6 +17,10 @@ jest.mock("@/lib/auth-guard", () => ({
 
 import { getAdminSession } from "@/lib/auth-guard"
 
+function createUrlRequest(url: string): NextRequest {
+    return { url } as unknown as NextRequest
+}
+
 function createJsonRequest(body: unknown): NextRequest {
     return {
         json: async () => body,
@@ -24,25 +28,68 @@ function createJsonRequest(body: unknown): NextRequest {
 }
 
 describe("GET /api/tags", () => {
-    it("returns all tags with product counts", async () => {
+    it("returns all tags with product counts (no code = only public products)", async () => {
         const tags = [
             {
                 id: "tag_1",
                 name: "Game",
                 slug: "game",
-                _count: { products: 3 },
+                createdAt: new Date(),
+                updatedAt: new Date(),
+                products: [{ id: "p1" }, { id: "p2" }, { id: "p3" }],
             },
         ]
         prismaMock.tag.findMany.mockResolvedValueOnce(tags)
 
-        const res = await GET()
+        const res = await GET(createUrlRequest("http://localhost/api/tags"))
         const data = await res.json()
 
         expect(res.status).toBe(200)
-        expect(data).toEqual(tags)
+        expect(data).toHaveLength(1)
+        expect(data[0]).toMatchObject({
+            id: "tag_1",
+            name: "Game",
+            slug: "game",
+            _count: { products: 3 },
+        })
         expect(prismaMock.tag.findMany).toHaveBeenCalledWith({
             include: {
-                _count: { select: { products: true } },
+                products: {
+                    where: { status: "ACTIVE", secretCode: null },
+                    select: { id: true },
+                },
+            },
+            orderBy: { name: "asc" },
+        })
+    })
+
+    it("filters product count by code when code param provided", async () => {
+        const tags = [
+            {
+                id: "tag_1",
+                name: "Game",
+                slug: "game",
+                createdAt: new Date(),
+                updatedAt: new Date(),
+                products: [{ id: "p1" }, { id: "p2" }],
+            },
+        ]
+        prismaMock.tag.findMany.mockResolvedValueOnce(tags)
+
+        const res = await GET(createUrlRequest("http://localhost/api/tags?code=secret1"))
+        const data = await res.json()
+
+        expect(res.status).toBe(200)
+        expect(data[0]._count.products).toBe(2)
+        expect(prismaMock.tag.findMany).toHaveBeenCalledWith({
+            include: {
+                products: {
+                    where: {
+                        status: "ACTIVE",
+                        OR: [{ secretCode: null }, { secretCode: "secret1" }],
+                    },
+                    select: { id: true },
+                },
             },
             orderBy: { name: "asc" },
         })

@@ -46,6 +46,7 @@ export function ProductCatalog() {
     const router = useRouter()
     const searchParams = useSearchParams()
     const tagParam = searchParams.get("tag") ?? ""
+    const codeParam = searchParams.get("code") ?? ""
     const selectedTagSlugs = parseTagFromUrl(searchParams.get("tag"))
 
     const [searchInput, setSearchInput] = useState("")
@@ -63,14 +64,15 @@ export function ProductCatalog() {
 
     const fetchTags = useCallback(async () => {
         try {
-            const res = await fetch("/api/tags")
+            const url = codeParam ? `/api/tags?code=${encodeURIComponent(codeParam)}` : "/api/tags"
+            const res = await fetch(url)
             if (!res.ok) throw new Error("Failed to fetch tags")
             const data = await res.json()
             setTags(data)
         } catch {
             setTags([])
         }
-    }, [])
+    }, [codeParam])
 
     const fetchProducts = useCallback(async () => {
         setLoading(true)
@@ -79,6 +81,7 @@ export function ProductCatalog() {
             const params = new URLSearchParams()
             if (search.trim()) params.set("q", search.trim())
             if (tagParam) params.set("tag", tagParam)
+            if (codeParam) params.set("code", codeParam)
             if (sort !== "default") params.set("sort", sort)
             params.set("page", String(currentPage))
             params.set("pageSize", String(PAGE_SIZE))
@@ -94,7 +97,7 @@ export function ProductCatalog() {
         } finally {
             setLoading(false)
         }
-    }, [search, tagParam, sort, currentPage])
+    }, [search, tagParam, codeParam, sort, currentPage])
 
     useEffect(() => {
         fetchTags()
@@ -320,7 +323,7 @@ export function ProductCatalog() {
                 <h2 className="sr-only">商品列表</h2>
                 <div className="grid grid-cols-1 items-stretch gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 min-[1600px]:grid-cols-6">
                     {products.map((product, idx) => (
-                        <ProductCard key={product.id} product={product} gradientIndex={idx} />
+                        <ProductCard key={product.id} product={product} gradientIndex={idx} code={codeParam || undefined} />
                     ))}
                 </div>
                 </>

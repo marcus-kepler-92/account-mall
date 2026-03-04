@@ -101,6 +101,7 @@ model Product {
   status      ProductStatus @default(ACTIVE)
   productType ProductType   @default(NORMAL)
   sourceUrl   String?       @db.Text
+  secretCode  String?       @db.VarChar(64)
   pinnedAt    DateTime?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
