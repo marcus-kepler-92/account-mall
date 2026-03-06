@@ -25,3 +25,18 @@ export const patchCardStatusSchema = z.object({
 });
 
 export type PatchCardStatusInput = z.infer<typeof patchCardStatusSchema>;
+
+/**
+ * Schema for POST /api/cards/batch (batch delete/disable/enable).
+ * - action: DELETE (only UNSOLD), DISABLE (only UNSOLD), ENABLE (only DISABLED)
+ * - cardIds: 1–100 IDs
+ */
+export const batchCardActionSchema = z.object({
+    action: z.enum(["DELETE", "DISABLE", "ENABLE"]),
+    cardIds: z
+        .array(z.string().min(1))
+        .min(1, "At least one card ID is required")
+        .max(100, "Maximum 100 cards per batch operation"),
+});
+
+export type BatchCardActionInput = z.infer<typeof batchCardActionSchema>;
