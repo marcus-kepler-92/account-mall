@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getAdminSession } from "@/lib/auth-guard";
 import { createTagSchema } from "@/lib/validations/product";
@@ -14,14 +15,9 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const code = searchParams.get("code");
 
-    const productWhere: { status: "ACTIVE"; secretCode?: null; OR?: { secretCode: null }[] | { secretCode: string }[] } = {
-        status: "ACTIVE",
-    };
-    if (code) {
-        productWhere.OR = [{ secretCode: null }, { secretCode: code }];
-    } else {
-        productWhere.secretCode = null;
-    }
+    const productWhere = (code
+        ? { status: "ACTIVE" as const, OR: [{ secretCode: null }, { secretCode: code }] }
+        : { status: "ACTIVE" as const, secretCode: null }) as unknown as Prisma.ProductWhereInput;
 
     const tags = await prisma.tag.findMany({
         include: {
