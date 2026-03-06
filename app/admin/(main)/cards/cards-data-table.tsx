@@ -6,8 +6,6 @@ import { toast } from "sonner";
 import {
     useReactTable,
     getCoreRowModel,
-    getFilteredRowModel,
-    ColumnFiltersState,
     VisibilityState,
     RowSelectionState,
 } from "@tanstack/react-table";
@@ -53,7 +51,6 @@ const statusOptions = [
 
 export function CardsDataTable({ data, total, statusCounts }: CardsDataTableProps) {
     const router = useRouter();
-    const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
     const [batchLoading, setBatchLoading] = useState(false);
@@ -63,21 +60,19 @@ export function CardsDataTable({ data, total, statusCounts }: CardsDataTableProp
         data,
         columns: cardsColumns,
         state: {
-            columnFilters,
             columnVisibility,
             rowSelection,
         },
         enableRowSelection: true,
-        onColumnFiltersChange: setColumnFilters,
         onColumnVisibilityChange: setColumnVisibility,
         onRowSelectionChange: setRowSelection,
         getCoreRowModel: getCoreRowModel(),
-        getFilteredRowModel: getFilteredRowModel(),
         getRowId: (row) => row.id,
         manualPagination: true,
+        manualFiltering: true,
     });
 
-    const selectedRows = table.getFilteredSelectedRowModel().rows;
+    const selectedRows = table.getSelectedRowModel().rows;
     const selectedCards = selectedRows.map((row) => row.original);
     const selectedIds = selectedCards.map((card) => card.id);
 

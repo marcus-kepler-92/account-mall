@@ -9,7 +9,7 @@ import {
     VisibilityState,
     RowSelectionState,
 } from "@tanstack/react-table";
-import { Trash2, PowerOff, CircleDot, Loader2 } from "lucide-react";
+import { XCircle, Trash2, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -29,36 +29,34 @@ import {
     DataTableFacetedFilter,
     DataTableSelectionBar,
 } from "@/app/admin/components";
-import { productCardsColumns, type ProductCardRow } from "./product-cards-columns";
+import { ordersColumns, type OrderRow } from "./orders-columns";
 
-interface ProductCardsDataTableProps {
-    data: ProductCardRow[];
+interface OrdersDataTableProps {
+    data: OrderRow[];
     total: number;
     statusCounts: {
-        UNSOLD: number;
-        RESERVED: number;
-        SOLD: number;
-        DISABLED: number;
+        PENDING: number;
+        COMPLETED: number;
+        CLOSED: number;
     };
 }
 
 const statusOptions = [
-    { label: "未售", value: "UNSOLD" },
-    { label: "预占中", value: "RESERVED" },
-    { label: "已售", value: "SOLD" },
-    { label: "停用", value: "DISABLED" },
+    { label: "待完成", value: "PENDING" },
+    { label: "已完成", value: "COMPLETED" },
+    { label: "已关闭", value: "CLOSED" },
 ];
 
-export function ProductCardsDataTable({ data, total, statusCounts }: ProductCardsDataTableProps) {
+export function OrdersDataTable({ data, total, statusCounts }: OrdersDataTableProps) {
     const router = useRouter();
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
     const [batchLoading, setBatchLoading] = useState(false);
-    const [batchAction, setBatchAction] = useState<"DELETE" | "DISABLE" | "ENABLE" | null>(null);
+    const [batchAction, setBatchAction] = useState<"CLOSE" | "DELETE" | null>(null);
 
     const table = useReactTable({
         data,
-        columns: productCardsColumns,
+        columns: ordersColumns,
         state: {
             columnVisibility,
             rowSelection,
@@ -73,46 +71,45 @@ export function ProductCardsDataTable({ data, total, statusCounts }: ProductCard
     });
 
     const selectedRows = table.getSelectedRowModel().rows;
-    const selectedCards = selectedRows.map((row) => row.original);
+    const selectedOrders = selectedRows.map((row) => row.original);
 
-    const unsoldSelected = selectedCards.filter((c) => c.status === "UNSOLD");
-    const disabledSelected = selectedCards.filter((c) => c.status === "DISABLED");
+    const pendingSelected = selectedOrders.filter((o) => o.status === "PENDING");
+    const closedSelected = selectedOrders.filter((o) => o.status === "CLOSED");
 
-    const canBatchDelete = unsoldSelected.length > 0;
-    const canBatchDisable = unsoldSelected.length > 0;
-    const canBatchEnable = disabledSelected.length > 0;
+    const canBatchClose = pendingSelected.length > 0;
+    const canBatchDelete = closedSelected.length > 0;
 
-    const handleBatchAction = async (action: "DELETE" | "DISABLE" | "ENABLE") => {
-        const ids = action === "ENABLE" 
-            ? disabledSelected.map((c) => c.id)
-            : unsoldSelected.map((c) => c.id);
-        
+    const handleBatchAction = async (action: "CLOSE" | "DELETE") => {
+        const ids = action === "CLOSE"
+            ? pendingSelected.map((o) => o.id)
+            : closedSelected.map((o) => o.id);
+
         if (ids.length === 0) {
-            toast.error("没有可操作的卡密");
+            toast.error("没有可操作的订单");
             return;
         }
 
         setBatchLoading(true);
         try {
-            const res = await fetch("/api/cards/batch", {
+            const res = await fetch("/api/orders/batch", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action, cardIds: ids }),
+                body: JSON.stringify({ action, orderIds: ids }),
             });
             const result = await res.json();
             if (!res.ok) {
                 toast.error(result.error || "操作失败");
                 return;
             }
-            const actionLabel = action === "DELETE" ? "删除" : action === "DISABLE" ? "停用" : "启用";
-            toast.success(`成功${actionLabel} ${result.success} 条${result.skipped > 0 ? `，跳过 ${result.skipped} 条` : ""}`);
+            const actionLabel = action === "CLOSE" ? "关闭" : "删除";
+            toast.success(`成功${actionLabel} ${result.success} 笔${result.skipped > 0 ? `，跳过 ${result.skipped} 笔` : ""}`);
             setRowSelection({});
+            setBatchAction(null);
             router.refresh();
         } catch {
             toast.error("操作失败");
         } finally {
             setBatchLoading(false);
-            setBatchAction(null);
         }
     };
 
@@ -125,7 +122,7 @@ export function ProductCardsDataTable({ data, total, statusCounts }: ProductCard
         <div className="space-y-4">
             <DataTableToolbar
                 table={table}
-                searchPlaceholder="搜索卡密内容..."
+                searchPlaceholder="搜索邮箱或订单号..."
                 searchParamKey="search"
             >
                 <DataTableFacetedFilter
@@ -137,26 +134,15 @@ export function ProductCardsDataTable({ data, total, statusCounts }: ProductCard
             </DataTableToolbar>
 
             <DataTableSelectionBar table={table}>
-                {canBatchDisable && (
+                {canBatchClose && (
                     <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setBatchAction("DISABLE")}
+                        onClick={() => setBatchAction("CLOSE")}
                         disabled={batchLoading}
                     >
-                        <PowerOff className="mr-2 h-4 w-4" />
-                        批量停用 ({unsoldSelected.length})
-                    </Button>
-                )}
-                {canBatchEnable && (
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setBatchAction("ENABLE")}
-                        disabled={batchLoading}
-                    >
-                        <CircleDot className="mr-2 h-4 w-4" />
-                        批量启用 ({disabledSelected.length})
+                        <XCircle className="mr-2 h-4 w-4" />
+                        批量关闭 ({pendingSelected.length})
                     </Button>
                 )}
                 {canBatchDelete && (
@@ -172,12 +158,12 @@ export function ProductCardsDataTable({ data, total, statusCounts }: ProductCard
                         ) : (
                             <Trash2 className="mr-2 h-4 w-4" />
                         )}
-                        批量删除 ({unsoldSelected.length})
+                        批量删除 ({closedSelected.length})
                     </Button>
                 )}
             </DataTableSelectionBar>
 
-            <DataTable table={table} columns={productCardsColumns} emptyMessage="暂无卡密" />
+            <DataTable table={table} columns={ordersColumns} emptyMessage="暂无订单" />
 
             <DataTablePagination table={table} total={total} />
 
@@ -185,17 +171,14 @@ export function ProductCardsDataTable({ data, total, statusCounts }: ProductCard
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>
-                            确认{batchAction === "DELETE" ? "删除" : batchAction === "DISABLE" ? "停用" : "启用"}
+                            确认{batchAction === "CLOSE" ? "关闭" : "删除"}
                         </AlertDialogTitle>
                         <AlertDialogDescription>
+                            {batchAction === "CLOSE" && (
+                                <>确定要关闭选中的 {pendingSelected.length} 笔待完成订单吗？</>
+                            )}
                             {batchAction === "DELETE" && (
-                                <>确定要删除选中的 {unsoldSelected.length} 条未售卡密吗？此操作无法撤销。</>
-                            )}
-                            {batchAction === "DISABLE" && (
-                                <>确定要停用选中的 {unsoldSelected.length} 条未售卡密吗？</>
-                            )}
-                            {batchAction === "ENABLE" && (
-                                <>确定要启用选中的 {disabledSelected.length} 条停用卡密吗？</>
+                                <>确定要删除选中的 {closedSelected.length} 笔已关闭订单吗？此操作无法撤销。</>
                             )}
                         </AlertDialogDescription>
                     </AlertDialogHeader>

@@ -33,6 +33,21 @@ export const createOrderSchema = z.object({
     turnstileToken: z.string().optional(),
 })
 
+/**
+ * Schema for POST /api/orders/batch (batch close/delete).
+ * - CLOSE: only PENDING orders can be closed
+ * - DELETE: only CLOSED orders can be deleted (optional, for cleanup)
+ */
+export const batchOrderActionSchema = z.object({
+    action: z.enum(["CLOSE", "DELETE"]),
+    orderIds: z
+        .array(z.string().min(1))
+        .min(1, "At least one order ID is required")
+        .max(100, "Maximum 100 orders per batch operation"),
+})
+
+export type BatchOrderActionInput = z.infer<typeof batchOrderActionSchema>
+
 export const orderListQuerySchema = z.object({
     page: z.coerce.number().int().min(1).optional().default(1),
     pageSize: z.coerce.number().int().min(1).max(100).optional().default(20),
