@@ -11,8 +11,8 @@ import { SiteHeader } from "@/app/components/site-header"
 import { SoldOutOverlay } from "@/app/components/sold-out-overlay"
 import { RestockReminderForm } from "@/app/components/restock-reminder-form"
 import { ProductBottomBar } from "../../components/product-bottom-bar"
-import { ProductDescriptionView } from "@/app/components/product-description-view"
 import { descriptionToPlainText } from "@/lib/description"
+import { ProductDescriptionViewClient } from "@/app/components/product-description-view-client"
 
 export const dynamic = "force-dynamic"
 
@@ -158,7 +158,7 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
                             <section aria-label="商品详情">
                                 <div className="rounded-xl border bg-card p-4 shadow-sm sm:p-5">
                                     <h2 className="mb-3 text-sm font-semibold text-muted-foreground">商品详情</h2>
-                                    <ProductDescriptionView description={product.description} />
+                                    <ProductDescriptionViewClient description={product.description} />
                                 </div>
                             </section>
                         )}

@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/collapsible"
 import { ChevronDown, Megaphone } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { ProductDescriptionView } from "@/app/components/product-description-view"
+import { ProductDescriptionViewClient } from "@/app/components/product-description-view-client"
 
 const STORAGE_KEY = "announcements-expanded"
 
@@ -125,7 +125,7 @@ export function AnnouncementsBlock({ announcements }: AnnouncementsBlockProps) {
                                     </CollapsibleTrigger>
                                     <CollapsibleContent>
                                         <div className="border-t border-border bg-card px-8 py-3 text-sm text-muted-foreground rounded-b-lg">
-                                            <ProductDescriptionView description={a.content!} />
+                                            <ProductDescriptionViewClient description={a.content!} />
                                         </div>
                                     </CollapsibleContent>
                                 </Collapsible>
