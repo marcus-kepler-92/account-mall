@@ -52,3 +52,12 @@ scripts/analyze-apple-login-result.json
 scripts/crawl-apple-login-result.json
 scripts/explore-apple-login-report.json
 scripts/mcp-login-flow-report.json
+
+# Python (local automation)
+automation/.venv
+automation/__pycache__
+automation/**/__pycache__
+automation/*.egg-info
+automation/output/*
+automation/accounts.txt
+automation/error_logs/*

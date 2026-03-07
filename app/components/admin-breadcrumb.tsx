@@ -19,7 +19,6 @@ const routeLabels: Record<string, string> = {
     orders: "订单管理",
     cards: "卡密管理",
     announcements: "公告管理",
-    automation: "自动化任务",
 }
 
 function isIdSegment(seg: string) {
@@ -39,11 +38,7 @@ function getBreadcrumbItems(pathname: string) {
         if (seg === "admin") continue
 
         let label: string
-        if (prev === "automation") {
-            if (seg === "new") label = "新建任务"
-            else if (isIdSegment(seg)) label = "任务详情"
-            else label = seg
-        } else if (prev === "products") {
+        if (prev === "products") {
             if (seg === "cards") {
                 label = "卡密"
             } else if (isIdSegment(seg)) {
@@ -53,8 +48,6 @@ function getBreadcrumbItems(pathname: string) {
             }
         } else if (prev === "orders" && isIdSegment(seg)) {
             label = "订单详情"
-        } else if (seg === "edit" && isIdSegment(prev)) {
-            label = "编辑任务"
         } else if (seg in routeLabels) {
             label = routeLabels[seg]
         } else {

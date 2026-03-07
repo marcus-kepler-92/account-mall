@@ -10,7 +10,6 @@ import {
     LogOut,
     Store,
     Megaphone,
-    Bot,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { authClient } from "@/lib/auth-client"
@@ -57,11 +56,6 @@ const navItems = [
         title: "公告管理",
         href: "/admin/announcements",
         icon: Megaphone,
-    },
-    {
-        title: "自动化任务",
-        href: "/admin/automation",
-        icon: Bot,
     },
 ]
 
