@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getAdminSession } from "@/lib/auth-guard";
 import {
@@ -311,17 +312,17 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
   }
 
-  const data: { inputConfig?: unknown; summary?: unknown } = {};
+  const data: Prisma.AutomationTaskUpdateInput = {};
   if (parsed.data.inputConfig !== undefined) {
     const raw = parsed.data.inputConfig as Record<string, unknown>;
     const normalized: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(raw)) {
       normalized[k] = typeof v === "string" ? v.trim() : v;
     }
-    data.inputConfig = normalized;
+    data.inputConfig = normalized as Prisma.InputJsonValue;
   }
   if (parsed.data.summary !== undefined) {
-    data.summary = parsed.data.summary;
+    data.summary = parsed.data.summary as Prisma.InputJsonValue;
   }
 
   if (Object.keys(data).length > 0) {

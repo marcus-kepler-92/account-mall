@@ -14,7 +14,7 @@ export const createAutomationTaskSchema = z.object({
     .array(z.string().min(1))
     .min(1, "At least one card is required")
     .max(MAX_BATCH_CARDS, `Maximum ${MAX_BATCH_CARDS} cards per task`),
-  inputConfig: z.record(z.unknown()).optional(),
+  inputConfig: z.record(z.string(), z.unknown()).optional(),
 });
 
 export type CreateAutomationTaskInput = z.infer<
@@ -60,7 +60,7 @@ export const retryAutomationTaskSchema = z.object({
 });
 
 export const updateAutomationTaskSchema = z.object({
-  inputConfig: z.record(z.unknown()).optional(),
+  inputConfig: z.record(z.string(), z.unknown()).optional(),
   summary: z.unknown().optional(),
   cardIds: z.array(z.string().min(1)).min(0).max(MAX_BATCH_CARDS).optional(),
 });

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getAdminSession } from "@/lib/auth-guard";
 import { unauthorized, badRequest } from "@/lib/api-response";
@@ -53,7 +54,7 @@ export async function GET(request: NextRequest) {
             name: preset.name,
             presetType: preset.presetType,
             adapterKey: preset.adapterKey,
-            configJson: preset.configJson as Record<string, unknown>,
+            configJson: preset.configJson as Prisma.InputJsonValue,
             isEnabled: true,
           },
         })

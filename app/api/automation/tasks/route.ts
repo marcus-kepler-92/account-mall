@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getAdminSession } from "@/lib/auth-guard";
 import {
@@ -236,7 +237,7 @@ export async function POST(request: NextRequest) {
       presetId,
       status: AUTOMATION_TASK_STATUS.PENDING,
       createdBy: session.user.email ?? session.user.id,
-      inputConfig: inputConfig ?? {},
+      inputConfig: (inputConfig ?? {}) as Prisma.InputJsonValue,
       items: {
         create: validCardIds.map((cardId) => ({
           cardId,

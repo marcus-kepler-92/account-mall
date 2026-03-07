@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { chromium, type Page } from "playwright";
 import { prisma } from "@/lib/prisma";
 import { getAdminSession } from "@/lib/auth-guard";
@@ -255,7 +256,7 @@ export async function POST(request: NextRequest) {
                   where: { id: item.id },
                   data: {
                     status: AUTOMATION_TASK_ITEM_STATUS.SUCCESS,
-                    resultJson: (result.data || {}) as object,
+                    resultJson: (result.data || {}) as Prisma.InputJsonValue,
                     errorCode: null,
                     errorMessage: null,
                   },
@@ -356,7 +357,7 @@ export async function POST(request: NextRequest) {
           processed: items.length,
           success: successCount,
           failed: failedCount,
-        },
+        } as Prisma.InputJsonValue,
       },
     });
 

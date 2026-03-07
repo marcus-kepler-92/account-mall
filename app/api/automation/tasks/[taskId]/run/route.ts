@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { chromium, type Page } from "playwright";
 import { prisma } from "@/lib/prisma";
 import { getAdminSession } from "@/lib/auth-guard";
@@ -88,7 +89,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
   // FAILED items must be retried first (reset to PENDING) before execution
   const itemWhere = {
     taskId,
-    status: AUTOMATION_TASK_ITEM_STATUS.PENDING as const,
+    status: AUTOMATION_TASK_ITEM_STATUS.PENDING,
     ...(body.itemIds && body.itemIds.length > 0 ? { id: { in: body.itemIds } } : {}),
   };
 
@@ -216,7 +217,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
                 where: { id: item.id },
                 data: {
                   status: AUTOMATION_TASK_ITEM_STATUS.SUCCESS,
-                  resultJson: (result.data || {}) as object,
+                  resultJson: (result.data || {}) as Prisma.InputJsonValue,
                   errorCode: null,
                   errorMessage: null,
                 },
@@ -318,7 +319,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         success: successCount,
         failed: failedCount,
         skipped: skippedCount,
-      },
+      } as Prisma.InputJsonValue,
     },
   });
 

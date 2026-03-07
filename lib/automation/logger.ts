@@ -13,6 +13,7 @@
  *    - 内容：任务开始结束、项失败/异常、浏览器生命周期等；仅 ID/计数，不写账号密码等敏感信息
  *    - 写入方：仅 API 层（run、batch-run）在关键节点调用，flow/runners 不写
  */
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { LOG_LEVELS, type LogLevel, type LogStep } from "./constants";
 
@@ -34,7 +35,7 @@ export async function logTask(params: LogParams): Promise<void> {
       level,
       step,
       message,
-      data: data ?? undefined,
+      data: (data ?? undefined) as Prisma.InputJsonValue | undefined,
     },
   });
 }
