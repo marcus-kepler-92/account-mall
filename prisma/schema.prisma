@@ -58,7 +58,7 @@ model Verification {
   updatedAt  DateTime?
 }
 
-// ─── Business Models ─────────────────────────────────────────────
+// 鈹€鈹€鈹€ Business Models 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 enum ProductStatus {
   ACTIVE
@@ -89,6 +89,30 @@ enum ProductType {
   FREE_SHARED
 }
 
+enum AutomationCategory {
+  APPLE
+}
+
+enum AutomationPresetType {
+  STATUS_TEST
+  CHANGE_PASSWORD
+  CHANGE_REGION
+}
+
+enum AutomationTaskStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  PARTIAL_SUCCESS
+  FAILED
+}
+
+enum AutomationTaskItemStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  FAILED
+}
 model Product {
   id          String        @id @default(cuid())
   name        String
@@ -109,6 +133,8 @@ model Product {
   orders             Order[]
   tags               Tag[]
   restockSubscriptions RestockSubscription[]
+  automationPresets    ProductAutomationPreset[]
+  automationTasks      AutomationTask[]
 }
 
 model Tag {
@@ -121,15 +147,16 @@ model Tag {
 }
 
 model Card {
-  id        String     @id @default(cuid())
-  productId String
-  content   String
-  status    CardStatus @default(UNSOLD)
-  orderId   String?
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  product   Product    @relation(fields: [productId], references: [id])
-  order     Order?     @relation(fields: [orderId], references: [id])
+  id                  String               @id @default(cuid())
+  productId           String
+  content             String
+  status              CardStatus           @default(UNSOLD)
+  orderId             String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  product             Product              @relation(fields: [productId], references: [id])
+  order               Order?               @relation(fields: [orderId], references: [id])
+  automationTaskItems AutomationTaskItem[]
 
   @@index([productId, status])
   @@index([orderId])
@@ -189,3 +216,81 @@ model Announcement {
   @@index([status])
   @@index([status, sortOrder])
 }
+
+model ProductAutomationPreset {
+  id          String               @id @default(cuid())
+  productId   String
+  category    AutomationCategory   @default(APPLE)
+  presetKey   String
+  name        String
+  presetType  AutomationPresetType
+  adapterKey  String
+  configJson  Json?
+  isEnabled   Boolean              @default(true)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  product     Product              @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tasks       AutomationTask[]
+
+  @@unique([productId, presetKey])
+  @@index([productId, category, isEnabled])
+}
+
+model AutomationTask {
+  id           String               @id @default(cuid())
+  category     AutomationCategory   @default(APPLE)
+  productId    String
+  presetId     String
+  status       AutomationTaskStatus @default(PENDING)
+  createdBy    String
+  inputConfig  Json?
+  summary      Json?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  product      Product              @relation(fields: [productId], references: [id], onDelete: Cascade)
+  preset       ProductAutomationPreset @relation(fields: [presetId], references: [id], onDelete: Cascade)
+  items        AutomationTaskItem[]
+  logs         AutomationTaskLog[]
+
+  @@index([category, status, createdAt])
+  @@index([productId, createdAt])
+  @@index([presetId])
+}
+
+model AutomationTaskItem {
+  id            String                   @id @default(cuid())
+  taskId         String
+  cardId         String
+  status         AutomationTaskItemStatus @default(PENDING)
+  resultJson     Json?
+  errorCode      String?
+  errorMessage   String?
+  retryCount     Int                      @default(0)
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+  task           AutomationTask           @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  card           Card                     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  logs           AutomationTaskLog[]
+
+  @@index([taskId, status])
+  @@index([cardId])
+  @@unique([taskId, cardId])
+}
+
+model AutomationTaskLog {
+  id        String   @id @default(cuid())
+  taskId    String
+  itemId    String?
+  level     String
+  step      String
+  message   String
+  data      Json?
+  createdAt DateTime @default(now())
+
+  task AutomationTask      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  item AutomationTaskItem? @relation(fields: [itemId], references: [id], onDelete: SetNull)
+
+  @@index([taskId, createdAt])
+  @@index([itemId])
+}
+

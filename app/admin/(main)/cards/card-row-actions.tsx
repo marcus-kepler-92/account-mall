@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
+import { parseFreeSharedCardContent, formatFreeSharedCardForCopy } from "@/lib/free-shared-card"
 import {
     Tooltip,
     TooltipContent,
@@ -30,13 +31,19 @@ export function CardRowActions({
     const [copied, setCopied] = useState(false)
     const [actionLoading, setActionLoading] = useState(false)
 
+    const textToCopy = (() => {
+        const parsed = parseFreeSharedCardContent(content)
+        return parsed ? formatFreeSharedCardForCopy(parsed) : content
+    })()
+
     const handleCopy = async () => {
         try {
-            await navigator.clipboard.writeText(content)
+            await navigator.clipboard.writeText(textToCopy)
             setCopied(true)
+            toast.success("已复制")
             setTimeout(() => setCopied(false), 2000)
         } catch {
-            // ignore
+            toast.error("复制失败")
         }
     }
 
@@ -141,9 +148,9 @@ export function CardRowActions({
                             <Eye className="size-4" />
                         </Button>
                     </TooltipTrigger>
-                    <TooltipContent side="left" className="max-w-sm break-all font-mono text-xs">
+                    <TooltipContent side="left" className="max-w-sm break-all font-mono text-xs whitespace-pre-wrap">
                         <span className="block text-muted-foreground mb-1">完整卡密</span>
-                        {content}
+                        {textToCopy}
                     </TooltipContent>
                 </Tooltip>
             </div>

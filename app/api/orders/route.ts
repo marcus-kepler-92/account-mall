@@ -16,6 +16,7 @@ import { verifyTurnstileToken } from "@/lib/turnstile"
 import { scrapeSharedAccounts } from "@/lib/scrape-shared-accounts"
 import { sharedAccountToCardPayload, toCardContentJson } from "@/lib/free-shared-card"
 import { createOrderSuccessToken } from "@/lib/order-success-token"
+import { completePendingOrder } from "@/lib/complete-pending-order"
 import { unauthorized, validationError, badRequest, invalidJsonBody, notFound, internalServerError } from "@/lib/api-response"
 
 /**
@@ -443,18 +444,28 @@ export async function POST(request: NextRequest) {
         return internalServerError("Failed to create order")
     }
 
+    // Development: complete order immediately and return successToken so frontend redirects to success page
+    if (config.nodeEnv === "development") {
+        const result = await completePendingOrder(order.orderNo)
+        if (!result.done) {
+            return internalServerError(result.error ?? "Failed to complete order")
+        }
+        const successToken = createOrderSuccessToken(result.orderNo)
+        return NextResponse.json({
+            orderNo: order.orderNo,
+            amount: Number(order.amount),
+            paymentUrl: null,
+            ...(successToken && { successToken }),
+        })
+    }
+
     const amountStr = Number(order.amount).toFixed(2)
     const subject = product.name ?? `订单 ${order.orderNo}`
-    let paymentUrl = isYipayConfigured()
+    const paymentUrl = isYipayConfigured()
         ? getYipayPagePayUrl({ orderNo: order.orderNo, totalAmount: amountStr, subject })
         : getAlipayPagePayUrl({ orderNo: order.orderNo, totalAmount: amountStr, subject })
 
-    // When no real payment is configured, use mock payment page in development so "click buy" still goes to a payment step
-    if (!paymentUrl && config.nodeEnv === "development") {
-        const base = config.siteUrl ?? "http://localhost:3000"
-        paymentUrl = `${base}/orders/mock-pay?orderNo=${encodeURIComponent(order.orderNo)}&amount=${encodeURIComponent(amountStr)}`
-    }
-
+    // Non-development: return payment URL (or null if no payment configured)
     return NextResponse.json({
         orderNo: order.orderNo,
         amount: Number(order.amount),

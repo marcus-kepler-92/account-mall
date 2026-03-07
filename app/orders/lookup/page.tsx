@@ -26,7 +26,7 @@ import { toast } from "sonner"
 import { addOrUpdateOrder } from "@/lib/order-history-storage"
 import { applyFieldErrors } from "@/lib/form-utils"
 import { orderNoLookupSchema, emailLookupSchema, type OrderLookupFormValues } from "@/lib/validations/lookup"
-import { type FreeSharedCardPayload, isFreeSharedCard } from "@/lib/free-shared-card"
+import { type FreeSharedCardPayload, isFreeSharedCard, formatFreeSharedCardForCopy } from "@/lib/free-shared-card"
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -488,15 +488,7 @@ function OrderLookupPageContent() {
     const copyAllCards = async () => {
         if (!result || result.cards.length === 0) return
         const lines = result.cards.map((card) =>
-            isFreeSharedCard(card)
-                ? [
-                      `账号: ${card.account}`,
-                      `密码: ${card.password}`,
-                      `地区: ${card.region}`,
-                      ...(card.lastCheckedAt ? [`上次检查: ${card.lastCheckedAt}`] : []),
-                      ...(card.installStatus ? [`装好状态: ${card.installStatus}`] : []),
-                  ].join("\n")
-                : card.content
+            isFreeSharedCard(card) ? formatFreeSharedCardForCopy(card) : card.content
         )
         try {
             await navigator.clipboard.writeText(lines.join("\n\n"))

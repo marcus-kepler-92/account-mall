@@ -1,4 +1,4 @@
-import { z } from "zod"
+import * as z from "zod"
 
 /**
  * Client-side only. Local storage key for recent orders (no card content, no password).

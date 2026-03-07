@@ -50,6 +50,14 @@ jest.mock("@/lib/turnstile", () => ({
     verifyTurnstileToken: jest.fn(),
 }))
 
+jest.mock("@/lib/complete-pending-order", () => ({
+    completePendingOrder: jest.fn(),
+}))
+
+jest.mock("@/lib/order-success-token", () => ({
+    createOrderSuccessToken: jest.fn().mockReturnValue("mock-success-token"),
+}))
+
 function createJsonRequest(body: unknown): NextRequest {
     return {
         json: async () => body,
@@ -338,6 +346,7 @@ describe("POST /api/orders (create order)", () => {
             amount: 100,
             paymentUrl: null,
         })
+        expect(data.successToken).toBeUndefined()
         expect(mockTx.order.create).toHaveBeenCalledWith({
             data: expect.objectContaining({
                 orderNo: expect.any(String),
@@ -362,7 +371,12 @@ describe("POST /api/orders (create order)", () => {
         })
     })
 
-    it("returns mock payment URL in development when no payment is configured", async () => {
+    it("in development completes order immediately and returns successToken and paymentUrl null", async () => {
+        const { completePendingOrder } = require("@/lib/complete-pending-order")
+        ;(completePendingOrder as jest.Mock).mockResolvedValueOnce({
+            done: true,
+            orderNo: "uuid-dev-mock",
+        })
         getConfigMock().nodeEnv = "development"
         getConfigMock().siteUrl = "https://example.com"
         const product = {
@@ -409,9 +423,65 @@ describe("POST /api/orders (create order)", () => {
         )
         const data = await res.json()
         expect(res.status).toBe(200)
-        expect(data.paymentUrl).toBe(
-            "https://example.com/orders/mock-pay?orderNo=uuid-dev-mock&amount=50.00"
+        expect(data.paymentUrl).toBeNull()
+        expect(data.successToken).toBeDefined()
+        expect(typeof data.successToken).toBe("string")
+        expect(data.orderNo).toBe("uuid-dev-mock")
+        expect(data.amount).toBe(50)
+        expect(completePendingOrder).toHaveBeenCalledWith("uuid-dev-mock")
+        getConfigMock().nodeEnv = "test"
+    })
+
+    it("in development returns 500 when completePendingOrder returns done false", async () => {
+        const { completePendingOrder } = require("@/lib/complete-pending-order")
+        ;(completePendingOrder as jest.Mock).mockResolvedValueOnce({
+            done: false,
+            error: "Order not found",
+        })
+        getConfigMock().nodeEnv = "development"
+        const product = {
+            id: "prod_1",
+            name: "Test Product",
+            price: 50,
+            maxQuantity: 5,
+            status: "ACTIVE",
+        }
+        prismaMock.product.findUnique.mockResolvedValueOnce(product)
+        prismaMock.card.count.mockResolvedValueOnce(3)
+        const createdOrder = {
+            id: "order_new",
+            orderNo: "uuid-dev-mock",
+            productId: "prod_1",
+            email: "user@example.com",
+            passwordHash: "hashed-password",
+            quantity: 1,
+            amount: 50,
+            status: "PENDING",
+            paidAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+        }
+        const mockTx = {
+            order: { create: jest.fn().mockResolvedValue(createdOrder) },
+            card: {
+                findMany: jest.fn().mockResolvedValue([{ id: "card_1" }]),
+                updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+            },
+        }
+        ;(prismaMock.$transaction as jest.Mock).mockImplementation((cb: (tx: unknown) => Promise<unknown>) =>
+            cb(mockTx)
         )
+        const res = await POST(
+            createJsonRequest({
+                productId: "prod_1",
+                email: "user@example.com",
+                orderPassword: "password123",
+                quantity: 1,
+            })
+        )
+        const data = await res.json()
+        expect(res.status).toBe(500)
+        expect(data.error).toBeDefined()
         getConfigMock().nodeEnv = "test"
     })
 

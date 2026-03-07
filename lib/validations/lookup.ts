@@ -1,4 +1,4 @@
-import { z } from "zod"
+import * as z from "zod"
 
 const baseFields = {
     password: z.string().min(1, "请输入查询密码"),

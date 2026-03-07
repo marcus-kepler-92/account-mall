@@ -46,3 +46,9 @@ test-results/.last-run.json
 
 # scraper debug dump
 scripts/sample-share-page.html
+
+# script-generated reports (do not commit)
+scripts/analyze-apple-login-result.json
+scripts/crawl-apple-login-result.json
+scripts/explore-apple-login-report.json
+scripts/mcp-login-flow-report.json

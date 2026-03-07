@@ -59,6 +59,9 @@ jest.mock("@/lib/yipay", () => ({
 jest.mock("@/lib/turnstile", () => ({
     verifyTurnstileToken: jest.fn(),
 }))
+jest.mock("@/lib/complete-pending-order", () => ({
+    completePendingOrder: jest.fn(),
+}))
 
 const getAdminSession = require("@/lib/auth-guard").getAdminSession as jest.Mock
 const verifyPassword = require("better-auth/crypto").verifyPassword as jest.Mock
@@ -354,6 +357,11 @@ describe("Security: Mass assignment and privilege", () => {
     })
 
     it("create order with extra body field status does not set order status", async () => {
+        const { completePendingOrder } = require("@/lib/complete-pending-order")
+        ;(completePendingOrder as jest.Mock).mockResolvedValue({
+            done: true,
+            orderNo: "uuid-1",
+        })
         getAdminSession.mockResolvedValue(null)
         prismaMock.product.findUnique.mockResolvedValue({
             id: "p1",

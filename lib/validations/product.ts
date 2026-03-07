@@ -1,4 +1,4 @@
-import { z } from "zod";
+import * as z from "zod";
 
 // Slug format: lowercase alphanumeric with hyphens
 const slugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;

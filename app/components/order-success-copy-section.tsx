@@ -4,7 +4,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Copy, Check, Mail, KeyRound, Globe, Clock } from "lucide-react"
 import { toast } from "sonner"
-import { parseFreeSharedCardContent, type FreeSharedCardPayload } from "@/lib/free-shared-card"
+import { parseFreeSharedCardContent, formatFreeSharedCardForCopy, type FreeSharedCardPayload } from "@/lib/free-shared-card"
 
 type OrderSuccessCopySectionProps = {
     cards: string[]
@@ -16,7 +16,11 @@ export function OrderSuccessCopySection({ cards }: OrderSuccessCopySectionProps)
 
     const copyAll = async () => {
         if (cards.length === 0) return
-        const text = cards.join("\n")
+        const lines = cards.map((content) => {
+            const parsed = parseFreeSharedCardContent(content)
+            return parsed ? formatFreeSharedCardForCopy(parsed) : content
+        })
+        const text = lines.join("\n\n")
         try {
             await navigator.clipboard.writeText(text)
             setCopiedAll(true)

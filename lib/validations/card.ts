@@ -1,4 +1,4 @@
-import { z } from "zod";
+import * as z from "zod";
 
 const MAX_BULK_IMPORT = 500;
 

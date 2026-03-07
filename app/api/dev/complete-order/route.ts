@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
 import { config } from "@/lib/config"
 import { createOrderSuccessToken } from "@/lib/order-success-token"
-import { sendOrderCompletionEmail } from "@/lib/order-completion-email"
+import { completePendingOrder } from "@/lib/complete-pending-order"
 import { badRequest, notFound } from "@/lib/api-response"
 
 /**
@@ -23,43 +22,19 @@ export async function POST(request: Request) {
     const orderNo = typeof body?.orderNo === "string" ? body.orderNo.trim() : ""
     if (!orderNo) return badRequest("orderNo is required")
 
-    const order = await prisma.order.findFirst({
-        where: { orderNo },
-        include: { product: { select: { name: true } }, cards: { select: { id: true, status: true } } },
-    })
-    if (!order) return notFound("Order not found")
-    if (order.status === "COMPLETED") {
-        const base = config.siteUrl ?? "http://localhost:3000"
-        const token = createOrderSuccessToken(orderNo)
-        const redirectUrl = token
-            ? `${base}/orders/${encodeURIComponent(orderNo)}/success?token=${encodeURIComponent(token)}`
-            : `${base}/orders/lookup?orderNo=${encodeURIComponent(orderNo)}&fromPay=1`
-        return NextResponse.json({ redirectUrl })
+    const result = await completePendingOrder(orderNo)
+    if (!result.done) {
+        if (result.error === "Order not found") {
+            return notFound("Order not found")
+        }
+        return badRequest(result.error)
     }
-    if (order.status !== "PENDING") {
-        return badRequest("Order is not pending")
-    }
-
-    await prisma.$transaction(async (tx) => {
-        await tx.order.updateMany({
-            where: { id: order.id, status: "PENDING" },
-            data: { status: "COMPLETED", paidAt: new Date() },
-        })
-        await tx.card.updateMany({
-            where: { orderId: order.id, status: "RESERVED" },
-            data: { status: "SOLD" },
-        })
-    })
-
-    sendOrderCompletionEmail(order.id).catch((err) =>
-        console.error("[order-completion-email]", err),
-    )
 
     const base = config.siteUrl ?? "http://localhost:3000"
-    const token = createOrderSuccessToken(orderNo)
+    const token = createOrderSuccessToken(result.orderNo)
     const redirectUrl = token
-        ? `${base}/orders/${encodeURIComponent(orderNo)}/success?token=${encodeURIComponent(token)}`
-        : `${base}/orders/lookup?orderNo=${encodeURIComponent(orderNo)}&fromPay=1`
+        ? `${base}/orders/${encodeURIComponent(result.orderNo)}/success?token=${encodeURIComponent(token)}`
+        : `${base}/orders/lookup?orderNo=${encodeURIComponent(result.orderNo)}&fromPay=1`
 
     return NextResponse.json({ redirectUrl })
 }
