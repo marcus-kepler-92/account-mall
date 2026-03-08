@@ -112,6 +112,20 @@ describe("Public pages (no auth required)", () => {
 
     expect(response.status).toBe(200);
   });
+
+  it("should allow access to /distributor/login", async () => {
+    const request = createRequest("/distributor/login");
+    const response = await middleware(request);
+
+    expect(response.status).toBe(200);
+  });
+
+  it("should allow access to /distributor/register", async () => {
+    const request = createRequest("/distributor/register");
+    const response = await middleware(request);
+
+    expect(response.status).toBe(200);
+  });
 });
 
 // ─── Public APIs ─────────────────────────────────────────────────
@@ -406,5 +420,76 @@ describe("Protected APIs", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get("x-middleware-next")).toBe("1");
+  });
+});
+
+// ─── Protected Distributor Pages ─────────────────────────────────────
+
+describe("Protected distributor pages", () => {
+  it("should redirect /distributor to /distributor/login without session", async () => {
+    const request = createRequest("/distributor");
+    const response = await middleware(request);
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toContain("/distributor/login");
+  });
+
+  it("should redirect /distributor/orders to /distributor/login without session", async () => {
+    const request = createRequest("/distributor/orders");
+    const response = await middleware(request);
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toContain("/distributor/login");
+  });
+
+  it("should allow distributor page access with valid session", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        session: { id: "s1", userId: "dist_1" },
+        user: { id: "dist_1", role: "DISTRIBUTOR" },
+      }),
+    });
+
+    const request = createRequest("/distributor", {
+      cookies: { "better-auth.session_token": "valid_token" },
+    });
+    const response = await middleware(request);
+
+    expect(response.status).toBe(200);
+  });
+});
+
+// ─── PromoCode cookie on storefront GET ───────────────────────────────
+
+describe("GET storefront with promoCode sets cookie", () => {
+  it("should set distributor_promo_code cookie when GET / with promoCode", async () => {
+    const request = new NextRequest("http://localhost:3000/?promoCode=ABC");
+    const response = await middleware(request);
+
+    expect(response.status).toBe(200);
+    const setCookie = response.headers.get("set-cookie");
+    expect(setCookie).toBeTruthy();
+    expect(setCookie).toContain("distributor_promo_code=ABC");
+    expect(setCookie).toMatch(/Max-Age=\d+/);
+  });
+
+  it("should set distributor_promo_code cookie when GET /products with promoCode", async () => {
+    const request = new NextRequest("http://localhost:3000/products?promoCode=PROMO1");
+    const response = await middleware(request);
+
+    expect(response.status).toBe(200);
+    const setCookie = response.headers.get("set-cookie");
+    expect(setCookie).toBeTruthy();
+    expect(setCookie).toContain("distributor_promo_code=PROMO1");
+  });
+
+  it("should not set cookie when GET / without promoCode", async () => {
+    const request = createRequest("/");
+    const response = await middleware(request);
+
+    expect(response.status).toBe(200);
+    const setCookie = response.headers.get("set-cookie");
+    expect(setCookie).toBeFalsy();
   });
 });

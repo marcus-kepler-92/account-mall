@@ -37,6 +37,7 @@ export default async function AdminEditProductPage({ params }: PageProps) {
                 product={{
                     ...product,
                     price: Number(product.price),
+                    commissionAmount: product.commissionAmount != null ? Number(product.commissionAmount) : null,
                 }}
                 allTags={tags}
             />

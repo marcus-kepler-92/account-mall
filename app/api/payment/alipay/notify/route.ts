@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verifyAlipayNotifySign } from "@/lib/alipay"
-import { sendOrderCompletionEmail } from "@/lib/order-completion-email"
+import { completePendingOrder } from "@/lib/complete-pending-order"
 
 /**
  * POST /api/payment/alipay/notify
@@ -60,6 +60,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (order.status === "COMPLETED") {
+        console.info("[payment-notify] alipay orderNo=%s amount=%s status=already_completed", outTradeNo, orderAmountStr)
         return new NextResponse("success", { headers: { "Content-Type": "text/plain" } })
     }
 
@@ -71,37 +72,8 @@ export async function POST(request: NextRequest) {
         return new NextResponse("success", { headers: { "Content-Type": "text/plain" } })
     }
 
-    let completedInThisRequest = 0
-    try {
-        completedInThisRequest = await prisma.$transaction(async (tx) => {
-            const updateResult = await tx.order.updateMany({
-                where: { id: order.id, status: "PENDING" },
-                data: { status: "COMPLETED", paidAt: new Date() },
-            })
-            if (updateResult.count > 0) {
-                await tx.card.updateMany({
-                    where: { orderId: order.id, status: "RESERVED" },
-                    data: { status: "SOLD" },
-                })
-            }
-            return updateResult.count
-        })
-        if (completedInThisRequest === 0) {
-            console.warn("[alipay/notify] Order no longer PENDING in transaction", {
-                orderNo: outTradeNo,
-            })
-        }
-    } catch (err) {
-        console.error("[alipay/notify] Transaction failed", { orderNo: outTradeNo, err })
-        return new NextResponse("failure", { status: 500, headers: { "Content-Type": "text/plain" } })
-    }
-
-    if (completedInThisRequest > 0) {
-        sendOrderCompletionEmail(order.id).catch((err) =>
-            console.error("[order-completion-email]", err),
-        )
-    }
-
+    console.info("[payment-notify] alipay orderNo=%s amount=%s status=completing", outTradeNo, orderAmountStr)
+    await completePendingOrder(outTradeNo)
     return new NextResponse("success", { headers: { "Content-Type": "text/plain" } })
 }
 

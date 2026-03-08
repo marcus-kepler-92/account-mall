@@ -1,13 +1,20 @@
+import { redirect } from "next/navigation"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { AdminSidebar } from "@/app/components/admin-sidebar"
 import { AdminBreadcrumb } from "@/app/components/admin-breadcrumb"
 import { AdminTopbarActions } from "@/app/components/admin-topbar-actions"
+import { getAdminSession } from "@/lib/auth-guard"
 
-export default function AdminMainLayout({
+export default async function AdminMainLayout({
     children,
 }: {
     children: React.ReactNode
 }) {
+    const session = await getAdminSession()
+    if (!session) {
+        redirect("/admin/login")
+    }
+
     return (
         <SidebarProvider>
             <AdminSidebar />

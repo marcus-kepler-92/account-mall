@@ -1,5 +1,5 @@
 import { prismaMock } from "../../__mocks__/prisma";
-import type { Product, Tag, Card, Order } from "@prisma/client";
+import type { Product, Tag, Card, Order, Commission, CommissionTier, Withdrawal } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 
 // ─── Product CRUD ────────────────────────────────────────────────
@@ -465,5 +465,149 @@ describe("Enum default values", () => {
       },
     });
     expect(result.status).toBe("PENDING");
+  });
+});
+
+// ─── Commission model (distributor) ─────────────────────────────────
+
+describe("Commission model", () => {
+  const mockCommission: Commission = {
+    id: "comm_001",
+    orderId: "ord_1",
+    distributorId: "dist_1",
+    amount: new Prisma.Decimal("10.50"),
+    status: "SETTLED",
+    createdAt: new Date("2026-01-01"),
+    updatedAt: new Date("2026-01-01"),
+  };
+
+  it("should create a commission with SETTLED status", async () => {
+    prismaMock.commission.create.mockResolvedValue(mockCommission);
+
+    const result = await prismaMock.commission.create({
+      data: {
+        orderId: "ord_1",
+        distributorId: "dist_1",
+        amount: 10.5,
+        status: "SETTLED",
+      },
+    });
+
+    expect(result.status).toBe("SETTLED");
+    expect(Number(result.amount)).toBe(10.5);
+    expect(prismaMock.commission.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        orderId: "ord_1",
+        distributorId: "dist_1",
+        status: "SETTLED",
+      }),
+    });
+  });
+
+  it("should find commissions by distributorId", async () => {
+    prismaMock.commission.findMany.mockResolvedValue([mockCommission]);
+
+    const result = await prismaMock.commission.findMany({
+      where: { distributorId: "dist_1", status: "SETTLED" },
+      orderBy: { createdAt: "desc" },
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0].distributorId).toBe("dist_1");
+  });
+});
+
+// ─── CommissionTier model ──────────────────────────────────────────
+
+describe("CommissionTier model", () => {
+  const mockTier: CommissionTier = {
+    id: "tier_001",
+    minAmount: new Prisma.Decimal("0"),
+    maxAmount: new Prisma.Decimal("1000"),
+    ratePercent: new Prisma.Decimal("5"),
+    sortOrder: 0,
+    createdAt: new Date("2026-01-01"),
+    updatedAt: new Date("2026-01-01"),
+  };
+
+  it("should create a commission tier", async () => {
+    prismaMock.commissionTier.create.mockResolvedValue(mockTier);
+
+    const result = await prismaMock.commissionTier.create({
+      data: {
+        minAmount: 0,
+        maxAmount: 1000,
+        ratePercent: 5,
+        sortOrder: 0,
+      },
+    });
+
+    expect(result.sortOrder).toBe(0);
+    expect(Number(result.minAmount)).toBe(0);
+    expect(Number(result.maxAmount)).toBe(1000);
+    expect(Number(result.ratePercent)).toBe(5);
+    expect(prismaMock.commissionTier.findMany).toBeDefined();
+  });
+
+  it("should find tiers ordered by sortOrder", async () => {
+    prismaMock.commissionTier.findMany.mockResolvedValue([mockTier]);
+
+    const result = await prismaMock.commissionTier.findMany({
+      orderBy: { sortOrder: "asc" },
+    });
+
+    expect(result).toHaveLength(1);
+    expect(prismaMock.commissionTier.findMany).toHaveBeenCalledWith({
+      orderBy: { sortOrder: "asc" },
+    });
+  });
+});
+
+// ─── Withdrawal model ──────────────────────────────────────────────
+
+describe("Withdrawal model", () => {
+  const mockWithdrawal: Withdrawal = {
+    id: "with_001",
+    distributorId: "dist_1",
+    amount: new Prisma.Decimal("50.00"),
+    status: "PENDING",
+    note: null,
+    processedAt: null,
+    createdAt: new Date("2026-01-01"),
+    updatedAt: new Date("2026-01-01"),
+  };
+
+  it("should create a withdrawal with PENDING status", async () => {
+    prismaMock.withdrawal.create.mockResolvedValue(mockWithdrawal);
+
+    const result = await prismaMock.withdrawal.create({
+      data: {
+        distributorId: "dist_1",
+        amount: 50,
+        status: "PENDING",
+      },
+    });
+
+    expect(result.status).toBe("PENDING");
+    expect(result.processedAt).toBeNull();
+    expect(prismaMock.withdrawal.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        distributorId: "dist_1",
+        amount: 50,
+        status: "PENDING",
+      }),
+    });
+  });
+
+  it("should find withdrawals by distributorId", async () => {
+    prismaMock.withdrawal.findMany.mockResolvedValue([mockWithdrawal]);
+
+    const result = await prismaMock.withdrawal.findMany({
+      where: { distributorId: "dist_1" },
+      orderBy: { createdAt: "desc" },
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0].distributorId).toBe("dist_1");
   });
 });

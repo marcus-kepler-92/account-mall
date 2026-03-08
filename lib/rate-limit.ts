@@ -17,6 +17,14 @@ const orderQueryLimiter = new RateLimiterMemory({
     duration: QUERY_LIMIT_DURATION,
 })
 
+/** 提现申请：每用户每分钟最多 10 次 */
+const WITHDRAWAL_CREATE_POINTS = 10
+const WITHDRAWAL_CREATE_DURATION = 60
+const withdrawalCreateLimiter = new RateLimiterMemory({
+    points: WITHDRAWAL_CREATE_POINTS,
+    duration: WITHDRAWAL_CREATE_DURATION,
+})
+
 export function getClientIp(request: NextRequest): string {
     const forwarded = request.headers.get("x-forwarded-for")
     if (forwarded) {
@@ -43,6 +51,24 @@ export async function checkOrderCreateRateLimit(request: NextRequest): Promise<R
     } catch {
         return new Response(
             JSON.stringify({ error: "Too many orders. Please try again later." }),
+            { status: 429, headers: { "Content-Type": "application/json" } },
+        )
+    }
+}
+
+/**
+ * Check withdrawal create rate limit (per distributor user).
+ * Key = userId. Skipped in development.
+ */
+export async function checkWithdrawalCreateRateLimit(userId: string): Promise<Response | null> {
+    if (config.nodeEnv === "development") return null
+    const key = `withdrawal:${userId}`
+    try {
+        await withdrawalCreateLimiter.consume(key)
+        return null
+    } catch {
+        return new Response(
+            JSON.stringify({ error: "提现申请过于频繁，请稍后再试。" }),
             { status: 429, headers: { "Content-Type": "application/json" } },
         )
     }

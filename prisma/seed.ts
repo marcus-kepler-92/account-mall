@@ -39,6 +39,7 @@ async function seed() {
                     email: config.adminEmail,
                     name: config.adminName,
                     emailVerified: true,
+                    role: 'ADMIN',
                     createdAt: now,
                     updatedAt: now,
                 },
@@ -67,6 +68,21 @@ async function seed() {
     } catch (error) {
         console.error('  ❌ Failed to create admin account:', error)
         process.exit(1)
+    }
+
+    // 阶梯佣金预设：L1–L5 固定档位（若无任何档位则写入）
+    const tierCount = await prisma.commissionTier.count()
+    if (tierCount === 0) {
+        console.log('  Seeding commission tier presets (L1–L5)...')
+        const presets = [
+            { minAmount: 0, maxAmount: 400, ratePercent: 52, sortOrder: 0 },   // L1 0-400 约52%
+            { minAmount: 400, maxAmount: 1200, ratePercent: 63, sortOrder: 1 }, // L2 400-1200 约63%
+            { minAmount: 1200, maxAmount: 3000, ratePercent: 74, sortOrder: 2 }, // L3 1200-3000 约74%
+            { minAmount: 3000, maxAmount: 7600, ratePercent: 84, sortOrder: 3 }, // L4 3000-7600 约84%
+            { minAmount: 7600, maxAmount: 99_999_999.99, ratePercent: 89, sortOrder: 4 }, // L5 >=7600 约89%
+        ]
+        await prisma.commissionTier.createMany({ data: presets })
+        console.log('  ✅ Commission tier presets (L1–L5) created.')
     }
 
     if (process.env.SEED_E2E === '1') {

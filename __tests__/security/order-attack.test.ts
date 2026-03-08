@@ -323,10 +323,9 @@ describe("Security: Mass assignment and privilege", () => {
     })
 
     it("PATCH order does not accept arbitrary status from client without validation", async () => {
+        const { completePendingOrder } = require("@/lib/complete-pending-order")
+        ;(completePendingOrder as jest.Mock).mockResolvedValueOnce({ done: true, orderNo: "ORD-1" })
         getAdminSession.mockResolvedValue({ id: "admin_1" })
-        ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: (tx: typeof prismaMock) => unknown) =>
-            fn(prismaMock),
-        )
         const fullOrder = {
             id: "o1",
             orderNo: "ORD-1",
@@ -341,6 +340,7 @@ describe("Security: Mass assignment and privilege", () => {
         }
         prismaMock.order.findUnique.mockResolvedValueOnce({
             id: "o1",
+            orderNo: "ORD-1",
             status: "PENDING",
             cards: [{ id: "c1", status: "RESERVED" }],
         }).mockResolvedValueOnce(fullOrder)

@@ -56,7 +56,7 @@ describe("GET /api/products", () => {
         expect(res.status).toBe(200)
         expect(prismaMock.product.findMany).toHaveBeenCalledWith(
             expect.objectContaining({
-                where: { status: "ACTIVE", secretCode: null },
+                where: { status: "ACTIVE" },
             })
         )
         expect(data.data).toHaveLength(1)
@@ -174,7 +174,7 @@ describe("GET /api/products", () => {
         )
     })
 
-    it("filters out products with secretCode when no code param (public)", async () => {
+    it("uses ACTIVE filter for public request", async () => {
         prismaMock.product.findMany.mockResolvedValueOnce([])
         prismaMock.product.count.mockResolvedValueOnce(0)
 
@@ -184,96 +184,9 @@ describe("GET /api/products", () => {
             expect.objectContaining({
                 where: expect.objectContaining({
                     status: "ACTIVE",
-                    secretCode: null,
                 }),
             })
         )
-    })
-
-    it("includes products with matching secretCode when code param provided", async () => {
-        prismaMock.product.findMany.mockResolvedValueOnce([])
-        prismaMock.product.count.mockResolvedValueOnce(0)
-
-        await GET(createUrlRequest("http://localhost/api/products?code=secret123"))
-
-        expect(prismaMock.product.findMany).toHaveBeenCalledWith(
-            expect.objectContaining({
-                where: expect.objectContaining({
-                    status: "ACTIVE",
-                    OR: [
-                        { secretCode: null },
-                        { secretCode: "secret123" },
-                    ],
-                }),
-            })
-        )
-    })
-
-    it("does not apply secretCode filter for admin request", async () => {
-        adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
-        prismaMock.product.findMany.mockResolvedValueOnce([])
-        prismaMock.product.count.mockResolvedValueOnce(0)
-
-        await GET(createUrlRequest("http://localhost/api/products?admin=true"))
-
-        expect(prismaMock.product.findMany).toHaveBeenCalledWith(
-            expect.objectContaining({
-                where: expect.not.objectContaining({
-                    secretCode: expect.anything(),
-                }),
-            })
-        )
-    })
-
-    it("count uses secretCode filter when no code param (public)", async () => {
-        prismaMock.product.findMany.mockResolvedValueOnce([])
-        prismaMock.product.count.mockResolvedValueOnce(5)
-
-        const res = await GET(createUrlRequest("http://localhost/api/products"))
-        const data = await res.json()
-
-        expect(prismaMock.product.count).toHaveBeenCalledWith({
-            where: expect.objectContaining({
-                status: "ACTIVE",
-                secretCode: null,
-            }),
-        })
-        expect(data.meta.total).toBe(5)
-    })
-
-    it("count uses secretCode OR filter when code param provided", async () => {
-        prismaMock.product.findMany.mockResolvedValueOnce([])
-        prismaMock.product.count.mockResolvedValueOnce(8)
-
-        const res = await GET(createUrlRequest("http://localhost/api/products?code=abc"))
-        const data = await res.json()
-
-        expect(prismaMock.product.count).toHaveBeenCalledWith({
-            where: expect.objectContaining({
-                status: "ACTIVE",
-                OR: [
-                    { secretCode: null },
-                    { secretCode: "abc" },
-                ],
-            }),
-        })
-        expect(data.meta.total).toBe(8)
-    })
-
-    it("count does not filter secretCode for admin request", async () => {
-        adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
-        prismaMock.product.findMany.mockResolvedValueOnce([])
-        prismaMock.product.count.mockResolvedValueOnce(10)
-
-        const res = await GET(createUrlRequest("http://localhost/api/products?admin=true"))
-        const data = await res.json()
-
-        expect(prismaMock.product.count).toHaveBeenCalledWith({
-            where: expect.not.objectContaining({
-                secretCode: expect.anything(),
-            }),
-        })
-        expect(data.meta.total).toBe(10)
     })
 })
 
@@ -439,19 +352,19 @@ describe("POST /api/products", () => {
         })
     })
 
-    it("creates product with secretCode", async () => {
+    it("creates product with commissionAmount", async () => {
         adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
         prismaMock.product.findUnique.mockResolvedValueOnce(null)
         const created = {
-            id: "prod_secret",
-            name: "Secret Product",
-            slug: "secret-product",
+            id: "prod_comm",
+            name: "Product With Commission",
+            slug: "product-commission",
             description: null,
             image: null,
             price: 99,
             maxQuantity: 10,
             status: "ACTIVE",
-            secretCode: "mycode",
+            commissionAmount: 5,
             createdAt: new Date(),
             updatedAt: new Date(),
             tags: [],
@@ -460,47 +373,17 @@ describe("POST /api/products", () => {
 
         const res = await POST(
             createJsonRequest({
-                name: "Secret Product",
-                slug: "secret-product",
+                name: "Product With Commission",
+                slug: "product-commission",
                 price: 99,
-                secretCode: "mycode",
+                commissionAmount: 5,
             })
         )
-        const data = await res.json()
 
         expect(res.status).toBe(201)
         expect(prismaMock.product.create).toHaveBeenCalledWith({
             data: expect.objectContaining({
-                secretCode: "mycode",
-            }),
-            include: expect.any(Object),
-        })
-    })
-
-    it("creates product with secretCode trimmed to null when empty", async () => {
-        adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
-        prismaMock.product.findUnique.mockResolvedValueOnce(null)
-        prismaMock.product.create.mockResolvedValueOnce({
-            id: "p1",
-            name: "Test",
-            slug: "test",
-            price: 50,
-            secretCode: null,
-            tags: [],
-        } as any)
-
-        await POST(
-            createJsonRequest({
-                name: "Test",
-                slug: "test",
-                price: 50,
-                secretCode: "  ",
-            })
-        )
-
-        expect(prismaMock.product.create).toHaveBeenCalledWith({
-            data: expect.objectContaining({
-                secretCode: null,
+                commissionAmount: 5,
             }),
             include: expect.any(Object),
         })

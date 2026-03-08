@@ -31,6 +31,7 @@ export const createOrderSchema = z.object({
     orderPassword: z.string().min(6),
     quantity: z.number().int().min(1),
     turnstileToken: z.string().optional(),
+    promoCode: z.string().max(64).optional(),
 })
 
 /**

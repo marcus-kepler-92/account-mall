@@ -39,6 +39,7 @@
     "@tiptap/starter-kit": "^3.19.0",
     "@uiw/react-md-editor": "^4.0.11",
     "@vercel/analytics": "^1.6.1",
+    "@vercel/blob": "^0.25.1",
     "alipay-sdk": "^4.14.0",
     "better-auth": "^1.4.18",
     "cheerio": "^1.2.0",

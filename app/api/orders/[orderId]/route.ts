@@ -1,4 +1,4 @@
-import { sendOrderCompletionEmail } from "@/lib/order-completion-email"
+import { completePendingOrder } from "@/lib/complete-pending-order"
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getAdminSession } from "@/lib/auth-guard"
@@ -113,87 +113,53 @@ export async function PATCH(
 
     const { status: nextStatus } = parsed.data
 
-    try {
-        await prisma.$transaction(async (tx) => {
-            const existing = await tx.order.findUnique({
-                where: { id: orderId },
-                include: {
-                    cards: {
-                        select: {
-                            id: true,
-                            status: true,
-                        },
-                    },
-                },
-            })
+    const existing = await prisma.order.findUnique({
+        where: { id: orderId },
+        include: {
+            cards: { select: { id: true, status: true } },
+        },
+    })
+    if (!existing) {
+        return notFound("Order not found")
+    }
+    const currentStatus = existing.status
+    if (!isValidStatusTransition(currentStatus, nextStatus)) {
+        return conflict("Invalid status transition")
+    }
+    if (currentStatus === nextStatus) {
+        const unchanged = await prisma.order.findUnique({
+            where: { id: orderId },
+            include: {
+                product: { select: { id: true, name: true, price: true } },
+                cards: { select: { status: true } },
+            },
+        })
+        if (!unchanged) return notFound("Order not found")
+        return NextResponse.json(mapOrderToResponse(unchanged))
+    }
 
-            if (!existing) {
-                throw new Error("ORDER_NOT_FOUND")
-            }
-
-            const currentStatus = existing.status
-
-            if (!isValidStatusTransition(currentStatus, nextStatus)) {
-                throw new Error("INVALID_STATUS_TRANSITION")
-            }
-
-            if (currentStatus === nextStatus) {
-                // Idempotent: nothing to update
-                return
-            }
-
-            if (currentStatus === "PENDING" && nextStatus === "COMPLETED") {
+    if (currentStatus === "PENDING" && nextStatus === "COMPLETED") {
+        const result = await completePendingOrder(existing.orderNo)
+        if (!result.done) {
+            return conflict(result.error ?? "Could not complete order")
+        }
+    } else if (nextStatus === "CLOSED") {
+        try {
+            await prisma.$transaction(async (tx) => {
                 await tx.order.update({
                     where: { id: existing.id },
-                    data: {
-                        status: "COMPLETED",
-                        paidAt: new Date(),
-                    },
+                    data: { status: "CLOSED" },
                 })
-
-                await tx.card.updateMany({
-                    where: {
-                        orderId: existing.id,
-                        status: "RESERVED",
-                    },
-                    data: {
-                        status: "SOLD",
-                    },
-                })
-            } else if (nextStatus === "CLOSED") {
-                await tx.order.update({
-                    where: { id: existing.id },
-                    data: {
-                        status: "CLOSED",
-                    },
-                })
-
                 if (currentStatus === "PENDING") {
                     await tx.card.updateMany({
-                        where: {
-                            orderId: existing.id,
-                            status: "RESERVED",
-                        },
-                        data: {
-                            status: "UNSOLD",
-                            orderId: null,
-                        },
+                        where: { orderId: existing.id, status: "RESERVED" },
+                        data: { status: "UNSOLD", orderId: null },
                     })
                 }
-            }
-        })
-    } catch (error) {
-        if (error instanceof Error) {
-            if (error.message === "ORDER_NOT_FOUND") {
-                return notFound("Order not found")
-            }
-
-            if (error.message === "INVALID_STATUS_TRANSITION") {
-                return conflict("Invalid status transition")
-            }
+            })
+        } catch {
+            return internalServerError()
         }
-
-        return internalServerError()
     }
 
     const updated = await prisma.order.findUnique({
@@ -226,9 +192,6 @@ export async function PATCH(
             adminUserEmail: session.user?.email,
             at: new Date().toISOString(),
         })
-        sendOrderCompletionEmail(orderId).catch((err) =>
-            console.error("[order-completion-email]", err),
-        )
     }
 
     return NextResponse.json(mapOrderToResponse(updated))

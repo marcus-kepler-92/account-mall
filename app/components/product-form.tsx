@@ -56,7 +56,7 @@ type ProductData = {
     status: string
     productType?: "NORMAL" | "FREE_SHARED"
     sourceUrl?: string | null
-    secretCode?: string | null
+    commissionAmount?: number | null
     tags: Tag[]
 }
 
@@ -91,7 +91,7 @@ export function ProductForm({
             isActive: product ? product.status === "ACTIVE" : true,
             productType: product?.productType ?? "NORMAL",
             sourceUrl: product?.sourceUrl ?? "",
-            secretCode: product?.secretCode ?? "",
+            commissionAmount: product?.commissionAmount != null ? String(product.commissionAmount) : "",
             tagIds: product?.tags.map((t) => t.id) ?? [],
         },
     })
@@ -210,7 +210,7 @@ export function ProductForm({
             status: data.isActive ? "ACTIVE" : "INACTIVE",
             productType: data.productType ?? "NORMAL",
             sourceUrl: isFreeShared ? null : (data.sourceUrl?.trim() || null),
-            secretCode: data.secretCode?.trim() || null,
+            commissionAmount: data.commissionAmount === "" || data.commissionAmount == null ? undefined : parseFloat(data.commissionAmount),
             tagIds: data.tagIds ?? [],
         }
 
@@ -530,22 +530,25 @@ export function ProductForm({
 
                         <Card>
                             <CardHeader>
-                                <CardTitle>暗号</CardTitle>
+                                <CardTitle>分销佣金（元/件）</CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <FormField
                                     control={form.control}
-                                    name="secretCode"
+                                    name="commissionAmount"
                                     render={({ field }) => (
                                         <FormItem>
                                             <FormControl>
                                                 <Input
-                                                    placeholder="留空则所有人可见"
+                                                    type="number"
+                                                    min={0}
+                                                    step="0.01"
+                                                    placeholder="留空则无分销佣金"
                                                     {...field}
                                                 />
                                             </FormControl>
                                             <FormDescription>
-                                                设置后，仅 URL 带 ?code=xxx 参数时可见
+                                                每卖出一件该商品，给分销员的固定佣金金额（元）
                                             </FormDescription>
                                             <FormMessage />
                                         </FormItem>

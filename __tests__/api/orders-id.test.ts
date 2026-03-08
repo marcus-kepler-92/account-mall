@@ -20,7 +20,13 @@ jest.mock("@/lib/order-completion-email", () => ({
   sendOrderCompletionEmail: jest.fn().mockResolvedValue(undefined),
 }))
 
+jest.mock("@/lib/complete-pending-order", () => ({
+  __esModule: true,
+  completePendingOrder: jest.fn(),
+}))
+
 import { getAdminSession } from "@/lib/auth-guard"
+import { completePendingOrder } from "@/lib/complete-pending-order"
 
 type RouteContext = {
   params: {
@@ -37,9 +43,12 @@ function createJsonRequest(body: unknown): NextRequest {
 describe("/api/orders/[orderId] admin detail & status", () => {
   const adminSessionMock = getAdminSession as jest.Mock
 
+  const completePendingOrderMock = completePendingOrder as jest.Mock
+
   beforeEach(() => {
     adminSessionMock.mockReset()
     ;(prismaMock.$transaction as jest.Mock).mockReset()
+    completePendingOrderMock.mockReset()
   })
 
   it("GET returns 401 when admin is not authenticated", async () => {
@@ -193,14 +202,12 @@ describe("/api/orders/[orderId] admin detail & status", () => {
       id: "admin_1",
       user: { id: "admin_1", email: "admin@test.com" },
     })
-
-    ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: any) =>
-      fn(prismaMock),
-    )
+    completePendingOrderMock.mockResolvedValueOnce({ done: true, orderNo: "FAK202402130001" })
 
     prismaMock.order.findUnique
       .mockResolvedValueOnce({
         id: "order_1",
+        orderNo: "FAK202402130001",
         status: "PENDING",
         cards: [
           { id: "card_1", status: "RESERVED" },
@@ -238,21 +245,19 @@ describe("/api/orders/[orderId] admin detail & status", () => {
     expect(res.status).toBe(200)
     expect(data.status).toBe("COMPLETED")
     expect(data.orderNo).toBe("FAK202402130001")
+    expect(completePendingOrderMock).toHaveBeenCalledWith("FAK202402130001")
   })
 
   it("PATCH PENDING -> COMPLETED returns 200 even when completion email fails (black-box)", async () => {
-    const { sendOrderCompletionEmail } = require("@/lib/order-completion-email")
-    ;(sendOrderCompletionEmail as jest.Mock).mockRejectedValueOnce(new Error("Email send failed"))
     adminSessionMock.mockResolvedValueOnce({
       id: "admin_1",
       user: { id: "admin_1", email: "admin@test.com" },
     })
-    ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: any) =>
-      fn(prismaMock),
-    )
+    completePendingOrderMock.mockResolvedValueOnce({ done: true, orderNo: "FAK001" })
     prismaMock.order.findUnique
       .mockResolvedValueOnce({
         id: "order_1",
+        orderNo: "FAK001",
         status: "PENDING",
         cards: [{ id: "card_1", status: "RESERVED" }],
       } as any)
@@ -470,7 +475,12 @@ describe("/api/orders/[orderId] admin detail & status", () => {
 
   it("PATCH returns 500 when transaction throws non-Error", async () => {
     adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
-
+    prismaMock.order.findUnique.mockResolvedValueOnce({
+      id: "order_1",
+      orderNo: "ORD1",
+      status: "PENDING",
+      cards: [{ id: "c1", status: "RESERVED" }],
+    } as any)
     ;(prismaMock.$transaction as jest.Mock).mockImplementation(async () => {
       throw "string error"
     })
@@ -486,13 +496,11 @@ describe("/api/orders/[orderId] admin detail & status", () => {
 
   it("PATCH returns 404 when order is missing after update (findUnique returns null)", async () => {
     adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
-
-    ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) =>
-      fn(prismaMock),
-    )
+    completePendingOrderMock.mockResolvedValueOnce({ done: true, orderNo: "ORD1" })
     prismaMock.order.findUnique
       .mockResolvedValueOnce({
         id: "order_1",
+        orderNo: "ORD1",
         status: "PENDING",
         cards: [{ id: "card_1", status: "RESERVED" }],
       } as any)

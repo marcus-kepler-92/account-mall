@@ -18,8 +18,6 @@ export async function GET(
     context: RouteContext
 ) {
     const { productId } = await context.params;
-    const { searchParams } = new URL(request.url);
-    const code = searchParams.get("code");
 
     const product = await prisma.product.findUnique({
         where: { id: productId },
@@ -31,11 +29,6 @@ export async function GET(
     });
 
     if (!product) {
-        return notFound("Product not found");
-    }
-
-    // Secret code check: if product has secretCode, verify it matches
-    if (product.secretCode && product.secretCode !== code) {
         return notFound("Product not found");
     }
 
@@ -89,7 +82,7 @@ export async function PUT(
         return notFound("Product not found");
     }
 
-    const { tagIds, productType, sourceUrl, price, pinned, secretCode, ...rest } = parsed.data;
+    const { tagIds, productType, sourceUrl, price, pinned, commissionAmount, ...rest } = parsed.data;
 
     // Check slug uniqueness if updating slug
     if (rest.slug && rest.slug !== existing.slug) {
@@ -109,8 +102,8 @@ export async function PUT(
         ...(sourceUrl !== undefined && {
             sourceUrl: isFreeShared ? null : (sourceUrl?.trim() || undefined),
         }),
-        ...(secretCode !== undefined && {
-            secretCode: secretCode?.trim() || null,
+        ...(commissionAmount !== undefined && {
+            commissionAmount: commissionAmount != null ? commissionAmount : null,
         }),
         ...(tagIds !== undefined && {
             tags: { set: tagIds.map((id) => ({ id })) },

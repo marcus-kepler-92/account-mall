@@ -49,92 +49,58 @@ describe("productFormSchema", () => {
         expect(result.success).toBe(false)
     })
 
-    it("accepts valid secretCode", () => {
+    it("accepts optional commissionAmount", () => {
         const result = productFormSchema.safeParse({
             name: "Test",
             slug: "test",
             price: "10",
             maxQuantity: "1",
             isActive: true,
-            secretCode: "mysecret",
+            commissionAmount: "5.5",
         })
         expect(result.success).toBe(true)
-    })
-
-    it("accepts empty secretCode", () => {
-        const result = productFormSchema.safeParse({
-            name: "Test",
-            slug: "test",
-            price: "10",
-            maxQuantity: "1",
-            isActive: true,
-            secretCode: "",
-        })
-        expect(result.success).toBe(true)
-    })
-
-    it("rejects secretCode longer than 64 characters", () => {
-        const result = productFormSchema.safeParse({
-            name: "Test",
-            slug: "test",
-            price: "10",
-            maxQuantity: "1",
-            isActive: true,
-            secretCode: "a".repeat(65),
-        })
-        expect(result.success).toBe(false)
     })
 })
 
 describe("createProductSchema", () => {
-    it("accepts secretCode", () => {
+    it("accepts commissionAmount", () => {
         const result = createProductSchema.safeParse({
             name: "Test",
             slug: "test",
             price: 99,
-            secretCode: "code123",
+            commissionAmount: 5,
         })
         expect(result.success).toBe(true)
         if (result.success) {
-            expect(result.data.secretCode).toBe("code123")
+            expect(result.data.commissionAmount).toBe(5)
         }
     })
 
-    it("accepts null secretCode", () => {
+    it("accepts null commissionAmount", () => {
         const result = createProductSchema.safeParse({
             name: "Test",
             slug: "test",
             price: 99,
-            secretCode: null,
+            commissionAmount: null,
         })
         expect(result.success).toBe(true)
-    })
-
-    it("rejects secretCode longer than 64 characters", () => {
-        const result = createProductSchema.safeParse({
-            name: "Test",
-            slug: "test",
-            price: 99,
-            secretCode: "a".repeat(65),
-        })
-        expect(result.success).toBe(false)
     })
 })
 
 describe("updateProductSchema", () => {
-    it("accepts secretCode update", () => {
+    it("accepts commissionAmount update", () => {
         const result = updateProductSchema.safeParse({
-            secretCode: "newcode",
+            commissionAmount: 10,
         })
         expect(result.success).toBe(true)
         if (result.success) {
-            expect(result.data.secretCode).toBe("newcode")
+            expect(result.data.commissionAmount).toBe(10)
         }
     })
 
-    it("accepts null secretCode to clear", () => {
+    it("accepts null commissionAmount to clear", () => {
         const result = updateProductSchema.safeParse({
-            secretCode: null,
+            commissionAmount: null,
         })
         expect(result.success).toBe(true)
     })

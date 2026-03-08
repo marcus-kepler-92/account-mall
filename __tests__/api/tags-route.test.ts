@@ -55,39 +55,7 @@ describe("GET /api/tags", () => {
         expect(prismaMock.tag.findMany).toHaveBeenCalledWith({
             include: {
                 products: {
-                    where: { status: "ACTIVE", secretCode: null },
-                    select: { id: true },
-                },
-            },
-            orderBy: { name: "asc" },
-        })
-    })
-
-    it("filters product count by code when code param provided", async () => {
-        const tags = [
-            {
-                id: "tag_1",
-                name: "Game",
-                slug: "game",
-                createdAt: new Date(),
-                updatedAt: new Date(),
-                products: [{ id: "p1" }, { id: "p2" }],
-            },
-        ]
-        prismaMock.tag.findMany.mockResolvedValueOnce(tags)
-
-        const res = await GET(createUrlRequest("http://localhost/api/tags?code=secret1"))
-        const data = await res.json()
-
-        expect(res.status).toBe(200)
-        expect(data[0]._count.products).toBe(2)
-        expect(prismaMock.tag.findMany).toHaveBeenCalledWith({
-            include: {
-                products: {
-                    where: {
-                        status: "ACTIVE",
-                        OR: [{ secretCode: null }, { secretCode: "secret1" }],
-                    },
+                    where: { status: "ACTIVE" },
                     select: { id: true },
                 },
             },

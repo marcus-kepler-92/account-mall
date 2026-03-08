@@ -28,6 +28,16 @@ export function SiteHeader() {
                     <ThemeToggle />
                     <Button variant="ghost" size="sm" className="size-9 shrink-0 p-0 sm:size-auto sm:px-3" asChild>
                         <Link
+                            href="/distributor"
+                            title="分销中心"
+                            aria-label="分销中心"
+                            className="gap-1.5 sm:gap-2"
+                        >
+                            <span className="hidden sm:inline">分销中心</span>
+                        </Link>
+                    </Button>
+                    <Button variant="ghost" size="sm" className="size-9 shrink-0 p-0 sm:size-auto sm:px-3" asChild>
+                        <Link
                         href="/orders/lookup"
                         title="订单查询"
                         aria-label="订单查询"

@@ -42,17 +42,6 @@ export async function GET(request: NextRequest) {
     } else {
         // Public: only active products
         where.status = "ACTIVE";
-
-        // Secret code filter: show products with no secretCode, or matching secretCode
-        const code = searchParams.get("code");
-        if (code) {
-            where.OR = [
-                { secretCode: null },
-                { secretCode: code },
-            ];
-        } else {
-            where.secretCode = null;
-        }
     }
 
     // Filter by tag(s)
@@ -158,7 +147,7 @@ export async function POST(request: NextRequest) {
         return validationError(parsed.error.flatten());
     }
 
-    const { name, slug, description, summary, image, price, maxQuantity, status, tagIds, productType, sourceUrl, secretCode } =
+    const { name, slug, description, summary, image, price, maxQuantity, status, tagIds, productType, sourceUrl, commissionAmount } =
         parsed.data;
 
     // Check slug uniqueness
@@ -186,7 +175,7 @@ export async function POST(request: NextRequest) {
             status: status ?? "ACTIVE",
             productType: productType ?? "NORMAL",
             sourceUrl: finalSourceUrl,
-            secretCode: secretCode?.trim() || null,
+            commissionAmount: commissionAmount != null ? commissionAmount : undefined,
             tags:
                 tagIds && tagIds.length > 0
                     ? { connect: tagIds.map((id) => ({ id })) }

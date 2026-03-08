@@ -40,6 +40,8 @@ export type OrderRow = {
     id: string;
     orderNo: string;
     email: string;
+    distributorId: string | null;
+    distributor: { id: string; name: string; distributorCode: string | null } | null;
     product: {
         id: string;
         name: string;
@@ -56,9 +58,9 @@ export type OrderRow = {
 };
 
 const statusMap = {
-    PENDING: { label: "待完成", className: "border-warning/50 bg-warning/10 text-warning" },
-    COMPLETED: { label: "已完成", className: "border-success/50 bg-success/10 text-success" },
-    CLOSED: { label: "已关闭", className: "border-muted-foreground/30 bg-muted text-muted-foreground" },
+    PENDING: { label: "待完成", variant: "warning" as const },
+    COMPLETED: { label: "已完成", variant: "success" as const },
+    CLOSED: { label: "已关闭", variant: "secondary" as const },
 };
 
 function OrderRowActions({ order }: { order: OrderRow }) {
@@ -261,6 +263,23 @@ export const ordersColumns: ColumnDef<OrderRow>[] = [
         ),
     },
     {
+        accessorKey: "distributor",
+        header: "分销员",
+        cell: ({ row }) => {
+            const d = row.original.distributor;
+            if (!d) return <span className="text-muted-foreground">—</span>;
+            return (
+                <div className="flex flex-col text-xs">
+                    <span>{d.name}</span>
+                    {d.distributorCode && (
+                        <span className="text-muted-foreground font-mono">{d.distributorCode}</span>
+                    )}
+                </div>
+            );
+        },
+        enableSorting: false,
+    },
+    {
         accessorKey: "product",
         header: "商品",
         cell: ({ row }) => {
@@ -301,12 +320,8 @@ export const ordersColumns: ColumnDef<OrderRow>[] = [
         header: "状态",
         cell: ({ row }) => {
             const status = row.getValue("status") as OrderRow["status"];
-            const { label, className } = statusMap[status];
-            return (
-                <Badge variant="outline" className={className}>
-                    {label}
-                </Badge>
-            );
+            const { label, variant } = statusMap[status];
+            return <Badge variant={variant}>{label}</Badge>;
         },
         filterFn: (row, id, value) => {
             const val = row.getValue(id) as string;

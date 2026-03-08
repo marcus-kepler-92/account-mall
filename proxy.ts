@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 
 // Public pages that never require authentication
 const PUBLIC_PAGE_PREFIXES = ["/products", "/orders"];
-const PUBLIC_EXACT_PAGES = ["/", "/admin/login"];
+const PUBLIC_EXACT_PAGES = ["/", "/admin/login", "/distributor/login", "/distributor/register"];
 
 // Public API routes that never require authentication
 const PUBLIC_API_PREFIXES = [
@@ -18,7 +18,9 @@ const PUBLIC_API_EXACT = [
 ];
 
 // Protected API routes that require admin authentication
-const PROTECTED_API_PREFIXES = ["/api/cards"];
+const PROTECTED_API_PREFIXES = ["/api/cards", "/api/admin"];
+// API routes that require distributor authentication (session + role checked in handler)
+const DISTRIBUTOR_API_PREFIX = "/api/distributor";
 
 /**
  * Check if the request path is a public page route
@@ -59,6 +61,17 @@ function isPublicApi(pathname: string, method: string): boolean {
 }
 
 /**
+ * Check if the request path requires distributor authentication (session only; role checked in layout)
+ */
+function isDistributorProtectedPage(pathname: string): boolean {
+    return (
+        pathname.startsWith("/distributor") &&
+        pathname !== "/distributor/login" &&
+        pathname !== "/distributor/register"
+    );
+}
+
+/**
  * Check if the request path requires admin authentication
  */
 function isProtectedRoute(pathname: string, method: string): boolean {
@@ -67,8 +80,18 @@ function isProtectedRoute(pathname: string, method: string): boolean {
         return true;
     }
 
-    // Protected API prefixes
+    // Distributor pages (except login/register) require session
+    if (isDistributorProtectedPage(pathname)) {
+        return true;
+    }
+
+    // Protected API prefixes (admin)
     if (PROTECTED_API_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
+        return true;
+    }
+
+    // Distributor API (session required; role checked in API)
+    if (pathname.startsWith(DISTRIBUTOR_API_PREFIX)) {
         return true;
     }
 
@@ -98,9 +121,31 @@ function getSessionCookie(request: NextRequest) {
     );
 }
 
+const PROMO_COOKIE_NAME = "distributor_promo_code";
+const PROMO_COOKIE_MAX_AGE_DAYS = 30;
+
 export async function proxy(request: NextRequest) {
     const { pathname } = request.nextUrl;
     const method = request.method;
+
+    // 0. Storefront: set promoCode cookie when URL has ?promoCode= (for distributor attribution)
+    if (method === "GET") {
+        const isStorefront =
+            pathname === "/" ||
+            (pathname.startsWith("/products") && !pathname.startsWith("/products/"));
+        const promoCode = request.nextUrl.searchParams.get("promoCode")?.trim();
+        if (isStorefront && promoCode && promoCode.length <= 64) {
+            const res = NextResponse.next();
+            res.cookies.set(PROMO_COOKIE_NAME, promoCode, {
+                path: "/",
+                maxAge: PROMO_COOKIE_MAX_AGE_DAYS * 24 * 60 * 60,
+                sameSite: "lax",
+                httpOnly: true,
+                secure: request.nextUrl.protocol === "https:",
+            });
+            return res;
+        }
+    }
 
     // 1. Admin login page: redirect to dashboard if already authenticated
     if (pathname === "/admin/login") {
@@ -152,6 +197,9 @@ export async function proxy(request: NextRequest) {
                     { status: 401 }
                 );
             }
+            if (isDistributorProtectedPage(pathname)) {
+                return NextResponse.redirect(new URL("/distributor/login", request.url));
+            }
             return NextResponse.redirect(new URL("/admin/login", request.url));
         }
 
@@ -172,6 +220,9 @@ export async function proxy(request: NextRequest) {
                     { status: 401 }
                 );
             }
+            if (isDistributorProtectedPage(pathname)) {
+                return NextResponse.redirect(new URL("/distributor/login", request.url));
+            }
             return NextResponse.redirect(new URL("/admin/login", request.url));
         }
 
@@ -183,7 +234,18 @@ export async function proxy(request: NextRequest) {
                     { status: 401 }
                 );
             }
+            if (isDistributorProtectedPage(pathname)) {
+                return NextResponse.redirect(new URL("/distributor/login", request.url));
+            }
             return NextResponse.redirect(new URL("/admin/login", request.url));
+        }
+
+        // Distributor pages: require DISTRIBUTOR role (or ADMIN can access admin only; distributor area is for DISTRIBUTOR)
+        if (!pathname.startsWith("/api/") && isDistributorProtectedPage(pathname)) {
+            const user = session?.user as { role?: string } | undefined;
+            if (user?.role !== "DISTRIBUTOR" && user?.role !== "ADMIN") {
+                return NextResponse.redirect(new URL("/distributor/login", request.url));
+            }
         }
     }
 

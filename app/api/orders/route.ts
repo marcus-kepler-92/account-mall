@@ -223,6 +223,9 @@ export async function GET(request: NextRequest) {
                         price: true,
                     },
                 },
+                distributor: {
+                    select: { id: true, name: true, distributorCode: true },
+                },
                 cards: {
                     select: {
                         status: true,
@@ -245,6 +248,8 @@ export async function GET(request: NextRequest) {
             id: order.id,
             orderNo: order.orderNo,
             email: order.email,
+            distributorId: order.distributorId,
+            distributor: order.distributor ? { id: order.distributor.id, name: order.distributor.name, distributorCode: order.distributor.distributorCode } : null,
             product: {
                 id: order.product.id,
                 name: order.product.name,
@@ -289,7 +294,19 @@ export async function POST(request: NextRequest) {
         return validationError(parsed.error.flatten())
     }
 
-    const { productId, email, orderPassword, quantity, turnstileToken } = parsed.data
+    const { productId, email, orderPassword, quantity, turnstileToken, promoCode: bodyPromoCode } = parsed.data
+
+    // Resolve distributor from promoCode (cookie or body)
+    const cookiePromoCode = request.cookies?.get?.("distributor_promo_code")?.value?.trim()
+    const promoCode = (bodyPromoCode?.trim() || cookiePromoCode) || null
+    let distributorId: string | null = null
+    if (promoCode) {
+        const distributor = await prisma.user.findFirst({
+            where: { distributorCode: promoCode, role: "DISTRIBUTOR", disabledAt: null },
+            select: { id: true },
+        })
+        if (distributor) distributorId = distributor.id
+    }
 
     const secretKey = config.turnstileSecretKey
     const turnstileEnabled = secretKey && config.nodeEnv !== "development"
@@ -385,12 +402,14 @@ export async function POST(request: NextRequest) {
                     data: {
                         orderNo,
                         productId,
+                        ...(distributorId && { distributorId }),
                         email: email.trim().toLowerCase(),
                         passwordHash,
                         quantity,
                         amount: amountRounded,
                         status: "PENDING",
                         ...(clientIp !== "unknown" && { clientIp }),
+                        commissionAmountSnapshot: product.commissionAmount ?? null,
                     },
                 })
 

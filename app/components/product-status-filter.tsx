@@ -10,12 +10,10 @@ type Tag = { slug: string; name: string }
 export function ProductStatusFilter({
     currentStatus,
     currentTag,
-    currentHasSecretCode,
     tags,
 }: {
     currentStatus?: string
     currentTag?: string
-    currentHasSecretCode?: string
     tags: Tag[]
 }) {
     const router = useRouter()
@@ -37,12 +35,6 @@ export function ProductStatusFilter({
         { label: "下架", value: "INACTIVE" },
     ]
 
-    const secretCodeOptions = [
-        { label: "全部", value: "" },
-        { label: "有暗号", value: "true" },
-        { label: "无暗号", value: "false" },
-    ]
-
     return (
         <div className="flex flex-wrap items-center gap-3">
             {/* Status filter */}
@@ -59,27 +51,6 @@ export function ProductStatusFilter({
                         size="sm"
                         onClick={() =>
                             setFilter("status", opt.value || null)
-                        }
-                    >
-                        {opt.label}
-                    </Button>
-                ))}
-            </div>
-
-            {/* Secret code filter */}
-            <div className="flex items-center gap-1">
-                <span className="text-sm text-muted-foreground mr-1">暗号：</span>
-                {secretCodeOptions.map((opt) => (
-                    <Button
-                        key={opt.value}
-                        variant={
-                            (currentHasSecretCode ?? "") === opt.value
-                                ? "default"
-                                : "outline"
-                        }
-                        size="sm"
-                        onClick={() =>
-                            setFilter("hasSecretCode", opt.value || null)
                         }
                     >
                         {opt.label}

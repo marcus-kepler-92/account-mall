@@ -58,9 +58,10 @@ jest.mock("@/lib/order-success-token", () => ({
     createOrderSuccessToken: jest.fn().mockReturnValue("mock-success-token"),
 }))
 
-function createJsonRequest(body: unknown): NextRequest {
+function createJsonRequest(body: unknown, cookies?: { get: (name: string) => { value: string } | undefined }): NextRequest {
     return {
         json: async () => body,
+        cookies: cookies ?? { get: () => undefined },
     } as unknown as NextRequest
 }
 
@@ -743,6 +744,157 @@ describe("POST /api/orders (create order)", () => {
                 "127.0.0.1"
             )
             expect(mockTx.order.create).toHaveBeenCalled()
+        })
+    })
+
+    describe("promoCode attribution (distributor)", () => {
+        const product = {
+            id: "prod_1",
+            name: "Test Product",
+            price: 50,
+            maxQuantity: 5,
+            status: "ACTIVE",
+        }
+        const createdOrder = {
+            id: "order_new",
+            orderNo: "550e8400-e29b-41d4-a716-446655440000",
+            productId: "prod_1",
+            email: "user@example.com",
+            passwordHash: "hashed-password",
+            quantity: 2,
+            amount: 100,
+            status: "PENDING",
+            paidAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+        }
+        function mockTxWithCreate() {
+            const tx = {
+                order: { create: jest.fn().mockResolvedValue(createdOrder) },
+                card: {
+                    findMany: jest.fn().mockResolvedValue([{ id: "card_1" }, { id: "card_2" }]),
+                    updateMany: jest.fn().mockResolvedValue({ count: 2 }),
+                },
+            }
+            ;(prismaMock.$transaction as jest.Mock).mockImplementation((cb: (t: unknown) => Promise<unknown>) =>
+                cb(tx)
+            )
+            return tx
+        }
+
+        it("includes distributorId when body has valid promoCode", async () => {
+            prismaMock.user.findFirst.mockResolvedValueOnce({ id: "dist_1" })
+            prismaMock.product.findUnique.mockResolvedValueOnce(product)
+            prismaMock.card.count.mockResolvedValueOnce(3)
+            const tx = mockTxWithCreate()
+
+            const res = await POST(
+                createJsonRequest({
+                    productId: "prod_1",
+                    email: "user@example.com",
+                    orderPassword: "password123",
+                    quantity: 2,
+                    promoCode: "PROMO1",
+                })
+            )
+            const data = await res.json()
+
+            expect(res.status).toBe(200)
+            expect(tx.order.create).toHaveBeenCalledWith({
+                data: expect.objectContaining({
+                    distributorId: "dist_1",
+                    productId: "prod_1",
+                    quantity: 2,
+                    amount: 100,
+                }),
+            })
+        })
+
+        it("includes distributorId when cookie has valid promoCode and body has none", async () => {
+            prismaMock.user.findFirst.mockResolvedValueOnce({ id: "dist_1" })
+            prismaMock.product.findUnique.mockResolvedValueOnce(product)
+            prismaMock.card.count.mockResolvedValueOnce(3)
+            const tx = mockTxWithCreate()
+            const cookies = {
+                get: (name: string) =>
+                    name === "distributor_promo_code" ? { value: "PROMO1" } : undefined,
+            }
+
+            const res = await POST(
+                createJsonRequest(
+                    {
+                        productId: "prod_1",
+                        email: "user@example.com",
+                        orderPassword: "password123",
+                        quantity: 2,
+                    },
+                    cookies
+                )
+            )
+
+            expect(res.status).toBe(200)
+            expect(tx.order.create).toHaveBeenCalledWith({
+                data: expect.objectContaining({
+                    distributorId: "dist_1",
+                }),
+            })
+        })
+
+        it("does not set distributorId when promoCode is invalid or distributor disabled", async () => {
+            prismaMock.user.findFirst.mockResolvedValueOnce(null)
+            prismaMock.product.findUnique.mockResolvedValueOnce(product)
+            prismaMock.card.count.mockResolvedValueOnce(3)
+            const tx = mockTxWithCreate()
+
+            const res = await POST(
+                createJsonRequest({
+                    productId: "prod_1",
+                    email: "user@example.com",
+                    orderPassword: "password123",
+                    quantity: 2,
+                    promoCode: "INVALID",
+                })
+            )
+
+            expect(res.status).toBe(200)
+            const call = (tx.order.create as jest.Mock).mock.calls[0][0]
+            expect(call.data).not.toHaveProperty("distributorId")
+        })
+
+        it("prefers body promoCode over cookie when both present", async () => {
+            prismaMock.user.findFirst
+                .mockResolvedValueOnce({ id: "dist_body" })
+                .mockResolvedValueOnce({ id: "dist_cookie" })
+            prismaMock.product.findUnique.mockResolvedValueOnce(product)
+            prismaMock.card.count.mockResolvedValueOnce(3)
+            const tx = mockTxWithCreate()
+            const cookies = {
+                get: (name: string) =>
+                    name === "distributor_promo_code" ? { value: "COOKIE_PROMO" } : undefined,
+            }
+
+            await POST(
+                createJsonRequest(
+                    {
+                        productId: "prod_1",
+                        email: "user@example.com",
+                        orderPassword: "password123",
+                        quantity: 2,
+                        promoCode: "BODY_PROMO",
+                    },
+                    cookies
+                )
+            )
+
+            expect(prismaMock.user.findFirst).toHaveBeenCalledWith({
+                where: { distributorCode: "BODY_PROMO", role: "DISTRIBUTOR", disabledAt: null },
+                select: { id: true },
+            })
+            expect(tx.order.create).toHaveBeenCalledWith({
+                data: expect.objectContaining({
+                    distributorId: "dist_body",
+                }),
+            })
         })
     })
 })

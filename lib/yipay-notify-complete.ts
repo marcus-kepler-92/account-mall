@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { verifyYipayNotifySign } from "@/lib/yipay"
-import { sendOrderCompletionEmail } from "@/lib/order-completion-email"
+import { completePendingOrder } from "@/lib/complete-pending-order"
 
 /**
  * Process Yipay notify/return params: verify sign, match order and amount, idempotent complete.
@@ -47,31 +47,14 @@ export async function processYipayNotifyAndComplete(
     }
 
     if (order.status === "COMPLETED") {
+        console.info("[payment-notify] yipay orderNo=%s amount=%s status=already_completed", outTradeNo, orderAmountStr)
         return { ok: true }
     }
     if (order.status !== "PENDING") {
         return { ok: true }
     }
 
-    let completedInThisRequest = 0
-    completedInThisRequest = await prisma.$transaction(async (tx) => {
-        const updateResult = await tx.order.updateMany({
-            where: { id: order.id, status: "PENDING" },
-            data: { status: "COMPLETED", paidAt: new Date() },
-        })
-        if (updateResult.count > 0) {
-            await tx.card.updateMany({
-                where: { orderId: order.id, status: "RESERVED" },
-                data: { status: "SOLD" },
-            })
-        }
-        return updateResult.count
-    })
-
-    if (completedInThisRequest > 0) {
-        sendOrderCompletionEmail(order.id).catch((err) =>
-            console.error("[order-completion-email]", err),
-        )
-    }
+    console.info("[payment-notify] yipay orderNo=%s amount=%s status=completing", outTradeNo, orderAmountStr)
+    await completePendingOrder(outTradeNo)
     return { ok: true }
 }

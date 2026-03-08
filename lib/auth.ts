@@ -8,9 +8,15 @@ export const auth = betterAuth({
     database: prismaAdapter(prisma, {
         provider: "postgresql",
     }),
+    user: {
+        additionalFields: {
+            role: { type: "string", required: false },
+            distributorCode: { type: "string", required: false },
+        },
+    },
     emailAndPassword: {
         enabled: true,
-        disableSignUp: true, // Only admin login allowed, no public registration
+        disableSignUp: false, // Allow sign-up for distributors; admin is created via seed
     },
     trustedOrigins: [config.siteUrl],
     rateLimit: {

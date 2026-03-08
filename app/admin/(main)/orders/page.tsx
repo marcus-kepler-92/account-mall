@@ -95,6 +95,9 @@ export default async function AdminOrdersPage({
                         price: true,
                     },
                 },
+                distributor: {
+                    select: { id: true, name: true, distributorCode: true },
+                },
                 cards: {
                     select: {
                         status: true,
@@ -132,6 +135,10 @@ export default async function AdminOrdersPage({
             id: order.id,
             orderNo: order.orderNo,
             email: order.email,
+            distributorId: order.distributorId,
+            distributor: order.distributor
+                ? { id: order.distributor.id, name: order.distributor.name, distributorCode: order.distributor.distributorCode }
+                : null,
             product: {
                 id: order.product.id,
                 name: order.product.name,

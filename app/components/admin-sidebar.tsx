@@ -10,6 +10,9 @@ import {
     LogOut,
     Store,
     Megaphone,
+    Users,
+    Layers,
+    Wallet,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { authClient } from "@/lib/auth-client"
@@ -56,6 +59,21 @@ const navItems = [
         title: "公告管理",
         href: "/admin/announcements",
         icon: Megaphone,
+    },
+    {
+        title: "分销员管理",
+        href: "/admin/distributors",
+        icon: Users,
+    },
+    {
+        title: "阶梯佣金配置",
+        href: "/admin/commission-tiers",
+        icon: Layers,
+    },
+    {
+        title: "提现管理",
+        href: "/admin/withdrawals",
+        icon: Wallet,
     },
 ]
 
