@@ -75,6 +75,7 @@ export function ProductForm({
     const [deletingTagId, setDeletingTagId] = useState<string | null>(null)
     const [confirmDeleteTagId, setConfirmDeleteTagId] = useState<string | null>(null)
     const [slugManuallyEdited, setSlugManuallyEdited] = useState(false)
+    const [imageUploading, setImageUploading] = useState(false)
 
     const form = useForm<ProductFormSchema>({
         resolver: zodResolver(productFormSchema),
@@ -103,8 +104,8 @@ export function ProductForm({
     const tagIds = watch("tagIds") ?? []
     const isFreeShared = productType === "FREE_SHARED"
 
-    // Convert uploaded file to base64
-    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // 上传图片到服务器，得到 URL 后写入表单
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (!file) return
         if (!file.type.startsWith("image/")) {
@@ -115,11 +116,27 @@ export function ProductForm({
             toast.error("图片大小不能超过 2MB")
             return
         }
-        const reader = new FileReader()
-        reader.onload = () => {
-            setValue("image", reader.result as string)
+        setImageUploading(true)
+        try {
+            const formData = new FormData()
+            formData.append("file", file)
+            const res = await fetch("/api/upload/image", {
+                method: "POST",
+                body: formData,
+            })
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}))
+                toast.error(data.error || "图片上传失败")
+                return
+            }
+            const { url } = await res.json()
+            if (url) setValue("image", url)
+        } catch {
+            toast.error("图片上传失败")
+        } finally {
+            setImageUploading(false)
+            e.target.value = ""
         }
-        reader.readAsDataURL(file)
     }
 
     // Auto-generate slug from name (unless manually edited)
@@ -348,11 +365,15 @@ export function ProductForm({
                                                         ) : (
                                                             <label
                                                                 htmlFor="image-upload"
-                                                                className="flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed p-6 transition-colors hover:border-foreground/30 hover:bg-accent/50"
+                                                                className={`flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed p-6 transition-colors hover:border-foreground/30 hover:bg-accent/50 ${imageUploading ? "pointer-events-none opacity-60" : ""}`}
                                                             >
-                                                                <Upload className="mb-2 size-6 text-muted-foreground" />
+                                                                {imageUploading ? (
+                                                                    <Loader2 className="mb-2 size-6 animate-spin text-muted-foreground" />
+                                                                ) : (
+                                                                    <Upload className="mb-2 size-6 text-muted-foreground" />
+                                                                )}
                                                                 <span className="text-sm text-muted-foreground">
-                                                                    点击上传图片
+                                                                    {imageUploading ? "上传中…" : "点击上传图片"}
                                                                 </span>
                                                                 <span className="mt-1 text-xs text-muted-foreground">
                                                                     支持 JPG、PNG、GIF，最大 2MB
@@ -364,6 +385,7 @@ export function ProductForm({
                                                             type="file"
                                                             accept="image/*"
                                                             className="hidden"
+                                                            disabled={imageUploading}
                                                             onChange={handleImageUpload}
                                                         />
                                                 </div>
