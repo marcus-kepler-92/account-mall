@@ -1,161 +1,81 @@
 import { redirect } from "next/navigation"
-import Link from "next/link"
 import { getDistributorSession } from "@/lib/auth-guard"
 import { prisma } from "@/lib/prisma"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table"
-import { DistributorOrdersPagination } from "./orders-pagination"
-import { EmptyState } from "@/app/components/empty-state"
-import { ShoppingCart } from "lucide-react"
+    parseDistributorOrderFilters,
+    type DistributorOrderFiltersInput,
+} from "./orders-filters"
+import { DistributorOrdersDataTable } from "./orders-data-table"
+import type { DistributorOrderRow } from "./orders-columns"
 
 export const dynamic = "force-dynamic"
-
-const statusConfig: Record<string, { label: string; variant: "warning" | "success" | "secondary" }> = {
-    PENDING: { label: "待支付", variant: "warning" },
-    COMPLETED: { label: "已完成", variant: "success" },
-    CLOSED: { label: "已关闭", variant: "secondary" },
-}
 
 export default async function DistributorOrdersPage({
     searchParams,
 }: {
-    searchParams: Promise<{ page?: string; status?: string }>
+    searchParams: Promise<{ page?: string; pageSize?: string; status?: string; search?: string }>
 }) {
     const session = await getDistributorSession()
     if (!session) redirect("/distributor/login")
 
     const user = session.user as { id: string }
     const params = await searchParams
-    const page = Math.max(1, parseInt(params.page ?? "1", 10))
-    const pageSize = 20
-    const status = params.status as "PENDING" | "COMPLETED" | "CLOSED" | undefined
+    const filters = parseDistributorOrderFilters(params as DistributorOrderFiltersInput)
 
-    const where: { distributorId: string; status?: "PENDING" | "COMPLETED" | "CLOSED" } = {
+    const where: { distributorId: string; status?: { in: ("PENDING" | "COMPLETED" | "CLOSED")[] }; orderNo?: { contains: string } } = {
         distributorId: user.id,
     }
-    if (status) where.status = status
+    if (filters.statusList.length > 0) {
+        where.status = { in: filters.statusList }
+    }
+    if (filters.search) {
+        where.orderNo = { contains: filters.search.trim() }
+    }
 
-    const [orders, total] = await Promise.all([
+    const [orders, total, statusCounts] = await Promise.all([
         prisma.order.findMany({
             where,
-            include: { product: { select: { name: true, slug: true, price: true } } },
+            include: { product: { select: { name: true } } },
             orderBy: { createdAt: "desc" },
-            skip: (page - 1) * pageSize,
-            take: pageSize,
+            skip: (filters.page - 1) * filters.pageSize,
+            take: filters.pageSize,
         }),
         prisma.order.count({ where }),
+        prisma.order.groupBy({
+            by: ["status"],
+            where: { distributorId: user.id },
+            _count: { id: true },
+        }),
     ])
 
-    const totalPages = Math.ceil(total / pageSize) || 1
+    const orderStats = {
+        PENDING: statusCounts.find((c) => c.status === "PENDING")?._count.id ?? 0,
+        COMPLETED: statusCounts.find((c) => c.status === "COMPLETED")?._count.id ?? 0,
+        CLOSED: statusCounts.find((c) => c.status === "CLOSED")?._count.id ?? 0,
+    }
 
-    const statusTabs = [
-        { value: undefined, label: "全部" },
-        { value: "PENDING" as const, label: "待支付" },
-        { value: "COMPLETED" as const, label: "已完成" },
-        { value: "CLOSED" as const, label: "已关闭" },
-    ]
+    const rows: DistributorOrderRow[] = orders.map((o) => ({
+        id: o.id,
+        orderNo: o.orderNo,
+        productName: o.productNameSnapshot ?? o.product.name,
+        quantity: o.quantity,
+        amount: Number(o.amount),
+        status: o.status,
+        createdAt: o.createdAt.toISOString(),
+    }))
 
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-xl font-bold tracking-tight sm:text-2xl">我的订单</h1>
+                <h2 className="text-2xl font-bold tracking-tight">我的订单</h2>
                 <p className="text-muted-foreground">归属您的全部订单明细</p>
             </div>
 
-            <div className="overflow-x-auto border-b border-border [-webkit-overflow-scrolling:touch]">
-                <div className="flex min-w-0 gap-1">
-                    {statusTabs.map((tab) => {
-                        const isActive = status === tab.value
-                        const href = tab.value
-                            ? `/distributor/orders?status=${tab.value}`
-                            : "/distributor/orders"
-                        return (
-                            <Link
-                                key={tab.value ?? "all"}
-                                href={href}
-                                className={`shrink-0 touch-manipulation px-4 py-2.5 text-sm font-medium transition-colors rounded-t-md -mb-px border-b-2 ${
-                                    isActive
-                                        ? "border-primary text-foreground"
-                                        : "border-transparent text-muted-foreground hover:text-foreground"
-                                }`}
-                            >
-                                {tab.label}
-                            </Link>
-                        )
-                    })}
-                </div>
-            </div>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>订单列表</CardTitle>
-                    <CardDescription>共 {total} 笔订单</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    {orders.length === 0 ? (
-                        <EmptyState
-                            icon={<ShoppingCart className="size-8 text-muted-foreground" />}
-                            title="暂无订单"
-                            description="分享推广链接获得订单后将在此展示。"
-                        />
-                    ) : (
-                        <>
-                            <div className="overflow-x-auto rounded-md border [-webkit-overflow-scrolling:touch]">
-                                <Table>
-                                    <TableHeader>
-                                    <TableRow>
-                                        <TableHead>订单号</TableHead>
-                                        <TableHead>商品</TableHead>
-                                        <TableHead>数量</TableHead>
-                                        <TableHead className="text-right">金额</TableHead>
-                                        <TableHead>状态</TableHead>
-                                        <TableHead>时间</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {orders.map((o) => (
-                                        <TableRow key={o.id}>
-                                            <TableCell className="font-mono text-xs">
-                                                {o.orderNo}
-                                            </TableCell>
-                                            <TableCell>{o.productNameSnapshot ?? o.product.name}</TableCell>
-                                            <TableCell>{o.quantity}</TableCell>
-                                            <TableCell className="text-right">
-                                                ¥{Number(o.amount).toFixed(2)}
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge variant={statusConfig[o.status]?.variant ?? "outline"}>
-                                                    {statusConfig[o.status]?.label ?? o.status}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell className="text-muted-foreground text-sm">
-                                                {new Date(o.createdAt).toLocaleString("zh-CN")}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                                </Table>
-                            </div>
-                            {totalPages > 1 && (
-                                <DistributorOrdersPagination
-                                    page={page}
-                                    totalPages={totalPages}
-                                    total={total}
-                                    currentStatus={status}
-                                />
-                            )}
-                        </>
-                    )}
-                </CardContent>
-            </Card>
+            <DistributorOrdersDataTable
+                data={rows}
+                total={total}
+                statusCounts={orderStats}
+            />
         </div>
     )
 }

@@ -29,11 +29,11 @@ export function SiteHeader() {
                     <Button variant="ghost" size="sm" className="size-9 min-w-9 shrink-0 p-0 sm:size-auto sm:px-3 touch-manipulation" asChild>
                         <Link
                             href="/distributor"
-                            title="分销中心"
-                            aria-label="分销中心"
+                            title="仪表盘"
+                            aria-label="仪表盘"
                             className="gap-1.5 sm:gap-2"
                         >
-                            <span className="hidden sm:inline">分销中心</span>
+                            <span className="hidden sm:inline">仪表盘</span>
                         </Link>
                     </Button>
                     <Button variant="ghost" size="sm" className="size-9 min-w-9 shrink-0 p-0 sm:size-auto sm:px-3 touch-manipulation" asChild>

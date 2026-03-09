@@ -41,7 +41,7 @@ export default function AdminLoginPage() {
                 router.push("/admin/dashboard")
                 router.refresh()
             } else {
-                toast.error("请使用分销中心入口登录")
+                toast.error("请使用分销后台入口登录")
                 await authClient.signOut()
                 router.refresh()
             }

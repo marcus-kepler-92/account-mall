@@ -21,6 +21,7 @@ function mapOrderToResponse(order: {
     status: string
     paidAt: Date | null
     createdAt: Date
+    productNameSnapshot?: string | null
     product: {
         id: string
         name: string

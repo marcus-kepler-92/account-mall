@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { getDistributorSession } from "@/lib/auth-guard";
 import {
   Card,
@@ -8,7 +7,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Link2, ShoppingCart, Coins, Wallet, TrendingUp } from "lucide-react";
 import { config } from "@/lib/config";
 import { prisma } from "@/lib/prisma";
@@ -81,7 +79,7 @@ export default async function DistributorDashboardPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-xl font-bold tracking-tight sm:text-2xl">分销中心</h1>
+        <h1 className="text-xl font-bold tracking-tight sm:text-2xl">仪表盘</h1>
         <p className="text-muted-foreground">推广链接与数据概览</p>
       </div>
 
@@ -192,18 +190,6 @@ export default async function DistributorDashboardPage() {
           </p>
         </CardContent>
       </Card>
-
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-4">
-        <Button asChild className="w-full min-h-11 touch-manipulation sm:w-auto">
-          <Link href="/distributor/orders">我的订单</Link>
-        </Button>
-        <Button asChild variant="outline" className="w-full min-h-11 touch-manipulation sm:w-auto">
-          <Link href="/distributor/commissions">我的佣金</Link>
-        </Button>
-        <Button asChild variant="outline" className="w-full min-h-11 touch-manipulation sm:w-auto">
-          <Link href="/distributor/withdrawals">提现记录</Link>
-        </Button>
-      </div>
     </div>
   );
 }

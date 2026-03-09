@@ -1,79 +1,99 @@
 import { redirect } from "next/navigation"
+import Link from "next/link"
 import { getDistributorSession } from "@/lib/auth-guard"
 import { prisma } from "@/lib/prisma"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { getDistributorTierSummary } from "@/lib/distributor-tier-summary"
-import { Badge } from "@/components/ui/badge"
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table"
-import Link from "next/link"
-import { ApplyWithdrawalForm } from "./apply-withdrawal-form"
-import { DistributorCommissionsPagination } from "./commissions-pagination"
-import { EmptyState } from "@/app/components/empty-state"
 import { Button } from "@/components/ui/button"
-import { Coins } from "lucide-react"
+import {
+    parseDistributorCommissionFilters,
+    type DistributorCommissionFiltersInput,
+} from "./commissions-filters"
+import { DistributorCommissionsDataTable } from "./commissions-data-table"
+import type { DistributorCommissionRow } from "./commissions-columns"
+import { ApplyWithdrawalForm } from "./apply-withdrawal-form"
 
 export const dynamic = "force-dynamic"
-
-const statusConfig: Record<string, { label: string; variant: "warning" | "success" | "secondary" }> = {
-    PENDING: { label: "待结算", variant: "warning" },
-    SETTLED: { label: "已结算", variant: "success" },
-    WITHDRAWN: { label: "已提现", variant: "secondary" },
-}
 
 export default async function DistributorCommissionsPage({
     searchParams,
 }: {
-    searchParams: Promise<{ page?: string }>
+    searchParams: Promise<{ page?: string; pageSize?: string; status?: string; search?: string }>
 }) {
     const session = await getDistributorSession()
     if (!session) redirect("/distributor/login")
 
     const user = session.user as { id: string }
     const params = await searchParams
-    const page = Math.max(1, parseInt(params.page ?? "1", 10))
-    const pageSize = 20
+    const filters = parseDistributorCommissionFilters(params as DistributorCommissionFiltersInput)
 
-    const [commissions, total, settledSum, paidSum, pendingSum, tierSummary] = await Promise.all([
-        prisma.commission.findMany({
-            where: { distributorId: user.id },
-            include: { order: { select: { orderNo: true, amount: true, paidAt: true } } },
-            orderBy: { createdAt: "desc" },
-            skip: (page - 1) * pageSize,
-            take: pageSize,
-        }),
-        prisma.commission.count({ where: { distributorId: user.id } }),
-        prisma.commission.aggregate({
-            where: { distributorId: user.id, status: "SETTLED" },
-            _sum: { amount: true },
-        }),
-        prisma.withdrawal.aggregate({
-            where: { distributorId: user.id, status: "PAID" },
-            _sum: { amount: true },
-        }),
-        prisma.withdrawal.aggregate({
-            where: { distributorId: user.id, status: "PENDING" },
-            _sum: { amount: true },
-        }),
-        getDistributorTierSummary(user.id),
-    ])
+    const where: {
+        distributorId: string
+        status?: { in: ("PENDING" | "SETTLED" | "WITHDRAWN")[] }
+        order?: { orderNo: { contains: string } }
+    } = {
+        distributorId: user.id,
+    }
+    if (filters.statusList.length > 0) {
+        where.status = { in: filters.statusList }
+    }
+    if (filters.search) {
+        where.order = { orderNo: { contains: filters.search.trim() } }
+    }
+
+    const [commissions, total, statusCounts, settledSum, paidSum, pendingSum, tierSummary] =
+        await Promise.all([
+            prisma.commission.findMany({
+                where,
+                include: { order: { select: { orderNo: true } } },
+                orderBy: { createdAt: "desc" },
+                skip: (filters.page - 1) * filters.pageSize,
+                take: filters.pageSize,
+            }),
+            prisma.commission.count({ where }),
+            prisma.commission.groupBy({
+                by: ["status"],
+                where: { distributorId: user.id },
+                _count: { id: true },
+            }),
+            prisma.commission.aggregate({
+                where: { distributorId: user.id, status: "SETTLED" },
+                _sum: { amount: true },
+            }),
+            prisma.withdrawal.aggregate({
+                where: { distributorId: user.id, status: "PAID" },
+                _sum: { amount: true },
+            }),
+            prisma.withdrawal.aggregate({
+                where: { distributorId: user.id, status: "PENDING" },
+                _sum: { amount: true },
+            }),
+            getDistributorTierSummary(user.id),
+        ])
 
     const settledTotal = Number(settledSum._sum.amount ?? 0)
     const paidTotal = Number(paidSum._sum.amount ?? 0)
     const pendingWithdrawalTotal = Number(pendingSum._sum.amount ?? 0)
     const withdrawableBalance = settledTotal - paidTotal - pendingWithdrawalTotal
-    const totalPages = Math.ceil(total / pageSize) || 1
+
+    const commissionStats = {
+        PENDING: statusCounts.find((c) => c.status === "PENDING")?._count.id ?? 0,
+        SETTLED: statusCounts.find((c) => c.status === "SETTLED")?._count.id ?? 0,
+        WITHDRAWN: statusCounts.find((c) => c.status === "WITHDRAWN")?._count.id ?? 0,
+    }
+
+    const rows: DistributorCommissionRow[] = commissions.map((c) => ({
+        id: c.id,
+        orderNo: c.order.orderNo,
+        amount: Number(c.amount),
+        status: c.status,
+        createdAt: c.createdAt.toISOString(),
+    }))
 
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-xl font-bold tracking-tight sm:text-2xl">我的佣金</h1>
+                <h2 className="text-2xl font-bold tracking-tight">我的佣金</h2>
                 <p className="text-muted-foreground">佣金明细与可提现余额</p>
                 <p className="mt-1 text-sm text-muted-foreground">
                     使用您本人账号邮箱下单的订单不记佣金。
@@ -121,65 +141,17 @@ export default async function DistributorCommissionsPage({
                 </CardContent>
             </Card>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>佣金明细</CardTitle>
-                    <CardDescription>
-                        共 {total} 笔。使用本人账号邮箱下单的订单不记佣金。
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    {commissions.length === 0 ? (
-                        <EmptyState
-                            icon={<Coins className="size-8 text-muted-foreground" />}
-                            title="暂无佣金记录"
-                            description="订单完成后将在此展示。"
-                        />
-                    ) : (
-                        <>
-                            <div className="overflow-x-auto rounded-md border [-webkit-overflow-scrolling:touch]">
-                                <Table>
-                                    <TableHeader>
-                                    <TableRow>
-                                        <TableHead>订单号</TableHead>
-                                        <TableHead className="text-right">佣金金额</TableHead>
-                                        <TableHead>状态</TableHead>
-                                        <TableHead>时间</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {commissions.map((c) => (
-                                        <TableRow key={c.id}>
-                                            <TableCell className="font-mono text-xs">
-                                                {c.order.orderNo}
-                                            </TableCell>
-                                            <TableCell className="text-right font-medium">
-                                                ¥{Number(c.amount).toFixed(2)}
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge variant={statusConfig[c.status]?.variant ?? "outline"}>
-                                                    {statusConfig[c.status]?.label ?? c.status}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell className="text-muted-foreground text-sm">
-                                                {new Date(c.createdAt).toLocaleString("zh-CN")}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                                </Table>
-                            </div>
-                            {totalPages > 1 && (
-                                <DistributorCommissionsPagination
-                                    page={page}
-                                    totalPages={totalPages}
-                                    total={total}
-                                />
-                            )}
-                        </>
-                    )}
-                </CardContent>
-            </Card>
+            <div>
+                <h3 className="text-lg font-semibold">佣金明细</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                    共 {total} 笔。使用本人账号邮箱下单的订单不记佣金。
+                </p>
+                <DistributorCommissionsDataTable
+                    data={rows}
+                    total={total}
+                    statusCounts={commissionStats}
+                />
+            </div>
         </div>
     )
 }

@@ -51,6 +51,7 @@ export async function POST(request: NextRequest) {
                 createdAt: true,
                 quantity: true,
                 amount: true,
+                productNameSnapshot: true,
                 product: {
                     select: {
                         name: true,

@@ -39,6 +39,7 @@ export async function POST(request: NextRequest) {
             quantity: true,
             amount: true,
             passwordHash: true,
+            productNameSnapshot: true,
             product: { select: { name: true } },
         },
         orderBy: { createdAt: "desc" },
