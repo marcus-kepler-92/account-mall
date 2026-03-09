@@ -54,10 +54,10 @@ export default async function DistributorWithdrawalsPage({
         <div className="space-y-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight">提现记录</h1>
+                    <h1 className="text-xl font-bold tracking-tight sm:text-2xl">提现记录</h1>
                     <p className="text-muted-foreground">申请提现与处理状态</p>
                 </div>
-                <Button asChild>
+                <Button asChild className="min-h-11 touch-manipulation">
                     <Link href="/distributor/commissions">申请提现</Link>
                 </Button>
             </div>
@@ -80,8 +80,9 @@ export default async function DistributorWithdrawalsPage({
                         />
                     ) : (
                         <>
-                            <Table>
-                                <TableHeader>
+                            <div className="overflow-x-auto rounded-md border [-webkit-overflow-scrolling:touch]">
+                                <Table>
+                                    <TableHeader>
                                     <TableRow>
                                         <TableHead className="text-right">金额</TableHead>
                                         <TableHead>状态</TableHead>
@@ -115,7 +116,8 @@ export default async function DistributorWithdrawalsPage({
                                         </TableRow>
                                     ))}
                                 </TableBody>
-                            </Table>
+                                </Table>
+                            </div>
                             {totalPages > 1 && (
                                 <DistributorWithdrawalsPagination
                                     page={page}

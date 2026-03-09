@@ -73,7 +73,7 @@ export default async function DistributorCommissionsPage({
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-bold tracking-tight">我的佣金</h1>
+                <h1 className="text-xl font-bold tracking-tight sm:text-2xl">我的佣金</h1>
                 <p className="text-muted-foreground">佣金明细与可提现余额</p>
                 <p className="mt-1 text-sm text-muted-foreground">
                     使用您本人账号邮箱下单的订单不记佣金。
@@ -103,7 +103,7 @@ export default async function DistributorCommissionsPage({
                             已结算 − 已打款 − 提现中 = 可提现余额；申请提现后由管理员线下打款
                         </CardDescription>
                     </div>
-                    <Button variant="outline" size="sm" asChild>
+                    <Button variant="outline" size="sm" className="min-h-9 touch-manipulation" asChild>
                         <Link href="/distributor/withdrawals">查看提现记录</Link>
                     </Button>
                 </CardHeader>
@@ -137,8 +137,9 @@ export default async function DistributorCommissionsPage({
                         />
                     ) : (
                         <>
-                            <Table>
-                                <TableHeader>
+                            <div className="overflow-x-auto rounded-md border [-webkit-overflow-scrolling:touch]">
+                                <Table>
+                                    <TableHeader>
                                     <TableRow>
                                         <TableHead>订单号</TableHead>
                                         <TableHead className="text-right">佣金金额</TableHead>
@@ -166,7 +167,8 @@ export default async function DistributorCommissionsPage({
                                         </TableRow>
                                     ))}
                                 </TableBody>
-                            </Table>
+                                </Table>
+                            </div>
                             {totalPages > 1 && (
                                 <DistributorCommissionsPagination
                                     page={page}

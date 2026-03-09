@@ -81,7 +81,7 @@ export default async function DistributorDashboardPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">分销中心</h1>
+        <h1 className="text-xl font-bold tracking-tight sm:text-2xl">分销中心</h1>
         <p className="text-muted-foreground">推广链接与数据概览</p>
       </div>
 
@@ -193,14 +193,14 @@ export default async function DistributorDashboardPage() {
         </CardContent>
       </Card>
 
-      <div className="flex flex-wrap gap-4">
-        <Button asChild>
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-4">
+        <Button asChild className="w-full min-h-11 touch-manipulation sm:w-auto">
           <Link href="/distributor/orders">我的订单</Link>
         </Button>
-        <Button asChild variant="outline">
+        <Button asChild variant="outline" className="w-full min-h-11 touch-manipulation sm:w-auto">
           <Link href="/distributor/commissions">我的佣金</Link>
         </Button>
-        <Button asChild variant="outline">
+        <Button asChild variant="outline" className="w-full min-h-11 touch-manipulation sm:w-auto">
           <Link href="/distributor/withdrawals">提现记录</Link>
         </Button>
       </div>

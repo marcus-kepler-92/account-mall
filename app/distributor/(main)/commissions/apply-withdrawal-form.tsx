@@ -90,7 +90,7 @@ export function ApplyWithdrawalForm({
                         ? `您有 ¥${pendingWithdrawalTotal.toFixed(2)} 正在提现处理中，到账后可继续申请。`
                         : "订单佣金结算后将可申请提现"}
                 </p>
-                <Button variant="outline" size="sm" className="mt-4" asChild>
+                <Button variant="outline" size="sm" className="mt-4 min-h-11 touch-manipulation" asChild>
                     <Link href="/distributor/withdrawals">查看提现记录</Link>
                 </Button>
             </div>
@@ -105,12 +105,13 @@ export function ApplyWithdrawalForm({
                 <AlertDescription className="mt-1">
                     管理员将线下打款至您上传的收款码，到账时间以实际为准。
                     <div className="mt-3 flex flex-wrap gap-2">
-                        <Button size="sm" asChild>
+                        <Button size="sm" className="min-h-11 touch-manipulation" asChild>
                             <Link href="/distributor/withdrawals">查看提现记录</Link>
                         </Button>
                         <Button
                             size="sm"
                             variant="ghost"
+                            className="min-h-11 touch-manipulation"
                             onClick={() => setSubmitted(false)}
                         >
                             继续申请
@@ -142,6 +143,7 @@ export function ApplyWithdrawalForm({
                         type="button"
                         variant="outline"
                         size="sm"
+                        className="min-h-11 touch-manipulation"
                         onClick={setMaxAmount}
                     >
                         全部提现
@@ -193,7 +195,7 @@ export function ApplyWithdrawalForm({
                                 toast.error("请选择 JPG/PNG/WebP 图片")
                             }
                         }}
-                        className="flex w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/30 py-8 text-muted-foreground transition-colors hover:border-primary/50 hover:bg-muted/50 hover:text-foreground"
+                        className="flex min-h-11 w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/30 py-8 text-muted-foreground transition-colors touch-manipulation hover:border-primary/50 hover:bg-muted/50 hover:text-foreground"
                     >
                         <ImagePlus className="size-10" />
                         <span className="text-sm font-medium">点击或拖拽上传</span>
@@ -217,6 +219,7 @@ export function ApplyWithdrawalForm({
                                     type="button"
                                     variant="outline"
                                     size="sm"
+                                    className="min-h-11 touch-manipulation"
                                     onClick={() => fileInputRef.current?.click()}
                                 >
                                     更换
@@ -225,8 +228,8 @@ export function ApplyWithdrawalForm({
                                     type="button"
                                     variant="ghost"
                                     size="sm"
+                                    className="min-h-11 touch-manipulation text-muted-foreground"
                                     onClick={handleRemoveFile}
-                                    className="text-muted-foreground"
                                 >
                                     <X className="size-4" />
                                     移除
@@ -238,14 +241,14 @@ export function ApplyWithdrawalForm({
             </div>
 
             <div className="flex flex-wrap items-center gap-3 border-t pt-4">
-                <Button type="submit" disabled={!canSubmit}>
+                <Button type="submit" disabled={!canSubmit} className="min-h-11 touch-manipulation">
                     {loading ? (
                         <Loader2 className="size-4 animate-spin" />
                     ) : (
                         "提交申请"
                     )}
                 </Button>
-                <Button type="button" variant="ghost" size="sm" asChild>
+                <Button type="button" variant="ghost" size="sm" className="min-h-11 touch-manipulation" asChild>
                     <Link href="/distributor/withdrawals">查看提现记录</Link>
                 </Button>
                 <p className="text-xs text-muted-foreground">

@@ -14,14 +14,14 @@ export default async function DistributorMainLayout({
     }
 
     return (
-        <div className="min-h-screen bg-background">
-            <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b bg-background px-4">
+        <div className="flex min-h-screen flex-col bg-background">
+            <header className="sticky top-0 z-50 flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background px-4 pl-[max(1rem,env(safe-area-inset-left,0px))] pr-[max(1rem,env(safe-area-inset-right,0px))] supports-[padding:env(safe-area-inset-top)]:pt-[env(safe-area-inset-top)]">
                 <DistributorNav />
                 <DistributorTopbarActions />
             </header>
-            <main className="p-6">
+            <div className="flex-1 min-w-0 p-6 pb-[max(1.5rem,env(safe-area-inset-bottom,0px))]">
                 {children}
-            </main>
+            </div>
         </div>
     )
 }

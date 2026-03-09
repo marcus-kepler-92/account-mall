@@ -45,7 +45,7 @@ export default function DistributorLoginPage() {
     }
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="flex min-h-screen items-center justify-center bg-background p-4 sm:p-6 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
             <Card className="w-full max-w-md">
                 <CardHeader className="text-center">
                     <CardTitle className="text-2xl font-bold">

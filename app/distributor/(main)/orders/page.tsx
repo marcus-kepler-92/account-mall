@@ -66,30 +66,32 @@ export default async function DistributorOrdersPage({
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-bold tracking-tight">我的订单</h1>
+                <h1 className="text-xl font-bold tracking-tight sm:text-2xl">我的订单</h1>
                 <p className="text-muted-foreground">归属您的全部订单明细</p>
             </div>
 
-            <div className="flex gap-1 border-b border-border">
-                {statusTabs.map((tab) => {
-                    const isActive = status === tab.value
-                    const href = tab.value
-                        ? `/distributor/orders?status=${tab.value}`
-                        : "/distributor/orders"
-                    return (
-                        <Link
-                            key={tab.value ?? "all"}
-                            href={href}
-                            className={`px-4 py-2 text-sm font-medium transition-colors rounded-t-md -mb-px border-b-2 ${
-                                isActive
-                                    ? "border-primary text-foreground"
-                                    : "border-transparent text-muted-foreground hover:text-foreground"
-                            }`}
-                        >
-                            {tab.label}
-                        </Link>
-                    )
-                })}
+            <div className="overflow-x-auto border-b border-border [-webkit-overflow-scrolling:touch]">
+                <div className="flex min-w-0 gap-1">
+                    {statusTabs.map((tab) => {
+                        const isActive = status === tab.value
+                        const href = tab.value
+                            ? `/distributor/orders?status=${tab.value}`
+                            : "/distributor/orders"
+                        return (
+                            <Link
+                                key={tab.value ?? "all"}
+                                href={href}
+                                className={`shrink-0 touch-manipulation px-4 py-2.5 text-sm font-medium transition-colors rounded-t-md -mb-px border-b-2 ${
+                                    isActive
+                                        ? "border-primary text-foreground"
+                                        : "border-transparent text-muted-foreground hover:text-foreground"
+                                }`}
+                            >
+                                {tab.label}
+                            </Link>
+                        )
+                    })}
+                </div>
             </div>
 
             <Card>
@@ -106,8 +108,9 @@ export default async function DistributorOrdersPage({
                         />
                     ) : (
                         <>
-                            <Table>
-                                <TableHeader>
+                            <div className="overflow-x-auto rounded-md border [-webkit-overflow-scrolling:touch]">
+                                <Table>
+                                    <TableHeader>
                                     <TableRow>
                                         <TableHead>订单号</TableHead>
                                         <TableHead>商品</TableHead>
@@ -139,7 +142,8 @@ export default async function DistributorOrdersPage({
                                         </TableRow>
                                     ))}
                                 </TableBody>
-                            </Table>
+                                </Table>
+                            </div>
                             {totalPages > 1 && (
                                 <DistributorOrdersPagination
                                     page={page}
