@@ -149,6 +149,24 @@ describe("POST /api/orders/get-payment-url", () => {
     expect(mockGetPaymentUrlForOrder).not.toHaveBeenCalled()
   })
 
+  it("returns 400 when order is exactly at timeout boundary (elapsed >= pendingOrderTimeoutMs)", async () => {
+    ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: any) =>
+      fn(prismaMock),
+    )
+    const timeoutMs = 15 * 60 * 1000
+    const createdAt = new Date(Date.now() - timeoutMs)
+    prismaMock.order.findUnique.mockResolvedValueOnce(createPendingOrder(createdAt))
+    verifyPasswordMock.mockResolvedValueOnce(true)
+
+    const req = createJsonRequest({ orderNo: "FAK202402130001", password: "secret123" })
+    const res = await POST(req)
+    const data = await res.json()
+
+    expect(res.status).toBe(400)
+    expect(data.error).toBe("无法继续支付")
+    expect(mockGetPaymentUrlForOrder).not.toHaveBeenCalled()
+  })
+
   it("returns 503 when payment URL cannot be generated", async () => {
     ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: any) =>
       fn(prismaMock),

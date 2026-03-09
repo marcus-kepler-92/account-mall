@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
             const expiresAt = new Date(order.createdAt.getTime() + config.pendingOrderTimeoutMs).toISOString()
             const payload: LookupResponsePending = {
                 orderNo: order.orderNo,
-                productName: order.product.name,
+                productName: order.productNameSnapshot ?? order.product.name,
                 createdAt: order.createdAt,
                 status: order.status,
                 amount: Number(order.amount),
@@ -141,7 +141,7 @@ export async function POST(request: NextRequest) {
         const successToken = createOrderSuccessToken(order.orderNo)
         const payload: LookupResponseCompleted = {
             orderNo: order.orderNo,
-            productName: order.product.name,
+            productName: order.productNameSnapshot ?? order.product.name,
             createdAt: order.createdAt,
             status: order.status,
             amount: Number(order.amount),

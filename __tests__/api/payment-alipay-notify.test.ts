@@ -60,6 +60,56 @@ describe("POST /api/payment/alipay/notify", () => {
         expect(prismaMock.order.findFirst).not.toHaveBeenCalled()
     })
 
+    it("returns failure when out_trade_no or total_amount is missing (no DB query)", async () => {
+        verifyMock.mockReturnValue(true)
+        const req = createNotifyRequest({
+            trade_status: "TRADE_SUCCESS",
+        })
+        const res = await POST(req as any)
+        expect(res.status).toBe(400)
+        expect(await res.text()).toBe("failure")
+        expect(prismaMock.order.findFirst).not.toHaveBeenCalled()
+    })
+
+    it("returns success without completing when trade_status is not TRADE_SUCCESS or TRADE_FINISHED", async () => {
+        verifyMock.mockReturnValue(true)
+        const req = createNotifyRequest({
+            out_trade_no: "order-1",
+            total_amount: "99.00",
+            trade_status: "WAIT_BUYER_PAY",
+        })
+        const res = await POST(req as any)
+        expect(res.status).toBe(200)
+        expect(await res.text()).toBe("success")
+        expect(prismaMock.order.findFirst).not.toHaveBeenCalled()
+        expect(prismaMock.$transaction).not.toHaveBeenCalled()
+    })
+
+    it("returns success and completes order when trade_status is TRADE_FINISHED", async () => {
+        verifyMock.mockReturnValue(true)
+        prismaMock.order.findFirst.mockResolvedValue({
+            id: "ord_1",
+            orderNo: "order-1",
+            status: "PENDING",
+            amount: 99,
+            product: { name: "Test" },
+            cards: [{ id: "c1", status: "RESERVED" }],
+        } as any)
+        prismaMock.order.updateMany.mockResolvedValue({ count: 1 })
+        prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<number>) => {
+            return await fn(prismaMock)
+        })
+        const req = createNotifyRequest({
+            out_trade_no: "order-1",
+            total_amount: "99.00",
+            trade_status: "TRADE_FINISHED",
+        })
+        const res = await POST(req as any)
+        expect(res.status).toBe(200)
+        expect(await res.text()).toBe("success")
+        expect(prismaMock.order.updateMany).toHaveBeenCalled()
+    })
+
     it("returns failure when order not found", async () => {
         verifyMock.mockReturnValue(true)
         prismaMock.order.findFirst.mockResolvedValue(null)

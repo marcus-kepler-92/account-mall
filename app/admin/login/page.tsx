@@ -23,20 +23,28 @@ export default function AdminLoginPage() {
         setLoading(true)
 
         try {
-            await authClient.signIn.email({
+            const { error: signInError } = await authClient.signIn.email({
                 email,
                 password,
                 fetchOptions: {
-                    onSuccess: () => {
-                        toast.success("登录成功")
-                        router.push("/admin/dashboard")
-                        router.refresh()
-                    },
                     onError: (ctx) => {
                         toast.error(ctx.error.message)
                     }
                 }
             })
+            if (signInError) return
+
+            const { data: session } = await authClient.getSession()
+            const role = (session?.user as { role?: string } | undefined)?.role
+            if (role === "ADMIN") {
+                toast.success("登录成功")
+                router.push("/admin/dashboard")
+                router.refresh()
+            } else {
+                toast.error("请使用分销后台入口登录")
+                await authClient.signOut()
+                router.refresh()
+            }
         } catch {
             toast.error("发生未知错误")
         } finally {
@@ -46,7 +54,7 @@ export default function AdminLoginPage() {
 
     const adminPanelLabel = useAdminPanelLabel()
     return (
-        <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="flex min-h-dvh items-center justify-center bg-background p-4 sm:p-6 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
             <Card className="w-full max-w-md">
                 <CardHeader className="text-center">
                     <CardTitle className="text-2xl font-bold">
@@ -63,10 +71,13 @@ export default function AdminLoginPage() {
                             <Input
                                 id="email"
                                 type="email"
+                                inputMode="email"
+                                autoComplete="email"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 required
                                 placeholder="admin@example.com"
+                                className="min-h-11"
                             />
                         </div>
 
@@ -76,11 +87,12 @@ export default function AdminLoginPage() {
                                 <Input
                                     id="password"
                                     type={showPassword ? "text" : "password"}
+                                    autoComplete="current-password"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     required
                                     placeholder="••••••••"
-                                    className="pr-10"
+                                    className="min-h-11 pr-10"
                                 />
                                 <Button
                                     type="button"
@@ -103,7 +115,7 @@ export default function AdminLoginPage() {
                         <Button
                             type="submit"
                             disabled={loading}
-                            className="w-full"
+                            className="w-full min-h-11"
                         >
                             {loading ? "登录中..." : "登录"}
                         </Button>

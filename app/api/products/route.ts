@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
         return validationError(parsed.error.flatten());
     }
 
-    const { name, slug, description, summary, image, price, maxQuantity, status, tagIds, productType, sourceUrl, commissionAmount } =
+    const { name, slug, description, summary, image, price, maxQuantity, status, tagIds, productType, sourceUrl } =
         parsed.data;
 
     // Check slug uniqueness
@@ -175,7 +175,6 @@ export async function POST(request: NextRequest) {
             status: status ?? "ACTIVE",
             productType: productType ?? "NORMAL",
             sourceUrl: finalSourceUrl,
-            commissionAmount: commissionAmount != null ? commissionAmount : undefined,
             tags:
                 tagIds && tagIds.length > 0
                     ? { connect: tagIds.map((id) => ({ id })) }

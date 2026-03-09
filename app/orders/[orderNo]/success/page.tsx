@@ -88,7 +88,7 @@ export default async function OrderSuccessPage({ params, searchParams }: PagePro
     }
 
     const cards = order.cards.map((c) => c.content)
-    const productName = order.product?.name ?? "商品"
+    const productName = order.productNameSnapshot ?? order.product?.name ?? "商品"
 
     return (
         <div className="flex min-h-screen flex-col">

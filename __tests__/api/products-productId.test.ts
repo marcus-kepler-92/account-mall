@@ -57,7 +57,6 @@ describe("GET /api/products/[productId]", () => {
             price: 50,
             maxQuantity: 5,
             status: "ACTIVE",
-            commissionAmount: null,
             createdAt: new Date(),
             updatedAt: new Date(),
             tags: [{ id: "t1", name: "Tag", slug: "tag" }],
@@ -92,7 +91,6 @@ describe("GET /api/products/[productId]", () => {
             id: "prod_public",
             name: "Public",
             slug: "public",
-            commissionAmount: null,
             price: 50,
             tags: [],
         }
@@ -272,36 +270,6 @@ describe("PUT /api/products/[productId]", () => {
             data: expect.objectContaining({
                 name: "Updated Name",
                 price: 99,
-            }),
-            include: expect.any(Object),
-        })
-    })
-
-    it("updates product commissionAmount", async () => {
-        adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
-        prismaMock.product.findUnique.mockResolvedValueOnce({
-            id: "prod_1",
-            slug: "test",
-        })
-        const updated = {
-            id: "prod_1",
-            slug: "test",
-            commissionAmount: 5,
-            price: 50,
-            tags: [],
-        }
-        prismaMock.product.update.mockResolvedValueOnce(updated)
-
-        const res = await PUT(
-            createJsonRequest({ commissionAmount: 5 }),
-            createContext("prod_1")
-        )
-
-        expect(res.status).toBe(200)
-        expect(prismaMock.product.update).toHaveBeenCalledWith({
-            where: { id: "prod_1" },
-            data: expect.objectContaining({
-                commissionAmount: 5,
             }),
             include: expect.any(Object),
         })

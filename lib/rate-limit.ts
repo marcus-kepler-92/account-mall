@@ -17,6 +17,14 @@ const orderQueryLimiter = new RateLimiterMemory({
     duration: QUERY_LIMIT_DURATION,
 })
 
+/** 优惠码校验：每 IP 每分钟最多 30 次（防抖后够用） */
+const VALIDATE_PROMO_POINTS = 30
+const VALIDATE_PROMO_DURATION = 60
+const validatePromoLimiter = new RateLimiterMemory({
+    points: VALIDATE_PROMO_POINTS,
+    duration: VALIDATE_PROMO_DURATION,
+})
+
 /** 提现申请：每用户每分钟最多 10 次 */
 const WITHDRAWAL_CREATE_POINTS = 10
 const WITHDRAWAL_CREATE_DURATION = 60
@@ -69,6 +77,25 @@ export async function checkWithdrawalCreateRateLimit(userId: string): Promise<Re
     } catch {
         return new Response(
             JSON.stringify({ error: "提现申请过于频繁，请稍后再试。" }),
+            { status: 429, headers: { "Content-Type": "application/json" } },
+        )
+    }
+}
+
+/**
+ * Check validate-promo-code rate limit (per IP).
+ * Skipped in development.
+ */
+export async function checkValidatePromoCodeRateLimit(request: NextRequest): Promise<Response | null> {
+    if (config.nodeEnv === "development") return null
+    const key = getClientIp(request)
+    if (key === "unknown") return null
+    try {
+        await validatePromoLimiter.consume(key)
+        return null
+    } catch {
+        return new Response(
+            JSON.stringify({ error: "请求过于频繁，请稍后再试。" }),
             { status: 429, headers: { "Content-Type": "application/json" } },
         )
     }

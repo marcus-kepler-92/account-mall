@@ -10,8 +10,8 @@ import { useSiteName } from "@/app/components/site-name-provider"
 export function SiteHeader() {
     const siteName = useSiteName()
     return (
-        <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-sm supports-[padding:env(safe-area-inset-top)]:pt-[env(safe-area-inset-top)]">
-            <div className="mx-auto flex h-14 min-h-14 max-w-6xl items-center justify-between gap-3 px-3 sm:px-4 md:px-6 2xl:max-w-7xl">
+        <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-sm supports-[padding:env(safe-area-inset-top)]:pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
+            <div className="mx-auto flex h-14 min-h-14 max-w-6xl items-center justify-between gap-2 sm:gap-3 px-3 sm:px-4 md:px-6 2xl:max-w-7xl min-w-0">
                 <Link
                     href="/"
                     className="flex min-w-0 shrink items-center gap-2 focus-visible:outline focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md"
@@ -23,20 +23,20 @@ export function SiteHeader() {
                         {siteName}
                     </span>
                 </Link>
-                <nav className="flex shrink-0 items-center gap-0.5 sm:gap-2" aria-label="主导航">
+                <nav className="flex shrink-0 min-w-0 items-center justify-end gap-0.5 sm:gap-2 overflow-x-auto [-webkit-overflow-scrolling:touch]" aria-label="主导航">
                     <MyOrderHistory />
                     <ThemeToggle />
-                    <Button variant="ghost" size="sm" className="size-9 shrink-0 p-0 sm:size-auto sm:px-3" asChild>
+                    <Button variant="ghost" size="sm" className="size-9 min-w-9 shrink-0 p-0 sm:size-auto sm:px-3 touch-manipulation" asChild>
                         <Link
                             href="/distributor"
-                            title="分销中心"
-                            aria-label="分销中心"
+                            title="仪表盘"
+                            aria-label="仪表盘"
                             className="gap-1.5 sm:gap-2"
                         >
-                            <span className="hidden sm:inline">分销中心</span>
+                            <span className="hidden sm:inline">仪表盘</span>
                         </Link>
                     </Button>
-                    <Button variant="ghost" size="sm" className="size-9 shrink-0 p-0 sm:size-auto sm:px-3" asChild>
+                    <Button variant="ghost" size="sm" className="size-9 min-w-9 shrink-0 p-0 sm:size-auto sm:px-3 touch-manipulation" asChild>
                         <Link
                         href="/orders/lookup"
                         title="订单查询"

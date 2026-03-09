@@ -82,7 +82,7 @@ export async function PUT(
         return notFound("Product not found");
     }
 
-    const { tagIds, productType, sourceUrl, price, pinned, commissionAmount, ...rest } = parsed.data;
+    const { tagIds, productType, sourceUrl, price, pinned, ...rest } = parsed.data;
 
     // Check slug uniqueness if updating slug
     if (rest.slug && rest.slug !== existing.slug) {
@@ -101,9 +101,6 @@ export async function PUT(
         ...(productType !== undefined && { productType }),
         ...(sourceUrl !== undefined && {
             sourceUrl: isFreeShared ? null : (sourceUrl?.trim() || undefined),
-        }),
-        ...(commissionAmount !== undefined && {
-            commissionAmount: commissionAmount != null ? commissionAmount : null,
         }),
         ...(tagIds !== undefined && {
             tags: { set: tagIds.map((id) => ({ id })) },

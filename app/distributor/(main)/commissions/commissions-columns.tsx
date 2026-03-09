@@ -1,0 +1,68 @@
+"use client"
+
+import { ColumnDef } from "@tanstack/react-table"
+import { Badge } from "@/components/ui/badge"
+import { DataTableColumnHeader } from "@/app/admin/components/data-table-column-header"
+
+export type DistributorCommissionRow = {
+    id: string
+    orderNo: string
+    amount: number
+    status: "PENDING" | "SETTLED" | "WITHDRAWN"
+    createdAt: string
+}
+
+const statusMap = {
+    PENDING: { label: "待结算", variant: "warning" as const },
+    SETTLED: { label: "已结算", variant: "success" as const },
+    WITHDRAWN: { label: "已提现", variant: "secondary" as const },
+}
+
+export const distributorCommissionsColumns: ColumnDef<DistributorCommissionRow>[] = [
+    {
+        accessorKey: "orderNo",
+        header: ({ column }) => (
+            <DataTableColumnHeader column={column} title="订单号" />
+        ),
+        cell: ({ row }) => (
+            <span className="font-mono text-xs">
+                {row.original.orderNo}
+            </span>
+        ),
+    },
+    {
+        accessorKey: "amount",
+        header: ({ column }) => (
+            <DataTableColumnHeader column={column} title="佣金金额" />
+        ),
+        cell: ({ row }) => (
+            <span className="text-right font-medium">
+                ¥{(row.getValue("amount") as number).toFixed(2)}
+            </span>
+        ),
+    },
+    {
+        accessorKey: "status",
+        header: "状态",
+        cell: ({ row }) => {
+            const status = row.getValue("status") as DistributorCommissionRow["status"]
+            const { label, variant } = statusMap[status]
+            return <Badge variant={variant}>{label}</Badge>
+        },
+        filterFn: (row, id, value) => {
+            const val = row.getValue(id) as string
+            return Array.isArray(value) ? value.includes(val) : value === val
+        },
+    },
+    {
+        accessorKey: "createdAt",
+        header: ({ column }) => (
+            <DataTableColumnHeader column={column} title="时间" />
+        ),
+        cell: ({ row }) => (
+            <span className="text-muted-foreground text-sm">
+                {new Date(row.getValue("createdAt") as string).toLocaleString("zh-CN")}
+            </span>
+        ),
+    },
+]

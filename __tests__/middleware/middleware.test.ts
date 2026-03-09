@@ -35,7 +35,7 @@ function createRequest(
 }
 
 /**
- * Helper to simulate a valid session response
+ * Helper to simulate a valid session response (no user.role; use mockAdminSession or mockDistributorSession for role checks)
  */
 function mockValidSession() {
   mockFetch.mockResolvedValue({
@@ -46,6 +46,36 @@ function mockValidSession() {
         userId: "admin_001",
         token: "valid_token",
       },
+    }),
+  });
+}
+
+/**
+ * Helper to simulate a valid admin session (user.role === "ADMIN")
+ */
+function mockAdminSession() {
+  mockFetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      session: {
+        id: "session_001",
+        userId: "admin_001",
+        token: "valid_token",
+      },
+      user: { id: "admin_001", role: "ADMIN" },
+    }),
+  });
+}
+
+/**
+ * Helper to simulate a valid distributor session (user.role === "DISTRIBUTOR")
+ */
+function mockDistributorSession() {
+  mockFetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      session: { id: "s1", userId: "dist_1", token: "valid_token" },
+      user: { id: "dist_1", role: "DISTRIBUTOR" },
     }),
   });
 }
@@ -209,8 +239,8 @@ describe("Public APIs (no auth required)", () => {
 // ─── Admin login page with session ───────────────────────────────
 
 describe("Admin login page with session cookie", () => {
-  it("should redirect to /admin/dashboard when already authenticated", async () => {
-    mockValidSession();
+  it("should redirect to /admin/dashboard when already authenticated as ADMIN", async () => {
+    mockAdminSession();
 
     const request = createRequest("/admin/login", {
       cookies: { "better-auth.session_token": "valid_token" },
@@ -221,8 +251,8 @@ describe("Admin login page with session cookie", () => {
     expect(response.headers.get("location")).toContain("/admin/dashboard");
   });
 
-  it("should redirect to /admin/dashboard when authenticated with __Secure- cookie (production)", async () => {
-    mockValidSession();
+  it("should redirect to /admin/dashboard when authenticated with __Secure- cookie (production) as ADMIN", async () => {
+    mockAdminSession();
 
     const request = createRequest("/admin/login", {
       cookies: { "__Secure-better-auth.session_token": "valid_token" },
@@ -231,6 +261,18 @@ describe("Admin login page with session cookie", () => {
 
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toContain("/admin/dashboard");
+  });
+
+  it("should NOT redirect when on /admin/login with DISTRIBUTOR session (wrong entry)", async () => {
+    mockDistributorSession();
+
+    const request = createRequest("/admin/login", {
+      cookies: { "better-auth.session_token": "valid_token" },
+    });
+    const response = await middleware(request);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-middleware-next")).toBe("1");
   });
 });
 
@@ -261,8 +303,8 @@ describe("Protected admin pages", () => {
     expect(response.headers.get("location")).toContain("/admin/login");
   });
 
-  it("should allow admin page access with valid session", async () => {
-    mockValidSession();
+  it("should allow admin page access with valid ADMIN session", async () => {
+    mockAdminSession();
 
     const request = createRequest("/admin/dashboard", {
       cookies: { "better-auth.session_token": "valid_token" },
@@ -273,8 +315,8 @@ describe("Protected admin pages", () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
-  it("should allow admin page access with __Secure- session cookie (production)", async () => {
-    mockValidSession();
+  it("should allow admin page access with __Secure- session cookie (production) as ADMIN", async () => {
+    mockAdminSession();
 
     const request = createRequest("/admin/dashboard", {
       cookies: { "__Secure-better-auth.session_token": "valid_token" },
@@ -283,6 +325,18 @@ describe("Protected admin pages", () => {
 
     expect(response.status).toBe(200);
     expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("should redirect to /admin/login when DISTRIBUTOR session accesses /admin/dashboard", async () => {
+    mockDistributorSession();
+
+    const request = createRequest("/admin/dashboard", {
+      cookies: { "better-auth.session_token": "valid_token" },
+    });
+    const response = await middleware(request);
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toContain("/admin/login");
   });
 
   it("should redirect admin page with invalid session", async () => {
@@ -378,8 +432,8 @@ describe("Protected APIs", () => {
     expect(body.error).toBe("Unauthorized");
   });
 
-  it("should allow POST /api/products with valid session", async () => {
-    mockValidSession();
+  it("should allow POST /api/products with valid ADMIN session", async () => {
+    mockAdminSession();
 
     const request = createRequest("/api/products", {
       method: "POST",
@@ -390,8 +444,8 @@ describe("Protected APIs", () => {
     expect(response.status).toBe(200);
   });
 
-  it("should allow /api/cards with valid session", async () => {
-    mockValidSession();
+  it("should allow /api/cards with valid ADMIN session", async () => {
+    mockAdminSession();
 
     const request = createRequest("/api/cards/product_001/bulk", {
       method: "POST",
@@ -400,6 +454,19 @@ describe("Protected APIs", () => {
     const response = await middleware(request);
 
     expect(response.status).toBe(200);
+  });
+
+  it("should return 401 when DISTRIBUTOR session accesses admin API (GET /api/orders)", async () => {
+    mockDistributorSession();
+
+    const request = createRequest("/api/orders", {
+      cookies: { "better-auth.session_token": "valid_token" },
+    });
+    const response = await middleware(request);
+
+    expect(response.status).toBe(401);
+    const body = await response.json();
+    expect(body.error).toBe("Unauthorized");
   });
 
   it("should redirect to login when session fetch fails for protected page", async () => {
@@ -442,14 +509,8 @@ describe("Protected distributor pages", () => {
     expect(response.headers.get("location")).toContain("/distributor/login");
   });
 
-  it("should allow distributor page access with valid session", async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        session: { id: "s1", userId: "dist_1" },
-        user: { id: "dist_1", role: "DISTRIBUTOR" },
-      }),
-    });
+  it("should allow distributor page access with valid DISTRIBUTOR session", async () => {
+    mockDistributorSession();
 
     const request = createRequest("/distributor", {
       cookies: { "better-auth.session_token": "valid_token" },
@@ -458,38 +519,56 @@ describe("Protected distributor pages", () => {
 
     expect(response.status).toBe(200);
   });
+
+  it("should redirect to /distributor/login when ADMIN session accesses /distributor", async () => {
+    mockAdminSession();
+
+    const request = createRequest("/distributor", {
+      cookies: { "better-auth.session_token": "valid_token" },
+    });
+    const response = await middleware(request);
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toContain("/distributor/login");
+  });
 });
 
-// ─── PromoCode cookie on storefront GET ───────────────────────────────
+// ─── Distributor login page with session ─────────────────────────────
 
-describe("GET storefront with promoCode sets cookie", () => {
-  it("should set distributor_promo_code cookie when GET / with promoCode", async () => {
+describe("Distributor login page with session cookie", () => {
+  it("should redirect to /distributor when already authenticated as DISTRIBUTOR", async () => {
+    mockDistributorSession();
+
+    const request = createRequest("/distributor/login", {
+      cookies: { "better-auth.session_token": "valid_token" },
+    });
+    const response = await middleware(request);
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toContain("/distributor");
+  });
+
+  it("should NOT redirect when on /distributor/login with ADMIN session (wrong entry)", async () => {
+    mockAdminSession();
+
+    const request = createRequest("/distributor/login", {
+      cookies: { "better-auth.session_token": "valid_token" },
+    });
+    const response = await middleware(request);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-middleware-next")).toBe("1");
+  });
+});
+
+// ─── PromoCode cookie: handled by client hook + GET /api/set-promo-cookie ───
+
+describe("GET storefront with promoCode (cookie set by client, not middleware)", () => {
+  it("does not set cookie in middleware when GET / with promoCode", async () => {
     const request = new NextRequest("http://localhost:3000/?promoCode=ABC");
     const response = await middleware(request);
 
     expect(response.status).toBe(200);
-    const setCookie = response.headers.get("set-cookie");
-    expect(setCookie).toBeTruthy();
-    expect(setCookie).toContain("distributor_promo_code=ABC");
-    expect(setCookie).toMatch(/Max-Age=\d+/);
-  });
-
-  it("should set distributor_promo_code cookie when GET /products with promoCode", async () => {
-    const request = new NextRequest("http://localhost:3000/products?promoCode=PROMO1");
-    const response = await middleware(request);
-
-    expect(response.status).toBe(200);
-    const setCookie = response.headers.get("set-cookie");
-    expect(setCookie).toBeTruthy();
-    expect(setCookie).toContain("distributor_promo_code=PROMO1");
-  });
-
-  it("should not set cookie when GET / without promoCode", async () => {
-    const request = createRequest("/");
-    const response = await middleware(request);
-
-    expect(response.status).toBe(200);
-    const setCookie = response.headers.get("set-cookie");
-    expect(setCookie).toBeFalsy();
+    expect(response.headers.get("set-cookie")).toBeFalsy();
   });
 });

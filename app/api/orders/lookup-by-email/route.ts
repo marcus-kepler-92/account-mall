@@ -51,6 +51,7 @@ export async function POST(request: NextRequest) {
                 createdAt: true,
                 quantity: true,
                 amount: true,
+                productNameSnapshot: true,
                 product: {
                     select: {
                         name: true,
@@ -111,7 +112,7 @@ export async function POST(request: NextRequest) {
             if (order.status === "PENDING") {
                 return NextResponse.json({
                     orderNo: order.orderNo,
-                    productName: order.product.name,
+                    productName: order.productNameSnapshot ?? order.product.name,
                     createdAt: order.createdAt instanceof Date ? order.createdAt.toISOString() : order.createdAt,
                     status: order.status,
                     cards: [],
@@ -132,7 +133,7 @@ export async function POST(request: NextRequest) {
 
             return NextResponse.json({
                 orderNo: order.orderNo,
-                productName: order.product.name,
+                productName: order.productNameSnapshot ?? order.product.name,
                 createdAt: order.createdAt instanceof Date ? order.createdAt.toISOString() : order.createdAt,
                 status: order.status,
                 cards,
@@ -141,7 +142,7 @@ export async function POST(request: NextRequest) {
             // Multiple orders - return list
             const orders = result.data.map((order) => ({
                 orderNo: order.orderNo,
-                productName: order.product?.name || "",
+                productName: order.productNameSnapshot ?? order.product?.name ?? "",
                 createdAt: order.createdAt instanceof Date ? order.createdAt.toISOString() : order.createdAt,
                 status: order.status,
                 quantity: order.quantity,

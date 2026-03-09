@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation"
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { getDistributorSession } from "@/lib/auth-guard"
+import { DistributorSidebar } from "@/app/components/distributor-sidebar"
+import { DistributorBreadcrumb } from "@/app/components/distributor-breadcrumb"
 import { DistributorTopbarActions } from "@/app/components/distributor-topbar-actions"
-import { DistributorNav } from "@/app/components/distributor-nav"
 
 export default async function DistributorMainLayout({
     children,
@@ -14,14 +16,18 @@ export default async function DistributorMainLayout({
     }
 
     return (
-        <div className="min-h-screen bg-background">
-            <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b bg-background px-4">
-                <DistributorNav />
-                <DistributorTopbarActions />
-            </header>
-            <main className="p-6">
-                {children}
-            </main>
-        </div>
+        <SidebarProvider>
+            <DistributorSidebar />
+            <SidebarInset>
+                <header className="sticky top-0 z-50 flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4">
+                    <SidebarTrigger className="-ml-1" />
+                    <DistributorBreadcrumb />
+                    <DistributorTopbarActions />
+                </header>
+                <div className="flex-1 min-w-0 p-6">
+                    {children}
+                </div>
+            </SidebarInset>
+        </SidebarProvider>
     )
 }

@@ -12,8 +12,8 @@ import { SoldOutOverlay } from "@/app/components/sold-out-overlay"
 import { RestockReminderForm } from "@/app/components/restock-reminder-form"
 import { ProductBottomBar } from "../../components/product-bottom-bar"
 import { descriptionToPlainText } from "@/lib/description"
+import { buildProductDetailRedirectPath } from "@/lib/product-canonical-url"
 import { ProductDescriptionViewClient } from "@/app/components/product-description-view-client"
-
 export const dynamic = "force-dynamic"
 
 type PageProps = {
@@ -69,7 +69,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function ProductDetailPage({ params, searchParams }: PageProps) {
     const { productIdSlug } = await params
-    const { promoCode } = await searchParams
+    const resolvedParams = await searchParams
 
     const parsed = parseProductIdSlug(productIdSlug)
     if (!parsed) notFound()
@@ -87,9 +87,9 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
         notFound()
     }
 
-    // Redirect to canonical URL if slug mismatch
+    // Redirect to canonical URL if slug mismatch; preserve promoCode
     if (product.slug !== slug) {
-        redirect(`/products/${product.id}-${product.slug}`)
+        redirect(buildProductDetailRedirectPath(product.id, product.slug, resolvedParams.promoCode))
     }
 
     const productWithImage = product as typeof product & { image: string | null }
@@ -131,7 +131,7 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
             />
             <SiteHeader />
 
-            <main className="flex-1 mx-auto w-full max-w-6xl px-4 pb-24 pt-4 2xl:max-w-7xl lg:pb-10 lg:pt-8">
+            <main className="flex-1 mx-auto w-full max-w-6xl px-4 pb-[calc(7rem+env(safe-area-inset-bottom,0px))] pt-4 2xl:max-w-7xl lg:pb-10 lg:pt-8">
                 <div
                     className={cn(
                         "grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:gap-10",

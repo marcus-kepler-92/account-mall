@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { authClient } from "@/lib/auth-client"
+import { ThemeToggle } from "@/app/components/theme-toggle"
 import { Button } from "@/components/ui/button"
 import {
     DropdownMenu,
@@ -33,15 +34,16 @@ export function DistributorTopbarActions() {
     const initial = email ? email[0].toUpperCase() : "D"
 
     return (
-        <div className="ml-auto flex items-center gap-2">
-            <Button variant="ghost" size="icon" asChild aria-label="前往商城">
+        <div className="ml-auto flex items-center gap-1 sm:gap-2 shrink-0">
+            <ThemeToggle />
+            <Button variant="ghost" size="icon" className="size-9 min-w-9 touch-manipulation" asChild aria-label="前往商城">
                 <Link href="/" target="_blank" rel="noopener noreferrer">
                     <ExternalLink className="size-4" />
                 </Link>
             </Button>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="relative size-9 rounded-full">
+                    <Button variant="ghost" className="relative size-9 min-w-9 rounded-full touch-manipulation">
                         <Avatar className="size-8">
                             <AvatarFallback className="bg-primary text-primary-foreground text-sm">
                                 {initial}

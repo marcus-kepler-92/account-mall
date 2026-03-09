@@ -352,6 +352,7 @@ describe("POST /api/orders (create order)", () => {
             data: expect.objectContaining({
                 orderNo: expect.any(String),
                 productId: "prod_1",
+                productNameSnapshot: "Test Product",
                 email: "user@example.com",
                 passwordHash: "hashed-password",
                 quantity: 2,
@@ -370,6 +371,57 @@ describe("POST /api/orders (create order)", () => {
             where: { id: { in: ["card_1", "card_2"] } },
             data: { status: "RESERVED", orderId: "order_new" },
         })
+    })
+
+    it("ignores client-submitted price and amount; order amount is computed from product.price only", async () => {
+        const product = {
+            id: "prod_1",
+            name: "Test Product",
+            price: 50,
+            maxQuantity: 5,
+            status: "ACTIVE",
+        }
+        prismaMock.product.findUnique.mockResolvedValueOnce(product)
+        prismaMock.card.count.mockResolvedValueOnce(3)
+        const createdOrder = {
+            id: "order_new",
+            orderNo: "550e8400-e29b-41d4-a716-446655440000",
+            productId: "prod_1",
+            email: "user@example.com",
+            passwordHash: "hashed-password",
+            quantity: 2,
+            amount: 100,
+            status: "PENDING",
+            paidAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+        }
+        const mockTx = {
+            order: { create: jest.fn().mockResolvedValue(createdOrder) },
+            card: {
+                findMany: jest.fn().mockResolvedValue([{ id: "card_1" }, { id: "card_2" }]),
+                updateMany: jest.fn().mockResolvedValue({ count: 2 }),
+            },
+        }
+        ;(prismaMock.$transaction as jest.Mock).mockImplementation((cb: (tx: unknown) => Promise<unknown>) =>
+            cb(mockTx)
+        )
+
+        const res = await POST(
+            createJsonRequest({
+                productId: "prod_1",
+                email: "user@example.com",
+                orderPassword: "password123",
+                quantity: 2,
+                price: 0.01,
+                amount: 0.01,
+            })
+        )
+
+        expect(res.status).toBe(200)
+        const createCall = (mockTx.order.create as jest.Mock).mock.calls[0][0]
+        expect(createCall.data.amount).toBe(100)
+        expect(createCall.data).not.toMatchObject({ price: 0.01, amount: 0.01 })
     })
 
     it("in development completes order immediately and returns successToken and paymentUrl null", async () => {
@@ -888,13 +940,143 @@ describe("POST /api/orders (create order)", () => {
 
             expect(prismaMock.user.findFirst).toHaveBeenCalledWith({
                 where: { distributorCode: "BODY_PROMO", role: "DISTRIBUTOR", disabledAt: null },
-                select: { id: true },
+                select: { id: true, discountCodeEnabled: true, discountPercent: true },
             })
             expect(tx.order.create).toHaveBeenCalledWith({
                 data: expect.objectContaining({
                     distributorId: "dist_body",
                 }),
             })
+        })
+
+        it("applies discount and sets discountPercentApplied when distributor has discountCodeEnabled and discountPercent", async () => {
+            prismaMock.user.findFirst.mockResolvedValueOnce({
+                id: "dist_1",
+                discountCodeEnabled: true,
+                discountPercent: 5,
+            })
+            prismaMock.product.findUnique.mockResolvedValueOnce(product)
+            prismaMock.card.count.mockResolvedValueOnce(3)
+            const tx = mockTxWithCreate()
+
+            const res = await POST(
+                createJsonRequest({
+                    productId: "prod_1",
+                    email: "user@example.com",
+                    orderPassword: "password123",
+                    quantity: 2,
+                    promoCode: "PROMO1",
+                })
+            )
+
+            expect(res.status).toBe(200)
+            expect(tx.order.create).toHaveBeenCalledWith({
+                data: expect.objectContaining({
+                    distributorId: "dist_1",
+                    amount: 95,
+                    discountPercentApplied: 5,
+                }),
+            })
+        })
+
+        it("no discount when distributor has discountCodeEnabled false", async () => {
+            prismaMock.user.findFirst.mockResolvedValueOnce({
+                id: "dist_1",
+                discountCodeEnabled: false,
+                discountPercent: 5,
+            })
+            prismaMock.product.findUnique.mockResolvedValueOnce(product)
+            prismaMock.card.count.mockResolvedValueOnce(3)
+            const tx = mockTxWithCreate()
+
+            await POST(
+                createJsonRequest({
+                    productId: "prod_1",
+                    email: "user@example.com",
+                    orderPassword: "password123",
+                    quantity: 2,
+                    promoCode: "PROMO1",
+                })
+            )
+
+            const call = (tx.order.create as jest.Mock).mock.calls[0][0]
+            expect(call.data.amount).toBe(100)
+            expect(call.data).not.toHaveProperty("discountPercentApplied")
+        })
+
+        it("no discount when distributor has discountCodeEnabled true but discountPercent null", async () => {
+            prismaMock.user.findFirst.mockResolvedValueOnce({
+                id: "dist_1",
+                discountCodeEnabled: true,
+                discountPercent: null,
+            })
+            prismaMock.product.findUnique.mockResolvedValueOnce(product)
+            prismaMock.card.count.mockResolvedValueOnce(3)
+            const tx = mockTxWithCreate()
+
+            await POST(
+                createJsonRequest({
+                    productId: "prod_1",
+                    email: "user@example.com",
+                    orderPassword: "password123",
+                    quantity: 2,
+                    promoCode: "PROMO1",
+                })
+            )
+
+            const call = (tx.order.create as jest.Mock).mock.calls[0][0]
+            expect(call.data.amount).toBe(100)
+            expect(call.data).not.toHaveProperty("discountPercentApplied")
+        })
+
+        it("no discount when distributor has discountPercent 0", async () => {
+            prismaMock.user.findFirst.mockResolvedValueOnce({
+                id: "dist_1",
+                discountCodeEnabled: true,
+                discountPercent: 0,
+            })
+            prismaMock.product.findUnique.mockResolvedValueOnce(product)
+            prismaMock.card.count.mockResolvedValueOnce(3)
+            const tx = mockTxWithCreate()
+
+            await POST(
+                createJsonRequest({
+                    productId: "prod_1",
+                    email: "user@example.com",
+                    orderPassword: "password123",
+                    quantity: 2,
+                    promoCode: "PROMO1",
+                })
+            )
+
+            const call = (tx.order.create as jest.Mock).mock.calls[0][0]
+            expect(call.data.amount).toBe(100)
+            expect(call.data).not.toHaveProperty("discountPercentApplied")
+        })
+
+        it("no discount when distributor has discountPercent greater than 100", async () => {
+            prismaMock.user.findFirst.mockResolvedValueOnce({
+                id: "dist_1",
+                discountCodeEnabled: true,
+                discountPercent: 101,
+            })
+            prismaMock.product.findUnique.mockResolvedValueOnce(product)
+            prismaMock.card.count.mockResolvedValueOnce(3)
+            const tx = mockTxWithCreate()
+
+            await POST(
+                createJsonRequest({
+                    productId: "prod_1",
+                    email: "user@example.com",
+                    orderPassword: "password123",
+                    quantity: 2,
+                    promoCode: "PROMO1",
+                })
+            )
+
+            const call = (tx.order.create as jest.Mock).mock.calls[0][0]
+            expect(call.data.amount).toBe(100)
+            expect(call.data).not.toHaveProperty("discountPercentApplied")
         })
     })
 })

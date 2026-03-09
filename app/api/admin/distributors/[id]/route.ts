@@ -6,6 +6,8 @@ import { z } from "zod"
 
 const updateDistributorSchema = z.object({
     disabled: z.boolean().optional(),
+    discountCodeEnabled: z.boolean().optional(),
+    discountPercent: z.number().min(0).max(100).nullable().optional(),
 })
 
 type RouteContext = { params: Promise<{ id: string }> }
@@ -36,19 +38,28 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     })
     if (!existing) return notFound("Distributor not found")
 
+    const data: { disabledAt?: Date | null; discountCodeEnabled?: boolean; discountPercent?: number | null } = {}
+    if (parsed.data.disabled === true) data.disabledAt = new Date()
+    else if (parsed.data.disabled === false) data.disabledAt = null
+    if (parsed.data.discountCodeEnabled !== undefined) data.discountCodeEnabled = parsed.data.discountCodeEnabled
+    if (parsed.data.discountPercent !== undefined) data.discountPercent = parsed.data.discountPercent
+
     const user = await prisma.user.update({
         where: { id },
-        data: {
-            disabledAt: parsed.data.disabled === true ? new Date() : parsed.data.disabled === false ? null : undefined,
-        },
+        data,
         select: {
             id: true,
             email: true,
             name: true,
             distributorCode: true,
+            discountCodeEnabled: true,
+            discountPercent: true,
             disabledAt: true,
         },
     })
 
-    return NextResponse.json(user)
+    return NextResponse.json({
+        ...user,
+        discountPercent: user.discountPercent != null ? Number(user.discountPercent) : null,
+    })
 }

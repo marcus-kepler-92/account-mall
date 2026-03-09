@@ -4,7 +4,7 @@ import { ColumnDef } from "@tanstack/react-table"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"
-import { MoreHorizontal, UserCheck, UserX, Copy, Loader2 } from "lucide-react"
+import { MoreHorizontal, UserCheck, UserX, Copy, Loader2, Percent } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -14,12 +14,15 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { DataTableColumnHeader } from "@/app/admin/components/data-table-column-header"
+import { EditDiscountDialog } from "./edit-discount-dialog"
 
 export type DistributorRow = {
     id: string
     email: string
     name: string
     distributorCode: string | null
+    discountCodeEnabled: boolean
+    discountPercent: number | null
     disabledAt: string | null
     createdAt: string
     completedOrderCount: number
@@ -30,6 +33,7 @@ export type DistributorRow = {
 function DistributorRowActions({ row }: { row: DistributorRow }) {
     const router = useRouter()
     const [loading, setLoading] = useState(false)
+    const [discountOpen, setDiscountOpen] = useState(false)
     const disabled = !!row.disabledAt
 
     const handleToggle = async () => {
@@ -58,46 +62,61 @@ function DistributorRowActions({ row }: { row: DistributorRow }) {
         if (!row.distributorCode) return
         try {
             await navigator.clipboard.writeText(row.distributorCode)
-            toast.success("已复制优惠码")
+            toast.success("已复制推荐码")
         } catch {
             toast.error("复制失败")
         }
     }
 
     return (
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="h-8 w-8 p-0" disabled={loading}>
-                    <span className="sr-only">打开菜单</span>
-                    {loading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                        <MoreHorizontal className="h-4 w-4" />
-                    )}
-                </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleToggle}>
-                    {disabled ? (
-                        <>
-                            <UserCheck className="mr-2 h-4 w-4" />
-                            启用
-                        </>
-                    ) : (
-                        <>
-                            <UserX className="mr-2 h-4 w-4" />
-                            停用
-                        </>
-                    )}
-                </DropdownMenuItem>
-                {row.distributorCode && (
-                    <DropdownMenuItem onClick={handleCopyCode}>
-                        <Copy className="mr-2 h-4 w-4" />
-                        复制优惠码
+        <>
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="h-8 w-8 p-0" disabled={loading}>
+                        <span className="sr-only">打开菜单</span>
+                        {loading ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                            <MoreHorizontal className="h-4 w-4" />
+                        )}
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={handleToggle}>
+                        {disabled ? (
+                            <>
+                                <UserCheck className="mr-2 h-4 w-4" />
+                                启用
+                            </>
+                        ) : (
+                            <>
+                                <UserX className="mr-2 h-4 w-4" />
+                                停用
+                            </>
+                        )}
                     </DropdownMenuItem>
-                )}
-            </DropdownMenuContent>
-        </DropdownMenu>
+                    {row.distributorCode && (
+                        <DropdownMenuItem onClick={handleCopyCode}>
+                            <Copy className="mr-2 h-4 w-4" />
+                            复制推荐码
+                        </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem onClick={() => setDiscountOpen(true)}>
+                        <Percent className="mr-2 h-4 w-4" />
+                        优惠码设置
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
+            <EditDiscountDialog
+                open={discountOpen}
+                onOpenChange={setDiscountOpen}
+                distributorId={row.id}
+                distributorCode={row.distributorCode}
+                discountCodeEnabled={row.discountCodeEnabled}
+                discountPercent={row.discountPercent}
+                onSuccess={() => router.refresh()}
+            />
+        </>
     )
 }
 
@@ -122,10 +141,30 @@ export const distributorsColumns: ColumnDef<DistributorRow>[] = [
     },
     {
         accessorKey: "distributorCode",
-        header: "优惠码",
+        header: "推荐码",
         cell: ({ row }) =>
             row.original.distributorCode ? (
                 <code className="text-xs font-mono">{row.original.distributorCode}</code>
+            ) : (
+                <span className="text-muted-foreground">—</span>
+            ),
+    },
+    {
+        accessorKey: "discountCodeEnabled",
+        header: "优惠码",
+        cell: ({ row }) =>
+            row.original.discountCodeEnabled ? (
+                <Badge variant="secondary">已启用</Badge>
+            ) : (
+                <span className="text-muted-foreground text-sm">关闭</span>
+            ),
+    },
+    {
+        accessorKey: "discountPercent",
+        header: "折扣比例",
+        cell: ({ row }) =>
+            row.original.discountPercent != null ? (
+                <span className="tabular-nums">{row.original.discountPercent}%</span>
             ) : (
                 <span className="text-muted-foreground">—</span>
             ),
