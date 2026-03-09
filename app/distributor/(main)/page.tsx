@@ -130,7 +130,6 @@ export default async function DistributorDashboardPage() {
                     </CardHeader>
                     <CardContent>
                         <p className="text-xl font-mono font-bold">{distributorCode}</p>
-                        <p className="text-xs text-muted-foreground">URL 参数 promoCode</p>
                     </CardContent>
                 </Card>
             </div>

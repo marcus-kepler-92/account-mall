@@ -22,7 +22,7 @@ function makePendingOrder(overrides?: Record<string, unknown>) {
         amount: 99,
         quantity: 1,
         distributorId: null as string | null,
-        product: { name: "Test", commissionAmount: null as unknown },
+        product: { name: "Test" },
         cards: [{ id: "c1", status: "RESERVED" }],
         ...overrides,
     } as any
@@ -104,13 +104,13 @@ describe("completePendingOrder", () => {
             expect(prismaMock.commission.create).not.toHaveBeenCalled()
         })
 
-        it("does not call commission.create when distributorId set but no product commission and no tier", async () => {
+        it("does not call commission.create when distributorId set but no tier matches", async () => {
             prismaMock.user.findUnique.mockResolvedValue({ email: "dist@example.com" })
             prismaMock.order.findFirst.mockResolvedValue(
                 makePendingOrder({
                     distributorId: "dist_1",
                     quantity: 2,
-                    product: { name: "Test", commissionAmount: null },
+                    product: { name: "Test" },
                 })
             )
             prismaMock.order.updateMany.mockResolvedValue({ count: 1 })
@@ -125,45 +125,14 @@ describe("completePendingOrder", () => {
             expect(prismaMock.commission.create).not.toHaveBeenCalled()
         })
 
-        it("calls commission.create with base amount when product has commissionAmount and no tier matches", async () => {
-            prismaMock.user.findUnique.mockResolvedValue({ email: "dist@example.com" })
-            prismaMock.order.findFirst.mockResolvedValue(
-                makePendingOrder({
-                    distributorId: "dist_1",
-                    quantity: 2,
-                    product: { name: "Test", commissionAmount: 5 },
-                })
-            )
-            prismaMock.order.updateMany.mockResolvedValue({ count: 1 })
-            prismaMock.order.findMany.mockResolvedValue([{ amount: 99 }])
-            prismaMock.commissionTier.findMany.mockResolvedValue([
-                { minAmount: 1000, maxAmount: 5000, ratePercent: 3, sortOrder: 0 },
-            ])
-            prismaMock.commission.create.mockResolvedValue({})
-            prismaMock.$transaction.mockImplementation(async (fn: (tx: any) => Promise<void>) => {
-                await fn(prismaMock)
-            })
-
-            await completePendingOrder("order-1")
-
-            expect(prismaMock.commission.create).toHaveBeenCalledWith({
-                data: {
-                    orderId: "ord_1",
-                    distributorId: "dist_1",
-                    amount: 10,
-                    status: "SETTLED",
-                },
-            })
-        })
-
-        it("calls commission.create with base + tier bonus when week total falls in tier range", async () => {
+        it("calls commission.create with tier bonus when week total falls in tier range", async () => {
             prismaMock.user.findUnique.mockResolvedValue({ email: "dist@example.com" })
             prismaMock.order.findFirst.mockResolvedValue(
                 makePendingOrder({
                     distributorId: "dist_1",
                     quantity: 1,
                     amount: 100,
-                    product: { name: "Test", commissionAmount: 2 },
+                    product: { name: "Test" },
                 })
             )
             prismaMock.order.updateMany.mockResolvedValue({ count: 1 })
@@ -178,12 +147,12 @@ describe("completePendingOrder", () => {
 
             await completePendingOrder("order-1")
 
-            // base = 2*1 = 2, tier = 100 * 5% = 5, total = 7
+            // tier only: 100 * 5% = 5
             expect(prismaMock.commission.create).toHaveBeenCalledWith({
                 data: {
                     orderId: "ord_1",
                     distributorId: "dist_1",
-                    amount: 7,
+                    amount: 5,
                     status: "SETTLED",
                 },
             })
@@ -194,13 +163,15 @@ describe("completePendingOrder", () => {
             prismaMock.order.findFirst.mockResolvedValue(
                 makePendingOrder({
                     distributorId: "dist_1",
-                    quantity: 1,
-                    product: { name: "Test", commissionAmount: 10.556 },
+                    amount: 100,
+                    product: { name: "Test" },
                 })
             )
             prismaMock.order.updateMany.mockResolvedValue({ count: 1 })
-            prismaMock.order.findMany.mockResolvedValue([])
-            prismaMock.commissionTier.findMany.mockResolvedValue([])
+            prismaMock.order.findMany.mockResolvedValue([{ amount: 100 }])
+            prismaMock.commissionTier.findMany.mockResolvedValue([
+                { minAmount: 0, maxAmount: 10000, ratePercent: 10.556, sortOrder: 0 },
+            ])
             prismaMock.commission.create.mockResolvedValue({})
             prismaMock.$transaction.mockImplementation(async (fn: (tx: any) => Promise<void>) => {
                 await fn(prismaMock)
@@ -208,6 +179,7 @@ describe("completePendingOrder", () => {
 
             await completePendingOrder("order-1")
 
+            // 100 * 10.556% = 10.556 -> 10.56
             expect(prismaMock.commission.create).toHaveBeenCalledWith({
                 data: expect.objectContaining({
                     amount: 10.56,
@@ -223,7 +195,7 @@ describe("completePendingOrder", () => {
                     distributorId: "dist_1",
                     email: "buyer@example.com",
                     quantity: 1,
-                    product: { name: "Test", commissionAmount: 5 },
+                    product: { name: "Test" },
                 })
             )
             prismaMock.order.updateMany.mockResolvedValue({ count: 1 })
@@ -236,36 +208,6 @@ describe("completePendingOrder", () => {
             await completePendingOrder("order-1")
 
             expect(prismaMock.commission.create).not.toHaveBeenCalled()
-        })
-
-        it("uses commissionAmountSnapshot when set (lock commission at order creation, not product at completion)", async () => {
-            prismaMock.user.findUnique.mockResolvedValue({ email: "dist@example.com" })
-            prismaMock.order.findFirst.mockResolvedValue(
-                makePendingOrder({
-                    distributorId: "dist_1",
-                    quantity: 2,
-                    product: { name: "Test", commissionAmount: 0 },
-                    commissionAmountSnapshot: 5,
-                })
-            )
-            prismaMock.order.updateMany.mockResolvedValue({ count: 1 })
-            prismaMock.order.findMany.mockResolvedValue([])
-            prismaMock.commissionTier.findMany.mockResolvedValue([])
-            prismaMock.commission.create.mockResolvedValue({})
-            prismaMock.$transaction.mockImplementation(async (fn: (tx: any) => Promise<void>) => {
-                await fn(prismaMock)
-            })
-
-            await completePendingOrder("order-1")
-
-            expect(prismaMock.commission.create).toHaveBeenCalledWith({
-                data: {
-                    orderId: "ord_1",
-                    distributorId: "dist_1",
-                    amount: 10,
-                    status: "SETTLED",
-                },
-            })
         })
     })
 })

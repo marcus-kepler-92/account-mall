@@ -20,7 +20,6 @@ type Product = {
     status: string
     price: number
     pinnedAt: string | null
-    commissionAmount: number | null
     tags: { id: string; name: string; slug: string }[]
 }
 
@@ -41,7 +40,6 @@ export function ProductsList({ products, stockMap }: ProductsListProps) {
                             <TableHead>价格</TableHead>
                             <TableHead>库存</TableHead>
                             <TableHead>状态</TableHead>
-                            <TableHead>分销佣金</TableHead>
                             <TableHead>标签</TableHead>
                             <TableHead className="text-right">操作</TableHead>
                         </TableRow>
@@ -81,13 +79,6 @@ export function ProductsList({ products, stockMap }: ProductsListProps) {
                                     >
                                         {product.status === "ACTIVE" ? "上架" : "下架"}
                                     </Badge>
-                                </TableCell>
-                                <TableCell>
-                                    {product.commissionAmount != null ? (
-                                        <span className="text-sm">¥{Number(product.commissionAmount).toFixed(2)}/件</span>
-                                    ) : (
-                                        <span className="text-muted-foreground">-</span>
-                                    )}
                                 </TableCell>
                                 <TableCell>
                                     <div className="flex flex-wrap gap-1">
@@ -163,11 +154,6 @@ export function ProductsList({ products, stockMap }: ProductsListProps) {
                                         >
                                             {product.status === "ACTIVE" ? "上架" : "下架"}
                                         </Badge>
-                                        {product.commissionAmount != null && (
-                                            <span className="text-xs text-muted-foreground">
-                                                佣金 ¥{Number(product.commissionAmount).toFixed(2)}/件
-                                            </span>
-                                        )}
                                     </div>
                                 </div>
                                 <ProductRowActions

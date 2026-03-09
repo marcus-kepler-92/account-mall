@@ -112,7 +112,6 @@ model Product {
   status           ProductStatus @default(ACTIVE)
   productType      ProductType   @default(NORMAL)
   sourceUrl        String?       @db.Text
-  commissionAmount Decimal?      @db.Decimal(10, 2) // 每件分销佣金 元
   pinnedAt         DateTime?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
@@ -160,7 +159,6 @@ model Order {
   createdAt               DateTime    @default(now())
   updatedAt               DateTime    @updatedAt
   clientIp                String?     // For rate limit: max PENDING orders per IP
-  commissionAmountSnapshot Decimal?   @db.Decimal(10, 2) // 下单时商品每件佣金，完成时用此计算避免事后改价
   product                 Product     @relation(fields: [productId], references: [id])
   distributor             User?       @relation(fields: [distributorId], references: [id])
   cards                   Card[]

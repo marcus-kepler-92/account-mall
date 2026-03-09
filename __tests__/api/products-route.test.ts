@@ -351,41 +351,4 @@ describe("POST /api/products", () => {
             include: expect.any(Object),
         })
     })
-
-    it("creates product with commissionAmount", async () => {
-        adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
-        prismaMock.product.findUnique.mockResolvedValueOnce(null)
-        const created = {
-            id: "prod_comm",
-            name: "Product With Commission",
-            slug: "product-commission",
-            description: null,
-            image: null,
-            price: 99,
-            maxQuantity: 10,
-            status: "ACTIVE",
-            commissionAmount: 5,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            tags: [],
-        }
-        prismaMock.product.create.mockResolvedValueOnce(created)
-
-        const res = await POST(
-            createJsonRequest({
-                name: "Product With Commission",
-                slug: "product-commission",
-                price: 99,
-                commissionAmount: 5,
-            })
-        )
-
-        expect(res.status).toBe(201)
-        expect(prismaMock.product.create).toHaveBeenCalledWith({
-            data: expect.objectContaining({
-                commissionAmount: 5,
-            }),
-            include: expect.any(Object),
-        })
-    })
 })

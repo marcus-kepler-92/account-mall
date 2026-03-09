@@ -1,4 +1,3 @@
-import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { sendOrderCompletionEmail } from "@/lib/order-completion-email"
 
@@ -28,7 +27,7 @@ export async function completePendingOrder(
     const order = await prisma.order.findFirst({
         where: { orderNo },
         include: {
-            product: { select: { name: true, commissionAmount: true } },
+            product: { select: { name: true } },
             cards: { select: { id: true, status: true } },
         },
     })
@@ -74,12 +73,7 @@ export async function completePendingOrder(
                 return
             }
 
-            // 以下单时快照为准，避免完成后改商品佣金导致结算不一致
-            const product = order.product as { commissionAmount: Prisma.Decimal | null }
-            const commissionPerUnit = order.commissionAmountSnapshot ?? product?.commissionAmount ?? 0
-            const baseAmount = Number(commissionPerUnit) * order.quantity
-
-            // Weekly tier: distributor's completed order amount this week (including this order)
+            // Commission: tier-only (percentage of order amount), no per-item fixed amount
             const weekStart = getWeekStart(paidAt)
             const weekEnd = new Date(weekStart)
             weekEnd.setUTCDate(weekEnd.getUTCDate() + 7)
@@ -107,7 +101,7 @@ export async function completePendingOrder(
                 }
             }
 
-            const totalCommission = Math.round((baseAmount + tierBonus) * 100) / 100
+            const totalCommission = Math.round(tierBonus * 100) / 100
             if (totalCommission > 0) {
                 await tx.commission.create({
                     data: {

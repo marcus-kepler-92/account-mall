@@ -3,16 +3,19 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 import { AdminSidebar } from "@/app/components/admin-sidebar"
 import { AdminBreadcrumb } from "@/app/components/admin-breadcrumb"
 import { AdminTopbarActions } from "@/app/components/admin-topbar-actions"
-import { getAdminSession } from "@/lib/auth-guard"
+import { getSessionForAdminArea } from "@/lib/auth-guard"
 
 export default async function AdminMainLayout({
     children,
 }: {
     children: React.ReactNode
 }) {
-    const session = await getAdminSession()
-    if (!session) {
+    const result = await getSessionForAdminArea()
+    if (!result) {
         redirect("/admin/login")
+    }
+    if (result.role !== "ADMIN") {
+        redirect("/admin/forbidden")
     }
 
     return (

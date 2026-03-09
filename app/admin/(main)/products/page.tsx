@@ -63,7 +63,6 @@ export default async function AdminProductsPage({
         ...p,
         price: Number(p.price),
         pinnedAt: p.pinnedAt?.toISOString() ?? null,
-        commissionAmount: p.commissionAmount != null ? Number(p.commissionAmount) : null,
     }))
     const stockMapPlain = Object.fromEntries(stockMap)
 

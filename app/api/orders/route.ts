@@ -409,7 +409,6 @@ export async function POST(request: NextRequest) {
                         amount: amountRounded,
                         status: "PENDING",
                         ...(clientIp !== "unknown" && { clientIp }),
-                        commissionAmountSnapshot: product.commissionAmount ?? null,
                     },
                 })
 
