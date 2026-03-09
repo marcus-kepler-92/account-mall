@@ -23,20 +23,28 @@ export default function DistributorLoginPage() {
         setLoading(true)
 
         try {
-            await authClient.signIn.email({
+            const { error: signInError } = await authClient.signIn.email({
                 email,
                 password,
                 fetchOptions: {
-                    onSuccess: () => {
-                        toast.success("登录成功")
-                        router.push("/distributor")
-                        router.refresh()
-                    },
                     onError: (ctx) => {
                         toast.error(ctx.error.message)
                     }
                 }
             })
+            if (signInError) return
+
+            const { data: session } = await authClient.getSession()
+            const role = (session?.user as { role?: string } | undefined)?.role
+            if (role === "DISTRIBUTOR") {
+                toast.success("登录成功")
+                router.push("/distributor")
+                router.refresh()
+            } else {
+                toast.error("请使用管理员入口登录")
+                await authClient.signOut()
+                router.refresh()
+            }
         } catch {
             toast.error("发生未知错误")
         } finally {

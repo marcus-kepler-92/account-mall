@@ -72,6 +72,30 @@ function isDistributorProtectedPage(pathname: string): boolean {
 }
 
 /**
+ * Check if the request path is admin-only (requires ADMIN role).
+ * Used for role enforcement after session is validated.
+ */
+function isAdminOnlyRoute(pathname: string, method: string): boolean {
+    if (pathname.startsWith("/admin") && pathname !== "/admin/login") {
+        return true;
+    }
+    if (PROTECTED_API_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
+        return true;
+    }
+    if (pathname.startsWith("/api/products") && method !== "GET") {
+        return true;
+    }
+    if (
+        pathname.startsWith("/api/orders") &&
+        !PUBLIC_API_EXACT.includes(pathname) &&
+        !(pathname === "/api/orders" && method === "POST")
+    ) {
+        return true;
+    }
+    return false;
+}
+
+/**
  * Check if the request path requires admin authentication
  */
 function isProtectedRoute(pathname: string, method: string): boolean {
@@ -125,7 +149,7 @@ export async function proxy(request: NextRequest) {
     const { pathname } = request.nextUrl;
     const method = request.method;
 
-    // 1. Admin login page: redirect to dashboard if already authenticated
+    // 1. Admin login page: redirect to dashboard only if already authenticated as ADMIN
     if (pathname === "/admin/login") {
         const sessionCookie = getSessionCookie(request);
         if (sessionCookie) {
@@ -140,7 +164,8 @@ export async function proxy(request: NextRequest) {
                 );
                 if (response.ok) {
                     const session = await response.json();
-                    if (session?.session) {
+                    const user = session?.user as { role?: string } | undefined;
+                    if (session?.session && user?.role === "ADMIN") {
                         return NextResponse.redirect(
                             new URL("/admin/dashboard", request.url)
                         );
@@ -153,17 +178,46 @@ export async function proxy(request: NextRequest) {
         return NextResponse.next();
     }
 
-    // 2. Allow public pages
+    // 2. Distributor login page: redirect to /distributor only if already authenticated as DISTRIBUTOR
+    if (pathname === "/distributor/login") {
+        const sessionCookie = getSessionCookie(request);
+        if (sessionCookie) {
+            try {
+                const response = await fetch(
+                    new URL("/api/auth/get-session", request.nextUrl.origin),
+                    {
+                        headers: {
+                            cookie: request.headers.get("cookie") || "",
+                        },
+                    }
+                );
+                if (response.ok) {
+                    const session = await response.json();
+                    const user = session?.user as { role?: string } | undefined;
+                    if (session?.session && user?.role === "DISTRIBUTOR") {
+                        return NextResponse.redirect(
+                            new URL("/distributor", request.url)
+                        );
+                    }
+                }
+            } catch {
+                // Fall through to show login page
+            }
+        }
+        return NextResponse.next();
+    }
+
+    // 3. Allow public pages (login/register are handled above and return before this)
     if (isPublicPage(pathname)) {
         return NextResponse.next();
     }
 
-    // 3. Allow all public APIs
+    // 4. Allow all public APIs
     if (isPublicApi(pathname, method)) {
         return NextResponse.next();
     }
 
-    // 4. For protected routes, validate session
+    // 5. For protected routes, validate session
     if (isProtectedRoute(pathname, method)) {
         const sessionCookie = getSessionCookie(request);
 
@@ -218,16 +272,37 @@ export async function proxy(request: NextRequest) {
             return NextResponse.redirect(new URL("/admin/login", request.url));
         }
 
-        // Distributor pages: require DISTRIBUTOR role (or ADMIN can access admin only; distributor area is for DISTRIBUTOR)
-        if (!pathname.startsWith("/api/") && isDistributorProtectedPage(pathname)) {
-            const user = session?.user as { role?: string } | undefined;
-            if (user?.role !== "DISTRIBUTOR" && user?.role !== "ADMIN") {
-                return NextResponse.redirect(new URL("/distributor/login", request.url));
+        const userRole = (session?.user as { role?: string } | undefined)?.role;
+
+        // Admin-only routes: require ADMIN role; wrong role -> redirect or 401
+        if (isAdminOnlyRoute(pathname, method)) {
+            if (userRole !== "ADMIN") {
+                if (pathname.startsWith("/api/")) {
+                    return NextResponse.json(
+                        { error: "Unauthorized" },
+                        { status: 401 }
+                    );
+                }
+                return NextResponse.redirect(new URL("/admin/login", request.url));
             }
+        }
+
+        // Distributor routes (pages + API): require DISTRIBUTOR role only; wrong role -> redirect or 401
+        const isDistributorRoute =
+            isDistributorProtectedPage(pathname) ||
+            pathname.startsWith(DISTRIBUTOR_API_PREFIX);
+        if (isDistributorRoute && userRole !== "DISTRIBUTOR") {
+            if (pathname.startsWith("/api/")) {
+                return NextResponse.json(
+                    { error: "Unauthorized" },
+                    { status: 401 }
+                );
+            }
+            return NextResponse.redirect(new URL("/distributor/login", request.url));
         }
     }
 
-    // 5. Everything else passes through
+    // 6. Everything else passes through
     return NextResponse.next();
 }
 

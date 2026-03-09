@@ -23,20 +23,28 @@ export default function AdminLoginPage() {
         setLoading(true)
 
         try {
-            await authClient.signIn.email({
+            const { error: signInError } = await authClient.signIn.email({
                 email,
                 password,
                 fetchOptions: {
-                    onSuccess: () => {
-                        toast.success("登录成功")
-                        router.push("/admin/dashboard")
-                        router.refresh()
-                    },
                     onError: (ctx) => {
                         toast.error(ctx.error.message)
                     }
                 }
             })
+            if (signInError) return
+
+            const { data: session } = await authClient.getSession()
+            const role = (session?.user as { role?: string } | undefined)?.role
+            if (role === "ADMIN") {
+                toast.success("登录成功")
+                router.push("/admin/dashboard")
+                router.refresh()
+            } else {
+                toast.error("请使用分销中心入口登录")
+                await authClient.signOut()
+                router.refresh()
+            }
         } catch {
             toast.error("发生未知错误")
         } finally {
