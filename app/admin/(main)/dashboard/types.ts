@@ -51,7 +51,7 @@ export type OrderStatusCount = {
     count: number
 }
 
-/** KPI 汇总 */
+/** KPI 汇总（订单与库存 + 业务概览） */
 export type DashboardKpis = {
     totalRevenue: number
     revenueTrend: number
@@ -64,4 +64,14 @@ export type DashboardKpis = {
     aov: number
     unsoldCardCount: number
     restockPendingCount: number
+    /** 在售商品数（ACTIVE） */
+    activeProductCount: number
+    /** 分销员总数 */
+    distributorCount: number
+    /** 待处理提现笔数 */
+    pendingWithdrawalCount: number
+    /** 待处理提现总金额 */
+    pendingWithdrawalAmount: number
+    /** 待结算佣金总金额 */
+    pendingCommissionAmount: number
 }

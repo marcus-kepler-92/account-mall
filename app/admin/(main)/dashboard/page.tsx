@@ -16,6 +16,10 @@ import {
     TrendingUp,
     CreditCard,
     Bell,
+    Package,
+    Users,
+    Wallet,
+    Layers,
 } from "lucide-react"
 import { getDashboardData } from "./dashboard-data"
 import { ORDER_STATUS_LABEL } from "./types"
@@ -91,6 +95,47 @@ export default async function AdminDashboardPage() {
         },
     ]
 
+    const overviewCards = [
+        {
+            title: "在售商品数",
+            value: String(kpis.activeProductCount),
+            description: "当前在售商品数量",
+            href: "/admin/products",
+            icon: Package,
+            ariaLabel: `在售商品 ${kpis.activeProductCount} 个，管理商品`,
+        },
+        {
+            title: "分销员数",
+            value: String(kpis.distributorCount),
+            description: "分销员总数",
+            href: "/admin/distributors",
+            icon: Users,
+            ariaLabel: `分销员 ${kpis.distributorCount} 人，管理分销员`,
+        },
+        {
+            title: "待处理提现",
+            value:
+                kpis.pendingWithdrawalCount > 0
+                    ? `${kpis.pendingWithdrawalCount} 笔 · ¥${kpis.pendingWithdrawalAmount.toFixed(2)}`
+                    : "0 笔",
+            description: "待处理提现笔数与金额",
+            href: "/admin/withdrawals?status=PENDING",
+            icon: Wallet,
+            ariaLabel: `待处理提现 ${kpis.pendingWithdrawalCount} 笔，金额 ¥${kpis.pendingWithdrawalAmount.toFixed(2)}，查看提现`,
+        },
+        {
+            title: "待结算佣金",
+            value:
+                kpis.pendingCommissionAmount > 0
+                    ? `¥${kpis.pendingCommissionAmount.toFixed(2)}`
+                    : "¥0.00",
+            description: "待结算佣金总额",
+            href: "/admin/distributors",
+            icon: Layers,
+            ariaLabel: `待结算佣金 ¥${kpis.pendingCommissionAmount.toFixed(2)}，查看分销员`,
+        },
+    ]
+
     return (
         <div className={sectionGap}>
             <header>
@@ -141,6 +186,42 @@ export default async function AdminDashboardPage() {
                                                     {Math.abs(stat.trend).toFixed(0)}%
                                                 </span>
                                             )}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </Link>
+                    ))}
+                </div>
+            </section>
+
+            <section className="min-w-0" aria-label="业务概览">
+                <h3 className="mb-3 text-sm font-medium text-muted-foreground sm:mb-4">业务概览</h3>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    {overviewCards.map((stat) => (
+                        <Link
+                            key={stat.title}
+                            href={stat.href}
+                            aria-label={stat.ariaLabel}
+                            className="block h-full min-w-0"
+                        >
+                            <Card className="flex h-full min-w-0 flex-col transition-colors hover:bg-accent/50 cursor-pointer">
+                                <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                                    <CardDescription className="min-w-0 truncate">
+                                        {stat.description}
+                                    </CardDescription>
+                                    <stat.icon className="size-4 shrink-0 text-muted-foreground" />
+                                </CardHeader>
+                                <CardContent className="flex min-w-0 flex-1 flex-col justify-end">
+                                    <div
+                                        className="truncate text-lg font-bold sm:text-xl"
+                                        title={stat.value}
+                                    >
+                                        {stat.value}
+                                    </div>
+                                    <div className="mt-1">
+                                        <span className="text-xs text-muted-foreground sm:text-sm">
+                                            查看 →
+                                        </span>
                                     </div>
                                 </CardContent>
                             </Card>

@@ -38,6 +38,10 @@ export async function getDashboardKpis(): Promise<DashboardKpis> {
         orderCountByStatus,
         unsoldCardCount,
         restockPendingCount,
+        activeProductCount,
+        distributorCount,
+        pendingWithdrawalAgg,
+        pendingCommissionSum,
     ] = await Promise.all([
         prisma.order.aggregate({
             where: { status: "COMPLETED" },
@@ -66,6 +70,17 @@ export async function getDashboardKpis(): Promise<DashboardKpis> {
         }),
         prisma.card.count({ where: { status: "UNSOLD" } }),
         prisma.restockSubscription.count({ where: { status: "PENDING" } }),
+        prisma.product.count({ where: { status: "ACTIVE" } }),
+        prisma.user.count({ where: { role: "DISTRIBUTOR" } }),
+        prisma.withdrawal.aggregate({
+            where: { status: "PENDING" },
+            _count: { id: true },
+            _sum: { amount: true },
+        }),
+        prisma.commission.aggregate({
+            where: { status: "PENDING" },
+            _sum: { amount: true },
+        }),
     ])
 
     const totalRevenue = Number(totalRevenueResult._sum.amount ?? 0)
@@ -105,6 +120,11 @@ export async function getDashboardKpis(): Promise<DashboardKpis> {
         aov,
         unsoldCardCount,
         restockPendingCount,
+        activeProductCount,
+        distributorCount,
+        pendingWithdrawalCount: pendingWithdrawalAgg._count.id,
+        pendingWithdrawalAmount: Number(pendingWithdrawalAgg._sum.amount ?? 0),
+        pendingCommissionAmount: Number(pendingCommissionSum._sum.amount ?? 0),
     }
 }
 

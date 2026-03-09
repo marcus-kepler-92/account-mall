@@ -53,6 +53,15 @@ describe("dashboard-data", () => {
             ])
             prismaMock.card.count.mockResolvedValueOnce(50)
             prismaMock.restockSubscription.count.mockResolvedValueOnce(3)
+            prismaMock.product.count.mockResolvedValueOnce(5)
+            prismaMock.user.count.mockResolvedValueOnce(2)
+            prismaMock.withdrawal.aggregate.mockResolvedValueOnce({
+                _count: { id: 3 },
+                _sum: { amount: 1200 },
+            })
+            prismaMock.commission.aggregate.mockResolvedValueOnce({
+                _sum: { amount: 150 },
+            })
 
             const result = await getDashboardKpis()
 
@@ -66,6 +75,11 @@ describe("dashboard-data", () => {
                 aov: 50,
                 unsoldCardCount: 50,
                 restockPendingCount: 3,
+                activeProductCount: 5,
+                distributorCount: 2,
+                pendingWithdrawalCount: 3,
+                pendingWithdrawalAmount: 1200,
+                pendingCommissionAmount: 150,
             })
             expect(typeof result.revenueTrend).toBe("number")
             expect(typeof result.orderTrend).toBe("number")
@@ -83,12 +97,26 @@ describe("dashboard-data", () => {
             prismaMock.order.groupBy.mockResolvedValueOnce([])
             prismaMock.card.count.mockResolvedValueOnce(0)
             prismaMock.restockSubscription.count.mockResolvedValueOnce(0)
+            prismaMock.product.count.mockResolvedValueOnce(0)
+            prismaMock.user.count.mockResolvedValueOnce(0)
+            prismaMock.withdrawal.aggregate.mockResolvedValueOnce({
+                _count: { id: 0 },
+                _sum: { amount: null },
+            })
+            prismaMock.commission.aggregate.mockResolvedValueOnce({
+                _sum: { amount: null },
+            })
 
             const result = await getDashboardKpis()
 
             expect(result.aov).toBe(0)
             expect(result.completionRate).toBe(0)
             expect(result.totalRevenue).toBe(0)
+            expect(result.activeProductCount).toBe(0)
+            expect(result.distributorCount).toBe(0)
+            expect(result.pendingWithdrawalCount).toBe(0)
+            expect(result.pendingWithdrawalAmount).toBe(0)
+            expect(result.pendingCommissionAmount).toBe(0)
         })
     })
 
@@ -227,6 +255,13 @@ describe("dashboard-data", () => {
             prismaMock.restockSubscription.count.mockResolvedValue(0)
             prismaMock.restockSubscription.groupBy.mockResolvedValue([])
             prismaMock.product.findMany.mockResolvedValue([])
+            prismaMock.product.count.mockResolvedValue(0)
+            prismaMock.user.count.mockResolvedValue(0)
+            prismaMock.withdrawal.aggregate.mockResolvedValue({
+                _count: { id: 0 },
+                _sum: { amount: null },
+            })
+            prismaMock.commission.aggregate.mockResolvedValue({ _sum: { amount: null } })
             prismaMock.order.findMany.mockResolvedValue([])
 
             const result = await getDashboardData()
@@ -241,6 +276,14 @@ describe("dashboard-data", () => {
             expect(result).toHaveProperty("recentOrders")
             expect(result.trend7).toHaveLength(7)
             expect(result.trend30).toHaveLength(30)
+            // 业务概览 KPI 由 getDashboardKpis 提供，确保集成后 kpis 包含新增字段
+            expect(result.kpis).toMatchObject({
+                activeProductCount: 0,
+                distributorCount: 0,
+                pendingWithdrawalCount: 0,
+                pendingWithdrawalAmount: 0,
+                pendingCommissionAmount: 0,
+            })
         })
     })
 })
