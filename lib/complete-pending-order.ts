@@ -1,6 +1,15 @@
 import { prisma } from "@/lib/prisma"
 import { sendOrderCompletionEmail } from "@/lib/order-completion-email"
 
+/** Prisma Decimal 等转为 number，避免 Number(decimal) 在部分环境为 NaN 导致佣金为 0 */
+function toNumber(value: unknown): number {
+    if (typeof value === "number" && !Number.isNaN(value)) return value
+    const d = value as { toNumber?: () => number }
+    if (typeof d?.toNumber === "function") return d.toNumber()
+    const n = Number(value)
+    return Number.isNaN(n) ? 0 : n
+}
+
 /** Natural week: Monday 00:00:00 UTC for the given date. */
 function getWeekStart(date: Date): Date {
     const d = new Date(date)
@@ -86,21 +95,31 @@ export async function completePendingOrder(
                 },
                 select: { amount: true },
             })
-            const weekTotal = weekOrders.reduce((sum, o) => sum + Number(o.amount), 0)
+            const weekTotal = weekOrders.reduce((sum, o) => sum + toNumber(o.amount), 0)
 
             const tiers = await tx.commissionTier.findMany({
                 orderBy: { sortOrder: "asc" },
             })
-            let tierBonus = 0
+            let ratePercent: number | null = null
             for (const tier of tiers) {
-                const min = Number(tier.minAmount)
-                const max = Number(tier.maxAmount)
+                const min = toNumber(tier.minAmount)
+                const max = toNumber(tier.maxAmount)
                 if (weekTotal >= min && weekTotal < max) {
-                    tierBonus = Number(order.amount) * Number(tier.ratePercent) / 100
+                    ratePercent = toNumber(tier.ratePercent)
                     break
                 }
             }
-
+            // 当周销售额未落入任何档位时（如首单 9 元且最低档从 400 起），按最低档比例算佣金，避免 0 佣金
+            if (ratePercent == null && tiers.length > 0) {
+                ratePercent = toNumber(tiers[0].ratePercent)
+            }
+            // 佣金按原价（折前）计算：有折扣时用 实付 / (1 - 折扣比例) 反推原价
+            const paidAmount = toNumber(order.amount)
+            const discountPct = toNumber(order.discountPercentApplied)
+            const commissionBase =
+                discountPct > 0 && discountPct < 100 ? paidAmount / (1 - discountPct / 100) : paidAmount
+            const tierBonus =
+                ratePercent != null && commissionBase > 0 ? (commissionBase * ratePercent) / 100 : 0
             const totalCommission = Math.round(tierBonus * 100) / 100
             if (totalCommission > 0) {
                 await tx.commission.create({

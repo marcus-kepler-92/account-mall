@@ -123,7 +123,7 @@ export default async function DistributorOrdersPage({
                                             <TableCell className="font-mono text-xs">
                                                 {o.orderNo}
                                             </TableCell>
-                                            <TableCell>{o.product.name}</TableCell>
+                                            <TableCell>{o.productNameSnapshot ?? o.product.name}</TableCell>
                                             <TableCell>{o.quantity}</TableCell>
                                             <TableCell className="text-right">
                                                 ¥{Number(o.amount).toFixed(2)}

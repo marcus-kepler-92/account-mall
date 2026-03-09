@@ -29,6 +29,7 @@ export function generateOrderNo(): string {
 
 type ProductForFreeShared = {
     id: string
+    name: string
     sourceUrl: string | null
     productType: string | null
 }
@@ -94,6 +95,7 @@ async function createFreeSharedOrder(params: {
                 data: {
                     orderNo,
                     productId,
+                    productNameSnapshot: product.name,
                     email: email.trim().toLowerCase(),
                     passwordHash,
                     quantity: 1,
@@ -252,7 +254,7 @@ export async function GET(request: NextRequest) {
             distributor: order.distributor ? { id: order.distributor.id, name: order.distributor.name, distributorCode: order.distributor.distributorCode } : null,
             product: {
                 id: order.product.id,
-                name: order.product.name,
+                name: order.productNameSnapshot ?? order.product.name,
                 price: Number(order.product.price),
             },
             quantity: order.quantity,
@@ -296,16 +298,24 @@ export async function POST(request: NextRequest) {
 
     const { productId, email, orderPassword, quantity, turnstileToken, promoCode: bodyPromoCode } = parsed.data
 
-    // Resolve distributor from promoCode (cookie or body)
+    // Resolve distributor from promoCode (cookie or body); include discount settings for 同码优惠
     const cookiePromoCode = request.cookies?.get?.("distributor_promo_code")?.value?.trim()
     const promoCode = (bodyPromoCode?.trim() || cookiePromoCode) || null
     let distributorId: string | null = null
+    let distributorDiscountPercent: number | null = null
     if (promoCode) {
         const distributor = await prisma.user.findFirst({
             where: { distributorCode: promoCode, role: "DISTRIBUTOR", disabledAt: null },
-            select: { id: true },
+            select: { id: true, discountCodeEnabled: true, discountPercent: true },
         })
-        if (distributor) distributorId = distributor.id
+        if (distributor) {
+            distributorId = distributor.id
+            // 同码优惠：仅当启用优惠码且设置了折扣比例时应用
+            if (distributor.discountCodeEnabled && distributor.discountPercent != null) {
+                const pct = Number(distributor.discountPercent)
+                if (pct > 0 && pct <= 100) distributorDiscountPercent = pct
+            }
+        }
     }
 
     const secretKey = config.turnstileSecretKey
@@ -380,7 +390,12 @@ export async function POST(request: NextRequest) {
         return badRequest(`Insufficient stock. Available: ${unsoldCount}`)
     }
 
-    const amount = Number(product.price) * quantity
+    let amount = Number(product.price) * quantity
+    let discountPercentApplied: number | null = null
+    if (distributorDiscountPercent != null) {
+        amount = amount * (1 - distributorDiscountPercent / 100)
+        discountPercentApplied = distributorDiscountPercent
+    }
     const amountRounded = Math.round(amount * 100) / 100
     if (amountRounded <= 0 || amountRounded > 999_999.99) {
         return badRequest("Invalid order amount")
@@ -402,11 +417,13 @@ export async function POST(request: NextRequest) {
                     data: {
                         orderNo,
                         productId,
+                        productNameSnapshot: product.name,
                         ...(distributorId && { distributorId }),
                         email: email.trim().toLowerCase(),
                         passwordHash,
                         quantity,
                         amount: amountRounded,
+                        ...(discountPercentApplied != null && { discountPercentApplied }),
                         status: "PENDING",
                         ...(clientIp !== "unknown" && { clientIp }),
                     },

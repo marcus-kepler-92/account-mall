@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
         orderNo: order.orderNo,
         createdAt: order.createdAt,
         status: order.status,
-        productName: order.product.name,
+        productName: order.productNameSnapshot ?? order.product.name,
         quantity: order.quantity,
         amount: Number(order.amount),
     }))

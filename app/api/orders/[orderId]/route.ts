@@ -40,7 +40,7 @@ function mapOrderToResponse(order: {
         email: order.email,
         product: {
             id: order.product.id,
-            name: order.product.name,
+            name: order.productNameSnapshot ?? order.product.name,
             price: Number(order.product.price),
         },
         quantity: order.quantity,

@@ -75,6 +75,9 @@ export default async function DistributorCommissionsPage({
             <div>
                 <h1 className="text-2xl font-bold tracking-tight">我的佣金</h1>
                 <p className="text-muted-foreground">佣金明细与可提现余额</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                    使用您本人账号邮箱下单的订单不记佣金。
+                </p>
             </div>
 
             <Card>
@@ -121,7 +124,9 @@ export default async function DistributorCommissionsPage({
             <Card>
                 <CardHeader>
                     <CardTitle>佣金明细</CardTitle>
-                    <CardDescription>共 {total} 笔</CardDescription>
+                    <CardDescription>
+                        共 {total} 笔。使用本人账号邮箱下单的订单不记佣金。
+                    </CardDescription>
                 </CardHeader>
                 <CardContent>
                     {commissions.length === 0 ? (

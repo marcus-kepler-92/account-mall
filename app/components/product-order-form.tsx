@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
+import { useRequest } from "ahooks"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useRouter } from "next/navigation"
@@ -21,7 +22,9 @@ import { Eye, EyeOff, Loader2 } from "lucide-react"
 import { addOrUpdateOrder } from "@/lib/order-history-storage"
 import { applyFieldErrors } from "@/lib/form-utils"
 import { createOrderFormSchema, type OrderFormSchema } from "@/lib/validations/order"
+import { configClient } from "@/lib/config-client"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useProductPriceSyncStore } from "@/lib/stores/product-price-sync"
 
 const ORDER_FORM_LOADING_EVENT = "product-order-loading"
 
@@ -33,6 +36,27 @@ function dispatchOrderFormLoading(loading: boolean) {
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? ""
 const IS_DEV = process.env.NODE_ENV === "development"
+
+function isValidDiscountCodeFormat(code: string, maxLength: number = configClient.promoCodeMaxLength): boolean {
+    const t = code.trim()
+    return t.length >= 1 && t.length <= maxLength
+}
+
+type ValidatePromoResponse = { valid?: boolean; discountPercent?: number | null }
+
+function normalizePromoValidation(data: ValidatePromoResponse | undefined): PromoValidation {
+    if (data == null) return null
+    return {
+        valid: data.valid === true,
+        discountPercent:
+            data.valid === true && typeof data.discountPercent === "number" ? data.discountPercent : null,
+    }
+}
+
+type PromoValidation = {
+    valid: boolean
+    discountPercent: number | null
+} | null
 
 type ProductOrderFormProps = {
     productId: string
@@ -56,6 +80,24 @@ export function ProductOrderForm({
     const [showOrderPassword, setShowOrderPassword] = useState(false)
     const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
     const [turnstileWidgetReady, setTurnstileWidgetReady] = useState(false)
+    const [discountCode, setDiscountCode] = useState("")
+
+    const validatePromo = useCallback((code: string) => {
+        return fetch(`/api/validate-promo-code?promoCode=${encodeURIComponent(code)}`, {
+            credentials: "same-origin",
+        }).then((res) => res.json()) as Promise<ValidatePromoResponse>
+    }, [])
+
+    const { data: promoData, loading: promoValidating, run: runValidatePromo, mutate: setPromoData } = useRequest(
+        validatePromo,
+        {
+            manual: true,
+            debounceWait: configClient.promoValidateDebounceMs,
+        }
+    )
+
+    const promoValidation = normalizePromoValidation(promoData)
+    const setDisplay = useProductPriceSyncStore((s) => s.setDisplay)
 
     const router = useRouter()
     const requireTurnstile = Boolean(TURNSTILE_SITE_KEY) && !IS_DEV
@@ -72,8 +114,32 @@ export function ProductOrderForm({
     })
 
     const quantity = form.watch("quantity")
-    const totalPrice = isFreeShared ? "0.00" : (price * (isFreeShared ? 1 : quantity)).toFixed(2)
     const effectiveQuantity = isFreeShared ? 1 : quantity
+    const codeTrimmed = discountCode.trim()
+    const hasValidDiscountCodeFormat = codeTrimmed !== "" && isValidDiscountCodeFormat(discountCode)
+
+    // 防抖异步校验优惠码（ahooks useRequest）
+    useEffect(() => {
+        if (!hasValidDiscountCodeFormat) {
+            setPromoData(undefined)
+            return
+        }
+        runValidatePromo(codeTrimmed)
+    }, [codeTrimmed, hasValidDiscountCodeFormat, runValidatePromo, setPromoData])
+
+    const totalPrice = isFreeShared
+        ? "0.00"
+        : promoValidation?.valid && promoValidation.discountPercent != null
+          ? (price * effectiveQuantity * (1 - promoValidation.discountPercent / 100)).toFixed(2)
+          : (price * effectiveQuantity).toFixed(2)
+
+    useEffect(() => {
+        setDisplay(
+            totalPrice,
+            isFreeShared,
+            promoValidation?.valid ? promoValidation.discountPercent ?? null : null
+        )
+    }, [totalPrice, isFreeShared, promoValidation?.valid, promoValidation?.discountPercent, setDisplay])
 
     const onSubmit = async (data: OrderFormSchema) => {
         if (!inStock) return
@@ -81,16 +147,21 @@ export function ProductOrderForm({
         dispatchOrderFormLoading(true)
         let willRedirect = false
         try {
+            const payload: Record<string, unknown> = {
+                productId,
+                email: data.email.trim(),
+                orderPassword: data.orderPassword,
+                quantity: effectiveQuantity,
+                ...(turnstileToken && { turnstileToken }),
+            }
+            const codeTrimmed = discountCode.trim()
+            if (codeTrimmed && isValidDiscountCodeFormat(codeTrimmed)) {
+                payload.promoCode = codeTrimmed
+            }
             const res = await fetch("/api/orders", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    productId,
-                    email: data.email.trim(),
-                    orderPassword: data.orderPassword,
-                    quantity: effectiveQuantity,
-                    ...(turnstileToken && { turnstileToken }),
-                }),
+                body: JSON.stringify(payload),
             })
 
             const responseData = await res.json()
@@ -241,6 +312,37 @@ export function ProductOrderForm({
                         />
                     )}
 
+                    {!isFreeShared && (
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium leading-none">优惠码</label>
+                            <Input
+                                type="text"
+                                placeholder={`选填，1–${configClient.promoCodeMaxLength} 字符`}
+                                disabled={!inStock}
+                                maxLength={configClient.promoCodeMaxLength}
+                                value={discountCode}
+                                onChange={(e) => setDiscountCode(e.target.value)}
+                                className="font-mono"
+                            />
+                            {discountCode.trim() !== "" && !isValidDiscountCodeFormat(discountCode) && (
+                                <p className="text-xs text-destructive">优惠码格式：1–{configClient.promoCodeMaxLength} 个字符</p>
+                            )}
+                            {hasValidDiscountCodeFormat && (
+                                <p className="text-xs text-muted-foreground">
+                                    {promoValidating
+                                        ? "校验中…"
+                                        : promoValidation?.valid && promoValidation.discountPercent != null
+                                          ? `已享 ${promoValidation.discountPercent}% 优惠`
+                                          : promoValidation?.valid
+                                            ? "推荐码有效，但未开通折扣"
+                                            : promoValidation && !promoValidation.valid
+                                              ? "推荐码无效"
+                                              : "校验中…"}
+                                </p>
+                            )}
+                        </div>
+                    )}
+
                     {requireTurnstile && (
                         <div className="relative flex min-h-[76px] justify-center">
                             {!turnstileWidgetReady && (
@@ -263,9 +365,14 @@ export function ProductOrderForm({
                         </div>
                     )}
 
-                    <div className="flex items-center justify-between pt-2">
+                    {/* 桌面端显示合计 + 提交按钮；移动端仅低栏显示到手价，此处隐藏避免重复 */}
+                    <div className="hidden lg:flex items-center justify-between pt-2">
                         <span className="text-lg font-bold">
-                            {isFreeShared ? "免费" : `合计: ¥${totalPrice}`}
+                            {isFreeShared
+                                ? "免费"
+                                : promoValidation?.valid && promoValidation.discountPercent != null
+                                  ? `合计: ¥${totalPrice}（已享 ${promoValidation.discountPercent}% 优惠）`
+                                  : `合计: ¥${totalPrice}`}
                         </span>
                         <Button
                             type="submit"

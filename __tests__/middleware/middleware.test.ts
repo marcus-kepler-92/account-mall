@@ -460,36 +460,14 @@ describe("Protected distributor pages", () => {
   });
 });
 
-// ─── PromoCode cookie on storefront GET ───────────────────────────────
+// ─── PromoCode cookie: handled by client hook + GET /api/set-promo-cookie ───
 
-describe("GET storefront with promoCode sets cookie", () => {
-  it("should set distributor_promo_code cookie when GET / with promoCode", async () => {
+describe("GET storefront with promoCode (cookie set by client, not middleware)", () => {
+  it("does not set cookie in middleware when GET / with promoCode", async () => {
     const request = new NextRequest("http://localhost:3000/?promoCode=ABC");
     const response = await middleware(request);
 
     expect(response.status).toBe(200);
-    const setCookie = response.headers.get("set-cookie");
-    expect(setCookie).toBeTruthy();
-    expect(setCookie).toContain("distributor_promo_code=ABC");
-    expect(setCookie).toMatch(/Max-Age=\d+/);
-  });
-
-  it("should set distributor_promo_code cookie when GET /products with promoCode", async () => {
-    const request = new NextRequest("http://localhost:3000/products?promoCode=PROMO1");
-    const response = await middleware(request);
-
-    expect(response.status).toBe(200);
-    const setCookie = response.headers.get("set-cookie");
-    expect(setCookie).toBeTruthy();
-    expect(setCookie).toContain("distributor_promo_code=PROMO1");
-  });
-
-  it("should not set cookie when GET / without promoCode", async () => {
-    const request = createRequest("/");
-    const response = await middleware(request);
-
-    expect(response.status).toBe(200);
-    const setCookie = response.headers.get("set-cookie");
-    expect(setCookie).toBeFalsy();
+    expect(response.headers.get("set-cookie")).toBeFalsy();
   });
 });

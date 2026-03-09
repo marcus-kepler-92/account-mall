@@ -30,7 +30,7 @@ export async function sendOrderCompletionEmail(orderId: string): Promise<void> {
     const html = await render(
         React.createElement(OrderCompletion, {
             orderNo: order.orderNo,
-            productName: order.product.name,
+            productName: order.productNameSnapshot ?? order.product.name,
             quantity: order.quantity,
             cards: order.cards.map((c) => ({ content: c.content })),
             lookupUrl,

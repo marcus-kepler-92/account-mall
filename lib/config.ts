@@ -56,6 +56,10 @@ const envSchema = z
             .default("https://id.ali-door.top/share/yedamai"),
         /** 免费共享：单笔领取数量（固定为 1，可配置） */
         freeSharedMaxQuantityPerOrder: z.coerce.number().int().min(1).default(1),
+        /** 推荐码/优惠码：最大长度（字符），用于校验与防抖校验 API */
+        promoCodeMaxLength: z.coerce.number().int().min(1).max(256).default(64),
+        /** 推荐码/优惠码：前端防抖校验延迟（毫秒），输入停止后多久发起校验 */
+        promoValidateDebounceMs: z.coerce.number().int().min(0).default(400),
     })
     .transform((data) => {
         const urlFromEnv = data.databaseUrl?.trim()
@@ -157,6 +161,8 @@ function getEnvInput() {
         freeSharedCooldownHours: e.FREE_SHARED_COOLDOWN_HOURS,
         freeSharedSourceUrl: e.FREE_SHARED_SOURCE_URL,
         freeSharedMaxQuantityPerOrder: e.FREE_SHARED_MAX_QUANTITY_PER_ORDER,
+        promoCodeMaxLength: e.PROMO_CODE_MAX_LENGTH,
+        promoValidateDebounceMs: e.PROMO_VALIDATE_DEBOUNCE_MS,
     }
 }
 

@@ -48,8 +48,20 @@ function createWithdrawalFormRequest(amount: string, withFile = true): NextReque
     const formData = new FormData()
     formData.set("amount", amount)
     if (withFile) {
-        formData.set("receiptImage", new Blob(["x"], { type: "image/jpeg" }) as unknown as File)
+        formData.set("receiptImage", new File(["x"], "receipt.jpg", { type: "image/jpeg" }))
     }
+    return {
+        url: "http://localhost/api/distributor/withdrawals",
+        headers: { get: () => "multipart/form-data; boundary=----FormBoundary" },
+        formData: () => Promise.resolve(formData),
+    } as unknown as NextRequest
+}
+
+function createWithdrawalFormRequestWithFile(amount: string, fileType: string, fileSize: number): NextRequest {
+    const formData = new FormData()
+    formData.set("amount", amount)
+    const file = new File([new Uint8Array(fileSize)], "receipt.jpg", { type: fileType })
+    formData.set("receiptImage", file)
     return {
         url: "http://localhost/api/distributor/withdrawals",
         headers: { get: () => "multipart/form-data; boundary=----FormBoundary" },
@@ -205,6 +217,25 @@ describe("GET /api/distributor/commissions", () => {
         expect(data.withdrawableBalance).toBe(40)
         expect(data.meta).toBeDefined()
     })
+
+    it("queries commissions only for current user (distributorId from session, no IDOR)", async () => {
+        getDistributorSession.mockResolvedValue(distributorSession)
+        prismaMock.commission.findMany.mockResolvedValue([])
+        prismaMock.commission.count.mockResolvedValue(0)
+        prismaMock.commission.aggregate.mockResolvedValue({ _sum: { amount: null } })
+        prismaMock.withdrawal.aggregate
+            .mockResolvedValueOnce({ _sum: { amount: null } })
+            .mockResolvedValueOnce({ _sum: { amount: null } })
+
+        const req = createRequest("http://localhost/api/distributor/commissions")
+        await CommissionsGet(req)
+
+        expect(prismaMock.commission.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({ distributorId: "dist_1" }),
+            })
+        )
+    })
 })
 
 describe("GET /api/distributor/withdrawals", () => {
@@ -260,6 +291,42 @@ describe("POST /api/distributor/withdrawals", () => {
         } as unknown as NextRequest
         const res = await WithdrawalsPost(req)
         expect(res.status).toBe(401)
+    })
+
+    it("returns 401 when distributor is disabled (getDistributorSession returns null)", async () => {
+        getDistributorSession.mockResolvedValue(null)
+        const req = createWithdrawalFormRequest("10")
+        const res = await WithdrawalsPost(req)
+        expect(res.status).toBe(401)
+        expect(prismaMock.withdrawal.create).not.toHaveBeenCalled()
+    })
+
+    it("returns 400 when receipt image is missing or not uploaded", async () => {
+        getDistributorSession.mockResolvedValue(distributorSession)
+        const req = createWithdrawalFormRequest("10", false)
+        const res = await WithdrawalsPost(req)
+        expect(res.status).toBe(400)
+        const data = await res.json()
+        expect(data.error).toMatch(/收款码|上传|图片/i)
+        expect(prismaMock.withdrawal.create).not.toHaveBeenCalled()
+    })
+
+    it("returns 429 when withdrawal create rate limit is exceeded", async () => {
+        const { checkWithdrawalCreateRateLimit } = require("@/lib/rate-limit")
+        checkWithdrawalCreateRateLimit.mockResolvedValueOnce(
+            new Response(
+                JSON.stringify({ error: "提现申请过于频繁，请稍后再试。" }),
+                { status: 429, headers: { "Content-Type": "application/json" } }
+            )
+        )
+        getDistributorSession.mockResolvedValue(distributorSession)
+        const req = createWithdrawalFormRequest("10")
+        const res = await WithdrawalsPost(req)
+        expect(res.status).toBe(429)
+        const data = await res.json()
+        expect(data.error).toMatch(/频繁|稍后/i)
+        expect(prismaMock.$transaction).not.toHaveBeenCalled()
+        expect(prismaMock.withdrawal.create).not.toHaveBeenCalled()
     })
 
     it("returns 400 when body is invalid (non-number amount)", async () => {
@@ -368,5 +435,56 @@ describe("POST /api/distributor/withdrawals", () => {
                 receiptImageUrl: "/uploads/receipts/test.jpg",
             },
         })
+    })
+
+    it("returns 201 when amount equals withdrawable balance (boundary allowed)", async () => {
+        getDistributorSession.mockResolvedValue(distributorSession)
+        prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock))
+        prismaMock.commission.aggregate.mockResolvedValue({ _sum: { amount: 100 } })
+        prismaMock.withdrawal.aggregate
+            .mockResolvedValueOnce({ _sum: { amount: 20 } })
+            .mockResolvedValueOnce({ _sum: { amount: 0 } })
+        prismaMock.withdrawal.create.mockResolvedValue({
+            id: "with_1",
+            amount: 80,
+            status: "PENDING",
+            receiptImageUrl: "/uploads/receipts/test.jpg",
+            createdAt: new Date(),
+        })
+
+        const req = createWithdrawalFormRequest("80")
+        const res = await WithdrawalsPost(req)
+        const data = await res.json()
+
+        expect(res.status).toBe(201)
+        expect(data.amount).toBe(80)
+        expect(prismaMock.withdrawal.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                distributorId: "dist_1",
+                amount: 80,
+                status: "PENDING",
+            }),
+        })
+    })
+
+    it("returns 400 when receipt image type is not allowed (e.g. image/gif)", async () => {
+        getDistributorSession.mockResolvedValue(distributorSession)
+        const req = createWithdrawalFormRequestWithFile("10", "image/gif", 100)
+        const res = await WithdrawalsPost(req)
+        expect(res.status).toBe(400)
+        const data = await res.json()
+        expect(data.error).toMatch(/JPG|PNG|WebP|支持|图片/i)
+        expect(prismaMock.withdrawal.create).not.toHaveBeenCalled()
+    })
+
+    it("returns 400 when receipt image size exceeds 4MB", async () => {
+        getDistributorSession.mockResolvedValue(distributorSession)
+        const overLimit = 4 * 1024 * 1024 + 1
+        const req = createWithdrawalFormRequestWithFile("10", "image/jpeg", overLimit)
+        const res = await WithdrawalsPost(req)
+        expect(res.status).toBe(400)
+        const data = await res.json()
+        expect(data.error).toMatch(/4MB|大小|超过/i)
+        expect(prismaMock.withdrawal.create).not.toHaveBeenCalled()
     })
 })

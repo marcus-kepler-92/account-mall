@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
         }
 
         const totalAmount = Number(order.amount).toFixed(2)
-        const subject = order.product?.name ?? `订单 ${order.orderNo}`
+        const subject = order.productNameSnapshot ?? order.product?.name ?? `订单 ${order.orderNo}`
         const paymentUrl = getPaymentUrlForOrder({
             orderNo: order.orderNo,
             totalAmount,

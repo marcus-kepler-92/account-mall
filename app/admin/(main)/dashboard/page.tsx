@@ -225,7 +225,7 @@ export default async function AdminDashboardPage() {
                                                     {order.orderNo}
                                                 </TableCell>
                                                 <TableCell className="max-w-[120px] truncate sm:max-w-none">
-                                                    {order.product.name}
+                                                    {order.productNameSnapshot ?? order.product.name}
                                                 </TableCell>
                                                 <TableCell className="whitespace-nowrap">
                                                     ¥{Number(order.amount).toFixed(2)}

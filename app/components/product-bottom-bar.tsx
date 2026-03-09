@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useProductPriceSyncStore } from "@/lib/stores/product-price-sync"
 
 const ORDER_FORM_LOADING_EVENT = "product-order-loading"
 
@@ -25,6 +26,7 @@ export function ProductBottomBar({
     isFreeShared,
 }: ProductBottomBarProps) {
     const [isSubmitting, setIsSubmitting] = useState(false)
+    const d = useProductPriceSyncStore((s) => s.display)
 
     useEffect(() => {
         const handler = (e: CustomEvent<{ loading: boolean }>) => {
@@ -56,8 +58,16 @@ export function ProductBottomBar({
 
     const showSubmitState = inStock && isSubmitting
 
+    const displayFree = d ? d.isFreeShared : isFreeShared
+    const displayPrice = d && !d.isFreeShared ? d.totalPrice : price.toFixed(2)
+    const hasDiscount = Boolean(d?.discountPercent != null && d.discountPercent > 0)
+
     return (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 backdrop-blur lg:hidden">
+        <div
+            className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] backdrop-blur dark:shadow-[0_-4px_12px_rgba(0,0,0,0.25)] lg:hidden pb-3 supports-[padding:env(safe-area-inset-bottom)]:pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+            role="banner"
+            aria-label="商品操作栏"
+        >
             <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 2xl:max-w-7xl">
                 <div className="min-w-0 flex-1">
                     <div className="flex flex-col">
@@ -70,8 +80,13 @@ export function ProductBottomBar({
                                 !inStock && "text-muted-foreground line-through"
                             )}
                         >
-                            {isFreeShared ? "免费" : `¥${price.toFixed(2)}`}
+                            {displayFree ? "免费" : `¥${displayPrice}`}
                         </span>
+                        {inStock && hasDiscount && d?.discountPercent != null && (
+                            <span className="mt-0.5 text-[11px] text-muted-foreground">
+                                已享 {d.discountPercent}% 优惠
+                            </span>
+                        )}
                         {!inStock && (
                             <span className="mt-0.5 text-[11px] text-muted-foreground">
                                 已售罄，可订阅补货提醒
@@ -82,7 +97,7 @@ export function ProductBottomBar({
                 <Button
                     type="button"
                     size="lg"
-                    className="min-w-28 gap-2"
+                    className="min-h-11 min-w-28 gap-2 touch-manipulation"
                     onClick={handleClick}
                     disabled={(!inStock && !restockSectionId) || isSubmitting}
                 >

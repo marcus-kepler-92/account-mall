@@ -323,7 +323,12 @@ export function ProductCatalog() {
                 <h2 className="sr-only">商品列表</h2>
                 <div className="grid grid-cols-1 items-stretch gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 min-[1600px]:grid-cols-6">
                     {products.map((product, idx) => (
-                        <ProductCard key={product.id} product={product} gradientIndex={idx} code={codeParam || undefined} />
+                        <ProductCard
+                            key={product.id}
+                            product={product}
+                            gradientIndex={idx}
+                            code={codeParam || undefined}
+                        />
                     ))}
                 </div>
                 </>

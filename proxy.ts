@@ -121,31 +121,9 @@ function getSessionCookie(request: NextRequest) {
     );
 }
 
-const PROMO_COOKIE_NAME = "distributor_promo_code";
-const PROMO_COOKIE_MAX_AGE_DAYS = 30;
-
 export async function proxy(request: NextRequest) {
     const { pathname } = request.nextUrl;
     const method = request.method;
-
-    // 0. Storefront: set promoCode cookie when URL has ?promoCode= (for distributor attribution)
-    if (method === "GET") {
-        const isStorefront =
-            pathname === "/" ||
-            (pathname.startsWith("/products") && !pathname.startsWith("/products/"));
-        const promoCode = request.nextUrl.searchParams.get("promoCode")?.trim();
-        if (isStorefront && promoCode && promoCode.length <= 64) {
-            const res = NextResponse.next();
-            res.cookies.set(PROMO_COOKIE_NAME, promoCode, {
-                path: "/",
-                maxAge: PROMO_COOKIE_MAX_AGE_DAYS * 24 * 60 * 60,
-                sameSite: "lax",
-                httpOnly: true,
-                secure: request.nextUrl.protocol === "https:",
-            });
-            return res;
-        }
-    }
 
     // 1. Admin login page: redirect to dashboard if already authenticated
     if (pathname === "/admin/login") {
@@ -175,7 +153,7 @@ export async function proxy(request: NextRequest) {
         return NextResponse.next();
     }
 
-    // 2. Allow all public pages
+    // 2. Allow public pages
     if (isPublicPage(pathname)) {
         return NextResponse.next();
     }
