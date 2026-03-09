@@ -53,7 +53,7 @@ export default function DistributorLoginPage() {
     }
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-background p-4 sm:p-6 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
+        <div className="flex min-h-dvh items-center justify-center bg-background p-4 sm:p-6 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
             <Card className="w-full max-w-md">
                 <CardHeader className="text-center">
                     <CardTitle className="text-2xl font-bold">
@@ -70,10 +70,13 @@ export default function DistributorLoginPage() {
                             <Input
                                 id="email"
                                 type="email"
+                                inputMode="email"
+                                autoComplete="email"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 required
                                 placeholder="your@email.com"
+                                className="min-h-11"
                             />
                         </div>
 
@@ -83,11 +86,12 @@ export default function DistributorLoginPage() {
                                 <Input
                                     id="password"
                                     type={showPassword ? "text" : "password"}
+                                    autoComplete="current-password"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     required
                                     placeholder="••••••••"
-                                    className="pr-10"
+                                    className="min-h-11 pr-10"
                                 />
                                 <Button
                                     type="button"
@@ -110,7 +114,7 @@ export default function DistributorLoginPage() {
                         <Button
                             type="submit"
                             disabled={loading}
-                            className="w-full"
+                            className="w-full min-h-11"
                         >
                             {loading ? "登录中..." : "登录"}
                         </Button>
