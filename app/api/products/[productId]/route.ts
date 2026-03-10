@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getAdminSession } from "@/lib/auth-guard";
 import { updateProductSchema } from "@/lib/validations/product";
 import { config } from "@/lib/config";
-import { notFound, unauthorized, invalidJsonBody, validationError, conflict } from "@/lib/api-response";
+import { notFound, unauthorized, invalidJsonBody, validationError, conflict, badRequest } from "@/lib/api-response";
 
 type RouteContext = {
     params: Promise<{ productId: string }>;
@@ -132,10 +132,12 @@ export async function PUT(
 
 /**
  * DELETE /api/products/[productId]
- * Admin only: soft-delete product (set INACTIVE)
+ * Admin only.
+ * - No query: soft-delete (set INACTIVE).
+ * - ?permanent=true: hard-delete (only if INACTIVE and no orders).
  */
 export async function DELETE(
-    _request: NextRequest,
+    request: NextRequest,
     context: RouteContext
 ) {
     const session = await getAdminSession();
@@ -144,12 +146,38 @@ export async function DELETE(
     }
 
     const { productId } = await context.params;
+    const { searchParams } = new URL(request.url);
+    const permanent = searchParams.get("permanent") === "true";
 
     const existing = await prisma.product.findUnique({
         where: { id: productId },
     });
     if (!existing) {
         return notFound("Product not found");
+    }
+
+    if (permanent) {
+        if (existing.status !== "INACTIVE") {
+            return badRequest("只能删除已下架的商品");
+        }
+        const orderCount = await prisma.order.count({
+            where: { productId },
+        });
+        if (orderCount > 0) {
+            return badRequest("该商品存在关联订单，无法删除");
+        }
+
+        await prisma.$transaction(async (tx) => {
+            await tx.card.deleteMany({ where: { productId } });
+            await tx.restockSubscription.deleteMany({ where: { productId } });
+            await tx.product.update({
+                where: { id: productId },
+                data: { tags: { set: [] } },
+            });
+            await tx.product.delete({ where: { id: productId } });
+        });
+
+        return NextResponse.json({ message: "Product deleted" });
     }
 
     await prisma.product.update({

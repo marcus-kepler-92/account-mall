@@ -21,6 +21,7 @@ import {
     ExternalLink,
     Pin,
     PinOff,
+    Trash2,
 } from "lucide-react"
 import {
     Dialog,
@@ -53,6 +54,8 @@ export function ProductRowActions({
     const [open, setOpen] = useState(false)
     const [loading, setLoading] = useState(false)
     const [pinLoading, setPinLoading] = useState(false)
+    const [deleteOpen, setDeleteOpen] = useState(false)
+    const [deleteLoading, setDeleteLoading] = useState(false)
     const isActive = status === "ACTIVE"
     const isPinned = !!pinnedAt
 
@@ -102,6 +105,29 @@ export function ProductRowActions({
             toast.error("操作失败")
         } finally {
             setPinLoading(false)
+        }
+    }
+
+    const handleDelete = async () => {
+        setDeleteLoading(true)
+        try {
+            const res = await fetch(`/api/products/${productId}?permanent=true`, {
+                method: "DELETE",
+            })
+            if (res.ok) {
+                setDeleteOpen(false)
+                toast.success("商品已删除")
+                router.refresh()
+            } else if (res.status === 400) {
+                const data = await res.json().catch(() => ({}))
+                toast.error(data?.error ?? "该商品存在关联订单，无法删除")
+            } else {
+                toast.error("操作失败")
+            }
+        } catch {
+            toast.error("操作失败")
+        } finally {
+            setDeleteLoading(false)
         }
     }
 
@@ -195,6 +221,41 @@ export function ProductRowActions({
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
+                {!isActive && (
+                    <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+                        <DropdownMenuItem
+                            onSelect={(e) => {
+                                e.preventDefault()
+                                setDeleteOpen(true)
+                            }}
+                            className="text-destructive"
+                        >
+                            <Trash2 className="size-4" />
+                            删除
+                        </DropdownMenuItem>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>永久删除商品</DialogTitle>
+                                <DialogDescription>
+                                    此操作不可恢复，商品及其所有卡密将被永久删除。
+                                </DialogDescription>
+                            </DialogHeader>
+                            <DialogFooter>
+                                <Button variant="outline" onClick={() => setDeleteOpen(false)}>
+                                    取消
+                                </Button>
+                                <Button
+                                    variant="destructive"
+                                    onClick={handleDelete}
+                                    disabled={deleteLoading}
+                                >
+                                    {deleteLoading && <Loader2 className="size-4 animate-spin" />}
+                                    删除
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+                )}
             </DropdownMenuContent>
         </DropdownMenu>
     )
