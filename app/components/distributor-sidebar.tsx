@@ -9,6 +9,7 @@ import {
     Wallet,
     LogOut,
     Store,
+    BookOpen,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { authClient } from "@/lib/auth-client"
@@ -31,6 +32,7 @@ import { useSiteName } from "@/app/components/site-name-provider"
 
 const navItems = [
     { title: "仪表盘", href: "/distributor", icon: LayoutDashboard },
+    { title: "入门手册", href: "/distributor/guide", icon: BookOpen },
     { title: "我的订单", href: "/distributor/orders", icon: ShoppingCart },
     { title: "我的佣金", href: "/distributor/commissions", icon: Coins },
     { title: "提现记录", href: "/distributor/withdrawals", icon: Wallet },

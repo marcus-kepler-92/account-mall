@@ -124,12 +124,13 @@ model Product {
 }
 
 model Tag {
-  id        String    @id @default(cuid())
-  name      String    @unique
-  slug      String    @unique
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id        String             @id @default(cuid())
+  name      String             @unique
+  slug      String             @unique
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
   products  Product[]
+  guides    DistributorGuide[]
 }
 
 model Card {
@@ -260,6 +261,21 @@ model Announcement {
   updatedAt   DateTime           @updatedAt
 
   @@index([status])
+  @@index([status, sortOrder])
+}
+
+model DistributorGuide {
+  id          String             @id @default(cuid())
+  title       String
+  content     String?            @db.Text // Markdown 正文
+  tagId       String?
+  sortOrder   Int                @default(0)
+  status      AnnouncementStatus @default(DRAFT)
+  publishedAt DateTime?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime          @updatedAt
+  tag         Tag?               @relation(fields: [tagId], references: [id])
+
   @@index([status, sortOrder])
 }
 

@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/breadcrumb"
 
 const routeLabels: Record<string, string> = {
+    guide: "入门手册",
     orders: "我的订单",
     commissions: "我的佣金",
     withdrawals: "提现记录",

@@ -18,6 +18,7 @@ const routeLabels: Record<string, string> = {
     orders: "订单管理",
     cards: "卡密管理",
     announcements: "公告管理",
+    guides: "分销指南",
     distributors: "分销商",
     "commission-tiers": "佣金档位",
     withdrawals: "提现",
@@ -57,6 +58,14 @@ function getBreadcrumbItems(pathname: string) {
                 label = "新建公告"
             } else if (isIdSegment(seg)) {
                 label = "公告详情"
+            } else {
+                label = routeLabels[seg] ?? seg
+            }
+        } else if (prev === "guides") {
+            if (seg === "new") {
+                label = "新建指南"
+            } else if (isIdSegment(seg)) {
+                label = "编辑指南"
             } else {
                 label = routeLabels[seg] ?? seg
             }

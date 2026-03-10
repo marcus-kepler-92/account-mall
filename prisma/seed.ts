@@ -140,6 +140,54 @@ async function seed() {
             } else {
                 console.log('  ✅ E2E product and cards already present.')
             }
+
+            const e2eDistributorEmail = 'e2e-distributor@example.com'
+            const e2eDistributorPassword = 'e2e-distributor-password'
+            let distUser = await prisma.user.findUnique({
+                where: { email: e2eDistributorEmail },
+            })
+            if (!distUser) {
+                const now = new Date()
+                const distPasswordHash = await hashPassword(e2eDistributorPassword)
+                distUser = await prisma.user.create({
+                    data: {
+                        email: e2eDistributorEmail,
+                        name: 'E2E Distributor',
+                        emailVerified: true,
+                        role: 'DISTRIBUTOR',
+                        distributorCode: 'E2EDIST',
+                        createdAt: now,
+                        updatedAt: now,
+                    },
+                })
+                await prisma.account.create({
+                    data: {
+                        userId: distUser.id,
+                        accountId: distUser.id,
+                        providerId: 'credential',
+                        password: distPasswordHash,
+                        createdAt: now,
+                        updatedAt: now,
+                    },
+                })
+                console.log('  ✅ E2E distributor created (e2e-distributor@example.com).')
+            }
+
+            const guideCount = await prisma.distributorGuide.count({
+                where: { status: 'PUBLISHED' },
+            })
+            if (guideCount === 0) {
+                await prisma.distributorGuide.create({
+                    data: {
+                        title: 'E2E 入门指南',
+                        content: '## 示例\n\n```\n可复制的话术内容\n```',
+                        status: 'PUBLISHED',
+                        publishedAt: new Date(),
+                        sortOrder: 0,
+                    },
+                })
+                console.log('  ✅ E2E distributor guide created.')
+            }
         } catch (e2eError) {
             console.error('  ❌ E2E seed failed:', e2eError)
             process.exit(1)

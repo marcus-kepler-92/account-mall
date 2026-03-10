@@ -13,6 +13,7 @@ import {
     Users,
     Layers,
     Wallet,
+    BookOpen,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { authClient } from "@/lib/auth-client"
@@ -59,6 +60,11 @@ const navItems = [
         title: "公告管理",
         href: "/admin/announcements",
         icon: Megaphone,
+    },
+    {
+        title: "分销指南",
+        href: "/admin/guides",
+        icon: BookOpen,
     },
     {
         title: "分销员管理",
