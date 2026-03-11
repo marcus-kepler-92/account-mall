@@ -106,28 +106,64 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
     const descriptionPlain = product.description
         ? descriptionToPlainText(product.description, 160)
         : `${product.name} - ¥${priceNumber.toFixed(2)}`
+
+    const imageRaw = productWithImage.image
+    const imageAbsolute =
+        imageRaw && (imageRaw.startsWith("http://") || imageRaw.startsWith("https://"))
+            ? imageRaw
+            : imageRaw && imageRaw.startsWith("/")
+              ? config.siteUrl + imageRaw
+              : imageRaw || undefined
+
+    const offers: Record<string, unknown> = {
+        "@type": "Offer",
+        price: priceNumber,
+        priceCurrency: "CNY",
+        availability: isSoldOut
+            ? "https://schema.org/OutOfStock"
+            : "https://schema.org/InStock",
+        url: productUrl,
+    }
+
+    offers.shippingDetails = {
+        "@type": "OfferShippingDetails",
+        shippingDestination: {
+            "@type": "Country",
+            addressCountry: config.schemaShippingCountry,
+        },
+        shippingRate: {
+            "@type": "MonetaryAmount",
+            value: config.schemaShippingValue,
+            currency: "CNY",
+        },
+    }
+
+    offers.hasMerchantReturnPolicy = {
+        "@type": "MerchantReturnPolicy",
+        applicableCountry: config.schemaShippingCountry,
+        returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
+        merchantReturnDays: config.schemaReturnDays,
+        returnFees: `https://schema.org/${config.schemaReturnFees}`,
+    }
+
     const jsonLd = {
         "@context": "https://schema.org",
         "@type": "Product",
         name: product.name,
         description: descriptionPlain,
         url: productUrl,
-        ...(productWithImage.image && { image: productWithImage.image }),
-        offers: {
-            "@type": "Offer",
-            price: priceNumber,
-            priceCurrency: "CNY",
-            availability: isSoldOut
-                ? "https://schema.org/OutOfStock"
-                : "https://schema.org/InStock",
-        },
+        ...(imageAbsolute && { image: imageAbsolute }),
+        brand: { "@type": "Brand", name: config.schemaBrandName },
+        offers,
     }
+
+    const jsonLdSafe = JSON.stringify(jsonLd).replace(/</g, "\\u003c")
 
     return (
         <div className="min-h-screen flex flex-col">
             <script
                 type="application/ld+json"
-                dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+                dangerouslySetInnerHTML={{ __html: jsonLdSafe }}
             />
             <SiteHeader />
 

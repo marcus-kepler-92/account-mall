@@ -60,6 +60,16 @@ const envSchema = z
         promoCodeMaxLength: z.coerce.number().int().min(1).max(256).default(64),
         /** 推荐码/优惠码：前端防抖校验延迟（毫秒），输入停止后多久发起校验 */
         promoValidateDebounceMs: z.coerce.number().int().min(0).default(400),
+        /** Product JSON-LD：品牌名，用于 schema.org Brand */
+        schemaBrandName: z.string().min(1).default("Apple"),
+        /** Product JSON-LD：配送与退货政策适用国家 ISO 代码。面向中国用户填 CN；若主要客户在美国（如海外华人）填 US。与访问者 IP 无关。 */
+        schemaShippingCountry: z.string().min(1).default("CN"),
+        /** Product JSON-LD：运费金额，0 表示包邮 */
+        schemaShippingValue: z.coerce.number().min(0).default(0),
+        /** Product JSON-LD：退货天数 */
+        schemaReturnDays: z.coerce.number().int().min(0).default(7),
+        /** Product JSON-LD：退货是否免费，FreeReturn 或 ReturnShippingFees */
+        schemaReturnFees: z.enum(["FreeReturn", "ReturnShippingFees"]).default("FreeReturn"),
     })
     .transform((data) => {
         const urlFromEnv = data.databaseUrl?.trim()
@@ -163,6 +173,11 @@ function getEnvInput() {
         freeSharedMaxQuantityPerOrder: e.FREE_SHARED_MAX_QUANTITY_PER_ORDER,
         promoCodeMaxLength: e.PROMO_CODE_MAX_LENGTH,
         promoValidateDebounceMs: e.PROMO_VALIDATE_DEBOUNCE_MS,
+        schemaBrandName: e.SCHEMA_BRAND_NAME,
+        schemaShippingCountry: e.SCHEMA_SHIPPING_COUNTRY,
+        schemaShippingValue: e.SCHEMA_SHIPPING_VALUE,
+        schemaReturnDays: e.SCHEMA_RETURN_DAYS,
+        schemaReturnFees: e.SCHEMA_RETURN_FEES,
     }
 }
 
