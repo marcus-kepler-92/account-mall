@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Zap, Search } from "lucide-react"
+import { Zap, Search, LayoutDashboard } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/app/components/theme-toggle"
 import { MyOrderHistory } from "@/app/components/my-order-history"
@@ -29,11 +29,12 @@ export function SiteHeader() {
                     <Button variant="ghost" size="sm" className="size-9 min-w-9 shrink-0 p-0 sm:size-auto sm:px-3 touch-manipulation" asChild>
                         <Link
                             href="/distributor"
-                            title="仪表盘"
-                            aria-label="仪表盘"
+                            title="分销中心"
+                            aria-label="分销中心"
                             className="gap-1.5 sm:gap-2"
                         >
-                            <span className="hidden sm:inline">仪表盘</span>
+                            <LayoutDashboard className="size-4 shrink-0" aria-hidden />
+                            <span className="hidden sm:inline">分销中心</span>
                         </Link>
                     </Button>
                     <Button variant="ghost" size="sm" className="size-9 min-w-9 shrink-0 p-0 sm:size-auto sm:px-3 touch-manipulation" asChild>

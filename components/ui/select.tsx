@@ -6,10 +6,30 @@ import { Select as SelectPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 
+/** Sentinel used internally so SelectItem never passes value="" to Radix (empty string is reserved for clearing selection). */
+const EMPTY_VALUE_SENTINEL = "__EMPTY__"
+
 function Select({
+  value,
+  onValueChange,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Root>) {
-  return <SelectPrimitive.Root data-slot="select" {...props} />
+  const normalizedValue =
+    value === "" ? EMPTY_VALUE_SENTINEL : value
+  const handleValueChange = React.useCallback(
+    (v: string) => {
+      onValueChange?.(v === EMPTY_VALUE_SENTINEL ? "" : v)
+    },
+    [onValueChange]
+  )
+  return (
+    <SelectPrimitive.Root
+      data-slot="select"
+      value={normalizedValue}
+      onValueChange={handleValueChange}
+      {...props}
+    />
+  )
 }
 
 function SelectGroup({
@@ -103,11 +123,15 @@ function SelectLabel({
 function SelectItem({
   className,
   children,
+  value,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Item>) {
+  // Radix reserves value="" for clearing selection / placeholder; use sentinel so items never pass "".
+  const itemValue = value === "" ? EMPTY_VALUE_SENTINEL : value
   return (
     <SelectPrimitive.Item
       data-slot="select-item"
+      value={itemValue}
       className={cn(
         "focus:bg-accent focus:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex w-full cursor-default items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 *:[span]:last:flex *:[span]:last:items-center *:[span]:last:gap-2",
         className
