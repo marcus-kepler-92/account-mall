@@ -70,6 +70,14 @@ const envSchema = z
         schemaReturnDays: z.coerce.number().int().min(0).default(7),
         /** Product JSON-LD：退货是否免费，FreeReturn 或 ReturnShippingFees */
         schemaReturnFees: z.enum(["FreeReturn", "ReturnShippingFees"]).default("FreeReturn"),
+        /** Product JSON-LD：价格有效天数（相对当前日期），用于 Offer.priceValidUntil */
+        schemaPriceValidUntilDays: z.coerce.number().int().min(1).default(365),
+        /** Product JSON-LD：发货处理天数上限（handlingTime.maxValue），单位天 */
+        schemaDeliveryHandlingDays: z.coerce.number().int().min(0).default(1),
+        /** Product JSON-LD：在途天数上限（transitTime.maxValue），单位天 */
+        schemaDeliveryTransitDays: z.coerce.number().int().min(0).default(0),
+        /** Product JSON-LD：退货方式，空则不输出 returnMethod；可选 ReturnByMail、ReturnInStore 等 */
+        schemaReturnMethod: z.string().default(""),
     })
     .transform((data) => {
         const urlFromEnv = data.databaseUrl?.trim()
@@ -178,6 +186,10 @@ function getEnvInput() {
         schemaShippingValue: e.SCHEMA_SHIPPING_VALUE,
         schemaReturnDays: e.SCHEMA_RETURN_DAYS,
         schemaReturnFees: e.SCHEMA_RETURN_FEES,
+        schemaPriceValidUntilDays: e.SCHEMA_PRICE_VALID_UNTIL_DAYS,
+        schemaDeliveryHandlingDays: e.SCHEMA_DELIVERY_HANDLING_DAYS,
+        schemaDeliveryTransitDays: e.SCHEMA_DELIVERY_TRANSIT_DAYS,
+        schemaReturnMethod: e.SCHEMA_RETURN_METHOD,
     }
 }
 

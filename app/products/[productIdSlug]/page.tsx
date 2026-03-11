@@ -115,6 +115,10 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
               ? config.siteUrl + imageRaw
               : imageRaw || undefined
 
+    const priceValidUntil = new Date()
+    priceValidUntil.setDate(priceValidUntil.getDate() + config.schemaPriceValidUntilDays)
+    const priceValidUntilStr = priceValidUntil.toISOString().slice(0, 10)
+
     const offers: Record<string, unknown> = {
         "@type": "Offer",
         price: priceNumber,
@@ -123,6 +127,8 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
             ? "https://schema.org/OutOfStock"
             : "https://schema.org/InStock",
         url: productUrl,
+        priceValidUntil: priceValidUntilStr,
+        itemCondition: "https://schema.org/NewCondition",
     }
 
     offers.shippingDetails = {
@@ -136,15 +142,34 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
             value: config.schemaShippingValue,
             currency: "CNY",
         },
+        deliveryTime: {
+            "@type": "ShippingDeliveryTime",
+            handlingTime: {
+                "@type": "QuantitativeValue",
+                minValue: 0,
+                maxValue: config.schemaDeliveryHandlingDays,
+                unitCode: "DAY",
+            },
+            transitTime: {
+                "@type": "QuantitativeValue",
+                minValue: 0,
+                maxValue: config.schemaDeliveryTransitDays,
+                unitCode: "DAY",
+            },
+        },
     }
 
-    offers.hasMerchantReturnPolicy = {
+    const merchantReturnPolicy: Record<string, unknown> = {
         "@type": "MerchantReturnPolicy",
         applicableCountry: config.schemaShippingCountry,
         returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
         merchantReturnDays: config.schemaReturnDays,
         returnFees: `https://schema.org/${config.schemaReturnFees}`,
     }
+    if (config.schemaReturnMethod.trim()) {
+        merchantReturnPolicy.returnMethod = `https://schema.org/${config.schemaReturnMethod.trim()}`
+    }
+    offers.hasMerchantReturnPolicy = merchantReturnPolicy
 
     const jsonLd = {
         "@context": "https://schema.org",
@@ -152,6 +177,7 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
         name: product.name,
         description: descriptionPlain,
         url: productUrl,
+        sku: product.id,
         ...(imageAbsolute && { image: imageAbsolute }),
         brand: { "@type": "Brand", name: config.schemaBrandName },
         offers,
