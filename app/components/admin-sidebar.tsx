@@ -14,6 +14,7 @@ import {
     Layers,
     Wallet,
     BookOpen,
+    FolderOpen,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { authClient } from "@/lib/auth-client"
@@ -80,6 +81,11 @@ const navItems = [
         title: "提现管理",
         href: "/admin/withdrawals",
         icon: Wallet,
+    },
+    {
+        title: "文件管理",
+        href: "/admin/files",
+        icon: FolderOpen,
     },
 ]
 

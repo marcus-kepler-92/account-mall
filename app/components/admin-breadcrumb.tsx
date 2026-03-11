@@ -22,6 +22,7 @@ const routeLabels: Record<string, string> = {
     distributors: "分销商",
     "commission-tiers": "佣金档位",
     withdrawals: "提现",
+    files: "文件管理",
 }
 
 function isIdSegment(seg: string) {

@@ -6,7 +6,7 @@ import { uploadBinary, DEFAULT_MAX_BYTES } from "@/lib/upload"
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"] as const
 const PRODUCT_IMAGE_MAX_BYTES = 2 * 1024 * 1024 // 2MB，与表单提示一致
 
-const PATH_PREFIX_WHITELIST = ["products", "guides", "announcements"] as const
+const PATH_PREFIX_WHITELIST = ["products", "guides", "announcements", "receipts"] as const
 type PathPrefix = (typeof PATH_PREFIX_WHITELIST)[number]
 
 function getPathPrefix(formData: FormData, searchParams: URLSearchParams): PathPrefix {
