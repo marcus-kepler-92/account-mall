@@ -173,20 +173,29 @@ async function seed() {
                 console.log('  ✅ E2E distributor created (e2e-distributor@example.com).')
             }
 
-            const guideCount = await prisma.distributorGuide.count({
-                where: { status: 'PUBLISHED' },
-            })
-            if (guideCount === 0) {
-                await prisma.distributorGuide.create({
-                    data: {
-                        title: 'E2E 入门指南',
-                        content: '## 示例\n\n```\n可复制的话术内容\n```',
-                        status: 'PUBLISHED',
-                        publishedAt: new Date(),
-                        sortOrder: 0,
-                    },
+            try {
+                const guideCount = await prisma.distributorGuide.count({
+                    where: { status: 'PUBLISHED' },
                 })
-                console.log('  ✅ E2E distributor guide created.')
+                if (guideCount === 0) {
+                    await prisma.distributorGuide.create({
+                        data: {
+                            title: 'E2E 入门指南',
+                            content: '## 示例\n\n```\n可复制的话术内容\n```',
+                            status: 'PUBLISHED',
+                            publishedAt: new Date(),
+                            sortOrder: 0,
+                        },
+                    })
+                    console.log('  ✅ E2E distributor guide created.')
+                }
+            } catch (guideErr) {
+                const err = guideErr as { code?: string }
+                if (err?.code === 'P2021') {
+                    console.log('  ⏭️  DistributorGuide table missing; run prisma migrate deploy first. Skipping E2E guide.')
+                } else {
+                    throw guideErr
+                }
             }
         } catch (e2eError) {
             console.error('  ❌ E2E seed failed:', e2eError)

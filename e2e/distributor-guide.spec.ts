@@ -3,18 +3,17 @@ import { test, expect } from "@playwright/test"
 test.describe("Distributor guide (入门手册)", () => {
     test("unauthenticated access redirects to distributor login", async ({ page }) => {
         await page.goto("/distributor/guide")
-        await expect(page).toHaveURL(/\/distributor\/login/)
-        await expect(
-            page.getByRole("heading", { name: /分销中心登录|登录/i })
-        ).toBeVisible({ timeout: 10_000 })
+        await expect(page).toHaveURL(/\/distributor\/login/, { timeout: 10_000 })
+        await expect(page.getByText("分销中心登录")).toBeVisible({ timeout: 10_000 })
     })
 
-    test("guide page shows 入门手册 when visited after login", async ({ page }) => {
+    test("guide page shows 入门手册 when visited after login", async ({ page, context }) => {
+        await context.grantPermissions(["clipboard-write"])
         await page.goto("/distributor/login")
-        await expect(page.getByRole("main")).toBeVisible({ timeout: 10_000 })
+        await expect(page.getByText("分销中心登录")).toBeVisible({ timeout: 10_000 })
 
-        const emailInput = page.getByLabel(/邮箱/i).or(page.getByRole("textbox", { name: /email|邮箱/i }))
-        const passwordInput = page.getByLabel(/密码/i).or(page.locator("#password"))
+        const emailInput = page.locator("#email")
+        const passwordInput = page.locator("#password")
 
         if (!(await emailInput.isVisible())) {
             test.skip()
@@ -41,7 +40,9 @@ test.describe("Distributor guide (入门手册)", () => {
         const copyBtn = page.getByRole("button", { name: /复制/ }).first()
         if (await copyBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
             await copyBtn.click()
-            await expect(page.getByText("已复制")).toBeVisible({ timeout: 5000 })
+            await expect(
+                page.getByRole("region", { name: /Notifications/i }).getByText("已复制")
+            ).toBeVisible({ timeout: 5000 })
         }
     })
 })
