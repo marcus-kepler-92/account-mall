@@ -195,6 +195,7 @@ export function GuideForm({ guide, tags }: GuideFormProps) {
                                                 onChange={field.onChange}
                                                 placeholder="输入指南内容，支持 Markdown。将需要分销员复制的话术、描述等放在代码块（```）中，分销员端会自动显示复制按钮。"
                                                 height={460}
+                                                imageUpload={{ pathPrefix: "guides" }}
                                             />
                                         </FormControl>
                                         <FormDescription>支持 Markdown 语法；代码块内容可被分销员一键复制</FormDescription>

@@ -6,6 +6,16 @@ import { uploadBinary, DEFAULT_MAX_BYTES } from "@/lib/upload"
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"] as const
 const PRODUCT_IMAGE_MAX_BYTES = 2 * 1024 * 1024 // 2MB，与表单提示一致
 
+const PATH_PREFIX_WHITELIST = ["products", "guides", "announcements"] as const
+type PathPrefix = (typeof PATH_PREFIX_WHITELIST)[number]
+
+function getPathPrefix(formData: FormData, searchParams: URLSearchParams): PathPrefix {
+    const fromForm = formData.get("pathPrefix")
+    const fromQuery = searchParams.get("pathPrefix")
+    const raw = (typeof fromForm === "string" ? fromForm : fromQuery) ?? "products"
+    return PATH_PREFIX_WHITELIST.includes(raw as PathPrefix) ? (raw as PathPrefix) : "products"
+}
+
 export async function POST(request: NextRequest) {
     const session = await getAdminSession()
     if (!session) return unauthorized()
@@ -37,10 +47,11 @@ export async function POST(request: NextRequest) {
         )
     }
 
+    const pathPrefix = getPathPrefix(formData, request.nextUrl.searchParams)
     const buffer = Buffer.from(await file.arrayBuffer())
     const url = await uploadBinary(buffer, {
         mimeType: file.type,
-        pathPrefix: "products",
+        pathPrefix,
         cacheControlMaxAge: 365 * 24 * 60 * 60,
     })
 
