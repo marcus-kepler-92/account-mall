@@ -9,6 +9,10 @@ jest.mock("@/lib/order-completion-email", () => ({
     sendOrderCompletionEmail: jest.fn().mockResolvedValue(undefined),
 }))
 
+jest.mock("@/lib/config", () => ({
+    getConfig: jest.fn(() => ({ invitationRewardAmount: 5 })),
+}))
+
 import { sendOrderCompletionEmail } from "@/lib/order-completion-email"
 import { prismaMock } from "../../__mocks__/prisma"
 
@@ -36,6 +40,9 @@ describe("completePendingOrder", () => {
         prismaMock.order.findMany.mockReset()
         prismaMock.commissionTier.findMany.mockReset()
         prismaMock.commission.create.mockReset()
+        prismaMock.order.count?.mockReset()
+        prismaMock.invitationReward?.findUnique?.mockReset()
+        prismaMock.invitationReward?.create?.mockReset()
     })
 
     it("returns { done: false, error: 'Order not found' } when order does not exist", async () => {
@@ -339,6 +346,126 @@ describe("completePendingOrder", () => {
             const call = (prismaMock.commission.create as jest.Mock).mock.calls[0][0]
             expect(call.data.amount).toBeGreaterThanOrEqual(0)
             expect(Number.isNaN(call.data.amount)).toBe(false)
+        })
+    })
+
+    describe("invitation reward (invitee first order)", () => {
+        it("creates InvitationReward when distributor has inviterId and this is their first COMPLETED order", async () => {
+            prismaMock.user.findUnique
+                .mockResolvedValueOnce({ email: "other@example.com" })
+                .mockResolvedValueOnce({ inviterId: "inviter_1" })
+            prismaMock.order.findFirst.mockResolvedValue(
+                makePendingOrder({
+                    distributorId: "invitee_1",
+                    amount: 100,
+                    product: { name: "Test" },
+                })
+            )
+            prismaMock.order.updateMany.mockResolvedValue({ count: 1 })
+            prismaMock.order.findMany.mockResolvedValue([{ amount: 100 }])
+            prismaMock.commissionTier.findMany.mockResolvedValue([
+                { minAmount: 0, maxAmount: 10000, ratePercent: 10, sortOrder: 0 },
+            ])
+            prismaMock.commission.create.mockResolvedValue({})
+            prismaMock.order.count.mockResolvedValue(1)
+            prismaMock.invitationReward.findUnique.mockResolvedValue(null)
+            prismaMock.invitationReward.create.mockResolvedValue({})
+            prismaMock.$transaction.mockImplementation(async (fn: (tx: any) => Promise<void>) => {
+                await fn(prismaMock)
+            })
+
+            await completePendingOrder("order-1")
+
+            expect(prismaMock.invitationReward.create).toHaveBeenCalledTimes(1)
+            expect(prismaMock.invitationReward.create).toHaveBeenCalledWith({
+                data: {
+                    inviterId: "inviter_1",
+                    inviteeId: "invitee_1",
+                    orderId: "ord_1",
+                    amount: 5,
+                    status: "SETTLED",
+                },
+            })
+        })
+
+        it("does not create InvitationReward when completedCount > 1 (not first order)", async () => {
+            prismaMock.user.findUnique.mockResolvedValue({ email: "other@example.com" })
+            prismaMock.order.findFirst.mockResolvedValue(
+                makePendingOrder({
+                    distributorId: "invitee_1",
+                    amount: 100,
+                    product: { name: "Test" },
+                })
+            )
+            prismaMock.order.updateMany.mockResolvedValue({ count: 1 })
+            prismaMock.order.findMany.mockResolvedValue([{ amount: 100 }, { amount: 50 }])
+            prismaMock.commissionTier.findMany.mockResolvedValue([
+                { minAmount: 0, maxAmount: 10000, ratePercent: 10, sortOrder: 0 },
+            ])
+            prismaMock.commission.create.mockResolvedValue({})
+            prismaMock.order.count.mockResolvedValue(2)
+            prismaMock.$transaction.mockImplementation(async (fn: (tx: any) => Promise<void>) => {
+                await fn(prismaMock)
+            })
+
+            await completePendingOrder("order-1")
+
+            expect(prismaMock.invitationReward.create).not.toHaveBeenCalled()
+        })
+
+        it("does not create InvitationReward when distributor has no inviterId", async () => {
+            prismaMock.user.findUnique
+                .mockResolvedValueOnce({ email: "other@example.com" })
+                .mockResolvedValueOnce({ inviterId: null })
+            prismaMock.order.findFirst.mockResolvedValue(
+                makePendingOrder({
+                    distributorId: "invitee_1",
+                    amount: 100,
+                    product: { name: "Test" },
+                })
+            )
+            prismaMock.order.updateMany.mockResolvedValue({ count: 1 })
+            prismaMock.order.findMany.mockResolvedValue([{ amount: 100 }])
+            prismaMock.commissionTier.findMany.mockResolvedValue([
+                { minAmount: 0, maxAmount: 10000, ratePercent: 10, sortOrder: 0 },
+            ])
+            prismaMock.commission.create.mockResolvedValue({})
+            prismaMock.order.count.mockResolvedValue(1)
+            prismaMock.$transaction.mockImplementation(async (fn: (tx: any) => Promise<void>) => {
+                await fn(prismaMock)
+            })
+
+            await completePendingOrder("order-1")
+
+            expect(prismaMock.invitationReward.create).not.toHaveBeenCalled()
+        })
+
+        it("does not create InvitationReward when one already exists for this invitee", async () => {
+            prismaMock.user.findUnique
+                .mockResolvedValueOnce({ email: "other@example.com" })
+                .mockResolvedValueOnce({ inviterId: "inviter_1" })
+            prismaMock.order.findFirst.mockResolvedValue(
+                makePendingOrder({
+                    distributorId: "invitee_1",
+                    amount: 100,
+                    product: { name: "Test" },
+                })
+            )
+            prismaMock.order.updateMany.mockResolvedValue({ count: 1 })
+            prismaMock.order.findMany.mockResolvedValue([{ amount: 100 }])
+            prismaMock.commissionTier.findMany.mockResolvedValue([
+                { minAmount: 0, maxAmount: 10000, ratePercent: 10, sortOrder: 0 },
+            ])
+            prismaMock.commission.create.mockResolvedValue({})
+            prismaMock.order.count.mockResolvedValue(1)
+            prismaMock.invitationReward.findUnique.mockResolvedValue({ id: "existing_1" } as any)
+            prismaMock.$transaction.mockImplementation(async (fn: (tx: any) => Promise<void>) => {
+                await fn(prismaMock)
+            })
+
+            await completePendingOrder("order-1")
+
+            expect(prismaMock.invitationReward.create).not.toHaveBeenCalled()
         })
     })
 })

@@ -12,6 +12,7 @@ export const auth = betterAuth({
         additionalFields: {
             role: { type: "string", required: false },
             distributorCode: { type: "string", required: false },
+            inviterId: { type: "string", required: false },
         },
     },
     emailAndPassword: {

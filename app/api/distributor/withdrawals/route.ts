@@ -103,9 +103,13 @@ export async function POST(request: NextRequest) {
     let withdrawal: { id: string; amount: { toNumber?: () => number }; status: string; receiptImageUrl: string | null; createdAt: Date }
     try {
         withdrawal = await prisma.$transaction(async (tx) => {
-            const [settledSum, paidSum, pendingSum] = await Promise.all([
+            const [settledSum, invitationRewardSum, paidSum, pendingSum] = await Promise.all([
                 tx.commission.aggregate({
                     where: { distributorId: user.id, status: "SETTLED" },
+                    _sum: { amount: true },
+                }),
+                tx.invitationReward.aggregate({
+                    where: { inviterId: user.id, status: "SETTLED" },
                     _sum: { amount: true },
                 }),
                 tx.withdrawal.aggregate({
@@ -118,7 +122,8 @@ export async function POST(request: NextRequest) {
                 }),
             ])
             const withdrawableBalance =
-                Number(settledSum._sum.amount ?? 0) -
+                Number(settledSum._sum.amount ?? 0) +
+                Number(invitationRewardSum?._sum?.amount ?? 0) -
                 Number(paidSum._sum.amount ?? 0) -
                 Number(pendingSum._sum.amount ?? 0)
             if (amount > withdrawableBalance) {

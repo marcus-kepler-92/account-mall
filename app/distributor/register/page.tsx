@@ -4,7 +4,7 @@ import { useState } from "react"
 import { toast } from "sonner"
 import { Eye, EyeOff } from "lucide-react"
 import { authClient } from "@/lib/auth-client"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,6 +13,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 export default function DistributorRegisterPage() {
     const router = useRouter()
+    const searchParams = useSearchParams()
+    const inviteCode = searchParams.get("inviteCode")?.trim() || null
+
     const [name, setName] = useState("")
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
@@ -29,7 +32,22 @@ export default function DistributorRegisterPage() {
                 email,
                 password,
                 fetchOptions: {
-                    onSuccess: () => {
+                    onSuccess: async () => {
+                        if (inviteCode) {
+                            try {
+                                const res = await fetch("/api/distributor/bind-inviter", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ inviteCode }),
+                                })
+                                if (!res.ok) {
+                                    const data = await res.json().catch(() => ({}))
+                                    toast.error(data.error ?? "绑定邀请人失败")
+                                }
+                            } catch {
+                                toast.error("绑定邀请人失败")
+                            }
+                        }
                         toast.success("注册成功，请登录")
                         router.push("/distributor/login")
                         router.refresh()
@@ -54,7 +72,9 @@ export default function DistributorRegisterPage() {
                         分销员注册
                     </CardTitle>
                     <CardDescription>
-                        注册成为分销员，获取推广链接与佣金
+                        {inviteCode
+                            ? "您正在通过邀请链接注册，注册成功后将绑定邀请人。"
+                            : "注册成为分销员，获取推广链接与佣金"}
                     </CardDescription>
                 </CardHeader>
                 <CardContent>

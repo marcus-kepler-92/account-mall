@@ -58,6 +58,8 @@ const envSchema = z
         freeSharedMaxQuantityPerOrder: z.coerce.number().int().min(1).default(1),
         /** 推荐码/优惠码：最大长度（字符），用于校验与防抖校验 API */
         promoCodeMaxLength: z.coerce.number().int().min(1).max(256).default(64),
+        /** 邀请奖励：被邀请人首单完成时给邀请人的固定金额（元），默认 5 */
+        invitationRewardAmount: z.coerce.number().min(0).max(99999.99).default(5),
         /** 推荐码/优惠码：前端防抖校验延迟（毫秒），输入停止后多久发起校验 */
         promoValidateDebounceMs: z.coerce.number().int().min(0).default(400),
         /** Product JSON-LD：品牌名，用于 schema.org Brand */
@@ -181,6 +183,7 @@ function getEnvInput() {
         freeSharedMaxQuantityPerOrder: e.FREE_SHARED_MAX_QUANTITY_PER_ORDER,
         promoCodeMaxLength: e.PROMO_CODE_MAX_LENGTH,
         promoValidateDebounceMs: e.PROMO_VALIDATE_DEBOUNCE_MS,
+        invitationRewardAmount: e.INVITATION_REWARD_AMOUNT,
         schemaBrandName: e.SCHEMA_BRAND_NAME,
         schemaShippingCountry: e.SCHEMA_SHIPPING_COUNTRY,
         schemaShippingValue: e.SCHEMA_SHIPPING_VALUE,

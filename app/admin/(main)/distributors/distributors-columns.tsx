@@ -28,6 +28,7 @@ export type DistributorRow = {
     completedOrderCount: number
     totalCommission: number
     withdrawableBalance: number
+    inviter: { id: string; name: string; distributorCode: string | null } | null
 }
 
 function DistributorRowActions({ row }: { row: DistributorRow }) {
@@ -168,6 +169,24 @@ export const distributorsColumns: ColumnDef<DistributorRow>[] = [
             ) : (
                 <span className="text-muted-foreground">—</span>
             ),
+    },
+    {
+        accessorKey: "inviter",
+        header: "邀请人",
+        cell: ({ row }) => {
+            const inv = row.original.inviter
+            if (!inv) return <span className="text-muted-foreground">—</span>
+            return (
+                <span className="text-sm">
+                    {inv.name}
+                    {inv.distributorCode && (
+                        <span className="text-muted-foreground font-mono ml-1 text-xs">
+                            {inv.distributorCode}
+                        </span>
+                    )}
+                </span>
+            )
+        },
     },
     {
         accessorKey: "disabledAt",

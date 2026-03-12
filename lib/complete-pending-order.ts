@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { sendOrderCompletionEmail } from "@/lib/order-completion-email"
+import { getConfig } from "@/lib/config"
 
 /** Prisma Decimal 等转为 number，避免 Number(decimal) 在部分环境为 NaN 导致佣金为 0 */
 function toNumber(value: unknown): number {
@@ -130,6 +131,36 @@ export async function completePendingOrder(
                         status: "SETTLED",
                     },
                 })
+            }
+
+            // 邀请奖励：被邀请人（本单分销员）首单完成时，给邀请人发一笔固定金额，每名被邀请人只发一次
+            const completedCount = await tx.order.count({
+                where: { distributorId, status: "COMPLETED" },
+            })
+            if (completedCount === 1) {
+                const invitee = await tx.user.findUnique({
+                    where: { id: distributorId },
+                    select: { inviterId: true },
+                })
+                if (invitee?.inviterId) {
+                    const existing = await tx.invitationReward.findUnique({
+                        where: { inviteeId: distributorId },
+                    })
+                    if (!existing) {
+                        const amount = getConfig().invitationRewardAmount
+                        if (amount > 0) {
+                            await tx.invitationReward.create({
+                                data: {
+                                    inviterId: invitee.inviterId,
+                                    inviteeId: distributorId,
+                                    orderId: order.id,
+                                    amount,
+                                    status: "SETTLED",
+                                },
+                            })
+                        }
+                    }
+                }
             }
         }
     })

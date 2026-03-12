@@ -27,7 +27,7 @@ export async function GET() {
 
     const withStats = await Promise.all(
         distributors.map(async (d) => {
-            const [completedOrders, totalCommission, settledSum, paidWithdrawals, pendingWithdrawals] =
+            const [completedOrders, totalCommission, settledSum, invitationRewardSum, paidWithdrawals, pendingWithdrawals] =
                 await Promise.all([
                     prisma.order.count({
                         where: { distributorId: d.id, status: "COMPLETED" },
@@ -40,6 +40,10 @@ export async function GET() {
                         where: { distributorId: d.id, status: "SETTLED" },
                         _sum: { amount: true },
                     }),
+                    prisma.invitationReward.aggregate({
+                        where: { inviterId: d.id, status: "SETTLED" },
+                        _sum: { amount: true },
+                    }),
                     prisma.withdrawal.aggregate({
                         where: { distributorId: d.id, status: "PAID" },
                         _sum: { amount: true },
@@ -50,7 +54,8 @@ export async function GET() {
                     }),
                 ])
             const withdrawable =
-                Number(settledSum._sum.amount ?? 0) -
+                Number(settledSum._sum.amount ?? 0) +
+                Number(invitationRewardSum?._sum?.amount ?? 0) -
                 Number(paidWithdrawals._sum.amount ?? 0) -
                 Number(pendingWithdrawals._sum.amount ?? 0)
             return {

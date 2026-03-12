@@ -53,6 +53,9 @@ export default async function AdminDistributorsPage({
                 discountPercent: true,
                 disabledAt: true,
                 createdAt: true,
+                inviter: {
+                    select: { id: true, name: true, distributorCode: true },
+                },
             },
             orderBy: { createdAt: "desc" },
             skip: (page - 1) * pageSize,
@@ -64,7 +67,7 @@ export default async function AdminDistributorsPage({
     ])
 
     const ids = distributors.map((d) => d.id)
-    const [orderCounts, commissionAll, commissionSettled, withdrawalPaid, withdrawalPending] =
+    const [orderCounts, commissionAll, commissionSettled, invitationRewardSettled, withdrawalPaid, withdrawalPending] =
         ids.length > 0
             ? await Promise.all([
                   prisma.order.groupBy({
@@ -82,6 +85,11 @@ export default async function AdminDistributorsPage({
                       where: { distributorId: { in: ids }, status: "SETTLED" },
                       _sum: { amount: true },
                   }),
+                  prisma.invitationReward.groupBy({
+                      by: ["inviterId"],
+                      where: { inviterId: { in: ids }, status: "SETTLED" },
+                      _sum: { amount: true },
+                  }),
                   prisma.withdrawal.groupBy({
                       by: ["distributorId"],
                       where: { distributorId: { in: ids }, status: "PAID" },
@@ -93,7 +101,7 @@ export default async function AdminDistributorsPage({
                       _sum: { amount: true },
                   }),
               ])
-            : [[], [], [], [], []]
+            : [[], [], [], [], [], []]
 
     const orderCountMap = new Map(
         orderCounts.map((o) => [o.distributorId, o._count.id])
@@ -104,6 +112,9 @@ export default async function AdminDistributorsPage({
     const settledMap = new Map(
         commissionSettled.map((c) => [c.distributorId, Number(c._sum.amount ?? 0)])
     )
+    const invitationRewardMap = new Map(
+        invitationRewardSettled.map((r) => [r.inviterId, Number(r._sum.amount ?? 0)])
+    )
     const paidMap = new Map(
         withdrawalPaid.map((w) => [w.distributorId, Number(w._sum.amount ?? 0)])
     )
@@ -113,9 +124,10 @@ export default async function AdminDistributorsPage({
 
     const data: DistributorRow[] = distributors.map((d) => {
         const settled = settledMap.get(d.id) ?? 0
+        const invitationReward = invitationRewardMap.get(d.id) ?? 0
         const paid = paidMap.get(d.id) ?? 0
         const pending = pendingMap.get(d.id) ?? 0
-        const withdrawableBalance = settled - paid - pending
+        const withdrawableBalance = settled + invitationReward - paid - pending
         return {
             id: d.id,
             email: d.email,
@@ -128,6 +140,13 @@ export default async function AdminDistributorsPage({
             completedOrderCount: orderCountMap.get(d.id) ?? 0,
             totalCommission: commissionAllMap.get(d.id) ?? 0,
             withdrawableBalance,
+            inviter: d.inviter
+                ? {
+                      id: d.inviter.id,
+                      name: d.inviter.name,
+                      distributorCode: d.inviter.distributorCode,
+                  }
+                : null,
         }
     })
 

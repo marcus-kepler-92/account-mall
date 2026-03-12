@@ -41,13 +41,18 @@ export default async function DistributorDashboardPage() {
 
   const promoUrl = `${config.siteUrl}/?promoCode=${encodeURIComponent(distributorCode)}`;
 
+  const inviteUrl = `${config.siteUrl}/distributor/register?inviteCode=${encodeURIComponent(distributorCode)}`;
+  const invitationRewardAmount = config.invitationRewardAmount ?? 5;
+
   const [
     orderCount,
     commissionTotal,
     settledSum,
+    invitationRewardSum,
     paidSum,
     pendingSum,
     tierSummary,
+    inviteeCount,
   ] = await Promise.all([
     prisma.order.count({
       where: { distributorId: user.id, status: "COMPLETED" },
@@ -60,6 +65,10 @@ export default async function DistributorDashboardPage() {
       where: { distributorId: user.id, status: "SETTLED" },
       _sum: { amount: true },
     }),
+    prisma.invitationReward.aggregate({
+      where: { inviterId: user.id, status: "SETTLED" },
+      _sum: { amount: true },
+    }),
     prisma.withdrawal.aggregate({
       where: { distributorId: user.id, status: "PAID" },
       _sum: { amount: true },
@@ -69,9 +78,11 @@ export default async function DistributorDashboardPage() {
       _sum: { amount: true },
     }),
     getDistributorTierSummary(user.id),
+    prisma.user.count({ where: { inviterId: user.id } }),
   ]);
   const withdrawableBalance =
-    Number(settledSum._sum.amount ?? 0) -
+    Number(settledSum._sum.amount ?? 0) +
+    Number(invitationRewardSum._sum.amount ?? 0) -
     Number(paidSum._sum.amount ?? 0) -
     Number(pendingSum._sum.amount ?? 0);
   const pendingWithdrawalTotal = Number(pendingSum._sum.amount ?? 0);
@@ -82,6 +93,30 @@ export default async function DistributorDashboardPage() {
         <h1 className="text-xl font-bold tracking-tight sm:text-2xl">仪表盘</h1>
         <p className="text-muted-foreground">推广链接与数据概览</p>
       </div>
+
+      {/* 邀请分销员 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Link2 className="size-5" />
+            邀请分销员
+          </CardTitle>
+          <CardDescription>
+            分享下方链接，好友注册成为分销员后，当其首单成交时您将获得¥{invitationRewardAmount} 邀请奖励（每名被邀请人仅奖励一次）。
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <code className="flex-1 min-w-0 rounded bg-muted px-3 py-2 text-sm break-all">
+              {inviteUrl}
+            </code>
+            <CopyButtonClient url={inviteUrl} />
+          </div>
+          {inviteeCount > 0 && (
+            <p className="text-sm text-muted-foreground">已邀请 {inviteeCount} 人</p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* 整站推广链接 */}
       <Card>

@@ -42,10 +42,14 @@ export async function GET() {
   const weekEnd = new Date(weekStart);
   weekEnd.setUTCDate(weekEnd.getUTCDate() + 7);
 
-  const [settledSum, paidSum, pendingSum, weekOrders, tiers] =
+  const [settledSum, invitationRewardSum, paidSum, pendingSum, weekOrders, tiers] =
     await Promise.all([
       prisma.commission.aggregate({
         where: { distributorId: user.id, status: "SETTLED" },
+        _sum: { amount: true },
+      }),
+      prisma.invitationReward.aggregate({
+        where: { inviterId: user.id, status: "SETTLED" },
         _sum: { amount: true },
       }),
       prisma.withdrawal.aggregate({
@@ -69,7 +73,8 @@ export async function GET() {
       }),
     ]);
   const withdrawableBalance =
-    Number(settledSum._sum.amount ?? 0) -
+    Number(settledSum._sum.amount ?? 0) +
+    Number(invitationRewardSum?._sum?.amount ?? 0) -
     Number(paidSum._sum.amount ?? 0) -
     Number(pendingSum._sum.amount ?? 0);
   const weeklySalesTotal = weekOrders.reduce(

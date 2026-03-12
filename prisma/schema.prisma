@@ -23,13 +23,20 @@ model User {
   discountCodeEnabled Boolean   @default(false) // 是否启用该分销员的优惠码，默认关闭
   discountPercent     Decimal?  @db.Decimal(5, 2) // 折扣比例，如 5 表示 5%；启用优惠码时填写
   disabledAt          DateTime? // 分销员停用时设置，归因与登录可据此判断
+  inviterId            String?   // 邀请人（上级分销员），仅分销员有意义
   createdAt        DateTime
   updatedAt        DateTime
   sessions         Session[]
   accounts         Account[]
+  inviter          User?         @relation("InviterToInvitee", fields: [inviterId], references: [id])
+  invitees         User[]        @relation("InviterToInvitee")
+  invitationRewardReceived InvitationReward? @relation("InvitationRewardInvitee") // 作为被邀请人触发的邀请奖励
   ordersAsDistributor Order[]
   commissions      Commission[]
   withdrawals      Withdrawal[]
+  invitationRewardsGiven InvitationReward[] @relation("InvitationRewardInviter")
+
+  @@index([inviterId])
 }
 
 model Session {
@@ -168,6 +175,7 @@ model Order {
   distributor             User?       @relation(fields: [distributorId], references: [id])
   cards                   Card[]
   commissions             Commission[]
+  invitationReward        InvitationReward? // 触发邀请奖励的订单（被邀请人首单）
 
   @@index([email])
   @@index([status, createdAt])
@@ -243,6 +251,23 @@ model Withdrawal {
 
   @@index([distributorId])
   @@index([status])
+}
+
+// 邀请奖励：被邀请人（分销员）首单完成时，给邀请人发放一笔固定金额，每名被邀请人只触发一次
+model InvitationReward {
+  id         String   @id @default(cuid())
+  inviterId  String   // 邀请人（获得奖励的分销员）
+  inviteeId  String   @unique // 被邀请人（触发奖励的分销员），唯一保证每人只发一次
+  orderId    String   @unique // 触发奖励的订单（被邀请人首单），一对一
+  amount     Decimal  @db.Decimal(10, 2)
+  status     CommissionStatus @default(SETTLED) // 与 Commission 一致，便于并入可提现余额
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  inviter    User     @relation("InvitationRewardInviter", fields: [inviterId], references: [id])
+  order      Order    @relation(fields: [orderId], references: [id])
+  invitee    User     @relation("InvitationRewardInvitee", fields: [inviteeId], references: [id])
+
+  @@index([inviterId])
 }
 
 enum AnnouncementStatus {
