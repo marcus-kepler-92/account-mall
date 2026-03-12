@@ -78,6 +78,8 @@ const envSchema = z
         schemaDeliveryTransitDays: z.coerce.number().int().min(0).default(0),
         /** Product JSON-LD：退货方式，空则不输出 returnMethod；可选 ReturnByMail、ReturnInStore 等 */
         schemaReturnMethod: z.string().default(""),
+        /** 分销员提现：单笔最低提现金额（元），默认 50 */
+        withdrawalMinAmount: z.coerce.number().min(0.01).default(50),
     })
     .transform((data) => {
         const urlFromEnv = data.databaseUrl?.trim()
@@ -190,6 +192,7 @@ function getEnvInput() {
         schemaDeliveryHandlingDays: e.SCHEMA_DELIVERY_HANDLING_DAYS,
         schemaDeliveryTransitDays: e.SCHEMA_DELIVERY_TRANSIT_DAYS,
         schemaReturnMethod: e.SCHEMA_RETURN_METHOD,
+        withdrawalMinAmount: e.WITHDRAWAL_MIN_AMOUNT,
     }
 }
 

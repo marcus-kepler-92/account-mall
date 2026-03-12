@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getDistributorSession } from "@/lib/auth-guard"
 import { unauthorized } from "@/lib/api-response"
+import { config } from "@/lib/config"
 
 export async function GET(request: NextRequest) {
     const session = await getDistributorSession()
@@ -68,5 +69,6 @@ export async function GET(request: NextRequest) {
             totalPages: Math.ceil(total / pageSize) || 1,
         },
         withdrawableBalance,
+        withdrawalMinAmount: config.withdrawalMinAmount,
     })
 }

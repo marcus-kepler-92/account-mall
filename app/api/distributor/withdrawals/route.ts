@@ -4,6 +4,7 @@ import { getDistributorSession } from "@/lib/auth-guard"
 import { unauthorized } from "@/lib/api-response"
 import { checkWithdrawalCreateRateLimit } from "@/lib/rate-limit"
 import { uploadBinary, DEFAULT_MAX_BYTES } from "@/lib/upload"
+import { config } from "@/lib/config"
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"] as const
 
@@ -75,6 +76,13 @@ export async function POST(request: NextRequest) {
     const amount = Math.round(amountRaw * 100) / 100
     if (amount < 0.01) {
         return NextResponse.json({ error: "提现金额至少 0.01 元" }, { status: 400 })
+    }
+    const minAmount = config.withdrawalMinAmount
+    if (amount < minAmount) {
+        return NextResponse.json(
+            { error: `提现金额至少 ${minAmount} 元` },
+            { status: 400 }
+        )
     }
 
     if (!file || !(file instanceof File) || file.size === 0) {

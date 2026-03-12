@@ -16,8 +16,8 @@ jest.mock("@/lib/auth-guard", () => ({
 }))
 
 jest.mock("@/lib/config", () => ({
-    config: { siteUrl: "http://localhost:3000" },
-    getConfig: () => ({ siteUrl: "http://localhost:3000" }),
+    config: { siteUrl: "http://localhost:3000", withdrawalMinAmount: 50 },
+    getConfig: () => ({ siteUrl: "http://localhost:3000", withdrawalMinAmount: 50 }),
 }))
 
 jest.mock("@/lib/upload", () => ({
@@ -216,6 +216,7 @@ describe("GET /api/distributor/commissions", () => {
         expect(data.data).toHaveLength(1)
         expect(data.withdrawableBalance).toBe(40)
         expect(data.meta).toBeDefined()
+        expect(data.withdrawalMinAmount).toBe(50)
     })
 
     it("queries commissions only for current user (distributorId from session, no IDOR)", async () => {
@@ -303,7 +304,7 @@ describe("POST /api/distributor/withdrawals", () => {
 
     it("returns 400 when receipt image is missing or not uploaded", async () => {
         getDistributorSession.mockResolvedValue(distributorSession)
-        const req = createWithdrawalFormRequest("10", false)
+        const req = createWithdrawalFormRequest("50", false)
         const res = await WithdrawalsPost(req)
         expect(res.status).toBe(400)
         const data = await res.json()
@@ -320,7 +321,7 @@ describe("POST /api/distributor/withdrawals", () => {
             )
         )
         getDistributorSession.mockResolvedValue(distributorSession)
-        const req = createWithdrawalFormRequest("10")
+        const req = createWithdrawalFormRequest("50")
         const res = await WithdrawalsPost(req)
         expect(res.status).toBe(429)
         const data = await res.json()
@@ -354,31 +355,51 @@ describe("POST /api/distributor/withdrawals", () => {
         expect(data.error).toMatch(/至少|0\.01/)
     })
 
-    it("rounds amount to 2 decimals and creates withdrawal (e.g. 1.999 -> 2)", async () => {
+    it("returns 400 when amount is below withdrawal minimum amount (e.g. 20 < 50)", async () => {
+        getDistributorSession.mockResolvedValue(distributorSession)
+        const req = createWithdrawalFormRequest("20")
+        const res = await WithdrawalsPost(req)
+        expect(res.status).toBe(400)
+        const data = await res.json()
+        expect(data.error).toMatch(/至少.*50|50.*元/)
+        expect(prismaMock.withdrawal.create).not.toHaveBeenCalled()
+    })
+
+    it("returns 400 when amount is just below withdrawal minimum amount (e.g. 49)", async () => {
+        getDistributorSession.mockResolvedValue(distributorSession)
+        const req = createWithdrawalFormRequest("49")
+        const res = await WithdrawalsPost(req)
+        expect(res.status).toBe(400)
+        const data = await res.json()
+        expect(data.error).toMatch(/至少.*50|50.*元/)
+        expect(prismaMock.withdrawal.create).not.toHaveBeenCalled()
+    })
+
+    it("rounds amount to 2 decimals and creates withdrawal (e.g. 50.999 -> 51)", async () => {
         getDistributorSession.mockResolvedValue(distributorSession)
         prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock))
-        prismaMock.commission.aggregate.mockResolvedValue({ _sum: { amount: 100 } })
+        prismaMock.commission.aggregate.mockResolvedValue({ _sum: { amount: 200 } })
         prismaMock.withdrawal.aggregate
             .mockResolvedValueOnce({ _sum: { amount: 0 } })
             .mockResolvedValueOnce({ _sum: { amount: 0 } })
         prismaMock.withdrawal.create.mockResolvedValue({
             id: "with_1",
-            amount: 2,
+            amount: 51,
             status: "PENDING",
             receiptImageUrl: "/uploads/receipts/test.jpg",
             createdAt: new Date(),
         })
 
-        const req = createWithdrawalFormRequest("1.999")
+        const req = createWithdrawalFormRequest("50.999")
         const res = await WithdrawalsPost(req)
         const data = await res.json()
 
         expect(res.status).toBe(201)
-        expect(data.amount).toBe(2)
+        expect(data.amount).toBe(51)
         expect(prismaMock.withdrawal.create).toHaveBeenCalledWith({
             data: expect.objectContaining({
                 distributorId: "dist_1",
-                amount: 2,
+                amount: 51,
                 status: "PENDING",
                 receiptImageUrl: "/uploads/receipts/test.jpg",
             }),
@@ -402,35 +423,35 @@ describe("POST /api/distributor/withdrawals", () => {
         expect(prismaMock.withdrawal.create).not.toHaveBeenCalled()
     })
 
-    it("returns 201 and creates withdrawal when amount is valid", async () => {
+    it("returns 201 and creates withdrawal when amount is valid (at minimum amount boundary)", async () => {
         getDistributorSession.mockResolvedValue(distributorSession)
         prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock))
         prismaMock.commission.aggregate.mockResolvedValue({ _sum: { amount: 100 } })
         prismaMock.withdrawal.aggregate
-            .mockResolvedValueOnce({ _sum: { amount: 20 } })
+            .mockResolvedValueOnce({ _sum: { amount: 0 } })
             .mockResolvedValueOnce({ _sum: { amount: 0 } })
         prismaMock.withdrawal.create.mockResolvedValue({
             id: "with_1",
-            amount: 30,
+            amount: 50,
             status: "PENDING",
             receiptImageUrl: "/uploads/receipts/test.jpg",
             createdAt: new Date(),
         })
 
-        const req = createWithdrawalFormRequest("30")
+        const req = createWithdrawalFormRequest("50")
         const res = await WithdrawalsPost(req)
         const data = await res.json()
 
         expect(res.status).toBe(201)
         expect(data).toMatchObject({
             id: "with_1",
-            amount: 30,
+            amount: 50,
             status: "PENDING",
         })
         expect(prismaMock.withdrawal.create).toHaveBeenCalledWith({
             data: {
                 distributorId: "dist_1",
-                amount: 30,
+                amount: 50,
                 status: "PENDING",
                 receiptImageUrl: "/uploads/receipts/test.jpg",
             },
@@ -469,7 +490,7 @@ describe("POST /api/distributor/withdrawals", () => {
 
     it("returns 400 when receipt image type is not allowed (e.g. image/gif)", async () => {
         getDistributorSession.mockResolvedValue(distributorSession)
-        const req = createWithdrawalFormRequestWithFile("10", "image/gif", 100)
+        const req = createWithdrawalFormRequestWithFile("50", "image/gif", 100)
         const res = await WithdrawalsPost(req)
         expect(res.status).toBe(400)
         const data = await res.json()
@@ -480,7 +501,7 @@ describe("POST /api/distributor/withdrawals", () => {
     it("returns 400 when receipt image size exceeds 4MB", async () => {
         getDistributorSession.mockResolvedValue(distributorSession)
         const overLimit = 4 * 1024 * 1024 + 1
-        const req = createWithdrawalFormRequestWithFile("10", "image/jpeg", overLimit)
+        const req = createWithdrawalFormRequestWithFile("50", "image/jpeg", overLimit)
         const res = await WithdrawalsPost(req)
         expect(res.status).toBe(400)
         const data = await res.json()

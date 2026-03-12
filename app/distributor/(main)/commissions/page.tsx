@@ -12,6 +12,7 @@ import {
 import { DistributorCommissionsDataTable } from "./commissions-data-table"
 import type { DistributorCommissionRow } from "./commissions-columns"
 import { ApplyWithdrawalForm } from "./apply-withdrawal-form"
+import { config } from "@/lib/config"
 
 export const dynamic = "force-dynamic"
 
@@ -137,6 +138,7 @@ export default async function DistributorCommissionsPage({
                     <ApplyWithdrawalForm
                         withdrawableBalance={withdrawableBalance}
                         pendingWithdrawalTotal={pendingWithdrawalTotal}
+                        minAmount={config.withdrawalMinAmount}
                     />
                 </CardContent>
             </Card>
