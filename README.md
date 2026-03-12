@@ -59,7 +59,7 @@ cp .env.example .env
 ```
 
 **Required:** set `DATABASE_URL` and `BETTER_AUTH_SECRET` (at least 32 characters).  
-**Production:** 务必设置 `CRON_SECRET`（保护 `/api/cron/close-expired-orders`）和 `BETTER_AUTH_URL`；Cron 请求需带 `Authorization: Bearer <CRON_SECRET>`。  
+**Production:** 务必设置 `BETTER_AUTH_URL`。过期订单关闭默认由**后台订单页「关闭过期订单」按钮**触发（`POST /api/admin/close-expired-orders`）；若需外部定时自动执行，设置 `CRON_SECRET` 并用外部 Cron 服务（如 cron-job.org）调用 `GET /api/cron/close-expired-orders`，携带 `Authorization: Bearer <CRON_SECRET>`。  
 Full list and defaults: see [Environment variables](#environment-variables) below or [lib/config.ts](lib/config.ts).
 
 ### 3. Start Database
@@ -118,7 +118,7 @@ docker compose exec app npm run db:seed
 | `SITE_NAME`, `SITE_DESCRIPTION`, `SITE_TAGLINE`, `SITE_SUBTITLE`, `ADMIN_PANEL_LABEL` | Site copy and admin label | No | See [lib/config.ts](lib/config.ts) |
 | `RESEND_API_KEY`, `EMAIL_FROM` | Email delivery (Resend) | No | - |
 | `ALIPAY_APP_ID`, `ALIPAY_PRIVATE_KEY`, `ALIPAY_PUBLIC_KEY` | Alipay payment | No | - |
-| `CRON_SECRET` | API secret for cron (close expired orders) | No | - |
+| `CRON_SECRET` | 外部定时服务调用 `/api/cron/close-expired-orders` 的鉴权密钥（可选；后台按钮触发无需此项） | No | - |
 | `PENDING_ORDER_TIMEOUT_MS`, `ORDER_RATE_LIMIT_POINTS`, `ORDER_QUERY_RATE_LIMIT_POINTS`, `MAX_PENDING_ORDERS_PER_IP` | Order timeout and rate limits | No | See [lib/config.ts](lib/config.ts) |
 | `ORDER_SUCCESS_TOKEN_SECRET` | 订单成功页 token 签名（≥16 位；不设则用 BETTER_AUTH_SECRET，开发环境有默认） | No | - |
 | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`, `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Cloudflare Turnstile | No | - |
@@ -157,7 +157,8 @@ account-mall/
 │   ├── api/                    # API routes
 │   │   ├── auth/               # better-auth
 │   │   ├── orders/, products/, tags/, cards/  # CRUD & lookup
-│   │   ├── payment/, cron/     # Alipay, close-expired-orders
+│   │   ├── payment/, cron/     # Alipay, close-expired-orders (external cron)
+│   │   ├── admin/              # Admin-only APIs (incl. close-expired-orders button trigger)
 │   │   └── restock-subscriptions/
 │   ├── components/             # App-level components
 │   ├── generated/              # Prisma generated client (output)

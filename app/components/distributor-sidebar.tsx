@@ -66,7 +66,7 @@ export function DistributorSidebar() {
                                 </div>
                                 <div className="flex flex-col gap-0.5 leading-none">
                                     <span className="font-semibold">{siteName}</span>
-                                    <span className="text-xs text-muted-foreground">仪表盘</span>
+                                    <span className="text-xs text-muted-foreground">分销中心</span>
                                 </div>
                             </Link>
                         </SidebarMenuButton>

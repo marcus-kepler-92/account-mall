@@ -24,8 +24,18 @@ export function SiteHeader() {
                     </span>
                 </Link>
                 <nav className="flex shrink-0 min-w-0 items-center justify-end gap-0.5 sm:gap-2 overflow-x-auto [-webkit-overflow-scrolling:touch]" aria-label="主导航">
+                    <Button variant="ghost" size="sm" className="size-9 min-w-9 shrink-0 p-0 sm:size-auto sm:px-3 touch-manipulation" asChild>
+                        <Link
+                            href="/orders/lookup"
+                            title="订单查询"
+                            aria-label="订单查询"
+                            className="gap-1.5 sm:gap-2"
+                        >
+                            <Search className="size-4 shrink-0" aria-hidden />
+                            <span className="hidden sm:inline">订单查询</span>
+                        </Link>
+                    </Button>
                     <MyOrderHistory />
-                    <ThemeToggle />
                     <Button variant="ghost" size="sm" className="size-9 min-w-9 shrink-0 p-0 sm:size-auto sm:px-3 touch-manipulation" asChild>
                         <Link
                             href="/distributor"
@@ -37,17 +47,7 @@ export function SiteHeader() {
                             <span className="hidden sm:inline">分销中心</span>
                         </Link>
                     </Button>
-                    <Button variant="ghost" size="sm" className="size-9 min-w-9 shrink-0 p-0 sm:size-auto sm:px-3 touch-manipulation" asChild>
-                        <Link
-                        href="/orders/lookup"
-                        title="订单查询"
-                        aria-label="订单查询"
-                        className="gap-1.5 sm:gap-2"
-                    >
-                            <Search className="size-4 shrink-0" aria-hidden />
-                            <span className="hidden sm:inline">订单查询</span>
-                        </Link>
-                    </Button>
+                    <ThemeToggle />
                 </nav>
             </div>
         </header>

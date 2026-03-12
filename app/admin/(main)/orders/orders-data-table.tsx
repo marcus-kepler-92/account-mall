@@ -9,7 +9,7 @@ import {
     VisibilityState,
     RowSelectionState,
 } from "@tanstack/react-table";
-import { XCircle, Trash2, Loader2 } from "lucide-react";
+import { XCircle, Trash2, Loader2, TimerOff } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -53,6 +53,7 @@ export function OrdersDataTable({ data, total, statusCounts }: OrdersDataTablePr
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
     const [batchLoading, setBatchLoading] = useState(false);
     const [batchAction, setBatchAction] = useState<"CLOSE" | "DELETE" | null>(null);
+    const [closeExpiredLoading, setCloseExpiredLoading] = useState(false);
 
     const table = useReactTable({
         data,
@@ -113,6 +114,28 @@ export function OrdersDataTable({ data, total, statusCounts }: OrdersDataTablePr
         }
     };
 
+    const handleCloseExpired = async () => {
+        setCloseExpiredLoading(true);
+        try {
+            const res = await fetch("/api/admin/close-expired-orders", { method: "POST" });
+            const result = await res.json();
+            if (!res.ok) {
+                toast.error(result.error || "操作失败");
+                return;
+            }
+            if (result.closed === 0) {
+                toast.info("没有需要关闭的过期订单");
+            } else {
+                toast.success(`已关闭 ${result.closed} 笔过期订单`);
+                router.refresh();
+            }
+        } catch {
+            toast.error("操作失败");
+        } finally {
+            setCloseExpiredLoading(false);
+        }
+    };
+
     const statusOptionsWithCounts = statusOptions.map((opt) => ({
         ...opt,
         count: statusCounts[opt.value as keyof typeof statusCounts],
@@ -131,6 +154,19 @@ export function OrdersDataTable({ data, total, statusCounts }: OrdersDataTablePr
                     options={statusOptionsWithCounts}
                     paramKey="status"
                 />
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCloseExpired}
+                    disabled={closeExpiredLoading}
+                >
+                    {closeExpiredLoading ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                        <TimerOff className="mr-2 h-4 w-4" />
+                    )}
+                    关闭过期订单
+                </Button>
             </DataTableToolbar>
 
             <DataTableSelectionBar table={table}>

@@ -13,10 +13,13 @@ import { Loader2, CheckCircle2, Wallet, ImagePlus, X } from "lucide-react"
 export function ApplyWithdrawalForm({
     withdrawableBalance,
     pendingWithdrawalTotal = 0,
+    minAmount = 50,
 }: {
     withdrawableBalance: number
     /** 提现中金额，用于在余额为 0 时提示用户 */
     pendingWithdrawalTotal?: number
+    /** 单笔最低提现金额（元），默认 50 */
+    minAmount?: number
 }) {
     const router = useRouter()
     const [amount, setAmount] = useState("")
@@ -28,7 +31,9 @@ export function ApplyWithdrawalForm({
 
     const numAmount = parseFloat(amount)
     const amountValid =
-        !Number.isNaN(numAmount) && numAmount > 0 && numAmount <= withdrawableBalance
+        !Number.isNaN(numAmount) &&
+        numAmount >= minAmount &&
+        numAmount <= withdrawableBalance
     const canSubmit = amountValid && !!file && !loading
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -130,7 +135,7 @@ export function ApplyWithdrawalForm({
                     <Input
                         id="withdrawal-amount"
                         type="number"
-                        min={0.01}
+                        min={minAmount}
                         step={0.01}
                         max={withdrawableBalance}
                         value={amount}
@@ -150,9 +155,14 @@ export function ApplyWithdrawalForm({
                     </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                    最多可提现 ¥{withdrawableBalance.toFixed(2)}
+                    至少 ¥{minAmount.toFixed(2)}，最多可提现 ¥{withdrawableBalance.toFixed(2)}
                 </p>
-                {amount !== "" && numAmount > withdrawableBalance && (
+                {amount !== "" && !Number.isNaN(numAmount) && numAmount < minAmount && (
+                    <p className="text-xs text-destructive">
+                        不能低于最低提现额度 ¥{minAmount.toFixed(2)}
+                    </p>
+                )}
+                {amount !== "" && !Number.isNaN(numAmount) && numAmount >= minAmount && numAmount > withdrawableBalance && (
                     <p className="text-xs text-destructive">
                         不能超过可提现余额
                     </p>
