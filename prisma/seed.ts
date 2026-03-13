@@ -141,6 +141,40 @@ async function seed() {
                 console.log('  ✅ E2E product and cards already present.')
             }
 
+            // 低库存测试商品（仅 2 张卡，低于默认阈值 5，用于 E2E 低库存提示测试）
+            let lowStockProduct = await prisma.product.findUnique({
+                where: { slug: 'e2e-low-stock-product' },
+            })
+            if (!lowStockProduct) {
+                lowStockProduct = await prisma.product.create({
+                    data: {
+                        name: 'E2E 低库存商品',
+                        slug: 'e2e-low-stock-product',
+                        description: 'For E2E low stock warning tests',
+                        price: 0.01,
+                        maxQuantity: 5,
+                        status: 'ACTIVE',
+                    },
+                })
+                console.log('  ✅ E2E low-stock product created.')
+            }
+            const lowStockUnsold = await prisma.card.count({
+                where: { productId: lowStockProduct.id, status: 'UNSOLD' },
+            })
+            const lowStockNeed = 2 - lowStockUnsold
+            if (lowStockNeed > 0) {
+                await prisma.card.createMany({
+                    data: Array.from({ length: lowStockNeed }, (_, i) => ({
+                        productId: lowStockProduct!.id,
+                        content: `e2e-low-stock-card-${lowStockUnsold + i + 1}`,
+                        status: 'UNSOLD',
+                    })),
+                })
+                console.log(`  ✅ E2E low-stock cards: ${lowStockNeed} added (total UNSOLD: 2).`)
+            } else {
+                console.log('  ✅ E2E low-stock product and cards already present.')
+            }
+
             const e2eDistributorEmail = 'e2e-distributor@example.com'
             const e2eDistributorPassword = 'e2e-distributor-password'
             let distUser = await prisma.user.findUnique({

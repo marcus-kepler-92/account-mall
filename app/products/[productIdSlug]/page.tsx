@@ -7,8 +7,8 @@ import { config } from "@/lib/config"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
-import { ProductOrderForm } from "@/app/components/product-order-form"
 import { SiteHeader } from "@/app/components/site-header"
+import { ProductOrderSection } from "./product-order-section"
 import { SoldOutOverlay } from "@/app/components/sold-out-overlay"
 import { RestockReminderForm } from "./restock-reminder-form"
 import { ProductBottomBar } from "../../components/product-bottom-bar"
@@ -101,6 +101,8 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
 
     const isFreeShared = product.productType === "FREE_SHARED"
     const isSoldOut = !isFreeShared && stockCount === 0
+    const lowStockThreshold = Number(process.env.NEXT_PUBLIC_LOW_STOCK_THRESHOLD) || 5
+    const isLowStock = !isFreeShared && !isSoldOut && stockCount > 0 && stockCount <= lowStockThreshold
     const priceNumber = Number(product.price)
 
     const productUrl = `${config.siteUrl}/products/${product.id}-${product.slug}`
@@ -227,12 +229,13 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
                             stockCount={stockCount}
                             isSoldOut={isSoldOut}
                             isFreeShared={isFreeShared}
+                            isLowStock={isLowStock}
                         />
 
                         <ProductMetaNoticeSection />
 
                         <section id="order-section">
-                            <ProductOrderForm
+                            <ProductOrderSection
                                 productId={product.id}
                                 productName={product.name}
                                 maxQuantity={isFreeShared ? 1 : product.maxQuantity}
@@ -316,9 +319,10 @@ type ProductInfoSectionProps = {
     stockCount: number
     isSoldOut: boolean
     isFreeShared?: boolean
+    isLowStock?: boolean
 }
 
-function ProductInfoSection({ name, tags, price, stockCount, isSoldOut, isFreeShared }: ProductInfoSectionProps) {
+function ProductInfoSection({ name, tags, price, stockCount, isSoldOut, isFreeShared, isLowStock }: ProductInfoSectionProps) {
     return (
         <section
             aria-labelledby="product-info-heading"
@@ -369,6 +373,10 @@ function ProductInfoSection({ name, tags, price, stockCount, isSoldOut, isFreeSh
                                     <Badge variant="outline" className="text-xs font-normal">
                                         已售罄
                                     </Badge>
+                                ) : isLowStock ? (
+                                    <span className="inline-flex items-center gap-1 text-xs font-medium text-orange-500 dark:text-orange-400 animate-pulse">
+                                        仅剩 {stockCount} 件，手慢无！
+                                    </span>
                                 ) : (
                                     <span className="text-xs text-muted-foreground">
                                         库存 {stockCount} 件

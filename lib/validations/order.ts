@@ -32,6 +32,7 @@ export const createOrderSchema = z.object({
     quantity: z.number().int().min(1),
     turnstileToken: z.string().optional(),
     promoCode: z.string().max(64).optional(),
+    exitDiscountToken: z.string().optional(),
 })
 
 /**

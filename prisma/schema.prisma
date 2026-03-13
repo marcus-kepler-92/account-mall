@@ -128,6 +128,7 @@ model Product {
   orders             Order[]
   tags               Tag[]
   restockSubscriptions RestockSubscription[]
+  exitDiscountUsages ExitDiscountUsage[]
 }
 
 model Tag {
@@ -171,11 +172,13 @@ model Order {
   createdAt               DateTime    @default(now())
   updatedAt               DateTime    @updatedAt
   clientIp                String?     // For rate limit: max PENDING orders per IP
+  exitDiscountMeta        String?     @db.Text // Exit intent 折扣信号 JSON，订单 COMPLETED 后转存到 ExitDiscountUsage
   product                 Product     @relation(fields: [productId], references: [id])
   distributor             User?       @relation(fields: [distributorId], references: [id])
   cards                   Card[]
   commissions             Commission[]
   invitationReward        InvitationReward? // 触发邀请奖励的订单（被邀请人首单）
+  exitDiscountUsage       ExitDiscountUsage?
 
   @@index([email])
   @@index([status, createdAt])
@@ -302,6 +305,24 @@ model DistributorGuide {
   tag         Tag?               @relation(fields: [tagId], references: [id])
 
   @@index([status, sortOrder])
+}
+
+// Exit Intent 折扣使用记录：用于防止同一用户（按指纹/cookie/IP 三信号）重复领取离开挽留折扣
+model ExitDiscountUsage {
+  id              String   @id @default(cuid())
+  productId       String
+  orderId         String   @unique
+  visitorId       String   // 持久 cookie __ed_vid
+  fingerprintHash String   // FingerprintJS visitorId hash
+  ip              String
+  usedAt          DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id])
+  order   Order   @relation(fields: [orderId], references: [id])
+
+  @@index([productId, visitorId])
+  @@index([productId, fingerprintHash])
+  @@index([productId, ip])
 }
 
 

@@ -82,6 +82,12 @@ const envSchema = z
         schemaReturnMethod: z.string().default(""),
         /** 分销员提现：单笔最低提现金额（元），默认 50 */
         withdrawalMinAmount: z.coerce.number().min(0.01).default(50),
+        /** Exit Intent 折扣：HMAC 签名密钥，生产环境必填 */
+        exitDiscountSecret: z.string().optional(),
+        /** Exit Intent 折扣：折扣比例（百分比），默认 5 表示 95 折 */
+        exitDiscountPercent: z.coerce.number().min(1).max(50).default(5),
+        /** Exit Intent 折扣：Token 有效期（毫秒），默认 15 分钟 */
+        exitDiscountTtlMs: z.coerce.number().int().positive().default(900_000),
     })
     .transform((data) => {
         const urlFromEnv = data.databaseUrl?.trim()
@@ -196,6 +202,9 @@ function getEnvInput() {
         schemaDeliveryTransitDays: e.SCHEMA_DELIVERY_TRANSIT_DAYS,
         schemaReturnMethod: e.SCHEMA_RETURN_METHOD,
         withdrawalMinAmount: e.WITHDRAWAL_MIN_AMOUNT,
+        exitDiscountSecret: e.EXIT_DISCOUNT_SECRET,
+        exitDiscountPercent: e.EXIT_DISCOUNT_PERCENT,
+        exitDiscountTtlMs: e.EXIT_DISCOUNT_TTL_MS,
     }
 }
 

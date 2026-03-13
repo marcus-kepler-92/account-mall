@@ -13,6 +13,7 @@ import {
 } from "@/lib/rate-limit"
 import { config } from "@/lib/config"
 import { verifyTurnstileToken } from "@/lib/turnstile"
+import { verifyExitDiscountToken } from "@/lib/exit-discount"
 import { scrapeSharedAccounts } from "@/lib/scrape-shared-accounts"
 import { sharedAccountToCardPayload, toCardContentJson } from "@/lib/free-shared-card"
 import { createOrderSuccessToken } from "@/lib/order-success-token"
@@ -296,7 +297,7 @@ export async function POST(request: NextRequest) {
         return validationError(parsed.error.flatten())
     }
 
-    const { productId, email, orderPassword, quantity, turnstileToken, promoCode: bodyPromoCode } = parsed.data
+    const { productId, email, orderPassword, quantity, turnstileToken, promoCode: bodyPromoCode, exitDiscountToken } = parsed.data
 
     // Resolve distributor from promoCode (cookie or body); include discount settings for 同码优惠
     const cookiePromoCode = request.cookies?.get?.("distributor_promo_code")?.value?.trim()
@@ -390,11 +391,31 @@ export async function POST(request: NextRequest) {
         return badRequest(`Insufficient stock. Available: ${unsoldCount}`)
     }
 
+    // Exit intent 折扣：仅当无 promoCode 且配置了 secret 时生效
+    let exitDiscountPercent: number | null = null
+    let exitDiscountMeta: string | null = null
+    if (!promoCode && exitDiscountToken && config.exitDiscountSecret) {
+        const verifyResult = verifyExitDiscountToken(exitDiscountToken, config.exitDiscountSecret)
+        if (verifyResult.valid && verifyResult.payload.productId === productId) {
+            exitDiscountPercent = verifyResult.payload.discountPercent
+            exitDiscountMeta = JSON.stringify({
+                productId: verifyResult.payload.productId,
+                visitorId: verifyResult.payload.visitorId,
+                fingerprintHash: verifyResult.payload.fingerprintHash,
+                ip: verifyResult.payload.ip,
+                discountPercent: verifyResult.payload.discountPercent,
+            })
+        }
+    }
+
     let amount = Number(product.price) * quantity
     let discountPercentApplied: number | null = null
     if (distributorDiscountPercent != null) {
         amount = amount * (1 - distributorDiscountPercent / 100)
         discountPercentApplied = distributorDiscountPercent
+    } else if (exitDiscountPercent != null) {
+        amount = amount * (1 - exitDiscountPercent / 100)
+        discountPercentApplied = exitDiscountPercent
     }
     const amountRounded = Math.round(amount * 100) / 100
     if (amountRounded <= 0 || amountRounded > 999_999.99) {
@@ -426,6 +447,7 @@ export async function POST(request: NextRequest) {
                         ...(discountPercentApplied != null && { discountPercentApplied }),
                         status: "PENDING",
                         ...(clientIp !== "unknown" && { clientIp }),
+                        ...(exitDiscountMeta && { exitDiscountMeta }),
                     },
                 })
 

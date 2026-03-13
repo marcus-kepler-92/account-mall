@@ -68,6 +68,9 @@ type ProductOrderFormProps = {
     inStock: boolean
     formId?: string
     productType?: "NORMAL" | "FREE_SHARED"
+    exitDiscountToken?: string | null
+    exitDiscountPercent?: number | null
+    onExitDiscountConsumed?: () => void
 }
 
 export function ProductOrderForm({
@@ -78,6 +81,9 @@ export function ProductOrderForm({
     inStock,
     formId = "product-order-form",
     productType = "NORMAL",
+    exitDiscountToken = null,
+    exitDiscountPercent = null,
+    onExitDiscountConsumed,
 }: ProductOrderFormProps) {
     const [showOrderPassword, setShowOrderPassword] = useState(false)
     const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
@@ -124,19 +130,32 @@ export function ProductOrderForm({
         runValidatePromo(codeTrimmed)
     }, [codeTrimmed, discountCode, runValidatePromo, setPromoData])
 
+    // Exit discount 生效条件：有 token 且无 promoCode
+    const activeExitDiscount =
+        exitDiscountToken && exitDiscountPercent != null && !codeTrimmed
+            ? exitDiscountPercent
+            : null
+
     const totalPrice = isFreeShared
         ? "0.00"
         : promoValidation?.valid && promoValidation.discountPercent != null
           ? (price * effectiveQuantity * (1 - promoValidation.discountPercent / 100)).toFixed(2)
-          : (price * effectiveQuantity).toFixed(2)
+          : activeExitDiscount != null
+            ? (price * effectiveQuantity * (1 - activeExitDiscount / 100)).toFixed(2)
+            : (price * effectiveQuantity).toFixed(2)
+
+    const activeDiscountPercent =
+        promoValidation?.valid && promoValidation.discountPercent != null
+            ? promoValidation.discountPercent
+            : activeExitDiscount
 
     useEffect(() => {
         setDisplay(
             totalPrice,
             isFreeShared,
-            promoValidation?.valid ? promoValidation.discountPercent ?? null : null
+            promoValidation?.valid ? promoValidation.discountPercent ?? null : activeExitDiscount
         )
-    }, [totalPrice, isFreeShared, promoValidation?.valid, promoValidation?.discountPercent, setDisplay])
+    }, [totalPrice, isFreeShared, promoValidation?.valid, promoValidation?.discountPercent, activeExitDiscount, setDisplay])
 
     const onSubmit = async (data: OrderFormSchema) => {
         if (!inStock) return
@@ -152,6 +171,8 @@ export function ProductOrderForm({
             }
             if (codeTrimmed && isValidDiscountCodeFormat(codeTrimmed)) {
                 payload.promoCode = codeTrimmed
+            } else if (exitDiscountToken && activeExitDiscount != null) {
+                payload.exitDiscountToken = exitDiscountToken
             }
             const res = await fetch("/api/orders", {
                 method: "POST",
@@ -161,6 +182,7 @@ export function ProductOrderForm({
             const responseData = await res.json()
 
             if (res.ok) {
+                onExitDiscountConsumed?.()
                 addOrUpdateOrder({
                     orderNo: responseData.orderNo,
                     productName: productName ?? "商品",
@@ -300,8 +322,8 @@ export function ProductOrderForm({
                         <span className="text-lg font-bold">
                             {isFreeShared
                                 ? "免费"
-                                : promoValidation?.valid && promoValidation.discountPercent != null
-                                  ? `合计: ¥${totalPrice}（已享 ${promoValidation.discountPercent}% 优惠）`
+                                : activeDiscountPercent != null
+                                  ? `合计: ¥${totalPrice}（已享 ${activeDiscountPercent}% 优惠）`
                                   : `合计: ¥${totalPrice}`}
                         </span>
                         <Button

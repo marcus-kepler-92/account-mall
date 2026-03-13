@@ -36,6 +36,11 @@ export function getOrderHistory(): OrderHistoryItem[] {
     return getStored().slice(0, MAX_ITEMS)
 }
 
+/** 快速判断本地是否有任何订单历史，用于客户端预检 */
+export function hasLocalOrderHistory(): boolean {
+    return getStored().length > 0
+}
+
 export function addOrUpdateOrder(item: OrderHistoryItem): void {
     if (typeof window === "undefined") return
     const list = getStored()

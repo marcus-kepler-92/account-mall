@@ -40,6 +40,7 @@ export async function completePendingOrder(
             product: { select: { name: true } },
             cards: { select: { id: true, status: true } },
         },
+        // 同时取出 exitDiscountMeta 用于事后写 ExitDiscountUsage
     })
     if (!order) {
         return { done: false, error: "Order not found" }
@@ -169,7 +170,36 @@ export async function completePendingOrder(
         sendOrderCompletionEmail(order.id).catch((err) =>
             console.error("[order-completion-email]", err),
         )
+
+        // Exit intent 折扣：订单真正完成时才记录使用记录，防止未付款占坑
+        if (order.exitDiscountMeta) {
+            writeExitDiscountUsage(order.id, order.exitDiscountMeta).catch((err) =>
+                console.error("[exit-discount-usage]", err),
+            )
+        }
     }
 
     return { done: true, orderNo: order.orderNo }
+}
+
+async function writeExitDiscountUsage(orderId: string, metaJson: string): Promise<void> {
+    try {
+        const meta = JSON.parse(metaJson) as {
+            productId: string
+            visitorId: string
+            fingerprintHash: string
+            ip: string
+        }
+        await prisma.exitDiscountUsage.create({
+            data: {
+                productId: meta.productId,
+                orderId,
+                visitorId: meta.visitorId,
+                fingerprintHash: meta.fingerprintHash,
+                ip: meta.ip,
+            },
+        })
+    } catch (err) {
+        console.error("[exit-discount-usage] Failed to write usage record:", err)
+    }
 }

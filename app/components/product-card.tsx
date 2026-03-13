@@ -9,6 +9,7 @@ import { ImageIcon, Bell } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { descriptionToPlainText } from "@/lib/description"
 import { SoldOutOverlay } from "@/app/components/sold-out-overlay"
+import { configClient } from "@/lib/config-client"
 
 // Primary-based gradients for theme consistency
 /** Relative or same-origin URLs use next/image; data: or external URLs use img (no optimization). */
@@ -54,6 +55,7 @@ export function ProductCard({ product, gradientIndex = 0, className, code }: Pro
     const brief = briefRaw.slice(0, 80)
     const isFreeShared = product.productType === "FREE_SHARED"
     const isSoldOut = !isFreeShared && product.stock === 0
+    const isLowStock = !isFreeShared && !isSoldOut && product.stock > 0 && product.stock <= configClient.lowStockThreshold
     const productSlug = `${product.id}-${product.slug}`
 
     const buildDetailHref = () => {
@@ -156,7 +158,11 @@ export function ProductCard({ product, gradientIndex = 0, className, code }: Pro
                                     >
                                         ¥{product.price.toFixed(2)}
                                     </span>
-                                    {product.stock > 0 ? (
+                                    {isLowStock ? (
+                                        <span className="ml-1.5 block text-[11px] font-medium text-orange-500 dark:text-orange-400">
+                                            仅剩 {product.stock} 件
+                                        </span>
+                                    ) : product.stock > 0 ? (
                                         <span className="ml-1.5 block text-[11px] text-muted-foreground">
                                             库存 {product.stock}
                                         </span>
