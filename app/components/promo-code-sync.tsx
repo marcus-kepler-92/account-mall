@@ -1,7 +1,7 @@
 "use client"
 
 import { Suspense } from "react"
-import { useSyncPromoCodeToCookie } from "@/app/hooks/use-sync-promo-code-to-cookie"
+import { useSyncPromoCodeToCookie } from "@/hooks/use-sync-promo-code-to-cookie"
 
 function PromoCodeSyncInner() {
     useSyncPromoCodeToCookie()

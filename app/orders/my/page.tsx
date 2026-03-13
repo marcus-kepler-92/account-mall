@@ -20,6 +20,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Package, Search, Trash2 } from "lucide-react"
 import { SiteHeader } from "@/app/components/site-header"
 import { toast } from "sonner"
@@ -266,9 +267,25 @@ function MyOrdersPageContent() {
     )
 }
 
+function MyOrdersSkeleton() {
+    return (
+        <div className="flex min-h-screen flex-col">
+            <div className="mx-auto w-full max-w-3xl px-4 py-8 space-y-4">
+                <Skeleton className="h-8 w-40" />
+                <Skeleton className="h-4 w-64" />
+                <div className="space-y-3 pt-4">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                        <Skeleton key={i} className="h-24 w-full rounded-lg" />
+                    ))}
+                </div>
+            </div>
+        </div>
+    )
+}
+
 export default function MyOrdersPage() {
     return (
-        <Suspense fallback={<div className="min-h-screen" />}>
+        <Suspense fallback={<MyOrdersSkeleton />}>
             <MyOrdersPageContent />
         </Suspense>
     )

@@ -1,29 +1,15 @@
 import Link from "next/link"
 import { prisma } from "@/lib/prisma"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { WithdrawalsTable } from "./withdrawals-table"
 import { Clock, CheckCircle2, XCircle } from "lucide-react"
+import { WithdrawalsDataTable } from "./withdrawals-data-table"
+import type { WithdrawalRow } from "./withdrawals-columns"
 
 export const dynamic = "force-dynamic"
 
-type SearchParams = Promise<{ status?: string }>
-
-export default async function AdminWithdrawalsPage({
-    searchParams,
-}: {
-    searchParams: SearchParams
-}) {
-    const params = await searchParams
-    const status = params.status as "PENDING" | "PAID" | "REJECTED" | null
-
-    const where: { status?: "PENDING" | "PAID" | "REJECTED" } = {}
-    if (status === "PENDING" || status === "PAID" || status === "REJECTED") {
-        where.status = status
-    }
-
+export default async function AdminWithdrawalsPage() {
     const [withdrawals, statusCounts] = await Promise.all([
         prisma.withdrawal.findMany({
-            where,
             include: {
                 distributor: {
                     select: { id: true, email: true, name: true },
@@ -47,33 +33,30 @@ export default async function AdminWithdrawalsPage({
         {
             key: "PENDING" as const,
             label: "待处理",
-            value: String(counts.PENDING),
+            value: counts.PENDING,
             icon: Clock,
             color: "text-warning",
             borderColor: "border-l-warning",
-            active: status === "PENDING",
         },
         {
             key: "PAID" as const,
             label: "已打款",
-            value: String(counts.PAID),
+            value: counts.PAID,
             icon: CheckCircle2,
             color: "text-success",
             borderColor: "border-l-success",
-            active: status === "PAID",
         },
         {
             key: "REJECTED" as const,
             label: "已拒绝",
-            value: String(counts.REJECTED),
+            value: counts.REJECTED,
             icon: XCircle,
             color: "text-muted-foreground",
             borderColor: "border-l-muted-foreground",
-            active: status === "REJECTED",
         },
     ]
 
-    const data = withdrawals.map((w) => ({
+    const data: WithdrawalRow[] = withdrawals.map((w) => ({
         id: w.id,
         distributorId: w.distributorId,
         distributor: w.distributor,
@@ -95,30 +78,25 @@ export default async function AdminWithdrawalsPage({
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {statCards.map((stat) => {
-                    const cardEl = (
+                {statCards.map((stat) => (
+                    <Link href={`/admin/withdrawals`} key={stat.key}>
                         <Card
-                            key={stat.key}
-                            className={`border-l-4 ${stat.borderColor} transition-colors hover:bg-accent/50 cursor-pointer ${stat.active ? "ring-2 ring-primary/20 bg-accent/30" : ""}`}
+                            className={`border-l-4 ${stat.borderColor} transition-colors hover:bg-accent/50 cursor-pointer`}
                         >
                             <CardContent className="pt-4 pb-4">
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <p className="text-sm font-medium text-muted-foreground">{stat.label}</p>
+                                        <p className="text-sm font-medium text-muted-foreground">
+                                            {stat.label}
+                                        </p>
                                         <p className="text-2xl font-bold mt-1">{stat.value}</p>
                                     </div>
                                     <stat.icon className={`size-8 ${stat.color} opacity-80`} />
                                 </div>
                             </CardContent>
                         </Card>
-                    )
-                    const href = stat.active ? "/admin/withdrawals" : `/admin/withdrawals?status=${stat.key}`
-                    return (
-                        <Link href={href} key={stat.key}>
-                            {cardEl}
-                        </Link>
-                    )
-                })}
+                    </Link>
+                ))}
             </div>
 
             <Card>
@@ -129,7 +107,7 @@ export default async function AdminWithdrawalsPage({
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <WithdrawalsTable data={data} currentStatus={status} />
+                    <WithdrawalsDataTable data={data} />
                 </CardContent>
             </Card>
         </div>

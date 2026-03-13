@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react"
 import ReactECharts from "echarts-for-react"
 import type { EChartsOption } from "echarts"
-import type { TopProductRow } from "@/app/admin/(main)/dashboard/types"
+import type { TopProductRow } from "./types"
 import { useTheme } from "next-themes"
-import { useEChartsTheme, getEChartsTooltip } from "@/app/components/echarts-theme"
+import { useEChartsTheme, getEChartsTooltip } from "./echarts-theme"
 
 function truncateName(name: string, maxLen: number = 12) {
     if (name.length <= maxLen) return name

@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { CommissionTiersTable } from "./commission-tiers-table"
+import { CommissionTiersDataTable } from "./commission-tiers-data-table"
 import { AddTierDialog } from "./add-tier-dialog"
+import type { TierRow } from "./commission-tiers-columns"
 
 export const dynamic = "force-dynamic"
 
@@ -10,7 +11,7 @@ export default async function AdminCommissionTiersPage() {
         orderBy: { sortOrder: "asc" },
     })
 
-    const data = tiers.map((t) => ({
+    const data: TierRow[] = tiers.map((t) => ({
         id: t.id,
         minAmount: Number(t.minAmount),
         maxAmount: Number(t.maxAmount),
@@ -25,7 +26,7 @@ export default async function AdminCommissionTiersPage() {
                 <div>
                     <h2 className="text-2xl font-bold tracking-tight">阶梯佣金配置</h2>
                     <p className="text-muted-foreground">
-                        全局适用，按自然周累计销售额分档，每档按订单金额的百分比计算阶梯佣金。管理员与分销员均可查看此梯度规则与当前销售额。
+                        全局适用，按自然周累计销售额分档，每档按订单金额的百分比计算阶梯佣金。
                     </p>
                 </div>
                 <AddTierDialog />
@@ -38,7 +39,7 @@ export default async function AdminCommissionTiersPage() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <CommissionTiersTable data={data} />
+                    <CommissionTiersDataTable data={data} />
                 </CardContent>
             </Card>
         </div>

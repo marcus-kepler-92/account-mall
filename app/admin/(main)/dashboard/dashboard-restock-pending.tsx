@@ -9,7 +9,7 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
-import type { RestockPendingRow } from "@/app/admin/(main)/dashboard/types"
+import type { RestockPendingRow } from "./types"
 
 export function DashboardRestockPending({
     data,

@@ -10,7 +10,7 @@ import {
     TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import type { InventoryRow } from "@/app/admin/(main)/dashboard/types"
+import type { InventoryRow } from "./types"
 
 export function DashboardInventoryAlerts({
     data,

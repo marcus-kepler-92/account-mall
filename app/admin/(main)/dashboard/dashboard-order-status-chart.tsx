@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react"
 import ReactECharts from "echarts-for-react"
 import type { EChartsOption } from "echarts"
-import type { OrderStatusCount } from "@/app/admin/(main)/dashboard/types"
+import type { OrderStatusCount } from "./types"
 import { useTheme } from "next-themes"
-import { useEChartsTheme, getEChartsTooltip } from "@/app/components/echarts-theme"
+import { useEChartsTheme, getEChartsTooltip } from "./echarts-theme"
 
 export function DashboardOrderStatusChart({ data }: { data: OrderStatusCount[] }) {
     const [mounted, setMounted] = useState(false)

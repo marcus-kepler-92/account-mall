@@ -2,8 +2,8 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent } from "@/components/ui/card";
 import { CreditCard, Package } from "lucide-react";
-import { BackButton } from "@/app/components/back-button";
-import { BulkImportCards } from "@/app/components/bulk-import-cards";
+import { BackButton } from "./back-button";
+import { BulkImportCards } from "./bulk-import-cards";
 import { ProductCardsDataTable } from "./product-cards-data-table";
 import type { ProductCardRow } from "./product-cards-columns";
 

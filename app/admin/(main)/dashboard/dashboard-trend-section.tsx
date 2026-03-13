@@ -1,8 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { DashboardChart } from "@/app/components/dashboard-chart"
-import type { DashboardTrendPoint } from "@/app/admin/(main)/dashboard/types"
+import { DashboardChart } from "./dashboard-chart"
+import type { DashboardTrendPoint } from "./types"
 import {
     Select,
     SelectContent,

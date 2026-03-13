@@ -1,10 +1,9 @@
 import Link from "next/link"
 import { prisma } from "@/lib/prisma"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card"
-import { Plus, Megaphone } from "lucide-react"
-import { AnnouncementsList } from "@/app/components/announcements-list"
-import type { AnnouncementItem } from "@/app/components/announcements-list"
+import { Plus } from "lucide-react"
+import { AnnouncementsDataTable } from "./announcements-data-table"
+import type { AnnouncementRow } from "./announcements-columns"
 
 export const dynamic = "force-dynamic"
 
@@ -13,7 +12,7 @@ export default async function AdminAnnouncementsPage() {
         orderBy: [{ sortOrder: "desc" }, { publishedAt: "desc" }, { createdAt: "desc" }],
     })
 
-    const items: AnnouncementItem[] = announcements.map((a) => ({
+    const data: AnnouncementRow[] = announcements.map((a) => ({
         id: a.id,
         title: a.title,
         content: a.content,
@@ -40,28 +39,7 @@ export default async function AdminAnnouncementsPage() {
                     </Link>
                 </Button>
             </div>
-
-            {items.length > 0 ? (
-                <AnnouncementsList announcements={items} />
-            ) : (
-                <Card>
-                    <CardContent className="flex flex-col items-center justify-center py-16">
-                        <div className="rounded-full bg-muted p-4 mb-4">
-                            <Megaphone className="size-8 text-muted-foreground" />
-                        </div>
-                        <CardTitle className="mb-2">暂无公告</CardTitle>
-                        <CardDescription className="mb-6 text-center max-w-sm">
-                            创建第一条公告，让用户了解维护、活动等信息。
-                        </CardDescription>
-                        <Button asChild>
-                            <Link href="/admin/announcements/new">
-                                <Plus className="size-4" />
-                                新建公告
-                            </Link>
-                        </Button>
-                    </CardContent>
-                </Card>
-            )}
+            <AnnouncementsDataTable data={data} />
         </div>
     )
 }

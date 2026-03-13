@@ -6,7 +6,6 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Turnstile } from "@marsidev/react-turnstile"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -23,8 +22,9 @@ import { addOrUpdateOrder } from "@/lib/order-history-storage"
 import { applyFieldErrors } from "@/lib/form-utils"
 import { createOrderFormSchema, type OrderFormSchema } from "@/lib/validations/order"
 import { configClient } from "@/lib/config-client"
-import { Skeleton } from "@/components/ui/skeleton"
 import { useProductPriceSyncStore } from "@/lib/stores/product-price-sync"
+import { ProductOrderQuantityPicker } from "./product-order-quantity-picker"
+import { ProductOrderTurnstile } from "./product-order-turnstile"
 
 const ORDER_FORM_LOADING_EVENT = "product-order-loading"
 
@@ -37,26 +37,28 @@ function dispatchOrderFormLoading(loading: boolean) {
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? ""
 const IS_DEV = process.env.NODE_ENV === "development"
 
-function isValidDiscountCodeFormat(code: string, maxLength: number = configClient.promoCodeMaxLength): boolean {
+function isValidDiscountCodeFormat(code: string): boolean {
     const t = code.trim()
-    return t.length >= 1 && t.length <= maxLength
+    return t.length >= 1 && t.length <= configClient.promoCodeMaxLength
 }
 
 type ValidatePromoResponse = { valid?: boolean; discountPercent?: number | null }
+
+type PromoValidation = {
+    valid: boolean
+    discountPercent: number | null
+} | null
 
 function normalizePromoValidation(data: ValidatePromoResponse | undefined): PromoValidation {
     if (data == null) return null
     return {
         valid: data.valid === true,
         discountPercent:
-            data.valid === true && typeof data.discountPercent === "number" ? data.discountPercent : null,
+            data.valid === true && typeof data.discountPercent === "number"
+                ? data.discountPercent
+                : null,
     }
 }
-
-type PromoValidation = {
-    valid: boolean
-    discountPercent: number | null
-} | null
 
 type ProductOrderFormProps = {
     productId: string
@@ -88,17 +90,18 @@ export function ProductOrderForm({
         }).then((res) => res.json()) as Promise<ValidatePromoResponse>
     }, [])
 
-    const { data: promoData, loading: promoValidating, run: runValidatePromo, mutate: setPromoData } = useRequest(
-        validatePromo,
-        {
-            manual: true,
-            debounceWait: configClient.promoValidateDebounceMs,
-        }
-    )
+    const {
+        data: promoData,
+        loading: promoValidating,
+        run: runValidatePromo,
+        mutate: setPromoData,
+    } = useRequest(validatePromo, {
+        manual: true,
+        debounceWait: configClient.promoValidateDebounceMs,
+    })
 
     const promoValidation = normalizePromoValidation(promoData)
     const setDisplay = useProductPriceSyncStore((s) => s.setDisplay)
-
     const router = useRouter()
     const requireTurnstile = Boolean(TURNSTILE_SITE_KEY) && !IS_DEV
     const isFreeShared = productType === "FREE_SHARED"
@@ -106,26 +109,20 @@ export function ProductOrderForm({
     const form = useForm<OrderFormSchema>({
         resolver: zodResolver(createOrderFormSchema(maxQuantity)),
         mode: "onTouched",
-        defaultValues: {
-            email: "",
-            orderPassword: "",
-            quantity: 1,
-        },
+        defaultValues: { email: "", orderPassword: "", quantity: 1 },
     })
 
     const quantity = form.watch("quantity")
     const effectiveQuantity = isFreeShared ? 1 : quantity
     const codeTrimmed = discountCode.trim()
-    const hasValidDiscountCodeFormat = codeTrimmed !== "" && isValidDiscountCodeFormat(discountCode)
 
-    // 防抖异步校验优惠码（ahooks useRequest）
     useEffect(() => {
-        if (!hasValidDiscountCodeFormat) {
+        if (!codeTrimmed || !isValidDiscountCodeFormat(discountCode)) {
             setPromoData(undefined)
             return
         }
         runValidatePromo(codeTrimmed)
-    }, [codeTrimmed, hasValidDiscountCodeFormat, runValidatePromo, setPromoData])
+    }, [codeTrimmed, discountCode, runValidatePromo, setPromoData])
 
     const totalPrice = isFreeShared
         ? "0.00"
@@ -143,7 +140,6 @@ export function ProductOrderForm({
 
     const onSubmit = async (data: OrderFormSchema) => {
         if (!inStock) return
-
         dispatchOrderFormLoading(true)
         let willRedirect = false
         try {
@@ -154,7 +150,6 @@ export function ProductOrderForm({
                 quantity: effectiveQuantity,
                 ...(turnstileToken && { turnstileToken }),
             }
-            const codeTrimmed = discountCode.trim()
             if (codeTrimmed && isValidDiscountCodeFormat(codeTrimmed)) {
                 payload.promoCode = codeTrimmed
             }
@@ -163,7 +158,6 @@ export function ProductOrderForm({
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload),
             })
-
             const responseData = await res.json()
 
             if (res.ok) {
@@ -178,7 +172,7 @@ export function ProductOrderForm({
                     toast.success(isFreeShared ? "领取成功" : "订单已创建")
                     willRedirect = true
                     router.push(
-                        `/orders/${encodeURIComponent(responseData.orderNo)}/success?token=${encodeURIComponent(responseData.successToken)}`,
+                        `/orders/${encodeURIComponent(responseData.orderNo)}/success?token=${encodeURIComponent(responseData.successToken)}`
                     )
                     return
                 }
@@ -201,12 +195,9 @@ export function ProductOrderForm({
         } catch {
             toast.error("下单失败，请稍后重试")
         } finally {
-            if (!willRedirect) {
-                dispatchOrderFormLoading(false)
-            }
+            if (!willRedirect) dispatchOrderFormLoading(false)
         }
     }
-
 
     return (
         <div className="space-y-4">
@@ -284,88 +275,27 @@ export function ProductOrderForm({
                         )}
                     />
 
-                    {!isFreeShared && (
-                        <FormField
-                            control={form.control}
-                            name="quantity"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>购买数量</FormLabel>
-                                    <FormControl>
-                                        <Input
-                                            type="number"
-                                            min={1}
-                                            max={maxQuantity}
-                                            disabled={!inStock}
-                                            {...field}
-                                            onChange={(e) => {
-                                                const v = parseInt(e.target.value, 10)
-                                                if (Number.isNaN(v) || v < 1) field.onChange(1)
-                                                else if (v > maxQuantity) field.onChange(maxQuantity)
-                                                else field.onChange(v)
-                                            }}
-                                        />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
+                    <ProductOrderQuantityPicker
+                        isFreeShared={isFreeShared}
+                        maxQuantity={maxQuantity}
+                        inStock={inStock}
+                        discountCode={discountCode}
+                        onDiscountCodeChange={setDiscountCode}
+                        promoValidating={promoValidating}
+                        promoValidation={promoValidation}
+                    />
+
+                    {requireTurnstile && (
+                        <ProductOrderTurnstile
+                            siteKey={TURNSTILE_SITE_KEY}
+                            isFreeShared={isFreeShared}
+                            widgetReady={turnstileWidgetReady}
+                            onWidgetReady={() => setTurnstileWidgetReady(true)}
+                            onSuccess={setTurnstileToken}
+                            onExpire={() => setTurnstileToken(null)}
                         />
                     )}
 
-                    {!isFreeShared && (
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium leading-none">优惠码</label>
-                            <Input
-                                type="text"
-                                placeholder={`选填，1–${configClient.promoCodeMaxLength} 字符`}
-                                disabled={!inStock}
-                                maxLength={configClient.promoCodeMaxLength}
-                                value={discountCode}
-                                onChange={(e) => setDiscountCode(e.target.value)}
-                                className="font-mono"
-                            />
-                            {discountCode.trim() !== "" && !isValidDiscountCodeFormat(discountCode) && (
-                                <p className="text-xs text-destructive">优惠码格式：1–{configClient.promoCodeMaxLength} 个字符</p>
-                            )}
-                            {hasValidDiscountCodeFormat && (
-                                <p className="text-xs text-muted-foreground">
-                                    {promoValidating
-                                        ? "校验中…"
-                                        : promoValidation?.valid && promoValidation.discountPercent != null
-                                          ? `已享 ${promoValidation.discountPercent}% 优惠`
-                                          : promoValidation?.valid
-                                            ? "推荐码有效，但未开通折扣"
-                                            : promoValidation && !promoValidation.valid
-                                              ? "推荐码无效"
-                                              : "校验中…"}
-                                </p>
-                            )}
-                        </div>
-                    )}
-
-                    {requireTurnstile && (
-                        <div className="relative flex min-h-[76px] justify-center">
-                            {!turnstileWidgetReady && (
-                                <div
-                                    className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/30 bg-muted/40 px-4 py-3"
-                                    aria-hidden
-                                >
-                                    <Skeleton className="h-10 w-[200px] rounded-full" />
-                                    <p className="text-xs text-muted-foreground">
-                                        安全验证加载中… 完成后即可点击{isFreeShared ? "「领取」" : "「立即购买」"}
-                                    </p>
-                                </div>
-                            )}
-                            <Turnstile
-                                siteKey={TURNSTILE_SITE_KEY}
-                                onSuccess={(token) => setTurnstileToken(token)}
-                                onExpire={() => setTurnstileToken(null)}
-                                onWidgetLoad={() => setTurnstileWidgetReady(true)}
-                            />
-                        </div>
-                    )}
-
-                    {/* 桌面端显示合计 + 提交按钮；移动端仅低栏显示到手价，此处隐藏避免重复 */}
                     <div className="hidden lg:flex items-center justify-between pt-2">
                         <span className="text-lg font-bold">
                             {isFreeShared
@@ -376,7 +306,11 @@ export function ProductOrderForm({
                         </span>
                         <Button
                             type="submit"
-                            disabled={!inStock || form.formState.isSubmitting || (requireTurnstile && !turnstileToken)}
+                            disabled={
+                                !inStock ||
+                                form.formState.isSubmitting ||
+                                (requireTurnstile && !turnstileToken)
+                            }
                             className="hidden lg:flex gap-2"
                         >
                             {form.formState.isSubmitting && (

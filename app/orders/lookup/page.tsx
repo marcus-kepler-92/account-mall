@@ -84,10 +84,12 @@ async function fetchApi(
     endpoint: string,
     body: Record<string, string>,
 ): Promise<ApiResult> {
-    const res = await fetch(endpoint, {
+    const { fetchWithTimeout } = await import("@/lib/fetch-with-timeout")
+    const res = await fetchWithTimeout(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
+        timeoutMs: 15_000,
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) return { ok: false, error: data?.error ?? "", raw: data }

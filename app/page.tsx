@@ -4,10 +4,21 @@ import { Suspense } from "react"
 import { Zap } from "lucide-react"
 import { prisma } from "@/lib/prisma"
 import { ProductCatalog } from "@/app/components/product-catalog"
+import { ProductCardSkeleton } from "@/app/components/product-card"
 import { SiteHeader } from "@/app/components/site-header"
-import { AnnouncementsBlock } from "@/app/components/announcements-block"
+import { AnnouncementsBlock } from "./announcements-block"
 import { config } from "@/lib/config"
 import { DEFAULT_SEO_TITLE, DEFAULT_SEO_DESCRIPTION, KEYWORDS_META } from "@/lib/seo-keywords"
+
+function ProductCatalogSkeleton() {
+    return (
+        <div className="grid grid-cols-1 items-stretch gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 min-[1600px]:grid-cols-6">
+            {Array.from({ length: 6 }).map((_, i) => (
+                <ProductCardSkeleton key={i} />
+            ))}
+        </div>
+    )
+}
 
 const ANNOUNCEMENTS_LIMIT = 20
 
@@ -57,7 +68,7 @@ export default async function HomePage() {
                         </p>
                     </section>
                     <AnnouncementsBlock announcements={frontAnnouncements} />
-                    <Suspense fallback={<div className="min-h-[400px]" />}>
+                    <Suspense fallback={<ProductCatalogSkeleton />}>
                         <ProductCatalog />
                     </Suspense>
                 </div>

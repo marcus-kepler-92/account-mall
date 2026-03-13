@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import { ProductForm } from "@/app/components/product-form"
-import { DeactivateProductButton } from "@/app/components/product-actions"
+import { DeactivateProductButton } from "./product-actions"
 
 export const dynamic = "force-dynamic"
 

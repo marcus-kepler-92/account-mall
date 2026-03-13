@@ -303,52 +303,47 @@ describe("Protected admin pages", () => {
     expect(response.headers.get("location")).toContain("/admin/login");
   });
 
-  it("should allow admin page access with valid ADMIN session", async () => {
-    mockAdminSession();
-
+  it("should allow admin page access with valid session cookie (no fetch needed)", async () => {
+    // Page navigations trust cookie presence; role check is delegated to layout auth-guard.
     const request = createRequest("/admin/dashboard", {
       cookies: { "better-auth.session_token": "valid_token" },
     });
     const response = await middleware(request);
 
     expect(response.status).toBe(200);
-    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it("should allow admin page access with __Secure- session cookie (production) as ADMIN", async () => {
-    mockAdminSession();
-
+  it("should allow admin page access with __Secure- session cookie (production, no fetch needed)", async () => {
     const request = createRequest("/admin/dashboard", {
       cookies: { "__Secure-better-auth.session_token": "valid_token" },
     });
     const response = await middleware(request);
 
     expect(response.status).toBe(200);
-    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it("should redirect to /admin/login when DISTRIBUTOR session accesses /admin/dashboard", async () => {
-    mockDistributorSession();
-
+  it("should allow page access when cookie exists regardless of role (role check delegated to layout)", async () => {
+    // proxy no longer fetches session for page navigations; layout auth-guard handles role enforcement.
     const request = createRequest("/admin/dashboard", {
       cookies: { "better-auth.session_token": "valid_token" },
     });
     const response = await middleware(request);
 
-    expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toContain("/admin/login");
+    expect(response.status).toBe(200);
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it("should redirect admin page with invalid session", async () => {
-    mockInvalidSession();
-
+  it("should allow page access when cookie exists even with expired/invalid token (layout auth-guard handles this)", async () => {
+    // proxy only checks cookie existence; actual session validation is in layout's auth-guard.
     const request = createRequest("/admin/dashboard", {
       cookies: { "better-auth.session_token": "expired_token" },
     });
     const response = await middleware(request);
 
-    expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toContain("/admin/login");
+    expect(response.status).toBe(200);
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 });
 
@@ -469,16 +464,15 @@ describe("Protected APIs", () => {
     expect(body.error).toBe("Unauthorized");
   });
 
-  it("should redirect to login when session fetch fails for protected page", async () => {
-    mockFetch.mockResolvedValueOnce({ ok: false });
-
+  it("should pass through protected page when cookie exists (no session fetch for page navigations)", async () => {
+    // proxy skips session fetch for page navigations; layout auth-guard handles validation.
     const request = createRequest("/admin/dashboard", {
       cookies: { "better-auth.session_token": "token" },
     });
     const response = await middleware(request);
 
-    expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toContain("/admin/login");
+    expect(response.status).toBe(200);
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 
   it("should pass through for non-public non-protected path", async () => {
@@ -509,27 +503,26 @@ describe("Protected distributor pages", () => {
     expect(response.headers.get("location")).toContain("/distributor/login");
   });
 
-  it("should allow distributor page access with valid DISTRIBUTOR session", async () => {
-    mockDistributorSession();
-
+  it("should allow distributor page access when cookie exists (no fetch needed)", async () => {
+    // proxy trusts cookie presence for page navigations; role check delegated to layout.
     const request = createRequest("/distributor", {
       cookies: { "better-auth.session_token": "valid_token" },
     });
     const response = await middleware(request);
 
     expect(response.status).toBe(200);
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it("should redirect to /distributor/login when ADMIN session accesses /distributor", async () => {
-    mockAdminSession();
-
+  it("should allow page access when ADMIN cookie present on distributor page (role check delegated to layout)", async () => {
+    // proxy no longer enforces role on page navigations; layout's auth-guard will redirect if wrong role.
     const request = createRequest("/distributor", {
       cookies: { "better-auth.session_token": "valid_token" },
     });
     const response = await middleware(request);
 
-    expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toContain("/distributor/login");
+    expect(response.status).toBe(200);
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 });
 

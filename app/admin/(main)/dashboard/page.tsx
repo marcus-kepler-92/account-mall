@@ -23,11 +23,13 @@ import {
 } from "lucide-react"
 import { getDashboardData } from "./dashboard-data"
 import { ORDER_STATUS_LABEL } from "./types"
-import { DashboardTrendSection } from "@/app/components/dashboard-trend-section"
-import { DashboardOrderStatusChart } from "@/app/components/dashboard-order-status-chart"
-import { DashboardTopProductsChart } from "@/app/components/dashboard-top-products-chart"
-import { DashboardInventoryAlerts } from "@/app/components/dashboard-inventory-alerts"
-import { DashboardRestockPending } from "@/app/components/dashboard-restock-pending"
+import { DashboardInventoryAlerts } from "./dashboard-inventory-alerts"
+import { DashboardRestockPending } from "./dashboard-restock-pending"
+import {
+    DashboardTrendSection,
+    DashboardOrderStatusChart,
+    DashboardTopProductsChart,
+} from "./dashboard-charts"
 import { config } from "@/lib/config"
 
 export const dynamic = "force-dynamic"

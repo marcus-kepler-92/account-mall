@@ -4,7 +4,7 @@ import { getDistributorSession } from "@/lib/auth-guard"
 import { prisma } from "@/lib/prisma"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { GuideMarkdownView } from "@/app/components/guide-markdown-view"
+import { GuideMarkdownView } from "./guide-markdown-view"
 
 export const dynamic = "force-dynamic"
 

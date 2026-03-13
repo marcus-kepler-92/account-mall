@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Mail, Hash, AlertCircle } from "lucide-react"
 import { SiteHeader } from "@/app/components/site-header"
-import { OrderSuccessCopySection } from "@/app/components/order-success-copy-section"
-import { OrderSuccessSyncHistory } from "@/app/components/order-success-sync-history"
+import { OrderSuccessCopySection } from "./order-success-copy-section"
+import { OrderSuccessSyncHistory } from "./order-success-sync-history"
 
 type PageProps = {
     params: Promise<{ orderNo: string }>

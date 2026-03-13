@@ -1,10 +1,9 @@
 import Link from "next/link"
 import { prisma } from "@/lib/prisma"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Plus, BookOpen } from "lucide-react"
-import { GuidesList } from "@/app/components/guides-list"
-import type { GuideItem } from "@/app/components/guides-list"
+import { Plus } from "lucide-react"
+import { GuidesDataTable } from "./guides-data-table"
+import type { GuideRow } from "./guides-columns"
 
 export const dynamic = "force-dynamic"
 
@@ -20,7 +19,7 @@ export default async function AdminGuidesPage() {
         },
     })
 
-    const items: GuideItem[] = guides.map((g) => ({
+    const data: GuideRow[] = guides.map((g) => ({
         id: g.id,
         title: g.title,
         content: g.content,
@@ -49,28 +48,7 @@ export default async function AdminGuidesPage() {
                     </Link>
                 </Button>
             </div>
-
-            {items.length > 0 ? (
-                <GuidesList guides={items} />
-            ) : (
-                <Card>
-                    <CardContent className="flex flex-col items-center justify-center py-16">
-                        <div className="rounded-full bg-muted p-4 mb-4">
-                            <BookOpen className="size-8 text-muted-foreground" />
-                        </div>
-                        <h3 className="font-semibold mb-2">暂无指南</h3>
-                        <p className="text-muted-foreground text-center max-w-sm mb-6">
-                            创建第一条分销员入门手册，包含商品上架、话术、引流文案等，分销员可直接复制使用。
-                        </p>
-                        <Button asChild>
-                            <Link href="/admin/guides/new">
-                                <Plus className="size-4" />
-                                新建指南
-                            </Link>
-                        </Button>
-                    </CardContent>
-                </Card>
-            )}
+            <GuidesDataTable data={data} />
         </div>
     )
 }

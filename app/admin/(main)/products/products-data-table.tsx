@@ -1,0 +1,87 @@
+"use client"
+
+import { useState } from "react"
+import {
+    useReactTable,
+    getCoreRowModel,
+    getSortedRowModel,
+    getFilteredRowModel,
+    type SortingState,
+    type ColumnFiltersState,
+    type VisibilityState,
+} from "@tanstack/react-table"
+import { X } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { DataTable, DataTableViewOptions } from "@/app/admin/components"
+import { productsColumns, type ProductRow } from "./products-columns"
+
+const statusOptions = [
+    { label: "全部", value: "" },
+    { label: "上架", value: "ACTIVE" },
+    { label: "下架", value: "INACTIVE" },
+]
+
+export function ProductsDataTable({ data }: { data: ProductRow[] }) {
+    const [sorting, setSorting] = useState<SortingState>([])
+    const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+    const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
+
+    const table = useReactTable({
+        data,
+        columns: productsColumns,
+        getCoreRowModel: getCoreRowModel(),
+        getSortedRowModel: getSortedRowModel(),
+        getFilteredRowModel: getFilteredRowModel(),
+        onSortingChange: setSorting,
+        onColumnFiltersChange: setColumnFilters,
+        onColumnVisibilityChange: setColumnVisibility,
+        state: { sorting, columnFilters, columnVisibility },
+    })
+
+    const nameFilter = (table.getColumn("name")?.getFilterValue() as string) ?? ""
+    const statusFilter = (table.getColumn("status")?.getFilterValue() as string) ?? ""
+    const hasFilters = columnFilters.length > 0
+
+    return (
+        <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap flex-1 items-center gap-2">
+                    <Input
+                        placeholder="搜索商品名称…"
+                        value={nameFilter}
+                        onChange={(e) => table.getColumn("name")?.setFilterValue(e.target.value)}
+                        className="h-8 w-[150px] lg:w-[250px]"
+                    />
+                    <div className="flex items-center gap-1">
+                        {statusOptions.map((opt) => (
+                            <Badge
+                                key={opt.value}
+                                variant={statusFilter === opt.value ? "default" : "outline"}
+                                className="cursor-pointer"
+                                onClick={() =>
+                                    table.getColumn("status")?.setFilterValue(opt.value || undefined)
+                                }
+                            >
+                                {opt.label}
+                            </Badge>
+                        ))}
+                    </div>
+                    {hasFilters && (
+                        <Button
+                            variant="ghost"
+                            onClick={() => table.resetColumnFilters()}
+                            className="h-8 px-2 lg:px-3"
+                        >
+                            重置
+                            <X className="ml-2 size-4" />
+                        </Button>
+                    )}
+                </div>
+                <DataTableViewOptions table={table} />
+            </div>
+            <DataTable table={table} columns={productsColumns} emptyMessage="暂无商品" />
+        </div>
+    )
+}

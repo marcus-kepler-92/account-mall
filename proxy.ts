@@ -235,7 +235,15 @@ export async function proxy(request: NextRequest) {
             return NextResponse.redirect(new URL("/admin/login", request.url));
         }
 
-        // Validate session by calling the auth API endpoint
+        // Page navigations: trust cookie presence for speed; the layout's
+        // auth-guard (getSessionForAdminArea / getDistributorSession) will do
+        // full session + role validation server-side.
+        const isPageNavigation = !pathname.startsWith("/api/");
+        if (isPageNavigation) {
+            return NextResponse.next();
+        }
+
+        // API routes: full session validation + role check
         const response = await fetch(
             new URL("/api/auth/get-session", request.nextUrl.origin),
             {
@@ -246,59 +254,34 @@ export async function proxy(request: NextRequest) {
         );
 
         if (!response.ok) {
-            if (pathname.startsWith("/api/")) {
-                return NextResponse.json(
-                    { error: "Unauthorized" },
-                    { status: 401 }
-                );
-            }
-            if (isDistributorProtectedPage(pathname)) {
-                return NextResponse.redirect(new URL("/distributor/login", request.url));
-            }
-            return NextResponse.redirect(new URL("/admin/login", request.url));
+            return NextResponse.json(
+                { error: "Unauthorized" },
+                { status: 401 }
+            );
         }
 
         const session = await response.json();
         if (!session?.session) {
-            if (pathname.startsWith("/api/")) {
-                return NextResponse.json(
-                    { error: "Unauthorized" },
-                    { status: 401 }
-                );
-            }
-            if (isDistributorProtectedPage(pathname)) {
-                return NextResponse.redirect(new URL("/distributor/login", request.url));
-            }
-            return NextResponse.redirect(new URL("/admin/login", request.url));
+            return NextResponse.json(
+                { error: "Unauthorized" },
+                { status: 401 }
+            );
         }
 
         const userRole = (session?.user as { role?: string } | undefined)?.role;
 
-        // Admin-only routes: require ADMIN role; wrong role -> redirect or 401
-        if (isAdminOnlyRoute(pathname, method)) {
-            if (userRole !== "ADMIN") {
-                if (pathname.startsWith("/api/")) {
-                    return NextResponse.json(
-                        { error: "Unauthorized" },
-                        { status: 401 }
-                    );
-                }
-                return NextResponse.redirect(new URL("/admin/login", request.url));
-            }
+        if (isAdminOnlyRoute(pathname, method) && userRole !== "ADMIN") {
+            return NextResponse.json(
+                { error: "Unauthorized" },
+                { status: 401 }
+            );
         }
 
-        // Distributor routes (pages + API): require DISTRIBUTOR role only; wrong role -> redirect or 401
-        const isDistributorRoute =
-            isDistributorProtectedPage(pathname) ||
-            pathname.startsWith(DISTRIBUTOR_API_PREFIX);
-        if (isDistributorRoute && userRole !== "DISTRIBUTOR") {
-            if (pathname.startsWith("/api/")) {
-                return NextResponse.json(
-                    { error: "Unauthorized" },
-                    { status: 401 }
-                );
-            }
-            return NextResponse.redirect(new URL("/distributor/login", request.url));
+        if (pathname.startsWith(DISTRIBUTOR_API_PREFIX) && userRole !== "DISTRIBUTOR") {
+            return NextResponse.json(
+                { error: "Unauthorized" },
+                { status: 401 }
+            );
         }
     }
 

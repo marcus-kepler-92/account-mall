@@ -4,8 +4,11 @@ import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/app/components/theme-provider";
 import { SiteNameProvider } from "@/app/components/site-name-provider";
 import { PromoCodeSync } from "@/app/components/promo-code-sync";
-import { Analytics } from "@vercel/analytics/next";
+import { QueryProvider } from "@/app/components/query-provider";
+import { NetworkStatusBar } from "@/app/components/network-status-bar";
+import { AnalyticsClient } from "@/app/components/analytics-client";
 import { config } from "@/lib/config";
+
 import { KEYWORDS_META } from "@/lib/seo-keywords";
 import "./globals.css";
 
@@ -79,18 +82,21 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <SiteNameProvider
-            siteName={config.siteName}
-            siteDescription={config.siteDescription}
-            siteTagline={config.siteTagline}
-            siteSubtitle={config.siteSubtitle}
-            adminPanelLabel={config.adminPanelLabel}
-          >
-            <PromoCodeSync />
-            {children}
-            <Toaster />
-            <Analytics />
-          </SiteNameProvider>
+          <QueryProvider>
+            <SiteNameProvider
+              siteName={config.siteName}
+              siteDescription={config.siteDescription}
+              siteTagline={config.siteTagline}
+              siteSubtitle={config.siteSubtitle}
+              adminPanelLabel={config.adminPanelLabel}
+            >
+              <PromoCodeSync />
+              {children}
+              <Toaster />
+              <AnalyticsClient />
+              <NetworkStatusBar />
+            </SiteNameProvider>
+          </QueryProvider>
         </ThemeProvider>
       </body>
     </html>

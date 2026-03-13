@@ -5,11 +5,12 @@ import { Suspense } from "react"
 import { prisma } from "@/lib/prisma"
 import { config } from "@/lib/config"
 import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import { ProductOrderForm } from "@/app/components/product-order-form"
 import { SiteHeader } from "@/app/components/site-header"
 import { SoldOutOverlay } from "@/app/components/sold-out-overlay"
-import { RestockReminderForm } from "@/app/components/restock-reminder-form"
+import { RestockReminderForm } from "./restock-reminder-form"
 import { ProductBottomBar } from "../../components/product-bottom-bar"
 import { descriptionToPlainText } from "@/lib/description"
 import { buildProductDetailRedirectPath } from "@/lib/product-canonical-url"
@@ -243,7 +244,7 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
                         </section>
 
                         {isSoldOut && (
-                            <Suspense fallback={null}>
+                            <Suspense fallback={<Skeleton className="h-32 w-full rounded-lg" />}>
                                 <ProductRestockSection
                                     productId={product.id}
                                     productName={product.name}
