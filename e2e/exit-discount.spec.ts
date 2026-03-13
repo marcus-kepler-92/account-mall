@@ -20,10 +20,14 @@ async function getProductPath(slug: string): Promise<string> {
     return `/products/${product.id}-${product.slug}`
 }
 
-/** 触发桌面端 exit intent：先移入再移出视口顶部 */
+/** 触发桌面端 exit intent：先移入再直接 dispatch mouseleave（负坐标在 headless 下会被裁剪，mouseleave 不可靠） */
 async function triggerDesktopExitIntent(page: Page) {
     await page.mouse.move(300, 300)
-    await page.mouse.move(300, -10)
+    await page.evaluate(() => {
+        document.dispatchEvent(
+            new MouseEvent("mouseleave", { bubbles: false, clientX: 300, clientY: -10 })
+        )
+    })
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -172,7 +176,7 @@ test.describe.serial("Exit discount flow", () => {
             expect(notifyRes.status()).toBe(200)
 
             await page.goto(`${baseURL}/orders/lookup?orderNo=${encodeURIComponent(completedOrderNo)}`)
-            await page.getByPlaceholder(/例如：FAK|订单号/).fill(completedOrderNo)
+            await expect(page.getByPlaceholder(/例如：FAK|订单号/)).toHaveValue(completedOrderNo, { timeout: 5_000 })
             await page.getByPlaceholder("下单时设置的查询密码").fill("e2e-exit-pass-123")
             await page.getByRole("button", { name: "查询订单" }).click()
             await expect(page.getByText("已完成", { exact: true })).toBeVisible({ timeout: 10_000 })

@@ -9,6 +9,8 @@ import { config } from "@/lib/config"
 
 /** 仅领取该状态的账号，其它（如异常）过滤掉；调参请改此处或 config */
 const ALLOWED_STATUS = "正常"
+/** 过滤掉的地区，这些地区的账号不会被分配给用户 */
+const BLOCKED_REGIONS = ["中国大陆"]
 const DEFAULT_USER_AGENT =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
@@ -55,6 +57,11 @@ function parseAccountsFromHtml(html: string): SharedAccount[] {
         return status.trim() === ALLOWED_STATUS
     }
 
+    /** 排除中国大陆等地区 */
+    function isAllowedRegion(region: string): boolean {
+        return !BLOCKED_REGIONS.includes(region.trim())
+    }
+
     // 策略0：id.ali-door.top 等页面 — .card 内用 data-clipboard-text 的复制按钮
     $(".card").each((_, card) => {
         const $card = $(card)
@@ -69,7 +76,7 @@ function parseAccountsFromHtml(html: string): SharedAccount[] {
             $card.find(".card-text .badge").first().text().trim() ||
             extractGroup(text, regionRe) ||
             "未知"
-        if (account && password && !seen.has(account)) {
+        if (account && password && !seen.has(account) && isAllowedRegion(region)) {
             seen.add(account)
             results.push({ account, password, region, status, lastCheckedAt, installStatus })
         }
@@ -86,7 +93,7 @@ function parseAccountsFromHtml(html: string): SharedAccount[] {
         const account = extractGroup(text, accountRe)
         const password = extractGroup(text, passwordRe)
         const region = extractGroup(text, regionRe) || "未知"
-        if (account && password && !seen.has(account)) {
+        if (account && password && !seen.has(account) && isAllowedRegion(region)) {
             seen.add(account)
             results.push({ account, password, region, status, lastCheckedAt, installStatus })
         }
@@ -111,7 +118,7 @@ function parseAccountsFromHtml(html: string): SharedAccount[] {
             const account = extractGroup(text, accountRe)
             const password = extractGroup(text, passwordRe)
             const region = extractGroup(text, regionRe) || "未知"
-            if (account && password && !seen.has(account)) {
+            if (account && password && !seen.has(account) && isAllowedRegion(region)) {
                 seen.add(account)
                 results.push({ account, password, region, status, lastCheckedAt, installStatus })
             }
@@ -128,7 +135,7 @@ function parseAccountsFromHtml(html: string): SharedAccount[] {
         const region = extractGroup(text, regionRe) || "未知"
         const lastCheckedAt = extractGroup(text, lastCheckedRe)?.trim() ?? undefined
         const installStatus = extractGroup(text, installStatusRe) ?? undefined
-        if (account && password && !seen.has(account)) {
+        if (account && password && !seen.has(account) && isAllowedRegion(region)) {
             seen.add(account)
             results.push({
                 account,
@@ -171,8 +178,8 @@ export async function scrapeSharedAccounts(sourceUrl: string): Promise<SharedAcc
         return cached.data
     }
 
-    const timeoutMs = config.freeSharedScrapeTimeoutMs
-    const userAgent = config.freeSharedScrapeUserAgent ?? DEFAULT_USER_AGENT
+    const timeoutMs = config.autoFetchScrapeTimeoutMs
+    const userAgent = config.autoFetchScrapeUserAgent ?? DEFAULT_USER_AGENT
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
 
@@ -187,13 +194,23 @@ export async function scrapeSharedAccounts(sourceUrl: string): Promise<SharedAcc
         })
         clearTimeout(timeoutId)
 
-        if (!res.ok) return []
+        if (!res.ok) {
+            console.warn(`[scrape] HTTP ${res.status} 从 ${url}`)
+            return []
+        }
         const html = await res.text()
+        if (process.env.NODE_ENV === "development") {
+            console.log(`[scrape] 页面长度 ${html.length} 字节，包含"状态":`, html.includes("状态"))
+        }
         const data = parseAccountsFromHtml(html)
-        scrapeCache.set(url, { data, expiresAt: now + config.freeSharedScrapeCacheTtlMs })
+        if (process.env.NODE_ENV === "development") {
+            console.log(`[scrape] 解析出 ${data.length} 条账号`)
+        }
+        scrapeCache.set(url, { data, expiresAt: now + config.autoFetchScrapeCacheTtlMs })
         return data
-    } catch {
+    } catch (err) {
         clearTimeout(timeoutId)
+        console.warn("[scrape] 爬取失败:", err instanceof Error ? err.message : err)
         return []
     }
 }

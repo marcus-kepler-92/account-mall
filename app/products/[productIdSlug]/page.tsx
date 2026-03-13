@@ -99,10 +99,11 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
         where: { productId: product.id, status: "UNSOLD" },
     })
 
-    const isFreeShared = product.productType === "FREE_SHARED"
-    const isSoldOut = !isFreeShared && stockCount === 0
+    const isAutoFetch = product.productType === "AUTO_FETCH"
+    const isFree = isAutoFetch && Number(product.price) === 0
+    const isSoldOut = !isAutoFetch && stockCount === 0
     const lowStockThreshold = Number(process.env.NEXT_PUBLIC_LOW_STOCK_THRESHOLD) || 5
-    const isLowStock = !isFreeShared && !isSoldOut && stockCount > 0 && stockCount <= lowStockThreshold
+    const isLowStock = !isAutoFetch && !isSoldOut && stockCount > 0 && stockCount <= lowStockThreshold
     const priceNumber = Number(product.price)
 
     const productUrl = `${config.siteUrl}/products/${product.id}-${product.slug}`
@@ -228,7 +229,8 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
                             price={priceNumber}
                             stockCount={stockCount}
                             isSoldOut={isSoldOut}
-                            isFreeShared={isFreeShared}
+                            isFree={isFree}
+                            isAutoFetch={isAutoFetch}
                             isLowStock={isLowStock}
                         />
 
@@ -238,11 +240,12 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
                             <ProductOrderSection
                                 productId={product.id}
                                 productName={product.name}
-                                maxQuantity={isFreeShared ? 1 : product.maxQuantity}
+                                maxQuantity={isAutoFetch ? 1 : product.maxQuantity}
                                 price={priceNumber}
                                 inStock={!isSoldOut}
                                 formId="product-order-form"
                                 productType={product.productType}
+                                validityHours={product.validityHours}
                             />
                         </section>
 
@@ -264,7 +267,7 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
                 orderSectionId="order-section"
                 restockSectionId={isSoldOut ? "restock-section" : undefined}
                 formId="product-order-form"
-                isFreeShared={isFreeShared}
+                isFree={isFree}
             />
         </div>
     )
@@ -318,11 +321,12 @@ type ProductInfoSectionProps = {
     price: number
     stockCount: number
     isSoldOut: boolean
-    isFreeShared?: boolean
+    isFree?: boolean
+    isAutoFetch?: boolean
     isLowStock?: boolean
 }
 
-function ProductInfoSection({ name, tags, price, stockCount, isSoldOut, isFreeShared, isLowStock }: ProductInfoSectionProps) {
+function ProductInfoSection({ name, tags, price, stockCount, isSoldOut, isFree, isAutoFetch, isLowStock }: ProductInfoSectionProps) {
     return (
         <section
             aria-labelledby="product-info-heading"
@@ -350,14 +354,11 @@ function ProductInfoSection({ name, tags, price, stockCount, isSoldOut, isFreeSh
                 </h1>
                 <div className="flex items-end justify-between gap-3">
                     <div className="flex items-baseline gap-2">
-                        {isFreeShared ? (
+                        {isFree ? (
                             <>
                                 <span className="text-2xl font-bold tabular-nums text-primary lg:text-3xl">
                                     免费
                                 </span>
-                                <Badge variant="secondary" className="text-xs font-normal">
-                                    免费共享
-                                </Badge>
                             </>
                         ) : (
                             <>
@@ -369,7 +370,11 @@ function ProductInfoSection({ name, tags, price, stockCount, isSoldOut, isFreeSh
                                 >
                                     ¥{price.toFixed(2)}
                                 </span>
-                                {isSoldOut ? (
+                                {isAutoFetch ? (
+                                    <Badge variant="secondary" className="text-xs font-normal">
+                                        有货
+                                    </Badge>
+                                ) : isSoldOut ? (
                                     <Badge variant="outline" className="text-xs font-normal">
                                         已售罄
                                     </Badge>

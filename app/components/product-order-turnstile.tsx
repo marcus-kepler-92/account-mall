@@ -10,7 +10,7 @@ const Turnstile = dynamic(
 
 type Props = {
     siteKey: string
-    isFreeShared: boolean
+    isAutoFetch: boolean
     widgetReady: boolean
     onWidgetReady: () => void
     onSuccess: (token: string) => void
@@ -19,7 +19,7 @@ type Props = {
 
 export function ProductOrderTurnstile({
     siteKey,
-    isFreeShared,
+    isAutoFetch,
     widgetReady,
     onWidgetReady,
     onSuccess,
@@ -35,7 +35,7 @@ export function ProductOrderTurnstile({
                     <Skeleton className="h-10 w-[200px] rounded-full" />
                     <p className="text-xs text-muted-foreground">
                         安全验证加载中… 完成后即可点击
-                        {isFreeShared ? "「领取」" : "「立即购买」"}
+                        {isAutoFetch ? "「领取」" : "「立即购买」"}
                     </p>
                 </div>
             )}

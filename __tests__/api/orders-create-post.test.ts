@@ -1079,4 +1079,72 @@ describe("POST /api/orders (create order)", () => {
             expect(call.data).not.toHaveProperty("discountPercentApplied")
         })
     })
+
+    describe("fingerprintHash 写入普通商品订单", () => {
+        function makeNormalProduct(price = 100) {
+            return {
+                id: "prod_normal",
+                name: "Normal Product",
+                price,
+                maxQuantity: 10,
+                status: "ACTIVE",
+                productType: "NORMAL",
+            }
+        }
+
+        function makeNormalOrderBody(overrides?: Record<string, unknown>) {
+            return {
+                productId: "prod_normal",
+                email: "buyer@example.com",
+                orderPassword: "password123",
+                quantity: 1,
+                ...overrides,
+            }
+        }
+
+        function setupNormalTransaction(captureRef: { data?: Record<string, unknown> }) {
+            return prismaMock.$transaction.mockImplementation(async (fn: Function) => {
+                const tx = {
+                    order: {
+                        create: jest.fn().mockImplementation(async (args: { data: Record<string, unknown> }) => {
+                            captureRef.data = args.data
+                            return { id: "ord_1", orderNo: "uuid-normal" }
+                        }),
+                    },
+                    card: {
+                        findMany: jest.fn().mockResolvedValue([{ id: "card_1" }]),
+                        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+                    },
+                }
+                await fn(tx)
+                return { id: "ord_1", orderNo: "uuid-normal" }
+            })
+        }
+
+        it("有指纹 → fingerprintHash 存入普通订单 data", async () => {
+            prismaMock.product.findUnique.mockResolvedValue(makeNormalProduct())
+            prismaMock.user.findFirst.mockResolvedValue(null)
+            prismaMock.order.count.mockResolvedValue(0)
+            prismaMock.card.count.mockResolvedValue(5)
+            const captureRef: { data?: Record<string, unknown> } = {}
+            setupNormalTransaction(captureRef)
+
+            await POST(createJsonRequest(makeNormalOrderBody({ fingerprintHash: "fp-normal-abc" })))
+
+            expect(captureRef.data?.fingerprintHash).toBe("fp-normal-abc")
+        })
+
+        it("无指纹 → fingerprintHash 不出现在普通订单 data", async () => {
+            prismaMock.product.findUnique.mockResolvedValue(makeNormalProduct())
+            prismaMock.user.findFirst.mockResolvedValue(null)
+            prismaMock.order.count.mockResolvedValue(0)
+            prismaMock.card.count.mockResolvedValue(5)
+            const captureRef: { data?: Record<string, unknown> } = {}
+            setupNormalTransaction(captureRef)
+
+            await POST(createJsonRequest(makeNormalOrderBody()))
+
+            expect(captureRef.data?.fingerprintHash).toBeUndefined()
+        })
+    })
 })

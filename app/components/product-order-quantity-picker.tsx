@@ -18,7 +18,7 @@ type PromoValidation = {
 } | null
 
 type Props = {
-    isFreeShared: boolean
+    isAutoFetch: boolean
     maxQuantity: number
     inStock: boolean
     discountCode: string
@@ -33,7 +33,7 @@ function isValidDiscountCodeFormat(code: string): boolean {
 }
 
 export function ProductOrderQuantityPicker({
-    isFreeShared,
+    isAutoFetch,
     maxQuantity,
     inStock,
     discountCode,
@@ -43,7 +43,7 @@ export function ProductOrderQuantityPicker({
 }: Props) {
     const { control } = useFormContext<OrderFormSchema>()
 
-    if (isFreeShared) return null
+    if (isAutoFetch) return null
 
     return (
         <>

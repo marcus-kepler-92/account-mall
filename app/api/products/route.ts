@@ -89,7 +89,7 @@ export async function GET(request: NextRequest) {
         prisma.product.count({ where }),
     ]);
 
-    // Also get unsold card counts for stock display (FREE_SHARED 无预存卡密，stock 仅用于展示，前端按 productType 判断可领取)
+    // Also get unsold card counts for stock display (AUTO_FETCH 无预存卡密，stock 仅用于展示，前端按 productType 判断可领取)
     const productsWithStock = await Promise.all(
         products.map(async (product) => {
             const unsoldCount = await prisma.card.count({
@@ -98,15 +98,15 @@ export async function GET(request: NextRequest) {
                     status: "UNSOLD",
                 },
             });
-            const isFreeShared = product.productType === "FREE_SHARED";
+            const isAutoFetch = product.productType === "AUTO_FETCH";
             return {
                 ...product,
                 price: Number(product.price),
                 stock: unsoldCount,
                 productType: product.productType ?? "NORMAL",
                 sourceUrl: product.sourceUrl ?? null,
-                // 免费共享在列表里按「有货」展示，不依赖库存数
-                ...(isFreeShared && { stock: 1 }),
+                // AUTO_FETCH 在列表里按「有货」展示，不依赖库存数
+                ...(isAutoFetch && { stock: 1 }),
             };
         })
     );
@@ -129,10 +129,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
     const session = await getAdminSession();
     if (!session) {
-        return NextResponse.json(
-            { error: "Unauthorized" },
-            { status: 401 }
-        );
+        return unauthorized();
     }
 
     let body: unknown;
@@ -147,7 +144,7 @@ export async function POST(request: NextRequest) {
         return validationError(parsed.error.flatten());
     }
 
-    const { name, slug, description, summary, image, price, maxQuantity, status, tagIds, productType, sourceUrl } =
+    const { name, slug, description, summary, image, price, maxQuantity, status, tagIds, productType, sourceUrl, validityHours } =
         parsed.data;
 
     // Check slug uniqueness
@@ -158,10 +155,10 @@ export async function POST(request: NextRequest) {
         return conflict("A product with this slug already exists");
     }
 
-    const isFreeShared = productType === "FREE_SHARED";
-    const finalPrice = isFreeShared ? 0 : price;
-    const finalMaxQuantity = isFreeShared ? config.freeSharedMaxQuantityPerOrder : (maxQuantity ?? 10);
-    const finalSourceUrl = isFreeShared ? null : (sourceUrl?.trim() || null);
+    const isAutoFetch = productType === "AUTO_FETCH";
+    const finalPrice = isAutoFetch ? (price ?? 0) : price;
+    const finalMaxQuantity = isAutoFetch ? config.autoFetchMaxQuantityPerOrder : (maxQuantity ?? 10);
+    const finalSourceUrl = sourceUrl?.trim() || null;
 
     const product = await prisma.product.create({
         data: {
@@ -175,6 +172,7 @@ export async function POST(request: NextRequest) {
             status: status ?? "ACTIVE",
             productType: productType ?? "NORMAL",
             sourceUrl: finalSourceUrl,
+            ...(validityHours != null && { validityHours }),
             tags:
                 tagIds && tagIds.length > 0
                     ? { connect: tagIds.map((id) => ({ id })) }

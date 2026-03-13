@@ -3,7 +3,7 @@ import * as z from "zod";
 // Slug format: lowercase alphanumeric with hyphens
 const slugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
-const productTypeEnum = z.enum(["NORMAL", "FREE_SHARED"]);
+const productTypeEnum = z.enum(["NORMAL", "AUTO_FETCH"]);
 
 export const createProductSchema = z.object({
     name: z.string().min(1, "Name is required").max(200, "Name is too long"),
@@ -20,10 +20,11 @@ export const createProductSchema = z.object({
     status: z.enum(["ACTIVE", "INACTIVE"]).optional(),
     productType: productTypeEnum.optional(),
     sourceUrl: z.string().url().optional().nullable().or(z.literal("")),
+    validityHours: z.number().int().min(1).max(8760).optional().nullable(),
     tagIds: z.array(z.string()).optional(),
 }).refine(
-    (data) => data.productType !== "FREE_SHARED" || data.price === 0,
-    { message: "Free shared product must have price 0", path: ["price"] }
+    (data) => data.productType !== "AUTO_FETCH" || (data.sourceUrl && data.sourceUrl !== ""),
+    { message: "Auto-fetch product must have a source URL", path: ["sourceUrl"] }
 );
 
 export const updateProductSchema = z.object({
@@ -42,19 +43,17 @@ export const updateProductSchema = z.object({
     status: z.enum(["ACTIVE", "INACTIVE"]).optional(),
     productType: productTypeEnum.optional(),
     sourceUrl: z.string().url().optional().nullable().or(z.literal("")),
+    validityHours: z.number().int().min(1).max(8760).optional().nullable(),
     tagIds: z.array(z.string()).optional(),
     pinned: z.boolean().optional(),
-}).refine(
-    (data) => data.productType !== "FREE_SHARED" || (data.price === undefined || data.price === 0),
-    { message: "Free shared product must have price 0", path: ["price"] }
-);
+});
 
 export const createTagSchema = z.object({
     name: z.string().min(1, "Tag name is required").max(50, "Tag name is too long"),
 });
 
 // Form schema for product form (handles string inputs from form fields)
-// 免费共享时 price/maxQuantity/sourceUrl 由环境变量提供，表单可不填
+// AUTO_FETCH 时 sourceUrl 必填，price/maxQuantity 由表单设置
 export const productFormSchema = z
     .object({
         name: z.string().min(1, "请输入商品名称").max(200, "商品名称过长"),
@@ -75,12 +74,16 @@ export const productFormSchema = z
             "数量必须在 1-1000 之间"
         ),
         isActive: z.boolean(),
-        productType: z.enum(["NORMAL", "FREE_SHARED"]).optional(),
+        productType: z.enum(["NORMAL", "AUTO_FETCH"]).optional(),
         sourceUrl: z.string().optional(),
+        validityHours: z.string().optional(),
         tagIds: z.array(z.string()).optional(),
     })
     .superRefine((data, ctx) => {
-        if (data.productType !== "FREE_SHARED") {
+        if (data.productType === "AUTO_FETCH") {
+            if (!data.sourceUrl || data.sourceUrl.trim() === "")
+                ctx.addIssue({ code: "custom", message: "AUTO_FETCH 商品必须填写来源 URL", path: ["sourceUrl"] })
+        } else {
             if (!data.price || data.price === "")
                 ctx.addIssue({ code: "custom", message: "请输入价格", path: ["price"] })
             else if (Number.isNaN(parseFloat(data.price)) || parseFloat(data.price) < 0)

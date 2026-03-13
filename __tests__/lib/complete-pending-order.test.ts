@@ -468,4 +468,102 @@ describe("completePendingOrder", () => {
             expect(prismaMock.invitationReward.create).not.toHaveBeenCalled()
         })
     })
+
+    describe("AUTO_FETCH 付费订单 expiresAt", () => {
+        function makeAutoFetchPendingOrder(overrides?: Record<string, unknown>) {
+            return {
+                id: "ord_af",
+                orderNo: "af-order-1",
+                status: "PENDING",
+                amount: 19.9,
+                quantity: 1,
+                distributorId: null,
+                expiresAt: null,
+                exitDiscountMeta: null,
+                product: { name: "AF Account", productType: "AUTO_FETCH", validityHours: 24 },
+                cards: [{ id: "c_af", status: "RESERVED" }],
+                ...overrides,
+            } as any
+        }
+
+        function setupAutoFetchTransaction() {
+            prismaMock.order.updateMany.mockResolvedValue({ count: 1 })
+            prismaMock.$transaction.mockImplementation(async (fn: (tx: any) => Promise<void>) => {
+                await fn(prismaMock)
+            })
+        }
+
+        it("付费 AUTO_FETCH 完成支付 → expiresAt = paidAt + validityHours", async () => {
+            prismaMock.order.findFirst.mockResolvedValue(makeAutoFetchPendingOrder())
+            setupAutoFetchTransaction()
+
+            const before = Date.now()
+            await completePendingOrder("af-order-1")
+            const after = Date.now()
+
+            const updateCall = prismaMock.order.updateMany.mock.calls[0][0]
+            const { expiresAt, paidAt } = updateCall.data
+            expect(expiresAt).toBeInstanceOf(Date)
+            // expiresAt 应 ≈ paidAt + 24h
+            const expectedMs = 24 * 60 * 60 * 1000
+            expect(expiresAt.getTime() - paidAt.getTime()).toBeCloseTo(expectedMs, -3)
+            // paidAt 在测试前后之间
+            expect(paidAt.getTime()).toBeGreaterThanOrEqual(before)
+            expect(paidAt.getTime()).toBeLessThanOrEqual(after)
+        })
+
+        it("validityHours = 48 → expiresAt 为 48 小时后", async () => {
+            prismaMock.order.findFirst.mockResolvedValue(
+                makeAutoFetchPendingOrder({ product: { name: "AF", productType: "AUTO_FETCH", validityHours: 48 } })
+            )
+            setupAutoFetchTransaction()
+
+            await completePendingOrder("af-order-1")
+
+            const { expiresAt, paidAt } = prismaMock.order.updateMany.mock.calls[0][0].data
+            const expectedMs = 48 * 60 * 60 * 1000
+            expect(expiresAt.getTime() - paidAt.getTime()).toBeCloseTo(expectedMs, -3)
+        })
+
+        it("validityHours 未设置 → 默认 24 小时", async () => {
+            prismaMock.order.findFirst.mockResolvedValue(
+                makeAutoFetchPendingOrder({ product: { name: "AF", productType: "AUTO_FETCH", validityHours: null } })
+            )
+            setupAutoFetchTransaction()
+
+            await completePendingOrder("af-order-1")
+
+            const { expiresAt, paidAt } = prismaMock.order.updateMany.mock.calls[0][0].data
+            const expectedMs = 24 * 60 * 60 * 1000
+            expect(expiresAt.getTime() - paidAt.getTime()).toBeCloseTo(expectedMs, -3)
+        })
+
+        it("已有 expiresAt（幂等）→ 不覆盖，updateMany data 不含 expiresAt", async () => {
+            const existingExpiresAt = new Date(Date.now() + 10 * 60 * 60 * 1000)
+            prismaMock.order.findFirst.mockResolvedValue(
+                makeAutoFetchPendingOrder({ expiresAt: existingExpiresAt })
+            )
+            setupAutoFetchTransaction()
+
+            await completePendingOrder("af-order-1")
+
+            const updateData = prismaMock.order.updateMany.mock.calls[0][0].data
+            expect(updateData.expiresAt).toBeUndefined()
+        })
+
+        it("普通商品（NORMAL）→ updateMany data 不含 expiresAt", async () => {
+            prismaMock.order.findFirst.mockResolvedValue(
+                makePendingOrder({ product: { name: "Normal", productType: "NORMAL", validityHours: null } })
+            )
+            prismaMock.order.updateMany.mockResolvedValue({ count: 1 })
+            prismaMock.$transaction.mockImplementation(async (fn: (tx: any) => Promise<void>) => {
+                await fn(prismaMock)
+            })
+
+            await completePendingOrder("order-1")
+
+            const updateData = prismaMock.order.updateMany.mock.calls[0][0].data
+            expect(updateData.expiresAt).toBeUndefined()
+        })
+    })
 })

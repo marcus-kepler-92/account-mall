@@ -106,7 +106,7 @@ enum RestockSubscriptionStatus {
 
 enum ProductType {
   NORMAL
-  FREE_SHARED
+  AUTO_FETCH
 }
 
 model Product {
@@ -121,6 +121,8 @@ model Product {
   status           ProductStatus @default(ACTIVE)
   productType      ProductType   @default(NORMAL)
   sourceUrl        String?       @db.Text
+  /// AUTO_FETCH 商品的有效期（小时），默认 24；null 表示使用系统默认值
+  validityHours    Int?
   pinnedAt         DateTime?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
@@ -147,6 +149,8 @@ model Card {
   content             String
   status              CardStatus           @default(UNSOLD)
   orderId             String?
+  /// AUTO_FETCH：上次刷新时间，用于限流（1 分钟/次）
+  lastRefreshedAt     DateTime?
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   product             Product              @relation(fields: [productId], references: [id])
@@ -169,9 +173,13 @@ model Order {
   productNameSnapshot       String?     @db.VarChar(500) // 下单时商品名称快照，便于历史订单展示
   status                    OrderStatus @default(PENDING)
   paidAt                  DateTime?
+  /// AUTO_FETCH：订单有效期截止时间；免费=创建时+validityHours，收费=支付时+validityHours
+  expiresAt               DateTime?
+  promoCode               String?     // 下单时使用的推荐码（冗余存储，便于查询）
   createdAt               DateTime    @default(now())
   updatedAt               DateTime    @updatedAt
   clientIp                String?     // For rate limit: max PENDING orders per IP
+  fingerprintHash         String?     // 浏览器指纹，用于免费商品多因素领取限制
   exitDiscountMeta        String?     @db.Text // Exit intent 折扣信号 JSON，订单 COMPLETED 后转存到 ExitDiscountUsage
   product                 Product     @relation(fields: [productId], references: [id])
   distributor             User?       @relation(fields: [distributorId], references: [id])
@@ -183,6 +191,7 @@ model Order {
   @@index([email])
   @@index([status, createdAt])
   @@index([clientIp, status])
+  @@index([fingerprintHash])
   @@index([distributorId])
 }
 

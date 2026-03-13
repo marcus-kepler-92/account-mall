@@ -25,6 +25,7 @@ import { configClient } from "@/lib/config-client"
 import { useProductPriceSyncStore } from "@/lib/stores/product-price-sync"
 import { ProductOrderQuantityPicker } from "./product-order-quantity-picker"
 import { ProductOrderTurnstile } from "./product-order-turnstile"
+import { useFingerprint } from "@/hooks/use-fingerprint"
 
 const ORDER_FORM_LOADING_EVENT = "product-order-loading"
 
@@ -67,7 +68,7 @@ type ProductOrderFormProps = {
     price: number
     inStock: boolean
     formId?: string
-    productType?: "NORMAL" | "FREE_SHARED"
+    productType?: "NORMAL" | "AUTO_FETCH"
     exitDiscountToken?: string | null
     exitDiscountPercent?: number | null
     onExitDiscountConsumed?: () => void
@@ -110,7 +111,9 @@ export function ProductOrderForm({
     const setDisplay = useProductPriceSyncStore((s) => s.setDisplay)
     const router = useRouter()
     const requireTurnstile = Boolean(TURNSTILE_SITE_KEY) && !IS_DEV
-    const isFreeShared = productType === "FREE_SHARED"
+    const isAutoFetch = productType === "AUTO_FETCH"
+    const isFree = isAutoFetch && price === 0
+    const fingerprintHash = useFingerprint()
 
     const form = useForm<OrderFormSchema>({
         resolver: zodResolver(createOrderFormSchema(maxQuantity)),
@@ -118,8 +121,15 @@ export function ProductOrderForm({
         defaultValues: { email: "", orderPassword: "", quantity: 1 },
     })
 
+    // 指纹就绪时写入表单，保持所有字段数据来源统一
+    useEffect(() => {
+        if (fingerprintHash) {
+            form.setValue("fingerprintHash", fingerprintHash)
+        }
+    }, [fingerprintHash, form])
+
     const quantity = form.watch("quantity")
-    const effectiveQuantity = isFreeShared ? 1 : quantity
+    const effectiveQuantity = isAutoFetch ? 1 : quantity
     const codeTrimmed = discountCode.trim()
 
     useEffect(() => {
@@ -136,7 +146,7 @@ export function ProductOrderForm({
             ? exitDiscountPercent
             : null
 
-    const totalPrice = isFreeShared
+    const totalPrice = isFree
         ? "0.00"
         : promoValidation?.valid && promoValidation.discountPercent != null
           ? (price * effectiveQuantity * (1 - promoValidation.discountPercent / 100)).toFixed(2)
@@ -152,10 +162,10 @@ export function ProductOrderForm({
     useEffect(() => {
         setDisplay(
             totalPrice,
-            isFreeShared,
+            isFree,
             promoValidation?.valid ? promoValidation.discountPercent ?? null : activeExitDiscount
         )
-    }, [totalPrice, isFreeShared, promoValidation?.valid, promoValidation?.discountPercent, activeExitDiscount, setDisplay])
+    }, [totalPrice, isFree, promoValidation?.valid, promoValidation?.discountPercent, activeExitDiscount, setDisplay])
 
     const onSubmit = async (data: OrderFormSchema) => {
         if (!inStock) return
@@ -167,6 +177,7 @@ export function ProductOrderForm({
                 email: data.email.trim(),
                 orderPassword: data.orderPassword,
                 quantity: effectiveQuantity,
+                fingerprintHash: data.fingerprintHash,
                 ...(turnstileToken && { turnstileToken }),
             }
             if (codeTrimmed && isValidDiscountCodeFormat(codeTrimmed)) {
@@ -191,7 +202,7 @@ export function ProductOrderForm({
                     status: responseData.claimedAccount ? "COMPLETED" : "PENDING",
                 })
                 if (responseData.successToken && responseData.orderNo) {
-                    toast.success(isFreeShared ? "领取成功" : "订单已创建")
+                    toast.success(isFree ? "领取成功" : "订单已创建")
                     willRedirect = true
                     router.push(
                         `/orders/${encodeURIComponent(responseData.orderNo)}/success?token=${encodeURIComponent(responseData.successToken)}`
@@ -230,14 +241,14 @@ export function ProductOrderForm({
                     className="space-y-4 rounded-xl border bg-card p-4 shadow-sm sm:p-5"
                 >
                     <div className="space-y-1">
-                        <h3 className="text-sm font-semibold text-foreground">
-                            {isFreeShared ? "免费领取" : "立即购买"}
-                        </h3>
-                        <p className="text-xs text-muted-foreground">
-                            {isFreeShared
-                                ? "填写邮箱与订单密码用于记录，领取后请复制保存账号信息。"
-                                : "支持邮箱接收卡密，请妥善保管订单密码以便后续查询。"}
-                        </p>
+                    <h3 className="text-sm font-semibold text-foreground">
+                        {isFree ? "免费领取" : "立即购买"}
+                    </h3>
+                    <p className="text-xs text-muted-foreground">
+                        {isFree
+                            ? "填写邮箱与订单密码用于记录，领取后请复制保存账号信息。"
+                            : "支持邮箱接收卡密，请妥善保管订单密码以便后续查询。"}
+                    </p>
                     </div>
 
                     <FormField
@@ -247,9 +258,9 @@ export function ProductOrderForm({
                             <FormItem>
                                 <FormLabel>邮箱</FormLabel>
                                 <FormControl>
-                                    <Input
-                                        type="email"
-                                        placeholder={isFreeShared ? "用于订单记录与查询" : "用于接收卡密"}
+                        <Input
+                                    type="email"
+                                    placeholder={isFree ? "用于订单记录与查询" : "用于接收卡密"}
                                         disabled={!inStock}
                                         {...field}
                                     />
@@ -298,7 +309,7 @@ export function ProductOrderForm({
                     />
 
                     <ProductOrderQuantityPicker
-                        isFreeShared={isFreeShared}
+                        isAutoFetch={isAutoFetch}
                         maxQuantity={maxQuantity}
                         inStock={inStock}
                         discountCode={discountCode}
@@ -310,7 +321,7 @@ export function ProductOrderForm({
                     {requireTurnstile && (
                         <ProductOrderTurnstile
                             siteKey={TURNSTILE_SITE_KEY}
-                            isFreeShared={isFreeShared}
+                            isAutoFetch={isAutoFetch}
                             widgetReady={turnstileWidgetReady}
                             onWidgetReady={() => setTurnstileWidgetReady(true)}
                             onSuccess={setTurnstileToken}
@@ -320,7 +331,7 @@ export function ProductOrderForm({
 
                     <div className="hidden lg:flex items-center justify-between pt-2">
                         <span className="text-lg font-bold">
-                            {isFreeShared
+                            {isFree
                                 ? "免费"
                                 : activeDiscountPercent != null
                                   ? `合计: ¥${totalPrice}（已享 ${activeDiscountPercent}% 优惠）`
@@ -330,6 +341,7 @@ export function ProductOrderForm({
                             type="submit"
                             disabled={
                                 !inStock ||
+                                !fingerprintHash ||
                                 form.formState.isSubmitting ||
                                 (requireTurnstile && !turnstileToken)
                             }
@@ -340,7 +352,7 @@ export function ProductOrderForm({
                             )}
                             {form.formState.isSubmitting
                                 ? "提交中…"
-                                : isFreeShared
+                                : isFree
                                   ? "领取一个账号"
                                   : inStock
                                     ? "立即购买"

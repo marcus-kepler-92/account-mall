@@ -33,6 +33,7 @@ export const createOrderSchema = z.object({
     turnstileToken: z.string().optional(),
     promoCode: z.string().max(64).optional(),
     exitDiscountToken: z.string().optional(),
+    fingerprintHash: z.string().max(128).optional(),
 })
 
 /**
@@ -68,6 +69,7 @@ export function createOrderFormSchema(maxQuantity: number) {
         email: z.string().min(1, "请输入邮箱").pipe(z.email({ error: "请输入有效的邮箱地址" })),
         orderPassword: z.string().min(6, "订单密码至少 6 位"),
         quantity: z.number().int().min(1, "数量至少为 1").max(maxQuantity, `数量不能超过 ${maxQuantity}`),
+        fingerprintHash: z.string().min(1),
     })
 }
 

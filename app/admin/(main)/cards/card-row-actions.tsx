@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
-import { parseFreeSharedCardContent, formatFreeSharedCardForCopy } from "@/lib/free-shared-card"
+import { parseAutoFetchCardContent, formatAutoFetchCardForCopy } from "@/lib/auto-fetch-card"
 import {
     Tooltip,
     TooltipContent,
@@ -32,8 +32,8 @@ export function CardRowActions({
     const [actionLoading, setActionLoading] = useState(false)
 
     const textToCopy = (() => {
-        const parsed = parseFreeSharedCardContent(content)
-        return parsed ? formatFreeSharedCardForCopy(parsed) : content
+        const parsed = parseAutoFetchCardContent(content)
+        return parsed ? formatAutoFetchCardForCopy(parsed) : content
     })()
 
     const handleCopy = async () => {

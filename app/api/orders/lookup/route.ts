@@ -8,7 +8,7 @@ import { createOrderSuccessToken } from "@/lib/order-success-token"
 import { checkOrderQueryRateLimit } from "@/lib/rate-limit"
 import { invalidJsonBody, validationError, badRequest, internalServerError } from "@/lib/api-response"
 import { config } from "@/lib/config"
-import { parseFreeSharedCardContent } from "@/lib/free-shared-card"
+import { parseAutoFetchCardContent } from "@/lib/auto-fetch-card"
 
 type LookupBody = z.infer<typeof publicOrderLookupSchema>
 type OrderStatus = z.infer<typeof orderStatusSchema>
@@ -35,7 +35,7 @@ interface LookupResponsePending extends LookupResponseBase {
     expiresAt?: string
 }
 
-/** 卡密：普通为 content；免费共享为 content(JSON) + account/password/region/lastCheckedAt/installStatus */
+/** 卡密：普通为 content；AUTO_FETCH 为 content(JSON) + account/password/region/lastCheckedAt/installStatus */
 interface LookupResponseCompleted extends LookupResponseBase {
     cards: Array<
         | { content: string }
@@ -49,6 +49,9 @@ interface LookupResponseCompleted extends LookupResponseBase {
           }
     >
     successToken?: string
+    /** AUTO_FETCH 订单的账号有效期 */
+    contentExpiresAt?: string
+    isAutoFetch?: boolean
 }
 
 /**
@@ -82,6 +85,7 @@ export async function POST(request: NextRequest) {
                     product: {
                         select: {
                             name: true,
+                            productType: true,
                         },
                     },
                     cards: {
@@ -131,7 +135,7 @@ export async function POST(request: NextRequest) {
         const cards = (order.cards as CardRow[])
             .filter((card: CardRow) => card.status === "SOLD" || card.status === "RESERVED")
             .map((card: CardRow) => {
-                const payload = parseFreeSharedCardContent(card.content)
+                const payload = parseAutoFetchCardContent(card.content)
                 if (payload) {
                     return { content: card.content, ...payload }
                 }
@@ -139,6 +143,7 @@ export async function POST(request: NextRequest) {
             })
 
         const successToken = createOrderSuccessToken(order.orderNo)
+        const isAutoFetch = order.product.productType === "AUTO_FETCH"
         const payload: LookupResponseCompleted = {
             orderNo: order.orderNo,
             productName: order.productNameSnapshot ?? order.product.name,
@@ -147,6 +152,8 @@ export async function POST(request: NextRequest) {
             amount: Number(order.amount),
             cards,
             ...(successToken && { successToken }),
+            ...(isAutoFetch && { isAutoFetch: true }),
+            ...(isAutoFetch && order.expiresAt && { contentExpiresAt: order.expiresAt.toISOString() }),
         }
         return NextResponse.json(payload)
     } catch (error) {

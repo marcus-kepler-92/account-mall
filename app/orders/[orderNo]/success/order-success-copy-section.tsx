@@ -4,21 +4,23 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Copy, Check, Mail, KeyRound, Globe, Clock } from "lucide-react"
 import { toast } from "sonner"
-import { parseFreeSharedCardContent, formatFreeSharedCardForCopy, type FreeSharedCardPayload } from "@/lib/free-shared-card"
+import { parseAutoFetchCardContent, formatAutoFetchCardForCopy, type AutoFetchCardPayload } from "@/lib/auto-fetch-card"
 
 type OrderSuccessCopySectionProps = {
     cards: string[]
+    isAutoFetch?: boolean
 }
 
-export function OrderSuccessCopySection({ cards }: OrderSuccessCopySectionProps) {
+export function OrderSuccessCopySection({ cards: initialCards, isAutoFetch: _isAutoFetch }: OrderSuccessCopySectionProps) {
+    const cards = initialCards
     const [copiedAll, setCopiedAll] = useState(false)
     const [copiedId, setCopiedId] = useState<string | null>(null)
 
     const copyAll = async () => {
         if (cards.length === 0) return
         const lines = cards.map((content) => {
-            const parsed = parseFreeSharedCardContent(content)
-            return parsed ? formatFreeSharedCardForCopy(parsed) : content
+            const parsed = parseAutoFetchCardContent(content)
+            return parsed ? formatAutoFetchCardForCopy(parsed) : content
         })
         const text = lines.join("\n\n")
         try {
@@ -68,11 +70,11 @@ export function OrderSuccessCopySection({ cards }: OrderSuccessCopySectionProps)
             </Button>
             <ul className={listClassName}>
                 {cards.map((content, i) => {
-                    const parsed = parseFreeSharedCardContent(content)
+                    const parsed = parseAutoFetchCardContent(content)
                     if (parsed) {
                         return (
                             <li key={i} className="rounded-lg border border-border/80 bg-card shadow-sm overflow-hidden">
-                                <FreeSharedCardBlock card={parsed} index={i} copiedId={copiedId} onCopy={copyOne} />
+                                <AutoFetchCardBlock card={parsed} index={i} copiedId={copiedId} onCopy={copyOne} />
                             </li>
                         )
                     }
@@ -103,13 +105,13 @@ export function OrderSuccessCopySection({ cards }: OrderSuccessCopySectionProps)
     )
 }
 
-function FreeSharedCardBlock({
+function AutoFetchCardBlock({
     card,
     index,
     copiedId,
     onCopy,
 }: {
-    card: FreeSharedCardPayload
+    card: AutoFetchCardPayload
     index: number
     copiedId: string | null
     onCopy: (text: string, id: string) => void

@@ -78,7 +78,6 @@ export function ExitIntentDialog({
 
     const handleTrigger = useCallback(async () => {
         if (!inStock) return
-        if (!fingerprintHash) return
         if (fetchedRef.current) return
         fetchedRef.current = true
 
@@ -91,7 +90,8 @@ export function ExitIntentDialog({
 
         setLoading(true)
         try {
-            const result = await fetchExitDiscount(productId, fingerprintHash)
+            // fingerprintHash 未就绪时用空字符串降级（仍可触发，后端以 cookie/IP 信号判断资格）
+            const result = await fetchExitDiscount(productId, fingerprintHash ?? "")
             setDiscountResult(result)
             if (result.eligible) {
                 setOpen(true)

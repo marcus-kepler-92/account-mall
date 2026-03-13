@@ -8,6 +8,7 @@ import { Mail, Hash, AlertCircle } from "lucide-react"
 import { SiteHeader } from "@/app/components/site-header"
 import { OrderSuccessCopySection } from "./order-success-copy-section"
 import { OrderSuccessSyncHistory } from "./order-success-sync-history"
+import { OrderSuccessAutoFetchSection } from "./order-success-auto-fetch-section"
 
 type PageProps = {
     params: Promise<{ orderNo: string }>
@@ -53,7 +54,7 @@ export default async function OrderSuccessPage({ params, searchParams }: PagePro
     const order = await prisma.order.findFirst({
         where: { orderNo },
         include: {
-            product: { select: { name: true } },
+            product: { select: { name: true, productType: true } },
             cards: {
                 where: { status: { in: ["SOLD", "RESERVED"] } },
                 select: { content: true },
@@ -89,6 +90,8 @@ export default async function OrderSuccessPage({ params, searchParams }: PagePro
 
     const cards = order.cards.map((c) => c.content)
     const productName = order.productNameSnapshot ?? order.product?.name ?? "商品"
+    const isAutoFetch = order.product?.productType === "AUTO_FETCH"
+    const expiresAt = order.expiresAt ? order.expiresAt.toISOString() : null
 
     return (
         <div className="flex min-h-screen flex-col">
@@ -109,14 +112,22 @@ export default async function OrderSuccessPage({ params, searchParams }: PagePro
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
                                 <Package className="size-5" />
-                                卡密信息
+                                账号信息
                             </CardTitle>
                             <CardDescription>
                                 共 {cards.length} 条，请妥善保存。建议保存订单号和查询密码以便日后查询。
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <OrderSuccessCopySection cards={cards} />
+                            {isAutoFetch ? (
+                                <OrderSuccessAutoFetchSection
+                                    orderNo={orderNo}
+                                    expiresAt={expiresAt}
+                                    initialCards={cards}
+                                />
+                            ) : (
+                                <OrderSuccessCopySection cards={cards} />
+                            )}
                             <div className="rounded-lg border bg-muted/50 p-3 text-sm text-muted-foreground">
                                 <p className="flex items-center gap-2">
                                     <Hash className="size-4 shrink-0" />

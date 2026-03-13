@@ -4,7 +4,7 @@ import { publicOrderLookupByEmailSchema } from "@/lib/validations/order"
 import { verifyPassword } from "better-auth/crypto"
 import { checkOrderQueryRateLimit } from "@/lib/rate-limit"
 import { invalidJsonBody, validationError, badRequest, internalServerError } from "@/lib/api-response"
-import { parseFreeSharedCardContent } from "@/lib/free-shared-card"
+import { parseAutoFetchCardContent } from "@/lib/auto-fetch-card"
 
 /**
  * POST /api/orders/lookup-by-email
@@ -49,12 +49,14 @@ export async function POST(request: NextRequest) {
                 passwordHash: true,
                 status: true,
                 createdAt: true,
+                expiresAt: true,
                 quantity: true,
                 amount: true,
                 productNameSnapshot: true,
                 product: {
                     select: {
                         name: true,
+                        productType: true,
                     },
                 },
                 cards: {
@@ -120,23 +122,26 @@ export async function POST(request: NextRequest) {
                 })
             }
 
-            // For COMPLETED/CLOSED orders, return cards（免费共享卡密解析为 account/password/region 等，避免前端显示 JSON 字符串）
+            // For COMPLETED/CLOSED orders, return cards（AUTO_FETCH 解析为 account/password/region 等，避免前端显示 JSON 字符串）
             const cards = order.cards
                 .filter((card) => card.status === "SOLD" || card.status === "RESERVED")
                 .map((card) => {
-                    const payload = parseFreeSharedCardContent(card.content)
+                    const payload = parseAutoFetchCardContent(card.content)
                     if (payload) {
                         return { content: card.content, ...payload }
                     }
                     return { content: card.content }
                 })
 
+            const isAutoFetch = order.product?.productType === "AUTO_FETCH"
             return NextResponse.json({
                 orderNo: order.orderNo,
-                productName: order.productNameSnapshot ?? order.product.name,
+                productName: order.productNameSnapshot ?? order.product?.name ?? "",
                 createdAt: order.createdAt instanceof Date ? order.createdAt.toISOString() : order.createdAt,
                 status: order.status,
                 cards,
+                ...(isAutoFetch && { isAutoFetch: true }),
+                ...(isAutoFetch && order.expiresAt && { contentExpiresAt: order.expiresAt.toISOString() }),
             })
         } else {
             // Multiple orders - return list

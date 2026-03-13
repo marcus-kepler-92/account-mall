@@ -8,16 +8,16 @@ type Display = {
 
 export const useProductPriceSyncStore = create<{
     display: Display | null
-    setDisplay: (totalPrice: string, isFreeShared: boolean, discountPercent: number | null) => void
+    setDisplay: (totalPrice: string, isFree: boolean, discountPercent: number | null) => void
 }>((set) => ({
     display: null,
-    setDisplay: (totalPrice, isFreeShared, discountPercent) =>
+    setDisplay: (totalPrice, isFree, discountPercent) =>
         set((prev) =>
             prev.display &&
             prev.display.totalPrice === totalPrice &&
-            prev.display.isFreeShared === isFreeShared &&
+            prev.display.isFreeShared === isFree &&
             prev.display.discountPercent === discountPercent
                 ? prev
-                : { display: { totalPrice, isFreeShared, discountPercent } }
+                : { display: { totalPrice, isFreeShared: isFree, discountPercent } }
         ),
 }))

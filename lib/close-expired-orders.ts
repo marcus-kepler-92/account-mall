@@ -10,8 +10,9 @@ export interface CloseExpiredOrdersResult {
 }
 
 /**
- * Finds all PENDING orders older than (pendingOrderTimeoutMs + grace) and closes them,
- * releasing reserved cards back to inventory.
+ * Finds all PENDING orders older than (pendingOrderTimeoutMs + grace) and closes them.
+ * - NORMAL product orders: release reserved cards back to inventory (RESERVED → UNSOLD)
+ * - AUTO_FETCH product orders: delete temporary cards (no inventory concept)
  */
 export async function closeExpiredOrders(): Promise<CloseExpiredOrdersResult> {
     const closeBeforeMs = config.pendingOrderTimeoutMs + PENDING_ORDER_CLOSE_GRACE_MS
@@ -22,7 +23,12 @@ export async function closeExpiredOrders(): Promise<CloseExpiredOrdersResult> {
             status: "PENDING",
             createdAt: { lt: before },
         },
-        select: { id: true },
+        select: {
+            id: true,
+            product: {
+                select: { productType: true },
+            },
+        },
     })
 
     if (expired.length === 0) {
@@ -32,15 +38,24 @@ export async function closeExpiredOrders(): Promise<CloseExpiredOrdersResult> {
     let closed = 0
     for (const order of expired) {
         try {
+            const isAutoFetch = order.product?.productType === "AUTO_FETCH"
             await prisma.$transaction(async (tx) => {
                 await tx.order.update({
                     where: { id: order.id },
                     data: { status: "CLOSED" },
                 })
-                await tx.card.updateMany({
-                    where: { orderId: order.id, status: "RESERVED" },
-                    data: { status: "UNSOLD", orderId: null },
-                })
+                if (isAutoFetch) {
+                    // AUTO_FETCH: 临时爬取的卡密无法回库，直接删除
+                    await tx.card.deleteMany({
+                        where: { orderId: order.id, status: "RESERVED" },
+                    })
+                } else {
+                    // NORMAL: 预存卡密回库
+                    await tx.card.updateMany({
+                        where: { orderId: order.id, status: "RESERVED" },
+                        data: { status: "UNSOLD", orderId: null },
+                    })
+                }
             })
             closed++
         } catch (err) {

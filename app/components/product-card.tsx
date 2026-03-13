@@ -34,7 +34,7 @@ export type ProductCardData = {
     image: string | null
     price: number
     stock: number
-    productType?: "NORMAL" | "FREE_SHARED"
+    productType?: "NORMAL" | "AUTO_FETCH"
     tags: { id: string; name: string; slug: string }[]
 }
 
@@ -53,9 +53,10 @@ export function ProductCard({ product, gradientIndex = 0, className, code }: Pro
     const descriptionFallback = descriptionToPlainText(product.description, 80)
     const briefRaw = product.summary?.trim() || descriptionFallback
     const brief = briefRaw.slice(0, 80)
-    const isFreeShared = product.productType === "FREE_SHARED"
-    const isSoldOut = !isFreeShared && product.stock === 0
-    const isLowStock = !isFreeShared && !isSoldOut && product.stock > 0 && product.stock <= configClient.lowStockThreshold
+    const isAutoFetch = product.productType === "AUTO_FETCH"
+    const isFree = isAutoFetch && product.price === 0
+    const isSoldOut = !isAutoFetch && product.stock === 0
+    const isLowStock = !isAutoFetch && !isSoldOut && product.stock > 0 && product.stock <= configClient.lowStockThreshold
     const productSlug = `${product.id}-${product.slug}`
 
     const buildDetailHref = () => {
@@ -141,7 +142,7 @@ export function ProductCard({ product, gradientIndex = 0, className, code }: Pro
                 <CardFooter className="shrink-0 border-t px-4 py-3">
                     <div className="flex w-full items-center justify-between gap-3">
                         <div className="min-w-0 flex-1">
-                            {isFreeShared ? (
+                            {isFree ? (
                                 <>
                                     <span className="text-lg font-bold tabular-nums text-primary">免费</span>
                                     <span className="ml-1.5 block text-[11px] text-muted-foreground">
@@ -158,7 +159,11 @@ export function ProductCard({ product, gradientIndex = 0, className, code }: Pro
                                     >
                                         ¥{product.price.toFixed(2)}
                                     </span>
-                                    {isLowStock ? (
+                                    {isAutoFetch ? (
+                                        <span className="ml-1.5 block text-[11px] text-muted-foreground">
+                                            有货
+                                        </span>
+                                    ) : isLowStock ? (
                                         <span className="ml-1.5 block text-[11px] font-medium text-orange-500 dark:text-orange-400">
                                             仅剩 {product.stock} 件
                                         </span>
@@ -180,7 +185,7 @@ export function ProductCard({ product, gradientIndex = 0, className, code }: Pro
                                     <Bell className="size-3.5" />
                                     补货提醒
                                 </>
-                            ) : isFreeShared ? (
+                            ) : isFree ? (
                                 "领取"
                             ) : (
                                 "购买"

@@ -39,23 +39,23 @@ const envSchema = z
         orderSuccessTokenSecret: z.string().optional(),
         turnstileSiteKey: z.string().optional(),
         turnstileSecretKey: z.string().optional(),
-        /** 免费共享：爬取结果缓存时间（毫秒），同一 sourceUrl 在此时间内复用 */
-        freeSharedScrapeCacheTtlMs: z.coerce.number().int().min(0).default(60_000),
-        /** 免费共享：爬取请求超时（毫秒） */
-        freeSharedScrapeTimeoutMs: z.coerce.number().int().positive().default(15_000),
-        /** 免费共享：爬取请求 User-Agent（可选，默认常见 Chrome） */
-        freeSharedScrapeUserAgent: z.string().optional(),
-        /** 免费共享：同一 IP/邮箱 同一商品 领取冷却时间（小时），仅生产/测试环境生效 */
-        freeSharedCooldownHours: z.coerce.number().positive().default(1),
-        /** 免费共享：爬取来源 URL（环境变量配置，商品表不存；未配置时使用默认地址） */
-        freeSharedSourceUrl: z
+        /** AUTO_FETCH：爬取结果缓存时间（毫秒），同一 sourceUrl 在此时间内复用 */
+        autoFetchScrapeCacheTtlMs: z.coerce.number().int().min(0).default(60_000),
+        /** AUTO_FETCH：爬取请求超时（毫秒） */
+        autoFetchScrapeTimeoutMs: z.coerce.number().int().positive().default(15_000),
+        /** AUTO_FETCH：爬取请求 User-Agent（可选，默认常见 Chrome） */
+        autoFetchScrapeUserAgent: z.string().optional(),
+        /** AUTO_FETCH：同一 IP/邮箱 同一商品 领取冷却时间（小时），仅生产/测试环境生效 */
+        autoFetchCooldownHours: z.coerce.number().positive().default(1),
+        /** AUTO_FETCH：全局默认爬取来源 URL（商品 sourceUrl 为空时回退用；未配置时使用默认地址） */
+        autoFetchSourceUrl: z
             .string()
             .optional()
             .or(z.literal(""))
             .refine((s) => !s || s === "" || (() => { try { new URL(s); return true } catch { return false } })(), { message: "Invalid URL" })
             .default("https://id.ali-door.top/share/yedamai"),
-        /** 免费共享：单笔领取数量（固定为 1，可配置） */
-        freeSharedMaxQuantityPerOrder: z.coerce.number().int().min(1).default(1),
+        /** AUTO_FETCH：单笔领取数量（固定为 1，可配置） */
+        autoFetchMaxQuantityPerOrder: z.coerce.number().int().min(1).default(1),
         /** 推荐码/优惠码：最大长度（字符），用于校验与防抖校验 API */
         promoCodeMaxLength: z.coerce.number().int().min(1).max(256).default(64),
         /** 邀请奖励：被邀请人首单完成时给邀请人的固定金额（元），默认 5 */
@@ -183,12 +183,12 @@ function getEnvInput() {
         orderSuccessTokenSecret: e.ORDER_SUCCESS_TOKEN_SECRET,
         turnstileSiteKey: e.TURNSTILE_SITE_KEY,
         turnstileSecretKey: e.TURNSTILE_SECRET_KEY,
-        freeSharedScrapeCacheTtlMs: e.FREE_SHARED_SCRAPE_CACHE_TTL_MS,
-        freeSharedScrapeTimeoutMs: e.FREE_SHARED_SCRAPE_TIMEOUT_MS,
-        freeSharedScrapeUserAgent: e.FREE_SHARED_SCRAPE_USER_AGENT,
-        freeSharedCooldownHours: e.FREE_SHARED_COOLDOWN_HOURS,
-        freeSharedSourceUrl: e.FREE_SHARED_SOURCE_URL,
-        freeSharedMaxQuantityPerOrder: e.FREE_SHARED_MAX_QUANTITY_PER_ORDER,
+        autoFetchScrapeCacheTtlMs: e.AUTO_FETCH_SCRAPE_CACHE_TTL_MS ?? e.FREE_SHARED_SCRAPE_CACHE_TTL_MS,
+        autoFetchScrapeTimeoutMs: e.AUTO_FETCH_SCRAPE_TIMEOUT_MS ?? e.FREE_SHARED_SCRAPE_TIMEOUT_MS,
+        autoFetchScrapeUserAgent: e.AUTO_FETCH_SCRAPE_USER_AGENT ?? e.FREE_SHARED_SCRAPE_USER_AGENT,
+        autoFetchCooldownHours: e.AUTO_FETCH_COOLDOWN_HOURS ?? e.FREE_SHARED_COOLDOWN_HOURS,
+        autoFetchSourceUrl: e.AUTO_FETCH_SOURCE_URL ?? e.FREE_SHARED_SOURCE_URL,
+        autoFetchMaxQuantityPerOrder: e.AUTO_FETCH_MAX_QUANTITY_PER_ORDER ?? e.FREE_SHARED_MAX_QUANTITY_PER_ORDER,
         promoCodeMaxLength: e.PROMO_CODE_MAX_LENGTH,
         promoValidateDebounceMs: e.PROMO_VALIDATE_DEBOUNCE_MS,
         invitationRewardAmount: e.INVITATION_REWARD_AMOUNT,

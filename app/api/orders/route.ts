@@ -15,7 +15,7 @@ import { config } from "@/lib/config"
 import { verifyTurnstileToken } from "@/lib/turnstile"
 import { verifyExitDiscountToken } from "@/lib/exit-discount"
 import { scrapeSharedAccounts } from "@/lib/scrape-shared-accounts"
-import { sharedAccountToCardPayload, toCardContentJson } from "@/lib/free-shared-card"
+import { sharedAccountToCardPayload, toCardContentJson } from "@/lib/auto-fetch-card"
 import { createOrderSuccessToken } from "@/lib/order-success-token"
 import { completePendingOrder } from "@/lib/complete-pending-order"
 import { unauthorized, validationError, badRequest, invalidJsonBody, notFound, internalServerError } from "@/lib/api-response"
@@ -28,107 +28,244 @@ export function generateOrderNo(): string {
     return randomUUID()
 }
 
-type ProductForFreeShared = {
+const DEFAULT_VALIDITY_HOURS = 24
+
+type ProductForAutoFetch = {
     id: string
     name: string
+    price: unknown
     sourceUrl: string | null
     productType: string | null
+    validityHours: number | null
 }
 
 /**
- * 免费共享领取：校验、限流、爬取、建单+卡密，返回 JSON 或错误 Response。
+ * AUTO_FETCH 下单：支持免费（price=0）和收费（price>0）。
+ * - 免费：直接创建 COMPLETED 订单 + SOLD 卡，返回 successToken
+ * - 收费：创建 PENDING 订单 + RESERVED 卡，返回 paymentUrl
  */
-async function createFreeSharedOrder(params: {
+async function createAutoFetchOrder(params: {
     productId: string
-    product: ProductForFreeShared
+    product: ProductForAutoFetch
     email: string
     orderPassword: string
     clientIp: string
+    price: number
+    distributorId: string | null
+    distributorDiscountPercent: number | null
+    promoCode: string | null
+    fingerprintHash: string | null
 }): Promise<NextResponse> {
-    const { productId, product, email, orderPassword, clientIp } = params
-    const sourceUrl = (product.sourceUrl?.trim() || config.freeSharedSourceUrl?.trim()) ?? ""
+    const { productId, product, email, orderPassword, clientIp, distributorId, distributorDiscountPercent, promoCode, fingerprintHash } = params
+    const sourceUrl = (product.sourceUrl?.trim() || config.autoFetchSourceUrl?.trim()) ?? ""
     if (!sourceUrl) {
-        return badRequest("未配置免费共享爬取来源（环境变量 FREE_SHARED_SOURCE_URL），无法领取。")
+        return badRequest("该商品暂时无法领取，请联系客服。")
     }
+
+    const isFreeAutoFetch = params.price === 0
+
+    // 多因素活跃订单检查：邮箱 / 指纹 / IP（辅助信号）三因素，任一命中则拒绝
     if (config.nodeEnv !== "development") {
-        const cooldownMs = config.freeSharedCooldownHours * 60 * 60 * 1000
-        const since = new Date(Date.now() - cooldownMs)
         const emailLower = email.trim().toLowerCase()
-        const recentCount = await prisma.order.count({
+        const cooldownStart = new Date(Date.now() - config.autoFetchCooldownHours * 60 * 60 * 1000)
+
+        // 时间窗口条件（两种情形兼容）
+        const timeWindowCondition = {
+            OR: [
+                // expiresAt 未设置（旧数据）按冷却小时数兜底
+                { expiresAt: null, createdAt: { gte: cooldownStart } },
+                // expiresAt 已设置：未过期的即为活跃
+                { expiresAt: { gt: new Date() } },
+            ],
+        }
+
+        // 身份条件：邮箱 OR 指纹（独立信号），IP 需与另一信号配合（避免 NAT 误杀）
+        const identitySignals: object[] = [{ email: emailLower }]
+        if (fingerprintHash) identitySignals.push({ fingerprintHash })
+        const ipAuxiliary =
+            clientIp !== "unknown"
+                ? { clientIp, OR: [{ email: emailLower }, ...(fingerprintHash ? [{ fingerprintHash }] : [])] }
+                : null
+        const ownerCondition = { OR: [...identitySignals, ...(ipAuxiliary ? [ipAuxiliary] : [])] }
+
+        const activeOrder = await prisma.order.findFirst({
             where: {
                 productId,
                 status: "COMPLETED",
-                amount: { equals: 0 },
-                createdAt: { gte: since },
-                ...(clientIp !== "unknown"
-                    ? { OR: [{ clientIp }, { email: emailLower }] }
-                    : { email: emailLower }),
+                ...(isFreeAutoFetch ? { amount: { equals: 0 } } : {}),
+                AND: [timeWindowCondition, ownerCondition],
             },
+            select: { id: true, expiresAt: true },
         })
-        if (recentCount >= 1) {
-            return NextResponse.json(
-                {
-                    error: `免费领取限流：同一商品 ${config.freeSharedCooldownHours} 小时内仅可领取 1 次，请稍后再试。`,
-                },
-                { status: 429 }
-            )
+        if (activeOrder) {
+            const expiresAt = activeOrder.expiresAt
+            const expiresInfo = expiresAt
+                ? `，可使用至 ${expiresAt.toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}`
+                : ""
+            const message = isFreeAutoFetch
+                ? `您今日已领取过该商品${expiresInfo}，请在可用时间内使用。`
+                : `您已有该商品的活跃订单${expiresInfo}，到期后再下单。`
+            return NextResponse.json({ error: message }, { status: 429 })
         }
     }
 
+    if (config.nodeEnv === "development") {
+        console.log("[AUTO_FETCH] 即将爬取 sourceUrl:", sourceUrl)
+    }
     const scrapedList = await scrapeSharedAccounts(sourceUrl)
     if (config.nodeEnv === "development") {
-        console.log("[免费共享] 爬取到的全部账号数据:", JSON.stringify(scrapedList, null, 2))
+        console.log("[AUTO_FETCH] 爬取结果数量:", scrapedList.length)
+        if (scrapedList.length > 0) {
+            console.log("[AUTO_FETCH] 第一条账号:", JSON.stringify(scrapedList[0]))
+        }
     }
     if (scrapedList.length === 0) {
         return badRequest("暂无可领取账号，请稍后再试。")
     }
 
     const picked = scrapedList[Math.floor(Math.random() * scrapedList.length)]
-    const payload = sharedAccountToCardPayload(picked)
-    const cardContent = toCardContentJson(payload)
+    const cardPayload = sharedAccountToCardPayload(picked)
+    const cardContent = toCardContentJson(cardPayload)
     const passwordHash = await hashPassword(orderPassword)
 
-    let freeOrder: { orderNo: string }
-    try {
-        freeOrder = await prisma.$transaction(async (tx) => {
-            const orderNo = generateOrderNo()
-            const newOrder = await tx.order.create({
-                data: {
-                    orderNo,
-                    productId,
-                    productNameSnapshot: product.name,
-                    email: email.trim().toLowerCase(),
-                    passwordHash,
-                    quantity: 1,
-                    amount: 0,
-                    status: "COMPLETED",
-                    paidAt: new Date(),
-                    ...(clientIp !== "unknown" && { clientIp }),
-                },
-            })
-            await tx.card.create({
-                data: {
-                    productId,
-                    content: cardContent,
-                    status: "SOLD",
-                    orderId: newOrder.id,
-                },
-            })
-            return { orderNo: newOrder.orderNo }
-        })
-    } catch (err) {
-        console.error("[免费共享] 创建订单失败:", err)
-        return internalServerError("领取失败，请稍后重试。")
+    // 计算实际金额（支持分销商折扣）
+    let amount = params.price
+    if (distributorDiscountPercent != null) {
+        amount = amount * (1 - distributorDiscountPercent / 100)
     }
+    amount = Math.round(amount * 100) / 100
 
-    const successToken = createOrderSuccessToken(freeOrder.orderNo)
-    return NextResponse.json({
-        orderNo: freeOrder.orderNo,
-        amount: 0,
-        paymentUrl: null,
-        claimedAccount: payload,
-        ...(successToken && { successToken }),
-    })
+    // 计算有效期截止时间
+    const validityHours = product.validityHours ?? DEFAULT_VALIDITY_HOURS
+    const validityMs = validityHours * 60 * 60 * 1000
+
+    if (isFreeAutoFetch) {
+        // 免费流程：直接 COMPLETED + SOLD，立即计算 expiresAt
+        const now = new Date()
+        const expiresAt = new Date(now.getTime() + validityMs)
+
+        let freeOrder: { orderNo: string }
+        try {
+            freeOrder = await prisma.$transaction(async (tx) => {
+                const orderNo = generateOrderNo()
+                const newOrder = await tx.order.create({
+                    data: {
+                        orderNo,
+                        productId,
+                        productNameSnapshot: product.name,
+                        email: email.trim().toLowerCase(),
+                        passwordHash,
+                        quantity: 1,
+                        amount: 0,
+                        status: "COMPLETED",
+                        paidAt: now,
+                        expiresAt,
+                        ...(clientIp !== "unknown" && { clientIp }),
+                        ...(distributorId && { distributorId }),
+                        ...(promoCode && { promoCode }),
+                        ...(fingerprintHash && { fingerprintHash }),
+                    },
+                })
+                await tx.card.create({
+                    data: {
+                        productId,
+                        content: cardContent,
+                        status: "SOLD",
+                        orderId: newOrder.id,
+                    },
+                })
+                return { orderNo: newOrder.orderNo }
+            })
+        } catch (err) {
+            console.error("[AUTO_FETCH] 创建免费订单失败:", err)
+            return internalServerError("领取失败，请稍后重试。")
+        }
+
+        const successToken = createOrderSuccessToken(freeOrder.orderNo)
+        return NextResponse.json({
+            orderNo: freeOrder.orderNo,
+            amount: 0,
+            paymentUrl: null,
+            claimedAccount: cardPayload,
+            expiresAt: expiresAt.toISOString(),
+            ...(successToken && { successToken }),
+        })
+    } else {
+        // 收费流程：PENDING + RESERVED，等待支付
+        let paidOrder: { orderNo: string; orderId: string }
+        try {
+            paidOrder = await prisma.$transaction(async (tx) => {
+                const orderNo = generateOrderNo()
+                const newOrder = await tx.order.create({
+                    data: {
+                        orderNo,
+                        productId,
+                        productNameSnapshot: product.name,
+                        email: email.trim().toLowerCase(),
+                        passwordHash,
+                        quantity: 1,
+                        amount,
+                        status: "PENDING",
+                        ...(clientIp !== "unknown" && { clientIp }),
+                        ...(distributorId && { distributorId }),
+                        ...(promoCode && { promoCode }),
+                        ...(fingerprintHash && { fingerprintHash }),
+                        ...(distributorDiscountPercent != null && { discountPercent: distributorDiscountPercent }),
+                    },
+                })
+                await tx.card.create({
+                    data: {
+                        productId,
+                        content: cardContent,
+                        status: "RESERVED",
+                        orderId: newOrder.id,
+                    },
+                })
+                return { orderNo: newOrder.orderNo, orderId: newOrder.id }
+            })
+        } catch (err) {
+            console.error("[AUTO_FETCH] 创建收费订单失败:", err)
+            return internalServerError("下单失败，请稍后重试。")
+        }
+
+        // Development 快捷通道
+        if (config.nodeEnv === "development") {
+            const devResult = await completePendingOrder(paidOrder.orderNo)
+            if (devResult.done) {
+                const successToken = createOrderSuccessToken(paidOrder.orderNo)
+                return NextResponse.json({
+                    orderNo: paidOrder.orderNo,
+                    amount,
+                    paymentUrl: null,
+                    ...(successToken && { successToken }),
+                })
+            }
+        }
+
+        // 获取支付链接
+        const paymentUrl = await (async () => {
+            const totalAmount = String(amount)
+            const subject = product.name
+            if (isYipayConfigured()) {
+                return getYipayPagePayUrl({
+                    orderNo: paidOrder.orderNo,
+                    totalAmount,
+                    subject,
+                })
+            }
+            return getAlipayPagePayUrl({
+                orderNo: paidOrder.orderNo,
+                totalAmount,
+                subject,
+            })
+        })()
+
+        return NextResponse.json({
+            orderNo: paidOrder.orderNo,
+            amount,
+            paymentUrl,
+        })
+    }
 }
 
 /**
@@ -297,7 +434,8 @@ export async function POST(request: NextRequest) {
         return validationError(parsed.error.flatten())
     }
 
-    const { productId, email, orderPassword, quantity, turnstileToken, promoCode: bodyPromoCode, exitDiscountToken } = parsed.data
+    const { productId, email, orderPassword, quantity, turnstileToken, promoCode: bodyPromoCode, exitDiscountToken, fingerprintHash: rawFingerprintHash } = parsed.data
+    const fingerprintHash = rawFingerprintHash?.trim() || null
 
     // Resolve distributor from promoCode (cookie or body); include discount settings for 同码优惠
     const cookiePromoCode = request.cookies?.get?.("distributor_promo_code")?.value?.trim()
@@ -364,21 +502,27 @@ export async function POST(request: NextRequest) {
         return notFound("Product not found or unavailable")
     }
 
-    const productWithType = product as unknown as ProductForFreeShared
-    const isFreeShared = productWithType.productType === "FREE_SHARED"
-    const maxQty = isFreeShared ? config.freeSharedMaxQuantityPerOrder : product.maxQuantity
+    const productWithType = product as unknown as ProductForAutoFetch
+    const isAutoFetch = productWithType.productType === "AUTO_FETCH"
+    const maxQty = isAutoFetch ? config.autoFetchMaxQuantityPerOrder : product.maxQuantity
     if (quantity < 1 || quantity > maxQty) {
         return badRequest(`Quantity must be between 1 and ${maxQty}`)
     }
 
-    // ─── 免费共享：实时爬取，随机取一个账号，单次领取；按 IP 限流防刷 ─────────────
-    if (isFreeShared) {
-        return createFreeSharedOrder({
+    // ─── AUTO_FETCH：实时爬取，随机取一个账号，单次领取 ─────────────────────────
+    if (isAutoFetch) {
+        const autoFetchPrice = Number(product.price)
+        return createAutoFetchOrder({
             productId,
             product: productWithType,
             email,
             orderPassword,
             clientIp,
+            price: autoFetchPrice,
+            distributorId,
+            distributorDiscountPercent,
+            promoCode,
+            fingerprintHash,
         })
     }
 
@@ -447,6 +591,7 @@ export async function POST(request: NextRequest) {
                         ...(discountPercentApplied != null && { discountPercentApplied }),
                         status: "PENDING",
                         ...(clientIp !== "unknown" && { clientIp }),
+                        ...(fingerprintHash && { fingerprintHash }),
                         ...(exitDiscountMeta && { exitDiscountMeta }),
                     },
                 })

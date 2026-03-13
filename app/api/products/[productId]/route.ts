@@ -82,7 +82,7 @@ export async function PUT(
         return notFound("Product not found");
     }
 
-    const { tagIds, productType, sourceUrl, price, pinned, ...rest } = parsed.data;
+    const { tagIds, productType, sourceUrl, price, pinned, validityHours, ...rest } = parsed.data;
 
     // Check slug uniqueness if updating slug
     if (rest.slug && rest.slug !== existing.slug) {
@@ -94,13 +94,13 @@ export async function PUT(
         }
     }
 
-    const isFreeShared = productType === "FREE_SHARED";
+    const isAutoFetch = productType === "AUTO_FETCH";
     const updateData: Record<string, unknown> = {
         ...rest,
-        ...(price !== undefined && { price: isFreeShared ? 0 : price }),
+        ...(price !== undefined && { price }),
         ...(productType !== undefined && { productType }),
         ...(sourceUrl !== undefined && {
-            sourceUrl: isFreeShared ? null : (sourceUrl?.trim() || undefined),
+            sourceUrl: sourceUrl?.trim() || undefined,
         }),
         ...(tagIds !== undefined && {
             tags: { set: tagIds.map((id) => ({ id })) },
@@ -108,10 +108,11 @@ export async function PUT(
         ...(pinned === true && { pinnedAt: new Date() }),
         ...(pinned === false && { pinnedAt: null }),
     };
-    if (isFreeShared) {
-        updateData.price = 0;
-        updateData.maxQuantity = config.freeSharedMaxQuantityPerOrder;
-        updateData.sourceUrl = null;
+    if (isAutoFetch) {
+        updateData.maxQuantity = config.autoFetchMaxQuantityPerOrder;
+    }
+    if (validityHours !== undefined) {
+        updateData.validityHours = validityHours
     }
 
     const product = await prisma.product.update({

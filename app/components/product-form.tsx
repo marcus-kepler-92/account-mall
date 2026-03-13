@@ -29,8 +29,9 @@ type ProductData = {
     price: number
     maxQuantity: number
     status: string
-    productType?: "NORMAL" | "FREE_SHARED"
+    productType?: "NORMAL" | "AUTO_FETCH"
     sourceUrl?: string | null
+    validityHours?: number | null
     tags: Tag[]
 }
 
@@ -59,6 +60,7 @@ export function ProductForm({
             isActive: product ? product.status === "ACTIVE" : true,
             productType: product?.productType ?? "NORMAL",
             sourceUrl: product?.sourceUrl ?? "",
+            validityHours: product?.validityHours ? String(product.validityHours) : "",
             tagIds: product?.tags.map((t) => t.id) ?? [],
         },
     })
@@ -66,7 +68,7 @@ export function ProductForm({
     const { handleSubmit, watch, setValue } = form
     const name = watch("name")
     const productType = watch("productType") ?? "NORMAL"
-    const isFreeShared = productType === "FREE_SHARED"
+    const isAutoFetch = productType === "AUTO_FETCH"
 
     useEffect(() => {
         if (!slugManuallyEdited && !isEditing) {
@@ -81,11 +83,12 @@ export function ProductForm({
             description: data.description?.trim() || undefined,
             summary: data.summary?.trim() || null,
             image: data.image || null,
-            price: isFreeShared ? 0 : (data.price === "" ? undefined : parseFloat(data.price)),
-            maxQuantity: isFreeShared ? 1 : (data.maxQuantity === "" ? 10 : parseInt(data.maxQuantity, 10)),
+            price: data.price === "" ? (isAutoFetch ? 0 : undefined) : parseFloat(data.price),
+            maxQuantity: isAutoFetch ? 1 : (data.maxQuantity === "" ? 10 : parseInt(data.maxQuantity, 10)),
             status: data.isActive ? "ACTIVE" : "INACTIVE",
             productType: data.productType ?? "NORMAL",
-            sourceUrl: isFreeShared ? null : (data.sourceUrl?.trim() || null),
+            sourceUrl: data.sourceUrl?.trim() || null,
+            validityHours: data.validityHours && data.validityHours !== "" ? parseInt(data.validityHours, 10) : null,
             tagIds: data.tagIds ?? [],
         }
 
@@ -137,7 +140,7 @@ export function ProductForm({
                                 isEditing={isEditing}
                                 onSlugManualEdit={() => setSlugManuallyEdited(true)}
                             />
-                            <ProductFormPricingFields isFreeShared={isFreeShared} />
+                            <ProductFormPricingFields isAutoFetch={isAutoFetch} />
                         </div>
 
                         <div className="space-y-6 lg:sticky lg:top-20 lg:self-start">

@@ -14,9 +14,10 @@ import {
 import { MarkdownEditor } from "@/app/components/markdown-editor"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import type { ProductFormSchema } from "@/lib/validations/product"
+import { Textarea } from "@/components/ui/textarea"
 
-export function ProductFormPricingFields({ isFreeShared }: { isFreeShared: boolean }) {
-    const { control, setValue } = useFormContext<ProductFormSchema>()
+export function ProductFormPricingFields({ isAutoFetch }: { isAutoFetch: boolean }) {
+    const { control } = useFormContext<ProductFormSchema>()
 
     return (
         <>
@@ -36,11 +37,6 @@ export function ProductFormPricingFields({ isFreeShared }: { isFreeShared: boole
                                         value={field.value}
                                         onValueChange={(value) => {
                                             field.onChange(value)
-                                            if (value === "FREE_SHARED") {
-                                                setValue("price", "0")
-                                                setValue("maxQuantity", "1")
-                                                setValue("sourceUrl", "")
-                                            }
                                         }}
                                         className="flex gap-4"
                                     >
@@ -49,8 +45,8 @@ export function ProductFormPricingFields({ isFreeShared }: { isFreeShared: boole
                                             <span className="text-sm">普通商品</span>
                                         </label>
                                         <label className="flex items-center gap-2 cursor-pointer">
-                                            <RadioGroupItem value="FREE_SHARED" />
-                                            <span className="text-sm">免费共享</span>
+                                            <RadioGroupItem value="AUTO_FETCH" />
+                                            <span className="text-sm">自动获取</span>
                                         </label>
                                     </RadioGroup>
                                 </FormControl>
@@ -59,29 +55,29 @@ export function ProductFormPricingFields({ isFreeShared }: { isFreeShared: boole
                         )}
                     />
 
-                    {!isFreeShared && (
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            <FormField
-                                control={control}
-                                name="price"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>
-                                            价格 (¥) <span className="text-destructive">*</span>
-                                        </FormLabel>
-                                        <FormControl>
-                                            <Input
-                                                type="number"
-                                                step="0.01"
-                                                min="0.01"
-                                                placeholder="0.00"
-                                                {...field}
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <FormField
+                            control={control}
+                            name="price"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>
+                                        价格 (¥) {!isAutoFetch && <span className="text-destructive">*</span>}
+                                    </FormLabel>
+                                    <FormControl>
+                                        <Input
+                                            type="number"
+                                            step="0.01"
+                                            min={isAutoFetch ? "0" : "0.01"}
+                                            placeholder={isAutoFetch ? "0.00（可免费）" : "0.00"}
+                                            {...field}
+                                        />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        {!isAutoFetch && (
                             <FormField
                                 control={control}
                                 name="maxQuantity"
@@ -96,7 +92,53 @@ export function ProductFormPricingFields({ isFreeShared }: { isFreeShared: boole
                                     </FormItem>
                                 )}
                             />
-                        </div>
+                        )}
+                    </div>
+
+                    {isAutoFetch && (
+                        <>
+                            <FormField
+                                control={control}
+                                name="sourceUrl"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>
+                                            来源 URL <span className="text-destructive">*</span>
+                                        </FormLabel>
+                                        <FormControl>
+                                            <Textarea
+                                                placeholder="https://example.com/share/accounts"
+                                                className="font-mono text-sm"
+                                                rows={2}
+                                                {...field}
+                                            />
+                                        </FormControl>
+                                        <FormDescription>自动获取账号的来源页面地址</FormDescription>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={control}
+                                name="validityHours"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>有效期（小时）</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                type="number"
+                                                min={1}
+                                                max={8760}
+                                                placeholder="24（默认）"
+                                                {...field}
+                                            />
+                                        </FormControl>
+                                        <FormDescription>账号有效时长，过期后需重新下单；留空使用默认值 24 小时</FormDescription>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </>
                     )}
                 </CardContent>
             </Card>
