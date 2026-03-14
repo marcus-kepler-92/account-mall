@@ -11,13 +11,6 @@ export type InviteeRow = {
     level2CommissionTotal: number
 }
 
-function maskEmail(email: string): string {
-    const [local, domain] = email.split("@")
-    if (!domain) return email
-    const visible = local.slice(0, Math.min(2, local.length))
-    return `${visible}***@${domain}`
-}
-
 export const inviteesColumns: ColumnDef<InviteeRow>[] = [
     {
         accessorKey: "name",
@@ -33,7 +26,7 @@ export const inviteesColumns: ColumnDef<InviteeRow>[] = [
         header: "邮箱",
         cell: ({ row }) => (
             <span className="text-muted-foreground text-sm">
-                {maskEmail(row.original.email)}
+                {row.original.email}
             </span>
         ),
     },
