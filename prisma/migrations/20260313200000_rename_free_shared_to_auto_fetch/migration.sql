@@ -1,20 +1,21 @@
 -- Rename ProductType enum value FREE_SHARED → AUTO_FETCH
--- PostgreSQL does not support ALTER TYPE ... RENAME VALUE directly (only available in PG 10+).
--- Strategy: add new value → migrate data → rebuild type without old value.
+-- PostgreSQL 不允许在同一事务内使用 ALTER TYPE ADD VALUE 新增的枚举值（55P04）。
+-- 解决方案：先将列改为 text，重建枚举类型，再迁移数据，最后将列改回枚举类型，全程无需 ADD VALUE。
 
--- Step 1: Add the new enum value
-ALTER TYPE "ProductType" ADD VALUE 'AUTO_FETCH';
+-- Step 1: 将列改为 text，脱离旧枚举约束
+ALTER TABLE "Product" ALTER COLUMN "productType" TYPE text;
 
--- Step 2: Migrate existing data
+-- Step 2: 删除旧枚举类型
+DROP TYPE "ProductType";
+
+-- Step 3: 创建新枚举类型（用 AUTO_FETCH 替换 FREE_SHARED）
+CREATE TYPE "ProductType" AS ENUM ('NORMAL', 'AUTO_FETCH');
+
+-- Step 4: 迁移现有数据
 UPDATE "Product" SET "productType" = 'AUTO_FETCH' WHERE "productType" = 'FREE_SHARED';
 
--- Step 3: Rebuild the enum type without FREE_SHARED
--- (PostgreSQL does not support DROP VALUE, so we must recreate the type)
--- Temporarily change the column type to text, drop old enum, create new, change back.
-ALTER TABLE "Product" ALTER COLUMN "productType" TYPE text;
-DROP TYPE "ProductType";
-CREATE TYPE "ProductType" AS ENUM ('NORMAL', 'AUTO_FETCH');
+-- Step 5: 将列改回枚举类型
 ALTER TABLE "Product" ALTER COLUMN "productType" TYPE "ProductType" USING "productType"::"ProductType";
 
--- Step 4: Restore the default value
+-- Step 6: 恢复默认值
 ALTER TABLE "Product" ALTER COLUMN "productType" SET DEFAULT 'NORMAL';
