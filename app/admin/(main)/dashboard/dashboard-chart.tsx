@@ -35,8 +35,8 @@ export function DashboardChart({
             axisPointer: { type: "shadow" },
             formatter: (params: unknown) => {
                 if (!Array.isArray(params) || params.length === 0) return ""
-                const allParams = params as Array<{ seriesName?: string; value?: number; color?: string }>
-                const date = data[allParams[0]?.dataIndex as number]?.date ?? ""
+                const allParams = params as Array<{ seriesName?: string; value?: number; color?: string; dataIndex?: number }>
+                const date = data[allParams[0]?.dataIndex ?? 0]?.date ?? ""
                 const lines = allParams.map((p) => {
                     const val = Number(p.value ?? 0)
                     const isRevenue = p.seriesName === "营收" || p.seriesName === "净收入"
