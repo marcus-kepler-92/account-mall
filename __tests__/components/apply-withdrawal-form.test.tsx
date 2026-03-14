@@ -83,4 +83,28 @@ describe("ApplyWithdrawalForm", () => {
         render(<ApplyWithdrawalForm withdrawableBalance={0} minAmount={50} />)
         expect(screen.getByText(/暂无可提现余额/)).toBeInTheDocument()
     })
+
+    it("shows fee breakdown and estimated payout when feePercent > 0 and amount is entered", async () => {
+        render(<ApplyWithdrawalForm withdrawableBalance={200} minAmount={50} feePercent={2} />)
+        const input = screen.getByLabelText(/提现金额/i)
+        fireEvent.change(input, { target: { value: "100" } })
+        await waitFor(() => {
+            expect(screen.getAllByText(/手续费.*2%|2%.*手续费/i).length).toBeGreaterThan(0)
+            expect(screen.getByLabelText(/手续费.*2\.00/i)).toBeInTheDocument()
+            expect(screen.getByLabelText(/预计到账.*98\.00/i)).toBeInTheDocument()
+        })
+    })
+
+    it("does not show fee breakdown when feePercent is 0", () => {
+        render(<ApplyWithdrawalForm withdrawableBalance={200} minAmount={50} feePercent={0} />)
+        const input = screen.getByLabelText(/提现金额/i)
+        fireEvent.change(input, { target: { value: "100" } })
+        expect(screen.queryByText(/手续费/)).not.toBeInTheDocument()
+        expect(screen.queryByText(/预计到账/)).not.toBeInTheDocument()
+    })
+
+    it("shows fee note in footer text when feePercent > 0", () => {
+        render(<ApplyWithdrawalForm withdrawableBalance={200} minAmount={50} feePercent={2} />)
+        expect(screen.getByText(/手续费/)).toBeInTheDocument()
+    })
 })

@@ -19,6 +19,7 @@ export type DashboardTrendPoint = {
     date: string
     订单: number
     营收: number
+    净收入: number
 }
 
 /** 商品表现（营收或订单数） */
@@ -74,4 +75,14 @@ export type DashboardKpis = {
     pendingWithdrawalAmount: number
     /** 待结算佣金总金额 */
     pendingCommissionAmount: number
+    /** 已结算佣金总额（L1 + L2） */
+    totalCommission: number
+    /** 提现手续费收入（PAID 状态的 feeAmount 之和） */
+    totalWithdrawalFee: number
+    /** 平台净收入 = 营收 - 佣金 + 手续费 */
+    netIncome: number
+    /** 净利率（%），营收为 0 时为 0 */
+    netMarginPercent: number
+    /** 净收入周环比（%） */
+    netIncomeTrend: number
 }

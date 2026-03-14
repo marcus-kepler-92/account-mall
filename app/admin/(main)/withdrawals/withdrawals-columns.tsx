@@ -12,6 +12,12 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog"
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { DataTableColumnHeader } from "@/app/admin/components"
 import { WithdrawalRowActions } from "./withdrawal-row-actions"
 
@@ -20,11 +26,20 @@ export type WithdrawalRow = {
     distributorId: string
     distributor: { id: string; email: string; name: string }
     amount: number
+    feePercent: number
+    feeAmount: number
+    actualAmount: number
     status: string
     receiptImageUrl: string | null
     note: string | null
     processedAt: string | null
     createdAt: string
+    // Balance fields
+    level1Settled: number
+    level2Settled: number
+    paidTotal: number
+    pendingTotal: number
+    currentBalance: number
 }
 
 const statusMap: Record<string, { label: string; variant: "warning" | "success" | "destructive" }> =
@@ -70,6 +85,42 @@ function ReceiptCell({ url }: { url: string | null }) {
     )
 }
 
+function BalanceCell({ row }: { row: WithdrawalRow }) {
+    return (
+        <TooltipProvider>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <span className="cursor-default tabular-nums underline decoration-dashed underline-offset-2">
+                        ¥{row.currentBalance.toFixed(2)}
+                    </span>
+                </TooltipTrigger>
+                <TooltipContent className="w-56 text-xs space-y-1 p-3">
+                    <div className="flex justify-between">
+                        <span className="text-muted-foreground">一级佣金（已结算）</span>
+                        <span>¥{row.level1Settled.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                        <span className="text-muted-foreground">二级佣金（已结算）</span>
+                        <span>¥{row.level2Settled.toFixed(2)}</span>
+                    </div>
+                    <div className="border-t pt-1 flex justify-between">
+                        <span className="text-muted-foreground">已打款</span>
+                        <span>-¥{row.paidTotal.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                        <span className="text-muted-foreground">提现中</span>
+                        <span>-¥{row.pendingTotal.toFixed(2)}</span>
+                    </div>
+                    <div className="border-t pt-1 flex justify-between font-medium">
+                        <span>可提现余额</span>
+                        <span>¥{row.currentBalance.toFixed(2)}</span>
+                    </div>
+                </TooltipContent>
+            </Tooltip>
+        </TooltipProvider>
+    )
+}
+
 export const withdrawalsColumns: ColumnDef<WithdrawalRow>[] = [
     {
         id: "distributor",
@@ -86,9 +137,35 @@ export const withdrawalsColumns: ColumnDef<WithdrawalRow>[] = [
     },
     {
         accessorKey: "amount",
-        header: () => <div className="text-right">金额</div>,
+        header: () => <div className="text-right">申请金额</div>,
         cell: ({ row }) => (
             <div className="text-right font-medium">¥{row.original.amount.toFixed(2)}</div>
+        ),
+    },
+    {
+        id: "actualAmount",
+        header: () => <div className="text-right">实付金额</div>,
+        cell: ({ row }) => {
+            const { feeAmount, actualAmount, feePercent } = row.original
+            return (
+                <div className="text-right">
+                    <span className="font-medium">¥{actualAmount.toFixed(2)}</span>
+                    {feeAmount > 0 && (
+                        <span className="block text-xs text-muted-foreground">
+                            手续费 {feePercent}% = -¥{feeAmount.toFixed(2)}
+                        </span>
+                    )}
+                </div>
+            )
+        },
+    },
+    {
+        id: "currentBalance",
+        header: () => <div className="text-right">可提现余额</div>,
+        cell: ({ row }) => (
+            <div className="text-right">
+                <BalanceCell row={row.original} />
+            </div>
         ),
     },
     {
@@ -128,9 +205,25 @@ export const withdrawalsColumns: ColumnDef<WithdrawalRow>[] = [
     },
     {
         id: "actions",
-        header: () => <div className="w-[180px]">操作</div>,
+        header: () => <div className="w-[200px]">操作</div>,
         cell: ({ row }) => (
-            <WithdrawalRowActions id={row.original.id} status={row.original.status} />
+            <WithdrawalRowActions
+                id={row.original.id}
+                status={row.original.status}
+                amount={row.original.amount}
+                feeAmount={row.original.feeAmount}
+                feePercent={row.original.feePercent}
+                actualAmount={row.original.actualAmount}
+                distributorName={row.original.distributor.name}
+                distributorEmail={row.original.distributor.email}
+                balance={{
+                    level1Settled: row.original.level1Settled,
+                    level2Settled: row.original.level2Settled,
+                    paidTotal: row.original.paidTotal,
+                    pendingTotal: row.original.pendingTotal,
+                    currentBalance: row.original.currentBalance,
+                }}
+            />
         ),
     },
 ]

@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 
 // Public pages that never require authentication
 const PUBLIC_PAGE_PREFIXES = ["/products", "/orders"];
-const PUBLIC_EXACT_PAGES = ["/", "/admin/login", "/distributor/login", "/distributor/register"];
+const PUBLIC_EXACT_PAGES = ["/", "/admin/login", "/distributor/login", "/distributor/register", "/distributor/accept-invite"];
 
 // Public API routes that never require authentication
 const PUBLIC_API_PREFIXES = [
@@ -15,6 +15,7 @@ const PUBLIC_API_EXACT = [
     "/api/orders/lookup",
     "/api/orders/lookup-by-email",
     "/api/orders/get-payment-url",
+    "/api/distributor/accept-invite",
 ];
 
 // Protected API routes that require admin authentication
@@ -67,7 +68,8 @@ function isDistributorProtectedPage(pathname: string): boolean {
     return (
         pathname.startsWith("/distributor") &&
         pathname !== "/distributor/login" &&
-        pathname !== "/distributor/register"
+        pathname !== "/distributor/register" &&
+        pathname !== "/distributor/accept-invite"
     );
 }
 

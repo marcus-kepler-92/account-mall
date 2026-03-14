@@ -44,7 +44,7 @@ describe("Auth configuration", () => {
     jest.clearAllMocks();
   });
 
-  it("should have emailAndPassword enabled and sign-up allowed for distributors", () => {
+  it("should have emailAndPassword enabled with sign-up disabled (invite-only)", () => {
     // Re-import to trigger the betterAuth call
     jest.isolateModules(() => {
       const { betterAuth } = require("better-auth");
@@ -54,7 +54,8 @@ describe("Auth configuration", () => {
         expect.objectContaining({
           emailAndPassword: expect.objectContaining({
             enabled: true,
-            disableSignUp: false,
+            // Sign-up disabled: distributors join via invite-only flow
+            disableSignUp: true,
           }),
           user: expect.objectContaining({
             additionalFields: expect.objectContaining({

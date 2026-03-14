@@ -16,8 +16,8 @@ jest.mock("@/lib/auth-guard", () => ({
 }))
 
 jest.mock("@/lib/config", () => ({
-    config: { siteUrl: "http://localhost:3000", withdrawalMinAmount: 50 },
-    getConfig: () => ({ siteUrl: "http://localhost:3000", withdrawalMinAmount: 50 }),
+    config: { siteUrl: "http://localhost:3000", withdrawalMinAmount: 50, withdrawalFeePercent: 2 },
+    getConfig: () => ({ siteUrl: "http://localhost:3000", withdrawalMinAmount: 50, withdrawalFeePercent: 2 }),
 }))
 
 jest.mock("@/lib/upload", () => ({
@@ -400,6 +400,8 @@ describe("POST /api/distributor/withdrawals", () => {
             data: expect.objectContaining({
                 distributorId: "dist_1",
                 amount: 51,
+                feePercent: 2,
+                feeAmount: 1.02,
                 status: "PENDING",
                 receiptImageUrl: "/uploads/receipts/test.jpg",
             }),
@@ -452,6 +454,8 @@ describe("POST /api/distributor/withdrawals", () => {
             data: {
                 distributorId: "dist_1",
                 amount: 50,
+                feePercent: 2,
+                feeAmount: 1,
                 status: "PENDING",
                 receiptImageUrl: "/uploads/receipts/test.jpg",
             },
@@ -507,5 +511,119 @@ describe("POST /api/distributor/withdrawals", () => {
         const data = await res.json()
         expect(data.error).toMatch(/4MB|大小|超过/i)
         expect(prismaMock.withdrawal.create).not.toHaveBeenCalled()
+    })
+
+    it("creates withdrawal with feePercent=2 and correct feeAmount", async () => {
+        getDistributorSession.mockResolvedValue(distributorSession)
+        prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock))
+        prismaMock.commission.aggregate.mockResolvedValue({ _sum: { amount: 200 } })
+        prismaMock.withdrawal.aggregate
+            .mockResolvedValueOnce({ _sum: { amount: 0 } })
+            .mockResolvedValueOnce({ _sum: { amount: 0 } })
+        prismaMock.withdrawal.create.mockResolvedValue({
+            id: "with_fee",
+            amount: 100,
+            feePercent: 2,
+            feeAmount: 2,
+            status: "PENDING",
+            receiptImageUrl: "/uploads/receipts/test.jpg",
+            createdAt: new Date(),
+        })
+
+        const req = createWithdrawalFormRequest("100")
+        const res = await WithdrawalsPost(req)
+        const data = await res.json()
+
+        expect(res.status).toBe(201)
+        expect(prismaMock.withdrawal.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({ amount: 100, feePercent: 2, feeAmount: 2 }),
+        })
+        expect(data.feeAmount).toBe(2)
+        expect(data.actualAmount).toBe(98)
+    })
+
+    it("calculates feeAmount rounded to 2 decimal places (83.33 * 2% = 1.67)", async () => {
+        getDistributorSession.mockResolvedValue(distributorSession)
+        prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock))
+        prismaMock.commission.aggregate.mockResolvedValue({ _sum: { amount: 200 } })
+        prismaMock.withdrawal.aggregate
+            .mockResolvedValueOnce({ _sum: { amount: 0 } })
+            .mockResolvedValueOnce({ _sum: { amount: 0 } })
+        prismaMock.withdrawal.create.mockResolvedValue({
+            id: "with_fee2",
+            amount: 83.33,
+            feePercent: 2,
+            feeAmount: 1.67,
+            status: "PENDING",
+            receiptImageUrl: "/uploads/receipts/test.jpg",
+            createdAt: new Date(),
+        })
+
+        // 83.33 * 2% = Math.round(166.66) / 100 = 167 / 100 = 1.67
+        const req = createWithdrawalFormRequest("83.33")
+        await WithdrawalsPost(req)
+
+        expect(prismaMock.withdrawal.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({ amount: 83.33, feePercent: 2, feeAmount: 1.67 }),
+        })
+    })
+
+    it("creates withdrawal with feeAmount=0 when feePercent is 0", async () => {
+        const { config } = require("@/lib/config")
+        const originalFee = config.withdrawalFeePercent
+        config.withdrawalFeePercent = 0
+
+        getDistributorSession.mockResolvedValue(distributorSession)
+        prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock))
+        prismaMock.commission.aggregate.mockResolvedValue({ _sum: { amount: 200 } })
+        prismaMock.withdrawal.aggregate
+            .mockResolvedValueOnce({ _sum: { amount: 0 } })
+            .mockResolvedValueOnce({ _sum: { amount: 0 } })
+        prismaMock.withdrawal.create.mockResolvedValue({
+            id: "with_nofee",
+            amount: 100,
+            feePercent: 0,
+            feeAmount: 0,
+            status: "PENDING",
+            receiptImageUrl: "/uploads/receipts/test.jpg",
+            createdAt: new Date(),
+        })
+
+        const req = createWithdrawalFormRequest("100")
+        await WithdrawalsPost(req)
+
+        expect(prismaMock.withdrawal.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({ feePercent: 0, feeAmount: 0 }),
+        })
+
+        config.withdrawalFeePercent = originalFee
+    })
+
+    it("GET returns feeAmount and actualAmount for each withdrawal", async () => {
+        getDistributorSession.mockResolvedValue(distributorSession)
+        prismaMock.withdrawal.findMany.mockResolvedValue([
+            {
+                id: "w1",
+                amount: 100,
+                feePercent: 2,
+                feeAmount: 2,
+                status: "PENDING",
+                receiptImageUrl: null,
+                note: null,
+                processedAt: null,
+                createdAt: new Date(),
+            },
+        ])
+        prismaMock.withdrawal.count.mockResolvedValue(1)
+
+        const url = "http://localhost/api/distributor/withdrawals"
+        const req = { url } as unknown as NextRequest
+        const res = await WithdrawalsGet(req)
+        const body = await res.json()
+
+        expect(res.status).toBe(200)
+        const w = body.data[0]
+        expect(w.feeAmount).toBe(2)
+        expect(w.actualAmount).toBe(98)
     })
 })

@@ -38,10 +38,12 @@ export function ApplyWithdrawalForm({
     withdrawableBalance,
     pendingWithdrawalTotal = 0,
     minAmount = 50,
+    feePercent = 0,
 }: {
     withdrawableBalance: number
     pendingWithdrawalTotal?: number
     minAmount?: number
+    feePercent?: number
 }) {
     const router = useRouter()
     const [file, setFile] = useState<File | null>(null)
@@ -54,6 +56,12 @@ export function ApplyWithdrawalForm({
         defaultValues: { amount: "" },
         mode: "onChange",
     })
+
+    const watchedAmount = form.watch("amount")
+    const parsedAmount = parseFloat(watchedAmount)
+    const hasValidAmount = !Number.isNaN(parsedAmount) && parsedAmount > 0
+    const estimatedFee = hasValidAmount ? Math.round(parsedAmount * feePercent) / 100 : 0
+    const estimatedActual = hasValidAmount ? Math.round((parsedAmount - estimatedFee) * 100) / 100 : 0
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const next = e.target.files?.[0] ?? null
@@ -184,6 +192,18 @@ export function ApplyWithdrawalForm({
                             <FormDescription>
                                 至少 ¥{minAmount.toFixed(2)}，最多可提现 ¥{withdrawableBalance.toFixed(2)}
                             </FormDescription>
+                            {feePercent > 0 && hasValidAmount && (
+                                <div className="mt-2 rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground space-y-0.5">
+                                    <div className="flex justify-between">
+                                        <span>手续费（{feePercent}%）</span>
+                                        <span aria-label={`手续费 ${estimatedFee.toFixed(2)} 元`}>- ¥{estimatedFee.toFixed(2)}</span>
+                                    </div>
+                                    <div className="flex justify-between font-medium text-foreground">
+                                        <span>预计到账</span>
+                                        <span aria-label={`预计到账 ${estimatedActual.toFixed(2)} 元`}>¥{estimatedActual.toFixed(2)}</span>
+                                    </div>
+                                </div>
+                            )}
                             <FormMessage />
                         </FormItem>
                     )}
@@ -289,7 +309,7 @@ export function ApplyWithdrawalForm({
                         <Link href="/distributor/withdrawals">查看提现记录</Link>
                     </Button>
                     <p className="text-xs text-muted-foreground">
-                        打款由管理员线下处理，到账时间以实际为准。
+                        打款由管理员线下处理，到账时间以实际为准。{feePercent > 0 && `实际到账金额扣除 ${feePercent}% 手续费。`}
                     </p>
                 </div>
             </form>

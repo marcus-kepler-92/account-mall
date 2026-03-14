@@ -30,11 +30,10 @@ model User {
   accounts         Account[]
   inviter          User?         @relation("InviterToInvitee", fields: [inviterId], references: [id])
   invitees         User[]        @relation("InviterToInvitee")
-  invitationRewardReceived InvitationReward? @relation("InvitationRewardInvitee") // 作为被邀请人触发的邀请奖励
   ordersAsDistributor Order[]
   commissions      Commission[]
   withdrawals      Withdrawal[]
-  invitationRewardsGiven InvitationReward[] @relation("InvitationRewardInviter")
+  distributorInvitationsSent DistributorInvitation[] @relation("DistributorInvitationInviter")
 
   @@index([inviterId])
 }
@@ -185,7 +184,6 @@ model Order {
   distributor             User?       @relation(fields: [distributorId], references: [id])
   cards                   Card[]
   commissions             Commission[]
-  invitationReward        InvitationReward? // 触发邀请奖励的订单（被邀请人首单）
   exitDiscountUsage       ExitDiscountUsage?
 
   @@index([email])
@@ -217,18 +215,24 @@ enum CommissionStatus {
 }
 
 model Commission {
-  id             String          @id @default(cuid())
-  orderId        String
-  distributorId  String
-  amount         Decimal         @db.Decimal(10, 2)
-  status         CommissionStatus @default(PENDING)
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  order          Order           @relation(fields: [orderId], references: [id])
-  distributor    User             @relation(fields: [distributorId], references: [id])
+  id                  String          @id @default(cuid())
+  orderId             String
+  distributorId       String
+  amount              Decimal         @db.Decimal(10, 2)
+  status              CommissionStatus @default(PENDING)
+  /// 1=一级佣金（直接推广所得），2=二级佣金（下线推广触发）
+  level               Int             @default(1)
+  /// level=2 时记录触发该佣金的下线分销员 ID，便于追溯
+  sourceDistributorId String?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  order               Order           @relation(fields: [orderId], references: [id])
+  distributor         User            @relation(fields: [distributorId], references: [id])
 
   @@index([distributorId])
+  @@index([distributorId, level])
   @@index([orderId])
+  @@index([sourceDistributorId])
 }
 
 model CommissionTier {
@@ -257,6 +261,8 @@ model Withdrawal {
   receiptImageUrl   String?          // 收款码图片 URL，申请提现时上传
   note              String?          @db.Text
   processedAt       DateTime?
+  feePercent        Decimal?         @db.Decimal(5, 2)  // 手续费比例（创建时固化），如 2.00 表示 2%
+  feeAmount         Decimal?         @db.Decimal(10, 2) // 手续费金额（创建时固化）
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
   distributor       User             @relation(fields: [distributorId], references: [id])
@@ -266,20 +272,20 @@ model Withdrawal {
 }
 
 // 邀请奖励：被邀请人（分销员）首单完成时，给邀请人发放一笔固定金额，每名被邀请人只触发一次
-model InvitationReward {
-  id         String   @id @default(cuid())
-  inviterId  String   // 邀请人（获得奖励的分销员）
-  inviteeId  String   @unique // 被邀请人（触发奖励的分销员），唯一保证每人只发一次
-  orderId    String   @unique // 触发奖励的订单（被邀请人首单），一对一
-  amount     Decimal  @db.Decimal(10, 2)
-  status     CommissionStatus @default(SETTLED) // 与 Commission 一致，便于并入可提现余额
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  inviter    User     @relation("InvitationRewardInviter", fields: [inviterId], references: [id])
-  order      Order    @relation(fields: [orderId], references: [id])
-  invitee    User     @relation("InvitationRewardInvitee", fields: [inviteeId], references: [id])
 
-  @@index([inviterId])
+/// 邀请分销员加入的邀请记录，支持管理员和分销员均可发起邀请
+model DistributorInvitation {
+  id         String    @id @default(cuid())
+  email      String
+  token      String    @unique
+  inviterId  String    // 邀请人 ID（可以是 ADMIN 或 DISTRIBUTOR）
+  expiresAt  DateTime
+  acceptedAt DateTime?
+  createdAt  DateTime  @default(now())
+  inviter    User      @relation("DistributorInvitationInviter", fields: [inviterId], references: [id])
+
+  @@index([token])
+  @@index([email])
 }
 
 enum AnnouncementStatus {

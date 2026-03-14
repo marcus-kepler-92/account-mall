@@ -1,5 +1,5 @@
 import { prismaMock } from "../../__mocks__/prisma";
-import type { Product, Tag, Card, Order, Commission, CommissionTier, Withdrawal } from "@prisma/client";
+import type { Product, Tag, Card, Order, Commission, CommissionTier, Withdrawal, DistributorInvitation } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 
 // ─── Product CRUD ────────────────────────────────────────────────
@@ -477,6 +477,8 @@ describe("Commission model", () => {
     distributorId: "dist_1",
     amount: new Prisma.Decimal("10.50"),
     status: "SETTLED",
+    level: 1,
+    sourceDistributorId: null,
     createdAt: new Date("2026-01-01"),
     updatedAt: new Date("2026-01-01"),
   };
@@ -609,5 +611,151 @@ describe("Withdrawal model", () => {
 
     expect(result).toHaveLength(1);
     expect(result[0].distributorId).toBe("dist_1");
+  });
+});
+
+// ─── Commission level field ──────────────────────────────────────────
+
+describe("Commission.level field", () => {
+  it("level=1 commission should be created for direct referral", async () => {
+    const commission: Commission = {
+      id: "comm_l1",
+      orderId: "ord_1",
+      distributorId: "dist_B",
+      amount: new Prisma.Decimal("44.00"),
+      status: "SETTLED",
+      level: 1,
+      sourceDistributorId: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    prismaMock.commission.create.mockResolvedValue(commission);
+
+    const result = await prismaMock.commission.create({
+      data: { orderId: "ord_1", distributorId: "dist_B", amount: 44, status: "SETTLED", level: 1 },
+    });
+
+    expect(result.level).toBe(1);
+    expect(result.sourceDistributorId).toBeNull();
+  });
+
+  it("level=2 commission should reference sourceDistributorId", async () => {
+    const commission: Commission = {
+      id: "comm_l2",
+      orderId: "ord_1",
+      distributorId: "dist_A",
+      amount: new Prisma.Decimal("8.00"),
+      status: "SETTLED",
+      level: 2,
+      sourceDistributorId: "dist_B",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    prismaMock.commission.create.mockResolvedValue(commission);
+
+    const result = await prismaMock.commission.create({
+      data: {
+        orderId: "ord_1",
+        distributorId: "dist_A",
+        amount: 8,
+        status: "SETTLED",
+        level: 2,
+        sourceDistributorId: "dist_B",
+      },
+    });
+
+    expect(result.level).toBe(2);
+    expect(result.sourceDistributorId).toBe("dist_B");
+  });
+
+  it("should filter commissions by level", async () => {
+    const l2 = {
+      id: "comm_l2",
+      distributorId: "dist_A",
+      level: 2,
+      amount: new Prisma.Decimal("8"),
+      sourceDistributorId: "dist_B",
+    };
+    prismaMock.commission.findMany.mockResolvedValue([l2 as any]);
+
+    const result = await prismaMock.commission.findMany({
+      where: { distributorId: "dist_A", level: 2 },
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0].level).toBe(2);
+  });
+});
+
+// ─── DistributorInvitation model ─────────────────────────────────────
+
+describe("DistributorInvitation model", () => {
+  const mockInvitation: DistributorInvitation = {
+    id: "inv_001",
+    email: "newdist@example.com",
+    token: "uuid-token-here",
+    inviterId: "dist_A",
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    acceptedAt: null,
+    createdAt: new Date(),
+  };
+
+  it("should create an invitation with null acceptedAt", async () => {
+    prismaMock.distributorInvitation.create.mockResolvedValue(mockInvitation);
+
+    const result = await prismaMock.distributorInvitation.create({
+      data: {
+        email: "newdist@example.com",
+        token: "uuid-token-here",
+        inviterId: "dist_A",
+        expiresAt: mockInvitation.expiresAt,
+      },
+    });
+
+    expect(result.acceptedAt).toBeNull();
+    expect(result.token).toBe("uuid-token-here");
+  });
+
+  it("should find invitation by token", async () => {
+    prismaMock.distributorInvitation.findUnique.mockResolvedValue(mockInvitation);
+
+    const result = await prismaMock.distributorInvitation.findUnique({
+      where: { token: "uuid-token-here" },
+    });
+
+    expect(result?.email).toBe("newdist@example.com");
+    expect(result?.acceptedAt).toBeNull();
+  });
+
+  it("should mark invitation as accepted", async () => {
+    const accepted = { ...mockInvitation, acceptedAt: new Date() };
+    prismaMock.distributorInvitation.update.mockResolvedValue(accepted);
+
+    const result = await prismaMock.distributorInvitation.update({
+      where: { token: "uuid-token-here" },
+      data: { acceptedAt: new Date() },
+    });
+
+    expect(result.acceptedAt).not.toBeNull();
+  });
+
+  it("should enforce unique token constraint", async () => {
+    prismaMock.distributorInvitation.create.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError(
+        "Unique constraint failed on the fields: (`token`)",
+        { code: "P2002", clientVersion: "7.3.0", meta: { target: ["token"] } }
+      )
+    );
+
+    await expect(
+      prismaMock.distributorInvitation.create({
+        data: {
+          email: "another@example.com",
+          token: "uuid-token-here",
+          inviterId: "dist_A",
+          expiresAt: new Date(),
+        },
+      })
+    ).rejects.toThrow(Prisma.PrismaClientKnownRequestError);
   });
 });

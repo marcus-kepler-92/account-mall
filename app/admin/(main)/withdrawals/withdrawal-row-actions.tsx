@@ -16,12 +16,38 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Loader2, CheckCircle, XCircle } from "lucide-react"
 
+type BalanceDetail = {
+    level1Settled: number
+    level2Settled: number
+    paidTotal: number
+    pendingTotal: number
+    currentBalance: number
+}
+
 type WithdrawalRowActionsProps = {
     id: string
     status: string
+    amount: number
+    feePercent?: number
+    feeAmount?: number
+    actualAmount?: number
+    distributorName: string
+    distributorEmail: string
+    balance: BalanceDetail
 }
 
-export function WithdrawalRowActions({ id, status }: WithdrawalRowActionsProps) {
+export function WithdrawalRowActions({
+    id,
+    status,
+    amount,
+    feePercent = 0,
+    feeAmount = 0,
+    actualAmount,
+    distributorName,
+    distributorEmail,
+    balance,
+}: WithdrawalRowActionsProps) {
+    const displayActualAmount = actualAmount ?? amount
     const router = useRouter()
     const [loading, setLoading] = useState(false)
     const [dialog, setDialog] = useState<{
@@ -77,28 +103,56 @@ export function WithdrawalRowActions({ id, status }: WithdrawalRowActionsProps) 
                 </Button>
             </div>
             <Dialog open={!!dialog} onOpenChange={(open) => !open && setDialog(null)}>
-                <DialogContent>
+                <DialogContent className="sm:max-w-md">
                     <DialogHeader>
-                        <DialogTitle>
-                            {dialog?.action === "PAID" ? "标记已打款" : "拒绝提现"}
-                        </DialogTitle>
+                        <DialogTitle>处理提现申请</DialogTitle>
                         <DialogDescription>
-                            {dialog?.action === "PAID"
-                                ? "请填写打款方式或流水号等备注（可选）"
-                                : "请填写拒绝原因（可选）"}
+                            {distributorName}（{distributorEmail}）申请提现 ¥{amount.toFixed(2)}
+                            {feeAmount > 0 && (
+                                <>，手续费 {feePercent}% = ¥{feeAmount.toFixed(2)}，<strong>实付 ¥{displayActualAmount.toFixed(2)}</strong></>
+                            )}
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-2 py-2">
-                        <Label>备注</Label>
-                        <Input
-                            value={dialog?.note ?? ""}
-                            onChange={(e) =>
-                                dialog && setDialog({ ...dialog, note: e.target.value })
-                            }
-                            placeholder={
-                                dialog?.action === "PAID" ? "打款方式、流水号等" : "拒绝原因"
-                            }
-                        />
+                    <div className="space-y-4 py-2">
+                        {/* Balance breakdown */}
+                        <div className="rounded-lg border bg-muted/30 p-3 text-sm space-y-1.5">
+                            <p className="font-medium text-xs text-muted-foreground uppercase tracking-wide mb-2">
+                                当前余额明细
+                            </p>
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">一级佣金（已结算）</span>
+                                <span>¥{balance.level1Settled.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">二级佣金（已结算）</span>
+                                <span>¥{balance.level2Settled.toFixed(2)}</span>
+                            </div>
+                            <div className="border-t pt-1.5 flex justify-between">
+                                <span className="text-muted-foreground">已打款</span>
+                                <span>-¥{balance.paidTotal.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">提现中（含本次）</span>
+                                <span>-¥{balance.pendingTotal.toFixed(2)}</span>
+                            </div>
+                            <div className="border-t pt-1.5 flex justify-between font-medium">
+                                <span>可提现余额</span>
+                                <span>¥{balance.currentBalance.toFixed(2)}</span>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>备注</Label>
+                            <Input
+                                value={dialog?.note ?? ""}
+                                onChange={(e) =>
+                                    dialog && setDialog({ ...dialog, note: e.target.value })
+                                }
+                                placeholder={
+                                    dialog?.action === "PAID" ? "打款方式、流水号等" : "拒绝原因"
+                                }
+                            />
+                        </div>
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setDialog(null)}>

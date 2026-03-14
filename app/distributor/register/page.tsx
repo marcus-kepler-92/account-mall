@@ -1,31 +1,35 @@
-import { Suspense } from "react"
-import { RegisterForm } from "./register-form"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Skeleton } from "@/components/ui/skeleton"
-
-function RegisterFormSkeleton() {
-    return (
-        <Card className="w-full max-w-md">
-            <CardHeader className="text-center">
-                <CardTitle className="text-2xl font-bold">分销员注册</CardTitle>
-                <CardDescription>加载中…</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-            </CardContent>
-        </Card>
-    )
-}
+import Link from "next/link";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { UserX } from "lucide-react";
 
 export default function DistributorRegisterPage() {
-    return (
-        <div className="flex min-h-screen items-center justify-center bg-background p-4 sm:p-6 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
-            <Suspense fallback={<RegisterFormSkeleton />}>
-                <RegisterForm />
-            </Suspense>
-        </div>
-    )
+  return (
+    <main className="flex min-h-svh items-center justify-center p-4">
+      <Card className="w-full max-w-md text-center">
+        <CardHeader>
+          <div className="flex justify-center mb-2">
+            <UserX className="size-12 text-muted-foreground" />
+          </div>
+          <CardTitle>分销员注册已关闭</CardTitle>
+          <CardDescription>
+            目前仅支持受邀加入。如需成为分销员，请联系已有分销员获取邀请，或联系管理员。
+          </CardDescription>
+        </CardHeader>
+        <CardContent />
+        <CardFooter className="justify-center">
+          <Button variant="outline" asChild>
+            <Link href="/distributor/login">← 返回登录页</Link>
+          </Button>
+        </CardFooter>
+      </Card>
+    </main>
+  );
 }

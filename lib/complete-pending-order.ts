@@ -42,7 +42,6 @@ export async function completePendingOrder(
       },
       cards: { select: { id: true, status: true } },
     },
-    // 同时取出 exitDiscountMeta 用于事后写 ExitDiscountUsage
   });
   if (!order) {
     return { done: false, error: "Order not found" };
@@ -90,7 +89,7 @@ export async function completePendingOrder(
       // 防刷：下单邮箱与分销员账号邮箱一致则不记佣金（自买不归因）
       const distributor = await tx.user.findUnique({
         where: { id: distributorId },
-        select: { email: true },
+        select: { email: true, inviterId: true },
       });
       const orderEmailNorm = order.email?.trim().toLowerCase() ?? "";
       const distributorEmailNorm =
@@ -129,7 +128,7 @@ export async function completePendingOrder(
           break;
         }
       }
-      // 当周销售额未落入任何档位时（如首单 9 元且最低档从 400 起），按最低档比例算佣金，避免 0 佣金
+      // 当周销售额未落入任何档位时，按最低档比例算佣金，避免 0 佣金
       if (ratePercent == null && tiers.length > 0) {
         ratePercent = toNumber(tiers[0].ratePercent);
       }
@@ -140,50 +139,73 @@ export async function completePendingOrder(
         discountPct > 0 && discountPct < 100
           ? paidAmount / (1 - discountPct / 100)
           : paidAmount;
-      const tierBonus =
+      const totalCommission =
         ratePercent != null && commissionBase > 0
-          ? (commissionBase * ratePercent) / 100
+          ? Math.round((commissionBase * ratePercent) / 100 * 100) / 100
           : 0;
-      const totalCommission = Math.round(tierBonus * 100) / 100;
-      if (totalCommission > 0) {
+
+      if (totalCommission <= 0) return;
+
+      // 二级佣金：查上线是否为未停用的分销员
+      const inviterId = distributor?.inviterId ?? null;
+      let inviter: { email: string; role: string; disabledAt: Date | null } | null = null;
+      if (inviterId) {
+        inviter = await tx.user.findUnique({
+          where: { id: inviterId },
+          select: { email: true, role: true, disabledAt: true },
+        }) as { email: string; role: string; disabledAt: Date | null } | null;
+      }
+
+      const config = getConfig();
+      const level2Rate = config.level2CommissionRatePercent;
+      const shouldSplitLevel2 =
+        inviterId &&
+        inviter &&
+        inviter.role === "DISTRIBUTOR" &&
+        !inviter.disabledAt &&
+        // 防刷：下单邮箱 = 上线邮箱时不拆分
+        orderEmailNorm !== inviter.email.trim().toLowerCase();
+
+      if (shouldSplitLevel2) {
+        // 比例制：上线从本笔总佣金中按 level2Rate% 抽成，下线实得剩余部分
+        const level2Amount =
+          Math.round(totalCommission * level2Rate / 100 * 100) / 100;
+        const level1Amount = Math.round((totalCommission - level2Amount) * 100) / 100;
+
+        if (level1Amount > 0) {
+          await tx.commission.create({
+            data: {
+              orderId: order.id,
+              distributorId,
+              amount: level1Amount,
+              status: "SETTLED",
+              level: 1,
+            },
+          });
+        }
+        if (level2Amount > 0) {
+          await tx.commission.create({
+            data: {
+              orderId: order.id,
+              distributorId: inviterId!,
+              amount: level2Amount,
+              status: "SETTLED",
+              level: 2,
+              sourceDistributorId: distributorId,
+            },
+          });
+        }
+      } else {
+        // 无上线 / 上线停用 / 上线是管理员 → 全额给分销员
         await tx.commission.create({
           data: {
             orderId: order.id,
             distributorId,
             amount: totalCommission,
             status: "SETTLED",
+            level: 1,
           },
         });
-      }
-
-      // 邀请奖励：被邀请人（本单分销员）首单完成时，给邀请人发一笔固定金额，每名被邀请人只发一次
-      const completedCount = await tx.order.count({
-        where: { distributorId, status: "COMPLETED" },
-      });
-      if (completedCount === 1) {
-        const invitee = await tx.user.findUnique({
-          where: { id: distributorId },
-          select: { inviterId: true },
-        });
-        if (invitee?.inviterId) {
-          const existing = await tx.invitationReward.findUnique({
-            where: { inviteeId: distributorId },
-          });
-          if (!existing) {
-            const amount = getConfig().invitationRewardAmount;
-            if (amount > 0) {
-              await tx.invitationReward.create({
-                data: {
-                  inviterId: invitee.inviterId,
-                  inviteeId: distributorId,
-                  orderId: order.id,
-                  amount,
-                  status: "SETTLED",
-                },
-              });
-            }
-          }
-        }
       }
     }
   });

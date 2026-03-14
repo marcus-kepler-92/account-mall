@@ -13,6 +13,12 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { DataTableColumnHeader } from "@/app/admin/components/data-table-column-header"
 import { EditDiscountDialog } from "./edit-discount-dialog"
 
@@ -27,8 +33,79 @@ export type DistributorRow = {
     createdAt: string
     completedOrderCount: number
     totalCommission: number
+    level1CommissionTotal: number
+    level2CommissionTotal: number
+    level1Settled: number
+    level2Settled: number
+    paidTotal: number
+    pendingTotal: number
     withdrawableBalance: number
+    inviteeCount: number
     inviter: { id: string; name: string; distributorCode: string | null } | null
+}
+
+function BalanceTooltip({ row }: { row: DistributorRow }) {
+    return (
+        <TooltipProvider>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <span className="cursor-default underline decoration-dashed underline-offset-2">
+                        ¥{row.withdrawableBalance.toFixed(2)}
+                    </span>
+                </TooltipTrigger>
+                <TooltipContent className="w-56 text-xs space-y-1 p-3">
+                    <div className="flex justify-between">
+                        <span className="text-muted-foreground">一级佣金（已结算）</span>
+                        <span>¥{row.level1Settled.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                        <span className="text-muted-foreground">二级佣金（已结算）</span>
+                        <span>¥{row.level2Settled.toFixed(2)}</span>
+                    </div>
+                    <div className="border-t pt-1 flex justify-between">
+                        <span className="text-muted-foreground">已打款</span>
+                        <span>-¥{row.paidTotal.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                        <span className="text-muted-foreground">提现中</span>
+                        <span>-¥{row.pendingTotal.toFixed(2)}</span>
+                    </div>
+                    <div className="border-t pt-1 flex justify-between font-medium">
+                        <span>可提现余额</span>
+                        <span>¥{row.withdrawableBalance.toFixed(2)}</span>
+                    </div>
+                </TooltipContent>
+            </Tooltip>
+        </TooltipProvider>
+    )
+}
+
+function CommissionTooltip({ row }: { row: DistributorRow }) {
+    return (
+        <TooltipProvider>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <span className="cursor-default underline decoration-dashed underline-offset-2">
+                        ¥{row.totalCommission.toFixed(2)}
+                    </span>
+                </TooltipTrigger>
+                <TooltipContent className="w-48 text-xs space-y-1 p-3">
+                    <div className="flex justify-between">
+                        <span className="text-muted-foreground">一级佣金</span>
+                        <span>¥{row.level1CommissionTotal.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                        <span className="text-muted-foreground">二级佣金</span>
+                        <span>¥{row.level2CommissionTotal.toFixed(2)}</span>
+                    </div>
+                    <div className="border-t pt-1 flex justify-between font-medium">
+                        <span>合计</span>
+                        <span>¥{row.totalCommission.toFixed(2)}</span>
+                    </div>
+                </TooltipContent>
+            </Tooltip>
+        </TooltipProvider>
+    )
 }
 
 function DistributorRowActions({ row }: { row: DistributorRow }) {
@@ -151,6 +228,35 @@ export const distributorsColumns: ColumnDef<DistributorRow>[] = [
             ),
     },
     {
+        accessorKey: "inviter",
+        header: "上线",
+        cell: ({ row }) => {
+            const inv = row.original.inviter
+            if (!inv) return <span className="text-muted-foreground">—</span>
+            return (
+                <span className="text-sm">
+                    {inv.name}
+                    {inv.distributorCode && (
+                        <span className="text-muted-foreground font-mono ml-1 text-xs">
+                            {inv.distributorCode}
+                        </span>
+                    )}
+                </span>
+            )
+        },
+    },
+    {
+        accessorKey: "inviteeCount",
+        header: ({ column }) => (
+            <DataTableColumnHeader column={column} title="下线数" className="justify-end" />
+        ),
+        cell: ({ row }) => (
+            <div className="text-right text-muted-foreground">
+                {row.original.inviteeCount}
+            </div>
+        ),
+    },
+    {
         accessorKey: "discountCodeEnabled",
         header: "优惠码",
         cell: ({ row }) =>
@@ -169,24 +275,6 @@ export const distributorsColumns: ColumnDef<DistributorRow>[] = [
             ) : (
                 <span className="text-muted-foreground">—</span>
             ),
-    },
-    {
-        accessorKey: "inviter",
-        header: "邀请人",
-        cell: ({ row }) => {
-            const inv = row.original.inviter
-            if (!inv) return <span className="text-muted-foreground">—</span>
-            return (
-                <span className="text-sm">
-                    {inv.name}
-                    {inv.distributorCode && (
-                        <span className="text-muted-foreground font-mono ml-1 text-xs">
-                            {inv.distributorCode}
-                        </span>
-                    )}
-                </span>
-            )
-        },
     },
     {
         accessorKey: "disabledAt",
@@ -216,7 +304,7 @@ export const distributorsColumns: ColumnDef<DistributorRow>[] = [
         ),
         cell: ({ row }) => (
             <div className="text-right font-medium">
-                ¥{row.original.totalCommission.toFixed(2)}
+                <CommissionTooltip row={row.original} />
             </div>
         ),
     },
@@ -227,7 +315,7 @@ export const distributorsColumns: ColumnDef<DistributorRow>[] = [
         ),
         cell: ({ row }) => (
             <div className="text-right font-medium">
-                ¥{row.original.withdrawableBalance.toFixed(2)}
+                <BalanceTooltip row={row.original} />
             </div>
         ),
     },

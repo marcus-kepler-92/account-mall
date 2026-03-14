@@ -120,4 +120,49 @@ export async function checkOrderQueryRateLimit(request: NextRequest): Promise<Re
     }
 }
 
+/** 接受邀请注册：每 IP 每分钟最多 10 次 */
+const ACCEPT_INVITE_POINTS = 10
+const ACCEPT_INVITE_DURATION = 60
+const acceptInviteLimiter = new RateLimiterMemory({
+    points: ACCEPT_INVITE_POINTS,
+    duration: ACCEPT_INVITE_DURATION,
+})
+
+/** 分销员发送邀请：每用户每小时最多 20 次 */
+const DISTRIBUTOR_INVITE_POINTS = 20
+const DISTRIBUTOR_INVITE_DURATION = 3600
+const distributorInviteLimiter = new RateLimiterMemory({
+    points: DISTRIBUTOR_INVITE_POINTS,
+    duration: DISTRIBUTOR_INVITE_DURATION,
+})
+
+export async function checkAcceptInviteRateLimit(request: NextRequest): Promise<Response | null> {
+    if (config.nodeEnv === "development") return null
+    const key = getClientIp(request)
+    if (key === "unknown") return null
+    try {
+        await acceptInviteLimiter.consume(key)
+        return null
+    } catch {
+        return new Response(
+            JSON.stringify({ error: "请求过于频繁，请稍后再试。" }),
+            { status: 429, headers: { "Content-Type": "application/json" } },
+        )
+    }
+}
+
+export async function checkDistributorInviteRateLimit(userId: string): Promise<Response | null> {
+    if (config.nodeEnv === "development") return null
+    const key = `dist-invite:${userId}`
+    try {
+        await distributorInviteLimiter.consume(key)
+        return null
+    } catch {
+        return new Response(
+            JSON.stringify({ error: "邀请发送过于频繁，请稍后再试。" }),
+            { status: 429, headers: { "Content-Type": "application/json" } },
+        )
+    }
+}
+
 export const MAX_PENDING_ORDERS_PER_IP = config.maxPendingOrdersPerIp

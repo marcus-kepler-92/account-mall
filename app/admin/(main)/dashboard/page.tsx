@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { cn } from "@/lib/utils"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
     Table,
@@ -19,7 +20,8 @@ import {
     Package,
     Users,
     Wallet,
-    Layers,
+    Minus,
+    ArrowUpRight,
 } from "lucide-react"
 import { getDashboardData } from "./dashboard-data"
 import { ORDER_STATUS_LABEL } from "./types"
@@ -36,107 +38,67 @@ export const dynamic = "force-dynamic"
 
 const sectionGap = "space-y-6 sm:space-y-8"
 const cardGrid = "grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-[repeat(2,minmax(0,1fr))]"
-const kpiGrid =
-    "grid grid-cols-1 gap-4 sm:grid-cols-[repeat(2,minmax(0,1fr))] lg:grid-cols-[repeat(3,minmax(0,1fr))] xl:grid-cols-[repeat(6,minmax(0,1fr))]"
+
+function KpiCard({
+    title,
+    value,
+    subValue,
+    description,
+    href,
+    icon: Icon,
+    trend,
+    accentColor,
+}: {
+    title: string
+    value: string
+    subValue?: string
+    description: string
+    href: string
+    icon: React.ElementType
+    trend?: number
+    accentColor?: string
+}) {
+    return (
+        <Link href={href} className="block h-full min-w-0">
+            <Card className="flex h-full min-w-0 flex-col transition-colors hover:bg-accent/50 cursor-pointer">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                    <CardDescription className="min-w-0 truncate text-xs sm:text-sm">
+                        {description}
+                    </CardDescription>
+                    <Icon className={cn("size-4 shrink-0", accentColor ?? "text-muted-foreground")} />
+                </CardHeader>
+                <CardContent className="flex min-w-0 flex-1 flex-col justify-end">
+                    <div className="truncate text-lg font-bold sm:text-xl xl:text-2xl" title={value}>
+                        {value}
+                    </div>
+                    {subValue && (
+                        <div className="mt-0.5 truncate text-xs text-muted-foreground">{subValue}</div>
+                    )}
+                    <div className="mt-1 flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">查看 →</span>
+                        {typeof trend === "number" && trend !== 0 && (
+                            <span className={trend > 0 ? "text-xs text-green-600" : "text-xs text-red-600"}>
+                                {trend > 0 ? "↑" : "↓"} {Math.abs(trend).toFixed(0)}%
+                            </span>
+                        )}
+                    </div>
+                </CardContent>
+            </Card>
+        </Link>
+    )
+}
 
 export default async function AdminDashboardPage() {
     const data = await getDashboardData()
     const { kpis, trend7, trend30, orderStatusDistribution, topProducts, inventory, restockPending, recentOrders } =
         data
 
-    const kpiCards = [
-        {
-            title: "总营收",
-            value: `¥${kpis.totalRevenue.toFixed(2)}`,
-            description: "已完成订单总金额",
-            href: "/admin/orders",
-            icon: DollarSign,
-            trend: kpis.revenueTrend,
-            ariaLabel: `总营收 ${kpis.totalRevenue.toFixed(2)} 元，较上周 ${kpis.revenueTrend >= 0 ? "增" : "降"} ${Math.abs(kpis.revenueTrend).toFixed(0)}%，查看订单`,
-        },
-        {
-            title: "订单数",
-            value: String(kpis.orderCount),
-            description: "订单总数",
-            href: "/admin/orders",
-            icon: ShoppingCart,
-            trend: kpis.orderTrend,
-            ariaLabel: `订单数 ${kpis.orderCount}，较上周 ${kpis.orderTrend >= 0 ? "增" : "降"} ${Math.abs(kpis.orderTrend).toFixed(0)}%，查看订单`,
-        },
-        {
-            title: "完成率",
-            value: `${kpis.completionRate.toFixed(1)}%`,
-            description: "已完成 / 总订单",
-            href: "/admin/orders",
-            icon: Percent,
-            ariaLabel: `完成率 ${kpis.completionRate.toFixed(1)}%，查看订单`,
-        },
-        {
-            title: "客单价",
-            value: kpis.completedCount > 0 ? `¥${kpis.aov.toFixed(2)}` : "—",
-            description: "平均订单金额",
-            href: "/admin/orders",
-            icon: TrendingUp,
-            ariaLabel: `客单价 ${kpis.aov.toFixed(2)} 元，查看订单`,
-        },
-        {
-            title: "卡密库存",
-            value: String(kpis.unsoldCardCount),
-            description: "未售出卡密总数",
-            href: "/admin/cards",
-            icon: CreditCard,
-            ariaLabel: `卡密库存 ${kpis.unsoldCardCount}，管理卡密`,
-        },
-        {
-            title: "待补货需求",
-            value: String(kpis.restockPendingCount),
-            description: "待通知补货提醒人数",
-            href: "/admin/products",
-            icon: Bell,
-            ariaLabel: `待补货需求 ${kpis.restockPendingCount} 人，查看商品`,
-        },
-    ]
-
-    const overviewCards = [
-        {
-            title: "在售商品数",
-            value: String(kpis.activeProductCount),
-            description: "当前在售商品数量",
-            href: "/admin/products",
-            icon: Package,
-            ariaLabel: `在售商品 ${kpis.activeProductCount} 个，管理商品`,
-        },
-        {
-            title: "分销员数",
-            value: String(kpis.distributorCount),
-            description: "分销员总数",
-            href: "/admin/distributors",
-            icon: Users,
-            ariaLabel: `分销员 ${kpis.distributorCount} 人，管理分销员`,
-        },
-        {
-            title: "待处理提现",
-            value:
-                kpis.pendingWithdrawalCount > 0
-                    ? `${kpis.pendingWithdrawalCount} 笔 · ¥${kpis.pendingWithdrawalAmount.toFixed(2)}`
-                    : "0 笔",
-            description: "待处理提现笔数与金额",
-            href: "/admin/withdrawals?status=PENDING",
-            icon: Wallet,
-            ariaLabel: `待处理提现 ${kpis.pendingWithdrawalCount} 笔，金额 ¥${kpis.pendingWithdrawalAmount.toFixed(2)}，查看提现`,
-        },
-        {
-            title: "待结算佣金",
-            value:
-                kpis.pendingCommissionAmount > 0
-                    ? `¥${kpis.pendingCommissionAmount.toFixed(2)}`
-                    : "¥0.00",
-            description: "待结算佣金总额",
-            href: "/admin/distributors",
-            icon: Layers,
-            ariaLabel: `待结算佣金 ¥${kpis.pendingCommissionAmount.toFixed(2)}，查看分销员`,
-        },
-    ]
+    const marginColor =
+        kpis.netMarginPercent >= 80
+            ? "text-green-600"
+            : kpis.netMarginPercent >= 60
+              ? "text-yellow-600"
+              : "text-red-600"
 
     return (
         <div className={sectionGap}>
@@ -147,88 +109,133 @@ export default async function AdminDashboardPage() {
                 </p>
             </header>
 
-            <section className="min-w-0" aria-label="核心指标">
-                <div className={kpiGrid}>
-                    {kpiCards.map((stat) => (
-                        <Link
-                            key={stat.title}
-                            href={stat.href}
-                            aria-label={stat.ariaLabel}
-                            className="block h-full min-w-0"
-                        >
-                            <Card className="flex h-full min-w-0 flex-col transition-colors hover:bg-accent/50 cursor-pointer">
-                                <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-                                    <CardDescription className="min-w-0 truncate">
-                                        {stat.description}
-                                    </CardDescription>
-                                    <stat.icon className="size-4 shrink-0 text-muted-foreground" />
-                                </CardHeader>
-                                <CardContent className="flex min-w-0 flex-1 flex-col justify-end">
-                                    <div
-                                        className="truncate text-lg font-bold sm:text-xl xl:text-2xl"
-                                        title={stat.value}
-                                    >
-                                        {stat.value}
-                                    </div>
-                                    <div className="mt-1 flex items-center gap-2">
-                                        <span className="text-xs text-muted-foreground sm:text-sm">
-                                            查看 →
-                                        </span>
-                                        {"trend" in stat &&
-                                            typeof stat.trend === "number" &&
-                                            stat.trend !== 0 && (
-                                                <span
-                                                    className={
-                                                        stat.trend > 0
-                                                            ? "text-xs text-green-600"
-                                                            : "text-xs text-red-600"
-                                                    }
-                                                >
-                                                    {stat.trend > 0 ? "↑" : "↓"}{" "}
-                                                    {Math.abs(stat.trend).toFixed(0)}%
-                                                </span>
-                                            )}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </Link>
-                    ))}
+            {/* 第一层：财务核心 */}
+            <section className="min-w-0" aria-label="财务核心指标">
+                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    财务核心
+                </h3>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <KpiCard
+                        title="累计收款"
+                        value={`¥${kpis.totalRevenue.toFixed(2)}`}
+                        description="已完成订单的总收款金额"
+                        href="/admin/orders"
+                        icon={DollarSign}
+                        trend={kpis.revenueTrend}
+                        accentColor="text-primary"
+                    />
+                    <KpiCard
+                        title="平台实得"
+                        value={`¥${kpis.netIncome.toFixed(2)}`}
+                        description="扣除分销佣金后，平台实际留存"
+                        href="/admin/distributors"
+                        icon={TrendingUp}
+                        trend={kpis.netIncomeTrend}
+                        accentColor="text-green-600"
+                    />
+                    <KpiCard
+                        title="已结算佣金"
+                        value={`¥${kpis.totalCommission.toFixed(2)}`}
+                        description="已发放给分销员的佣金总额"
+                        href="/admin/distributors"
+                        icon={Minus}
+                        accentColor="text-orange-500"
+                    />
+                    <Link href="/admin/orders" className="block h-full min-w-0">
+                        <Card className="flex h-full min-w-0 flex-col transition-colors hover:bg-accent/50 cursor-pointer">
+                            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                                <CardDescription className="min-w-0 truncate text-xs sm:text-sm">
+                                    收入留存率
+                                </CardDescription>
+                                <ArrowUpRight className="size-4 shrink-0 text-muted-foreground" />
+                            </CardHeader>
+                            <CardContent className="flex min-w-0 flex-1 flex-col justify-end">
+                                <div className={cn("text-lg font-bold sm:text-xl xl:text-2xl", marginColor)}>
+                                    {kpis.netMarginPercent.toFixed(1)}%
+                                </div>
+                                <div className="mt-0.5 text-xs text-muted-foreground">
+                                    {kpis.totalRevenue > 0
+                                        ? `每收 ¥100，留 ¥${kpis.netMarginPercent.toFixed(1)}`
+                                        : "暂无数据"}
+                                </div>
+                                <div className="mt-1">
+                                    <span className="text-xs text-muted-foreground">查看 →</span>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </Link>
                 </div>
             </section>
 
-            <section className="min-w-0" aria-label="业务概览">
-                <h3 className="mb-3 text-sm font-medium text-muted-foreground sm:mb-4">业务概览</h3>
+            {/* 第二层：运营效率 */}
+            <section className="min-w-0" aria-label="运营效率指标">
+                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    运营效率
+                </h3>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    {overviewCards.map((stat) => (
-                        <Link
-                            key={stat.title}
-                            href={stat.href}
-                            aria-label={stat.ariaLabel}
-                            className="block h-full min-w-0"
-                        >
-                            <Card className="flex h-full min-w-0 flex-col transition-colors hover:bg-accent/50 cursor-pointer">
-                                <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-                                    <CardDescription className="min-w-0 truncate">
-                                        {stat.description}
-                                    </CardDescription>
-                                    <stat.icon className="size-4 shrink-0 text-muted-foreground" />
-                                </CardHeader>
-                                <CardContent className="flex min-w-0 flex-1 flex-col justify-end">
-                                    <div
-                                        className="truncate text-lg font-bold sm:text-xl"
-                                        title={stat.value}
-                                    >
-                                        {stat.value}
-                                    </div>
-                                    <div className="mt-1">
-                                        <span className="text-xs text-muted-foreground sm:text-sm">
-                                            查看 →
-                                        </span>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </Link>
-                    ))}
+                    <KpiCard
+                        title="订单数"
+                        value={String(kpis.orderCount)}
+                        description="订单总数"
+                        href="/admin/orders"
+                        icon={ShoppingCart}
+                        trend={kpis.orderTrend}
+                    />
+                    <KpiCard
+                        title="客单价"
+                        value={kpis.completedCount > 0 ? `¥${kpis.aov.toFixed(2)}` : "—"}
+                        description="平均订单金额"
+                        href="/admin/orders"
+                        icon={DollarSign}
+                    />
+                    <KpiCard
+                        title="完成率"
+                        value={`${kpis.completionRate.toFixed(1)}%`}
+                        description="已完成 / 总订单"
+                        href="/admin/orders"
+                        icon={Percent}
+                    />
+                    <KpiCard
+                        title="卡密库存"
+                        value={String(kpis.unsoldCardCount)}
+                        description="未售出卡密总数"
+                        href="/admin/cards"
+                        icon={CreditCard}
+                    />
+                </div>
+            </section>
+
+            {/* 第三层：待办事项 */}
+            <section className="min-w-0" aria-label="待办事项">
+                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    待办事项
+                </h3>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <KpiCard
+                        title="待处理提现"
+                        value={
+                            kpis.pendingWithdrawalCount > 0
+                                ? `${kpis.pendingWithdrawalCount} 笔 · ¥${kpis.pendingWithdrawalAmount.toFixed(2)}`
+                                : "0 笔"
+                        }
+                        description="待处理提现笔数与金额"
+                        href="/admin/withdrawals?status=PENDING"
+                        icon={Wallet}
+                    />
+                    <KpiCard
+                        title="待补货需求"
+                        value={String(kpis.restockPendingCount)}
+                        description="待通知补货提醒人数"
+                        href="/admin/products"
+                        icon={Bell}
+                    />
+                    <KpiCard
+                        title="在售商品 / 分销员"
+                        value={`${kpis.activeProductCount} / ${kpis.distributorCount}`}
+                        description="在售商品数 / 分销员总数"
+                        href="/admin/products"
+                        icon={Package}
+                    />
                 </div>
             </section>
 

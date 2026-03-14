@@ -17,7 +17,9 @@ export const auth = betterAuth({
     },
     emailAndPassword: {
         enabled: true,
-        disableSignUp: false, // Allow sign-up for distributors; admin is created via seed
+        // Sign-up is disabled: distributors join via invite-only flow (/distributor/accept-invite)
+        // and admin accounts are created via seed script.
+        disableSignUp: true,
     },
     trustedOrigins: [config.siteUrl],
     rateLimit: {

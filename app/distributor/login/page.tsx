@@ -53,7 +53,7 @@ export default function DistributorLoginPage() {
     }
 
     return (
-        <div className="flex min-h-dvh items-center justify-center bg-background p-4 sm:p-6 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
+        <main className="flex min-h-dvh items-center justify-center bg-background p-4 sm:p-6 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
             <Card className="w-full max-w-md">
                 <CardHeader className="text-center">
                     <CardTitle className="text-2xl font-bold">
@@ -128,6 +128,6 @@ export default function DistributorLoginPage() {
                     </form>
                 </CardContent>
             </Card>
-        </div>
+        </main>
     )
 }

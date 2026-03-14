@@ -13,6 +13,7 @@ import {
     DataTableFacetedFilter,
 } from "@/app/admin/components"
 import { distributorsColumns, type DistributorRow } from "./distributors-columns"
+import { InviteDistributorButtonClient } from "./invite-distributor-button-client"
 
 interface DistributorsDataTableProps {
     data: DistributorRow[]
@@ -50,18 +51,21 @@ export function DistributorsDataTable({
 
     return (
         <div className="space-y-4">
-            <DataTableToolbar
-                table={table}
-                searchPlaceholder="搜索昵称、邮箱、优惠码..."
-                searchParamKey="search"
-            >
-                <DataTableFacetedFilter
-                    column={table.getColumn("disabledAt")}
-                    title="状态"
-                    options={statusOptionsWithCounts}
-                    paramKey="status"
-                />
-            </DataTableToolbar>
+            <div className="flex items-center justify-between gap-2">
+                <DataTableToolbar
+                    table={table}
+                    searchPlaceholder="搜索昵称、邮箱、优惠码..."
+                    searchParamKey="search"
+                >
+                    <DataTableFacetedFilter
+                        column={table.getColumn("disabledAt")}
+                        title="状态"
+                        options={statusOptionsWithCounts}
+                        paramKey="status"
+                    />
+                </DataTableToolbar>
+                <InviteDistributorButtonClient />
+            </div>
 
             <DataTable
                 table={table}

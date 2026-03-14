@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
         where.status = status
     }
 
-    const [commissions, total, settledSum, invitationRewardSum, paidSum, pendingSum] = await Promise.all([
+    const [commissions, total, settledSum, paidSum, pendingSum] = await Promise.all([
         prisma.commission.findMany({
             where,
             include: {
@@ -36,10 +36,6 @@ export async function GET(request: NextRequest) {
             where: { distributorId: user.id, status: "SETTLED" },
             _sum: { amount: true },
         }),
-        prisma.invitationReward.aggregate({
-            where: { inviterId: user.id, status: "SETTLED" },
-            _sum: { amount: true },
-        }),
         prisma.withdrawal.aggregate({
             where: { distributorId: user.id, status: "PAID" },
             _sum: { amount: true },
@@ -51,8 +47,7 @@ export async function GET(request: NextRequest) {
     ])
 
     const withdrawableBalance =
-        Number(settledSum._sum.amount ?? 0) +
-        Number(invitationRewardSum?._sum?.amount ?? 0) -
+        Number(settledSum._sum.amount ?? 0) -
         Number(paidSum._sum.amount ?? 0) -
         Number(pendingSum._sum.amount ?? 0)
 

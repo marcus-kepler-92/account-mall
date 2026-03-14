@@ -55,11 +55,15 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         },
     })
 
+    const feeAmount = Number(withdrawal.feeAmount ?? 0)
     return NextResponse.json({
         id: withdrawal.id,
         distributorId: withdrawal.distributorId,
         distributor: withdrawal.distributor,
         amount: Number(withdrawal.amount),
+        feePercent: Number(withdrawal.feePercent ?? 0),
+        feeAmount,
+        actualAmount: Math.round((Number(withdrawal.amount) - feeAmount) * 100) / 100,
         status: withdrawal.status,
         note: withdrawal.note,
         processedAt: withdrawal.processedAt,

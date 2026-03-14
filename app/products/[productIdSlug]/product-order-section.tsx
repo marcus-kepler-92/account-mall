@@ -54,7 +54,7 @@ export function ProductOrderSection({
                 <div className="mb-3 flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 text-xs text-blue-800 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300">
                     <Info className="size-3.5 mt-0.5 shrink-0" aria-hidden />
                     <p className="leading-relaxed">
-                        每人每天限领 1 次 · 同一邮箱、设备或网络每 {displayValidityHours} 小时仅可领取一次，领取后账号在此期间内持续有效
+                        每人每天可领取 1 次，账号在 {displayValidityHours} 小时内持续有效，到期后可再次领取
                     </p>
                 </div>
             )}

@@ -23,6 +23,7 @@ export function DashboardChart({
     const tooltipStyle = getEChartsTooltip(colors)
     const primary = colors.primary || "#5B8FF9"
     const chart2 = colors.chart2 || "#5AD8A6"
+    const chart3 = colors.chart3 || "#F6BD16"
     const axisColor = colors.mutedForeground || colors.foreground || "#666"
 
     const option: EChartsOption = {
@@ -33,18 +34,19 @@ export function DashboardChart({
             trigger: "axis",
             axisPointer: { type: "shadow" },
             formatter: (params: unknown) => {
-                const p = Array.isArray(params) ? params[0] : null
-                if (!p || !("data" in p)) return ""
-                const d = (p as { data: { date?: string; 订单?: number; 营收?: number } }).data
-                if (!d) return ""
-                const date = d.date ?? ""
-                const orders = Number(d.订单 ?? 0)
-                const revenue = Number(d.营收 ?? 0)
-                return `${date}<br/>订单数: ${orders}<br/>营收: ¥${revenue.toFixed(2)}`
+                if (!Array.isArray(params) || params.length === 0) return ""
+                const allParams = params as Array<{ seriesName?: string; value?: number; color?: string }>
+                const date = data[allParams[0]?.dataIndex as number]?.date ?? ""
+                const lines = allParams.map((p) => {
+                    const val = Number(p.value ?? 0)
+                    const isRevenue = p.seriesName === "营收" || p.seriesName === "净收入"
+                    return `<span style="display:inline-block;margin-right:4px;border-radius:50%;width:10px;height:10px;background:${p.color}"></span>${p.seriesName}: ${isRevenue ? `¥${val.toFixed(2)}` : val}`
+                })
+                return `${date}<br/>${lines.join("<br/>")}`
             },
         },
         legend: {
-            data: ["订单数", "营收"],
+            data: ["订单数", "营收", "净收入"],
             textStyle: { color: colors.foreground },
             top: 0,
         },
@@ -100,6 +102,19 @@ export function DashboardChart({
                     lineStyle: { color: primary, width: 3 },
                     itemStyle: { color: primary },
                     areaStyle: { color: primary, opacity: 0.3 },
+                },
+            },
+            {
+                name: "净收入",
+                type: "line",
+                yAxisIndex: 1,
+                data: data.map((d) => d.净收入),
+                smooth: true,
+                lineStyle: { color: chart3, type: "dashed", width: 2 },
+                itemStyle: { color: chart3 },
+                emphasis: {
+                    lineStyle: { color: chart3, width: 3 },
+                    itemStyle: { color: chart3 },
                 },
             },
         ],

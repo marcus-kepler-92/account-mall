@@ -1,0 +1,121 @@
+"use client"
+
+import { useState } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import * as z from "zod"
+import { toast } from "sonner"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog"
+import {
+    Form,
+    FormControl,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
+} from "@/components/ui/form"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { Loader2 } from "lucide-react"
+
+const formSchema = z.object({
+    email: z.string().email("请输入有效的邮箱地址"),
+})
+
+interface InviteDistributorDialogProps {
+    open: boolean
+    onOpenChange: (open: boolean) => void
+    /** When set, the invite is sent on behalf of this distributor (from admin row action) */
+    invitedByDistributorId?: string
+}
+
+export function InviteDistributorDialog({
+    open,
+    onOpenChange,
+}: InviteDistributorDialogProps) {
+    const [loading, setLoading] = useState(false)
+
+    const form = useForm<z.infer<typeof formSchema>>({
+        resolver: zodResolver(formSchema),
+        defaultValues: { email: "" },
+    })
+
+    const onSubmit = async (values: z.infer<typeof formSchema>) => {
+        setLoading(true)
+        try {
+            const res = await fetch("/api/admin/distributors/invite", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: values.email }),
+            })
+            const data = await res.json()
+            if (!res.ok) {
+                toast.error(data.error || "邀请失败，请稍后重试")
+                return
+            }
+            toast.success(`邀请邮件已发送至 ${values.email}`)
+            form.reset()
+            onOpenChange(false)
+        } catch {
+            toast.error("邀请失败，请稍后重试")
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>邀请新分销员</DialogTitle>
+                    <DialogDescription>
+                        输入对方邮箱，系统将发送邀请邮件，对方点击链接后设置密码即可加入。
+                        由管理员直接邀请的分销员无上线，享受完整阶梯佣金比例（不被扣除二级佣金）。
+                    </DialogDescription>
+                </DialogHeader>
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                        <FormField
+                            control={form.control}
+                            name="email"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>邮箱</FormLabel>
+                                    <FormControl>
+                                        <Input
+                                            type="email"
+                                            placeholder="请输入邮箱地址"
+                                            {...field}
+                                        />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <DialogFooter>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => onOpenChange(false)}
+                                disabled={loading}
+                            >
+                                取消
+                            </Button>
+                            <Button type="submit" disabled={loading}>
+                                {loading && <Loader2 className="mr-2 size-4 animate-spin" />}
+                                {loading ? "发送中..." : "发送邀请"}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </Form>
+            </DialogContent>
+        </Dialog>
+    )
+}

@@ -2,6 +2,12 @@
 
 import { ColumnDef } from "@tanstack/react-table"
 import { Badge } from "@/components/ui/badge"
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { DataTableColumnHeader } from "@/app/admin/components/data-table-column-header"
 
 export type DistributorCommissionRow = {
@@ -9,6 +15,8 @@ export type DistributorCommissionRow = {
     orderNo: string
     amount: number
     status: "PENDING" | "SETTLED" | "WITHDRAWN"
+    level: 1 | 2
+    sourceDistributorName?: string
     createdAt: string
 }
 
@@ -29,6 +37,30 @@ export const distributorCommissionsColumns: ColumnDef<DistributorCommissionRow>[
                 {row.original.orderNo}
             </span>
         ),
+    },
+    {
+        accessorKey: "level",
+        header: "类型",
+        cell: ({ row }) => {
+            const level = row.original.level
+            if (level === 2) {
+                return (
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Badge variant="outline" className="cursor-default">二级推广</Badge>
+                            </TooltipTrigger>
+                            {row.original.sourceDistributorName && (
+                                <TooltipContent>
+                                    <p>来自下线：{row.original.sourceDistributorName}</p>
+                                </TooltipContent>
+                            )}
+                        </Tooltip>
+                    </TooltipProvider>
+                )
+            }
+            return <Badge variant="default">一级推广</Badge>
+        },
     },
     {
         accessorKey: "amount",

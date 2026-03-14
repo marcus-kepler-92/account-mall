@@ -28,6 +28,8 @@ function getWeekBounds(now: Date) {
 export async function getDashboardKpis(): Promise<DashboardKpis> {
     const now = new Date()
     const { startOfThisPeriod, startOfLastPeriod } = getWeekBounds(now)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = prisma as any
 
     const [
         totalRevenueResult,
@@ -42,6 +44,12 @@ export async function getDashboardKpis(): Promise<DashboardKpis> {
         distributorCount,
         pendingWithdrawalAgg,
         pendingCommissionSum,
+        settledCommissionSum,
+        paidWithdrawalFeeSum,
+        lastPeriodSettledCommissionSum,
+        lastPeriodWithdrawalFeeSum,
+        thisPeriodSettledCommissionSum,
+        thisPeriodWithdrawalFeeSum,
     ] = await Promise.all([
         prisma.order.aggregate({
             where: { status: "COMPLETED" },
@@ -81,6 +89,46 @@ export async function getDashboardKpis(): Promise<DashboardKpis> {
             where: { status: "PENDING" },
             _sum: { amount: true },
         }),
+        // 利润相关：累计已结算佣金
+        prisma.commission.aggregate({
+            where: { status: "SETTLED" },
+            _sum: { amount: true },
+        }),
+        // 已打款提现的手续费收入
+        db.withdrawal.aggregate({
+            where: { status: "PAID" },
+            _sum: { feeAmount: true },
+        }),
+        // 上周：佣金+手续费（用于净收入环比）
+        prisma.commission.aggregate({
+            where: {
+                status: "SETTLED",
+                createdAt: { gte: startOfLastPeriod, lt: startOfThisPeriod },
+            },
+            _sum: { amount: true },
+        }),
+        db.withdrawal.aggregate({
+            where: {
+                status: "PAID",
+                processedAt: { gte: startOfLastPeriod, lt: startOfThisPeriod },
+            },
+            _sum: { feeAmount: true },
+        }),
+        // 本周：佣金+手续费
+        prisma.commission.aggregate({
+            where: {
+                status: "SETTLED",
+                createdAt: { gte: startOfThisPeriod },
+            },
+            _sum: { amount: true },
+        }),
+        db.withdrawal.aggregate({
+            where: {
+                status: "PAID",
+                processedAt: { gte: startOfThisPeriod },
+            },
+            _sum: { feeAmount: true },
+        }),
     ])
 
     const totalRevenue = Number(totalRevenueResult._sum.amount ?? 0)
@@ -108,6 +156,36 @@ export async function getDashboardKpis(): Promise<DashboardKpis> {
     const completionRate = orderCount > 0 ? (completedCount / orderCount) * 100 : 0
     const aov = completedCount > 0 ? totalRevenue / completedCount : 0
 
+    // 利润指标
+    const totalCommission = Number(settledCommissionSum._sum.amount ?? 0)
+    const totalWithdrawalFee = Number(paidWithdrawalFeeSum._sum.feeAmount ?? 0)
+    const netIncome = totalRevenue - totalCommission + totalWithdrawalFee
+    const netMarginPercent = totalRevenue > 0 ? (netIncome / totalRevenue) * 100 : 0
+
+    // 净收入环比
+    const lastPeriodNetIncome =
+        lastPeriodRevenue -
+        Number(lastPeriodSettledCommissionSum._sum.amount ?? 0) +
+        Number(lastPeriodWithdrawalFeeSum._sum.feeAmount ?? 0)
+    const thisPeriodRevenue = Number(
+        (
+            await prisma.order.aggregate({
+                where: { status: "COMPLETED", paidAt: { gte: startOfThisPeriod } },
+                _sum: { amount: true },
+            })
+        )._sum.amount ?? 0,
+    )
+    const thisPeriodNetIncome =
+        thisPeriodRevenue -
+        Number(thisPeriodSettledCommissionSum._sum.amount ?? 0) +
+        Number(thisPeriodWithdrawalFeeSum._sum.feeAmount ?? 0)
+    const netIncomeTrend =
+        lastPeriodNetIncome > 0
+            ? ((thisPeriodNetIncome - lastPeriodNetIncome) / lastPeriodNetIncome) * 100
+            : thisPeriodNetIncome > 0
+              ? 100
+              : 0
+
     return {
         totalRevenue,
         revenueTrend,
@@ -125,11 +203,16 @@ export async function getDashboardKpis(): Promise<DashboardKpis> {
         pendingWithdrawalCount: pendingWithdrawalAgg._count.id,
         pendingWithdrawalAmount: Number(pendingWithdrawalAgg._sum.amount ?? 0),
         pendingCommissionAmount: Number(pendingCommissionSum._sum.amount ?? 0),
+        totalCommission,
+        totalWithdrawalFee,
+        netIncome,
+        netMarginPercent,
+        netIncomeTrend,
     }
 }
 
 /**
- * 按日聚合的订单数、营收（用于趋势图）
+ * 按日聚合的订单数、营收、净收入（用于趋势图）
  */
 export async function getDashboardTrend(days: number): Promise<DashboardTrendPoint[]> {
     const now = new Date()
@@ -137,29 +220,49 @@ export async function getDashboardTrend(days: number): Promise<DashboardTrendPoi
     start.setDate(now.getDate() - days)
     start.setHours(0, 0, 0, 0)
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = prisma as any
+    type AmountGroupRow = { createdAt: Date; _sum: { amount: unknown } }
+    type FeeGroupRow = { processedAt: Date | null; _sum: { feeAmount?: unknown } }
+
     const dayList = getDaysForTrend(days)
-    const chartRaw = await prisma.order.groupBy({
-        by: ["createdAt"],
-        where: {
-            createdAt: { gte: start },
-            status: "COMPLETED",
-        },
-        _sum: { amount: true },
-        _count: { id: true },
-    })
+    const [chartRaw, commissionRaw, withdrawalFeeRaw] = await Promise.all([
+        prisma.order.groupBy({
+            by: ["createdAt"],
+            where: { createdAt: { gte: start }, status: "COMPLETED" },
+            _sum: { amount: true },
+            _count: { id: true },
+        }),
+        db.commission.groupBy({
+            by: ["createdAt"],
+            where: { createdAt: { gte: start }, status: "SETTLED" },
+            _sum: { amount: true },
+        }),
+        db.withdrawal.groupBy({
+            by: ["processedAt"],
+            where: { processedAt: { gte: start }, status: "PAID" },
+            _sum: { feeAmount: true },
+        }),
+    ])
 
     return dayList.map((d) => {
         const next = new Date(d)
         next.setDate(next.getDate() + 1)
-        const inDay = chartRaw.filter(
-            (r) => r.createdAt >= d && r.createdAt < next
-        )
-        const dayRevenue = inDay.reduce((s, r) => s + Number(r._sum.amount ?? 0), 0)
-        const dayOrders = inDay.reduce((s, r) => s + r._count.id, 0)
+        const inDay = chartRaw.filter((r) => r.createdAt >= d && r.createdAt < next)
+        const dayRevenue = inDay.reduce((s: number, r) => s + Number(r._sum?.amount ?? 0), 0)
+        const dayOrders = inDay.reduce((s: number, r) => s + r._count.id, 0)
+        const dayCommission = commissionRaw
+            .filter((r: AmountGroupRow) => r.createdAt >= d && r.createdAt < next)
+            .reduce((s: number, r: AmountGroupRow) => s + Number(r._sum.amount ?? 0), 0)
+        const dayFee = withdrawalFeeRaw
+            .filter((r: FeeGroupRow) => r.processedAt && r.processedAt >= d && r.processedAt < next)
+            .reduce((s: number, r: FeeGroupRow) => s + Number(r._sum.feeAmount ?? 0), 0)
+        const dayNetIncome = Math.round((dayRevenue - dayCommission + dayFee) * 100) / 100
         return {
             date: d.toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" }),
             订单: dayOrders,
             营收: dayRevenue,
+            净收入: dayNetIncome,
         }
     })
 }

@@ -67,7 +67,15 @@ export default async function AdminDistributorsPage({
     ])
 
     const ids = distributors.map((d) => d.id)
-    const [orderCounts, commissionAll, commissionSettled, invitationRewardSettled, withdrawalPaid, withdrawalPending] =
+    const [
+        orderCounts,
+        commissionAll,
+        level1Settled,
+        level2Settled,
+        withdrawalPaid,
+        withdrawalPending,
+        inviteeCounts,
+    ] =
         ids.length > 0
             ? await Promise.all([
                   prisma.order.groupBy({
@@ -82,12 +90,12 @@ export default async function AdminDistributorsPage({
                   }),
                   prisma.commission.groupBy({
                       by: ["distributorId"],
-                      where: { distributorId: { in: ids }, status: "SETTLED" },
+                      where: { distributorId: { in: ids }, level: 1, status: "SETTLED" },
                       _sum: { amount: true },
                   }),
-                  prisma.invitationReward.groupBy({
-                      by: ["inviterId"],
-                      where: { inviterId: { in: ids }, status: "SETTLED" },
+                  prisma.commission.groupBy({
+                      by: ["distributorId"],
+                      where: { distributorId: { in: ids }, level: 2, status: "SETTLED" },
                       _sum: { amount: true },
                   }),
                   prisma.withdrawal.groupBy({
@@ -100,8 +108,13 @@ export default async function AdminDistributorsPage({
                       where: { distributorId: { in: ids }, status: "PENDING" },
                       _sum: { amount: true },
                   }),
+                  prisma.user.groupBy({
+                      by: ["inviterId"],
+                      where: { inviterId: { in: ids } },
+                      _count: { id: true },
+                  }),
               ])
-            : [[], [], [], [], [], []]
+            : [[], [], [], [], [], [], []]
 
     const orderCountMap = new Map(
         orderCounts.map((o) => [o.distributorId, o._count.id])
@@ -109,11 +122,11 @@ export default async function AdminDistributorsPage({
     const commissionAllMap = new Map(
         commissionAll.map((c) => [c.distributorId, Number(c._sum.amount ?? 0)])
     )
-    const settledMap = new Map(
-        commissionSettled.map((c) => [c.distributorId, Number(c._sum.amount ?? 0)])
+    const level1SettledMap = new Map(
+        level1Settled.map((c) => [c.distributorId, Number(c._sum.amount ?? 0)])
     )
-    const invitationRewardMap = new Map(
-        invitationRewardSettled.map((r) => [r.inviterId, Number(r._sum.amount ?? 0)])
+    const level2SettledMap = new Map(
+        level2Settled.map((c) => [c.distributorId, Number(c._sum.amount ?? 0)])
     )
     const paidMap = new Map(
         withdrawalPaid.map((w) => [w.distributorId, Number(w._sum.amount ?? 0)])
@@ -121,13 +134,36 @@ export default async function AdminDistributorsPage({
     const pendingMap = new Map(
         withdrawalPending.map((w) => [w.distributorId, Number(w._sum.amount ?? 0)])
     )
+    const inviteeCountMap = new Map(
+        inviteeCounts.map((u) => [u.inviterId as string, u._count.id])
+    )
+
+    // Split totalCommission into level1 + level2 for display
+    const level1AllMap = new Map<string, number>()
+    const level2AllMap = new Map<string, number>()
+    if (ids.length > 0) {
+        const [l1All, l2All] = await Promise.all([
+            prisma.commission.groupBy({
+                by: ["distributorId"],
+                where: { distributorId: { in: ids }, level: 1 },
+                _sum: { amount: true },
+            }),
+            prisma.commission.groupBy({
+                by: ["distributorId"],
+                where: { distributorId: { in: ids }, level: 2 },
+                _sum: { amount: true },
+            }),
+        ])
+        l1All.forEach((c) => level1AllMap.set(c.distributorId, Number(c._sum.amount ?? 0)))
+        l2All.forEach((c) => level2AllMap.set(c.distributorId, Number(c._sum.amount ?? 0)))
+    }
 
     const data: DistributorRow[] = distributors.map((d) => {
-        const settled = settledMap.get(d.id) ?? 0
-        const invitationReward = invitationRewardMap.get(d.id) ?? 0
+        const l1Settled = level1SettledMap.get(d.id) ?? 0
+        const l2Settled = level2SettledMap.get(d.id) ?? 0
         const paid = paidMap.get(d.id) ?? 0
         const pending = pendingMap.get(d.id) ?? 0
-        const withdrawableBalance = settled + invitationReward - paid - pending
+        const withdrawableBalance = l1Settled + l2Settled - paid - pending
         return {
             id: d.id,
             email: d.email,
@@ -139,7 +175,14 @@ export default async function AdminDistributorsPage({
             createdAt: d.createdAt.toISOString(),
             completedOrderCount: orderCountMap.get(d.id) ?? 0,
             totalCommission: commissionAllMap.get(d.id) ?? 0,
+            level1CommissionTotal: level1AllMap.get(d.id) ?? 0,
+            level2CommissionTotal: level2AllMap.get(d.id) ?? 0,
+            level1Settled: l1Settled,
+            level2Settled: l2Settled,
+            paidTotal: paid,
+            pendingTotal: pending,
             withdrawableBalance,
+            inviteeCount: inviteeCountMap.get(d.id) ?? 0,
             inviter: d.inviter
                 ? {
                       id: d.inviter.id,

@@ -28,15 +28,21 @@ export async function GET(request: NextRequest) {
     ])
 
     return NextResponse.json({
-        data: withdrawals.map((w) => ({
-            id: w.id,
-            amount: Number(w.amount),
-            status: w.status,
-            receiptImageUrl: w.receiptImageUrl,
-            note: w.note,
-            processedAt: w.processedAt,
-            createdAt: w.createdAt,
-        })),
+        data: withdrawals.map((w) => {
+            const feeAmount = Number(w.feeAmount ?? 0)
+            return {
+                id: w.id,
+                amount: Number(w.amount),
+                feePercent: Number(w.feePercent ?? 0),
+                feeAmount,
+                actualAmount: Math.round((Number(w.amount) - feeAmount) * 100) / 100,
+                status: w.status,
+                receiptImageUrl: w.receiptImageUrl,
+                note: w.note,
+                processedAt: w.processedAt,
+                createdAt: w.createdAt,
+            }
+        }),
         meta: {
             total,
             page,
@@ -108,16 +114,15 @@ export async function POST(request: NextRequest) {
         cacheControlMaxAge: 365 * 24 * 60 * 60,
     })
 
-    let withdrawal: { id: string; amount: { toNumber?: () => number }; status: string; receiptImageUrl: string | null; createdAt: Date }
+    const feePercent = config.withdrawalFeePercent
+    const feeAmount = Math.round(amount * feePercent) / 100
+
+    let withdrawal: { id: string; amount: { toNumber?: () => number }; feePercent: unknown; feeAmount: unknown; status: string; receiptImageUrl: string | null; createdAt: Date }
     try {
         withdrawal = await prisma.$transaction(async (tx) => {
-            const [settledSum, invitationRewardSum, paidSum, pendingSum] = await Promise.all([
+            const [settledSum, paidSum, pendingSum] = await Promise.all([
                 tx.commission.aggregate({
                     where: { distributorId: user.id, status: "SETTLED" },
-                    _sum: { amount: true },
-                }),
-                tx.invitationReward.aggregate({
-                    where: { inviterId: user.id, status: "SETTLED" },
                     _sum: { amount: true },
                 }),
                 tx.withdrawal.aggregate({
@@ -130,8 +135,7 @@ export async function POST(request: NextRequest) {
                 }),
             ])
             const withdrawableBalance =
-                Number(settledSum._sum.amount ?? 0) +
-                Number(invitationRewardSum?._sum?.amount ?? 0) -
+                Number(settledSum._sum.amount ?? 0) -
                 Number(paidSum._sum.amount ?? 0) -
                 Number(pendingSum._sum.amount ?? 0)
             if (amount > withdrawableBalance) {
@@ -141,6 +145,8 @@ export async function POST(request: NextRequest) {
                 data: {
                     distributorId: user.id,
                     amount,
+                    feePercent,
+                    feeAmount,
                     status: "PENDING",
                     receiptImageUrl,
                 },
@@ -156,10 +162,14 @@ export async function POST(request: NextRequest) {
         throw err
     }
 
+    const createdFeeAmount = Number(withdrawal.feeAmount ?? 0)
     return NextResponse.json(
         {
             id: withdrawal.id,
             amount: Number(withdrawal.amount),
+            feePercent: Number(withdrawal.feePercent ?? 0),
+            feeAmount: createdFeeAmount,
+            actualAmount: Math.round((Number(withdrawal.amount) - createdFeeAmount) * 100) / 100,
             status: withdrawal.status,
             receiptImageUrl: withdrawal.receiptImageUrl,
             createdAt: withdrawal.createdAt,

@@ -34,34 +34,62 @@ describe("dashboard-data", () => {
         jest.useRealTimers()
     })
 
+    /** Provide all mock responses needed by getDashboardKpis' Promise.all (18 items) + 1 sequential query */
+    function setupKpisMocks({
+        totalRevenue = 1000,
+        lastPeriodRevenue = 800,
+        orderCount = 30,
+        lastPeriodOrderCount = 10,
+        thisPeriodOrderCount = 15,
+        statusGroups = [
+            { status: "COMPLETED", _count: { id: 20 } },
+            { status: "PENDING", _count: { id: 5 } },
+            { status: "CLOSED", _count: { id: 5 } },
+        ],
+        unsoldCardCount = 50,
+        restockCount = 3,
+        productCount = 5,
+        distributorCount = 2,
+        pendingWithdrawal = { _count: { id: 3 }, _sum: { amount: 1200 } },
+        pendingCommission = { _sum: { amount: 150 } },
+        settledCommission = { _sum: { amount: 200 } },
+        paidFee = { _sum: { feeAmount: 10 } },
+        lastPeriodCommission = { _sum: { amount: 180 } },
+        lastPeriodFee = { _sum: { feeAmount: 8 } },
+        thisPeriodCommission = { _sum: { amount: 160 } },
+        thisPeriodFee = { _sum: { feeAmount: 5 } },
+        thisPeriodRevenue = 600,
+    } = {}) {
+        // Promise.all order (18 queries):
+        prismaMock.order.aggregate
+            .mockResolvedValueOnce({ _sum: { amount: totalRevenue }, _count: { id: statusGroups.find(s => s.status === "COMPLETED")?._count.id ?? 20 } })
+            .mockResolvedValueOnce({ _sum: { amount: lastPeriodRevenue } })
+        prismaMock.order.count
+            .mockResolvedValueOnce(orderCount)
+            .mockResolvedValueOnce(lastPeriodOrderCount)
+            .mockResolvedValueOnce(thisPeriodOrderCount)
+        prismaMock.order.groupBy.mockResolvedValueOnce(statusGroups as any)
+        prismaMock.card.count.mockResolvedValueOnce(unsoldCardCount)
+        prismaMock.restockSubscription.count.mockResolvedValueOnce(restockCount)
+        prismaMock.product.count.mockResolvedValueOnce(productCount)
+        prismaMock.user.count.mockResolvedValueOnce(distributorCount)
+        prismaMock.withdrawal.aggregate
+            .mockResolvedValueOnce(pendingWithdrawal)
+            .mockResolvedValueOnce(paidFee)
+            .mockResolvedValueOnce(lastPeriodFee)
+            .mockResolvedValueOnce(thisPeriodFee)
+        prismaMock.commission.aggregate
+            .mockResolvedValueOnce(pendingCommission)
+            .mockResolvedValueOnce(settledCommission)
+            .mockResolvedValueOnce(lastPeriodCommission)
+            .mockResolvedValueOnce(thisPeriodCommission)
+        // Sequential: thisPeriodRevenue
+        prismaMock.order.aggregate.mockResolvedValueOnce({ _sum: { amount: thisPeriodRevenue } })
+    }
+
     describe("getDashboardKpis", () => {
         it("returns kpis with correct shape and computed values", async () => {
-            prismaMock.order.aggregate.mockResolvedValueOnce({
-                _sum: { amount: 1000 },
-                _count: { id: 20 },
-            })
-            prismaMock.order.aggregate.mockResolvedValueOnce({
-                _sum: { amount: 800 },
-            })
-            prismaMock.order.count.mockResolvedValueOnce(30)
-            prismaMock.order.count.mockResolvedValueOnce(10)
-            prismaMock.order.count.mockResolvedValueOnce(15)
-            prismaMock.order.groupBy.mockResolvedValueOnce([
-                { status: "COMPLETED", _count: { id: 20 } },
-                { status: "PENDING", _count: { id: 5 } },
-                { status: "CLOSED", _count: { id: 5 } },
-            ])
-            prismaMock.card.count.mockResolvedValueOnce(50)
-            prismaMock.restockSubscription.count.mockResolvedValueOnce(3)
-            prismaMock.product.count.mockResolvedValueOnce(5)
-            prismaMock.user.count.mockResolvedValueOnce(2)
-            prismaMock.withdrawal.aggregate.mockResolvedValueOnce({
-                _count: { id: 3 },
-                _sum: { amount: 1200 },
-            })
-            prismaMock.commission.aggregate.mockResolvedValueOnce({
-                _sum: { amount: 150 },
-            })
+            setupKpisMocks()
 
             const result = await getDashboardKpis()
 
@@ -85,26 +113,73 @@ describe("dashboard-data", () => {
             expect(typeof result.orderTrend).toBe("number")
         })
 
+        it("returns correct netIncome, netMarginPercent, totalWithdrawalFee", async () => {
+            // revenue=1000, commission=200, fee=10 → net=810, margin=81%
+            setupKpisMocks({
+                totalRevenue: 1000,
+                settledCommission: { _sum: { amount: 200 } },
+                paidFee: { _sum: { feeAmount: 10 } },
+            })
+
+            const result = await getDashboardKpis()
+
+            expect(result.totalCommission).toBe(200)
+            expect(result.totalWithdrawalFee).toBe(10)
+            expect(result.netIncome).toBe(810)
+            expect(result.netMarginPercent).toBeCloseTo(81, 1)
+        })
+
+        it("netMarginPercent is 0 when totalRevenue is 0 (no NaN)", async () => {
+            setupKpisMocks({
+                totalRevenue: 0,
+                lastPeriodRevenue: 0,
+                orderCount: 0,
+                thisPeriodOrderCount: 0,
+                lastPeriodOrderCount: 0,
+                statusGroups: [],
+                unsoldCardCount: 0,
+                restockCount: 0,
+                productCount: 0,
+                distributorCount: 0,
+                pendingWithdrawal: { _count: { id: 0 }, _sum: { amount: 0 } },
+                pendingCommission: { _sum: { amount: 0 } },
+                settledCommission: { _sum: { amount: 0 } },
+                paidFee: { _sum: { feeAmount: null } },
+                lastPeriodCommission: { _sum: { amount: 0 } },
+                lastPeriodFee: { _sum: { feeAmount: null } },
+                thisPeriodCommission: { _sum: { amount: 0 } },
+                thisPeriodFee: { _sum: { feeAmount: null } },
+                thisPeriodRevenue: 0,
+            })
+
+            const result = await getDashboardKpis()
+
+            expect(result.netMarginPercent).toBe(0)
+            expect(Number.isNaN(result.netMarginPercent)).toBe(false)
+            expect(result.netIncome).toBe(0)
+        })
+
         it("handles zero completed orders (AOV and completion rate)", async () => {
-            prismaMock.order.aggregate.mockResolvedValueOnce({
-                _sum: { amount: 0 },
-                _count: { id: 0 },
-            })
-            prismaMock.order.aggregate.mockResolvedValueOnce({ _sum: { amount: 0 } })
-            prismaMock.order.count.mockResolvedValueOnce(0)
-            prismaMock.order.count.mockResolvedValueOnce(0)
-            prismaMock.order.count.mockResolvedValueOnce(0)
-            prismaMock.order.groupBy.mockResolvedValueOnce([])
-            prismaMock.card.count.mockResolvedValueOnce(0)
-            prismaMock.restockSubscription.count.mockResolvedValueOnce(0)
-            prismaMock.product.count.mockResolvedValueOnce(0)
-            prismaMock.user.count.mockResolvedValueOnce(0)
-            prismaMock.withdrawal.aggregate.mockResolvedValueOnce({
-                _count: { id: 0 },
-                _sum: { amount: null },
-            })
-            prismaMock.commission.aggregate.mockResolvedValueOnce({
-                _sum: { amount: null },
+            setupKpisMocks({
+                totalRevenue: 0,
+                lastPeriodRevenue: 0,
+                orderCount: 0,
+                thisPeriodOrderCount: 0,
+                lastPeriodOrderCount: 0,
+                statusGroups: [],
+                unsoldCardCount: 0,
+                restockCount: 0,
+                productCount: 0,
+                distributorCount: 0,
+                pendingWithdrawal: { _count: { id: 0 }, _sum: { amount: null } },
+                pendingCommission: { _sum: { amount: null } },
+                settledCommission: { _sum: { amount: null } },
+                paidFee: { _sum: { feeAmount: null } },
+                lastPeriodCommission: { _sum: { amount: null } },
+                lastPeriodFee: { _sum: { feeAmount: null } },
+                thisPeriodCommission: { _sum: { amount: null } },
+                thisPeriodFee: { _sum: { feeAmount: null } },
+                thisPeriodRevenue: 0,
             })
 
             const result = await getDashboardKpis()
@@ -121,13 +196,38 @@ describe("dashboard-data", () => {
     })
 
     describe("getDashboardTrend", () => {
-        it("returns array of length equal to days", async () => {
+        it("returns array of length equal to days with 净收入 field", async () => {
             prismaMock.order.groupBy.mockResolvedValueOnce([])
+            prismaMock.commission.groupBy.mockResolvedValueOnce([])
+            prismaMock.withdrawal.groupBy.mockResolvedValueOnce([])
 
             const result = await getDashboardTrend(7)
 
             expect(result).toHaveLength(7)
-            expect(result.every((r) => typeof r.date === "string" && typeof r.订单 === "number" && typeof r.营收 === "number")).toBe(true)
+            expect(result.every(
+                (r) => typeof r.date === "string" &&
+                    typeof r.订单 === "number" &&
+                    typeof r.营收 === "number" &&
+                    typeof r.净收入 === "number"
+            )).toBe(true)
+        })
+
+        it("calculates 净收入 as revenue minus commission plus fee for each day", async () => {
+            const testDay = new Date("2024-02-13T12:00:00.000Z")
+            prismaMock.order.groupBy.mockResolvedValueOnce([
+                { createdAt: testDay, _sum: { amount: 100 }, _count: { id: 1 } },
+            ])
+            prismaMock.commission.groupBy.mockResolvedValueOnce([
+                { createdAt: testDay, _sum: { amount: 20 } },
+            ])
+            prismaMock.withdrawal.groupBy.mockResolvedValueOnce([
+                { processedAt: testDay, _sum: { feeAmount: 2 } },
+            ])
+
+            const result = await getDashboardTrend(7)
+            const dayResult = result.find((r) => r.营收 === 100)
+            // net = 100 - 20 + 2 = 82
+            expect(dayResult?.净收入).toBe(82)
         })
     })
 
@@ -246,7 +346,8 @@ describe("dashboard-data", () => {
     })
 
     describe("getDashboardData", () => {
-        it("returns all sections in one call", async () => {
+        it("returns all sections in one call with new profit fields", async () => {
+            const zeroAggregate = { _sum: { amount: null, feeAmount: null }, _count: { id: 0 } }
             prismaMock.order.aggregate.mockResolvedValue({ _sum: { amount: 0 }, _count: { id: 0 } })
             prismaMock.order.count.mockResolvedValue(0)
             prismaMock.order.groupBy.mockResolvedValue([])
@@ -257,11 +358,10 @@ describe("dashboard-data", () => {
             prismaMock.product.findMany.mockResolvedValue([])
             prismaMock.product.count.mockResolvedValue(0)
             prismaMock.user.count.mockResolvedValue(0)
-            prismaMock.withdrawal.aggregate.mockResolvedValue({
-                _count: { id: 0 },
-                _sum: { amount: null },
-            })
+            prismaMock.withdrawal.aggregate.mockResolvedValue(zeroAggregate)
+            prismaMock.withdrawal.groupBy.mockResolvedValue([])
             prismaMock.commission.aggregate.mockResolvedValue({ _sum: { amount: null } })
+            prismaMock.commission.groupBy.mockResolvedValue([])
             prismaMock.order.findMany.mockResolvedValue([])
 
             const result = await getDashboardData()
@@ -276,14 +376,19 @@ describe("dashboard-data", () => {
             expect(result).toHaveProperty("recentOrders")
             expect(result.trend7).toHaveLength(7)
             expect(result.trend30).toHaveLength(30)
-            // 业务概览 KPI 由 getDashboardKpis 提供，确保集成后 kpis 包含新增字段
             expect(result.kpis).toMatchObject({
                 activeProductCount: 0,
                 distributorCount: 0,
                 pendingWithdrawalCount: 0,
                 pendingWithdrawalAmount: 0,
                 pendingCommissionAmount: 0,
+                totalCommission: 0,
+                totalWithdrawalFee: 0,
+                netIncome: 0,
+                netMarginPercent: 0,
             })
+            // trend points include 净收入
+            expect(result.trend7.every((p) => typeof p.净收入 === "number")).toBe(true)
         })
     })
 })
