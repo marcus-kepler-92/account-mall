@@ -128,8 +128,8 @@ const acceptInviteLimiter = new RateLimiterMemory({
     duration: ACCEPT_INVITE_DURATION,
 })
 
-/** 分销员发送邀请：每用户每小时最多 20 次 */
-const DISTRIBUTOR_INVITE_POINTS = 20
+/** 分销员发送邀请：每用户每小时最多 3 次 */
+const DISTRIBUTOR_INVITE_POINTS = 3
 const DISTRIBUTOR_INVITE_DURATION = 3600
 const distributorInviteLimiter = new RateLimiterMemory({
     points: DISTRIBUTOR_INVITE_POINTS,

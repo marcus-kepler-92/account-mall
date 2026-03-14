@@ -25,6 +25,10 @@ export async function sendOrderCompletionEmail(orderId: string): Promise<void> {
         return;
     }
 
+    if (!config.orderCompletionEmailEnabled) {
+        return;
+    }
+
     const lookupUrl = `${config.siteUrl}/orders/lookup?type=orderNo&orderNo=${encodeURIComponent(order.orderNo)}`;
 
     const html = await render(

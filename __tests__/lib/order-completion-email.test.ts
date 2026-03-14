@@ -10,7 +10,7 @@ jest.mock("@/lib/prisma", () => {
 })
 
 jest.mock("@/lib/config", () => ({
-  config: { siteName: "Account Mall", siteUrl: "http://localhost:3000" },
+  config: { siteName: "Account Mall", siteUrl: "http://localhost:3000", orderCompletionEmailEnabled: true },
 }))
 
 jest.mock("@/lib/email", () => ({
@@ -30,6 +30,26 @@ type DeepMockPrisma = typeof prismaMock & PrismaClient
 describe("sendOrderCompletionEmail", () => {
   beforeEach(() => {
     ;(sendMail as jest.Mock).mockClear()
+  })
+
+  it("does not send when orderCompletionEmailEnabled is false", async () => {
+    const { config } = require("@/lib/config") as { config: { orderCompletionEmailEnabled: boolean } }
+    config.orderCompletionEmailEnabled = false
+
+    ;(prismaMock as DeepMockPrisma).order.findUnique.mockResolvedValue({
+      id: "order_1",
+      orderNo: "ORD001",
+      email: "buyer@example.com",
+      status: "COMPLETED",
+      quantity: 1,
+      product: { name: "Test Product" },
+      cards: [{ content: "card1" }],
+    } as any)
+
+    await sendOrderCompletionEmail("order_1")
+
+    expect(sendMail).not.toHaveBeenCalled()
+    config.orderCompletionEmailEnabled = true
   })
 
   it("does not send when order is not found", async () => {
