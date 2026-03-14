@@ -1,6 +1,7 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
+import { formatDateTime } from "@/lib/utils";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -351,10 +352,10 @@ export const ordersColumns: ColumnDef<OrderRow>[] = [
             const paidAt = row.original.paidAt;
             return (
                 <div className="flex flex-col items-end text-xs">
-                    <span>{new Date(createdAt).toLocaleString("zh-CN")}</span>
+                    <span>{formatDateTime(createdAt)}</span>
                     {paidAt && (
                         <span className="text-muted-foreground">
-                            支付于 {new Date(paidAt).toLocaleString("zh-CN")}
+                            支付于 {formatDateTime(paidAt)}
                         </span>
                     )}
                 </div>

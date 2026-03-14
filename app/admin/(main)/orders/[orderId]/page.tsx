@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { prisma } from "@/lib/prisma"
+import { formatDateTime } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -141,12 +142,12 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
                         </div>
                         <div>
                             <p className="text-muted-foreground">创建时间</p>
-                            <p>{order.createdAt.toLocaleString("zh-CN")}</p>
+                            <p>{formatDateTime(order.createdAt)}</p>
                         </div>
                         {order.paidAt && (
                             <div>
                                 <p className="text-muted-foreground">支付时间</p>
-                                <p>{order.paidAt.toLocaleString("zh-CN")}</p>
+                                <p>{formatDateTime(order.paidAt)}</p>
                             </div>
                         )}
                     </div>
@@ -204,7 +205,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
                                                 </Badge>
                                             </TableCell>
                                             <TableCell className="text-right text-muted-foreground text-xs">
-                                                {card.createdAt.toLocaleString("zh-CN")}
+                                                {formatDateTime(card.createdAt)}
                                             </TableCell>
                                             <TableCell className="text-right pr-4">
                                                 <CardRowActions

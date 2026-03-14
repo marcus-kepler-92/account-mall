@@ -5,6 +5,7 @@ import type { ColumnDef } from "@tanstack/react-table"
 import { Badge } from "@/components/ui/badge"
 import { DataTableColumnHeader } from "@/app/admin/components"
 import { AnnouncementRowActions } from "./announcement-row-actions"
+import { formatDateTime } from "@/lib/utils"
 
 export type AnnouncementRow = {
     id: string
@@ -15,17 +16,6 @@ export type AnnouncementRow = {
     publishedAt: string | null
     createdAt: string
     updatedAt: string
-}
-
-function formatDate(dateStr: string | null) {
-    if (!dateStr) return "—"
-    return new Date(dateStr).toLocaleString("zh-CN", {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-    })
 }
 
 export const announcementsColumns: ColumnDef<AnnouncementRow>[] = [
@@ -67,7 +57,7 @@ export const announcementsColumns: ColumnDef<AnnouncementRow>[] = [
         header: ({ column }) => <DataTableColumnHeader column={column} title="发布时间" />,
         cell: ({ row }) => (
             <span className="text-muted-foreground text-sm">
-                {formatDate(row.original.publishedAt)}
+                {formatDateTime(row.original.publishedAt)}
             </span>
         ),
     },
@@ -76,7 +66,7 @@ export const announcementsColumns: ColumnDef<AnnouncementRow>[] = [
         header: ({ column }) => <DataTableColumnHeader column={column} title="创建时间" />,
         cell: ({ row }) => (
             <span className="text-muted-foreground text-sm">
-                {formatDate(row.original.createdAt)}
+                {formatDateTime(row.original.createdAt)}
             </span>
         ),
     },

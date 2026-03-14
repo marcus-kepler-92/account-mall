@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { cn } from "@/lib/utils"
+import { cn, formatDateTimeShort } from "@/lib/utils"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
     Table,
@@ -321,12 +321,7 @@ export default async function AdminDashboardPage() {
                                                     ¥{Number(order.amount).toFixed(2)}
                                                 </TableCell>
                                                 <TableCell className="hidden text-muted-foreground text-sm sm:table-cell">
-                                                    {order.createdAt.toLocaleString("zh-CN", {
-                                                        month: "numeric",
-                                                        day: "numeric",
-                                                        hour: "2-digit",
-                                                        minute: "2-digit",
-                                                    })}
+                                                    {formatDateTimeShort(order.createdAt)}
                                                 </TableCell>
                                                 <TableCell>
                                                     <Badge

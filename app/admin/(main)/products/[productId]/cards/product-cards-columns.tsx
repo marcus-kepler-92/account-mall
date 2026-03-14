@@ -1,6 +1,7 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
+import { formatDateTime } from "@/lib/utils";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -287,7 +288,7 @@ export const productCardsColumns: ColumnDef<ProductCardRow>[] = [
             const date = row.getValue("createdAt") as string;
             return (
                 <span className="text-xs text-muted-foreground">
-                    {new Date(date).toLocaleString("zh-CN")}
+                    {formatDateTime(date)}
                 </span>
             );
         },

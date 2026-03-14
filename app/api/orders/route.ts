@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { hashPassword } from "better-auth/crypto"
 import { getAdminSession } from "@/lib/auth-guard"
 import { createOrderSchema, orderListQuerySchema } from "@/lib/validations/order"
+import { formatDateTimeShort } from "@/lib/utils"
 import { getAlipayPagePayUrl } from "@/lib/alipay"
 import { isYipayConfigured, getYipayPagePayUrl } from "@/lib/yipay"
 import {
@@ -100,7 +101,7 @@ async function createAutoFetchOrder(params: {
         if (activeOrder) {
             const expiresAt = activeOrder.expiresAt
             const expiresInfo = expiresAt
-                ? `，可使用至 ${expiresAt.toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}`
+                ? `，可使用至 ${formatDateTimeShort(expiresAt)}`
                 : ""
             const message = isFreeAutoFetch
                 ? `您今日已领取过该商品${expiresInfo}，请在可用时间内使用。`

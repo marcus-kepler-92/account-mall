@@ -27,6 +27,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { addOrUpdateOrder } from "@/lib/order-history-storage"
+import { formatDateTime, formatDateTimeShort } from "@/lib/utils"
 import { applyFieldErrors } from "@/lib/form-utils"
 import { orderNoLookupSchema, emailLookupSchema, type OrderLookupFormValues } from "@/lib/validations/lookup"
 import { type AutoFetchCardPayload, isAutoFetchCard, formatAutoFetchCardForCopy, toCardContentJson } from "@/lib/auto-fetch-card"
@@ -73,12 +74,6 @@ const STATUS_CONFIG: Record<string, { label: string; variant: "default" | "secon
     CLOSED: { label: "已关闭", variant: "outline" },
 }
 
-function formatDate(dateString: string) {
-    return new Date(dateString).toLocaleString("zh-CN", {
-        year: "numeric", month: "2-digit", day: "2-digit",
-        hour: "2-digit", minute: "2-digit",
-    })
-}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ApiOk = { ok: true; data: Record<string, any> }
@@ -333,7 +328,7 @@ function OrderDetailContent({
                 </div>
                 <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">创建时间</span>
-                    <span>{formatDate(result.createdAt)}</span>
+                    <span>{formatDateTime(result.createdAt)}</span>
                 </div>
                 {!result.isPending && result.cards.length > 0 && (
                     <div className="flex items-center justify-between">
@@ -371,7 +366,7 @@ function OrderDetailContent({
                     <p className="text-xs">该订单尚未完成支付，完成支付后即可查看账号内容。</p>
                     {result.expiresAt && (
                         <p className="text-xs">
-                            请在 {new Date(result.expiresAt).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })} 前完成支付。
+                            请在 {formatDateTimeShort(result.expiresAt)} 前完成支付。
                         </p>
                     )}
                     <Button className="w-full gap-2" onClick={handleContinuePayment} disabled={continuePaymentLoading}>
@@ -758,7 +753,7 @@ function OrderLookupPageContent() {
                                                     </div>
                                                     <div className="flex w-full items-center justify-between gap-2 text-xs text-muted-foreground">
                                                         <span className="font-mono truncate">{order.orderNo}</span>
-                                                        <span className="shrink-0">{formatDate(order.createdAt)}</span>
+                                                        <span className="shrink-0">{formatDateTime(order.createdAt)}</span>
                                                     </div>
                                                 </Button>
                                             )

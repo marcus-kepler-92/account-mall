@@ -1,6 +1,7 @@
 "use client"
 
 import { ColumnDef } from "@tanstack/react-table"
+import { formatDateTime } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import {
     Tooltip,
@@ -93,7 +94,7 @@ export const distributorCommissionsColumns: ColumnDef<DistributorCommissionRow>[
         ),
         cell: ({ row }) => (
             <span className="text-muted-foreground text-sm">
-                {new Date(row.getValue("createdAt") as string).toLocaleString("zh-CN")}
+                {formatDateTime(row.getValue("createdAt") as string)}
             </span>
         ),
     },

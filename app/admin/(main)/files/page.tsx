@@ -35,7 +35,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Skeleton } from "@/components/ui/skeleton"
-import { cn } from "@/lib/utils"
+import { cn, formatDateTime } from "@/lib/utils"
 
 const PREFIX_OPTIONS = [
     { value: "products", label: "商品图片" },
@@ -452,7 +452,7 @@ export default function AdminFilesPage() {
                                                 {formatSize(b.size)}
                                             </TableCell>
                                             <TableCell className="text-muted-foreground text-sm">
-                                                {new Date(b.uploadedAt).toLocaleString()}
+                                                {formatDateTime(b.uploadedAt)}
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex gap-1">

@@ -24,33 +24,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Package, Search, Trash2 } from "lucide-react"
 import { SiteHeader } from "@/app/components/site-header"
 import { toast } from "sonner"
-
-function formatDate(s: string) {
-    try {
-        return new Date(s).toLocaleString("zh-CN", {
-            year: "numeric",
-            month: "2-digit",
-            day: "2-digit",
-            hour: "2-digit",
-            minute: "2-digit",
-        })
-    } catch {
-        return s
-    }
-}
-
-function formatDateShort(s: string) {
-    try {
-        return new Date(s).toLocaleString("zh-CN", {
-            month: "2-digit",
-            day: "2-digit",
-            hour: "2-digit",
-            minute: "2-digit",
-        })
-    } catch {
-        return ""
-    }
-}
+import { formatDateTime, formatDateTimeShort } from "@/lib/utils"
 
 function formatAmount(amount: unknown): string {
     if (typeof amount === "number" && !Number.isNaN(amount)) return amount.toFixed(2)
@@ -184,7 +158,7 @@ function MyOrdersPageContent() {
                                                         </p>
                                                         <p className="mt-1.5 flex min-w-0 items-center justify-between gap-2 text-xs text-muted-foreground">
                                                             <span className="min-w-0 truncate" title={o.productName}>{o.productName}</span>
-                                                            <span className="shrink-0">{formatDateShort(o.createdAt)}</span>
+                                                            <span className="shrink-0">{formatDateTimeShort(o.createdAt)}</span>
                                                         </p>
                                                     </div>
                                                     <Button
@@ -242,7 +216,7 @@ function MyOrdersPageContent() {
                                                 </div>
                                                 <div className="flex flex-col gap-0.5 sm:flex-row sm:justify-between sm:gap-4">
                                                     <dt className="shrink-0 text-muted-foreground">创建时间</dt>
-                                                    <dd>{formatDate(selected.createdAt)}</dd>
+                                                    <dd>{formatDateTime(selected.createdAt)}</dd>
                                                 </div>
                                             </dl>
                                             <Button asChild className="mt-1 w-full gap-2">

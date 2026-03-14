@@ -1,6 +1,7 @@
 "use client"
 
 import { ColumnDef } from "@tanstack/react-table"
+import { formatDateTime } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { DataTableColumnHeader } from "@/app/admin/components/data-table-column-header"
 
@@ -51,7 +52,7 @@ export const distributorWithdrawalsColumns: ColumnDef<DistributorWithdrawalRow>[
         ),
         cell: ({ row }) => (
             <span className="text-muted-foreground text-sm">
-                {new Date(row.getValue("createdAt") as string).toLocaleString("zh-CN")}
+                {formatDateTime(row.getValue("createdAt") as string)}
             </span>
         ),
     },
@@ -63,7 +64,7 @@ export const distributorWithdrawalsColumns: ColumnDef<DistributorWithdrawalRow>[
             return (
                 <span className="text-muted-foreground text-sm">
                     {processedAt
-                        ? new Date(processedAt).toLocaleString("zh-CN")
+                        ? formatDateTime(processedAt)
                         : "—"}
                 </span>
             )

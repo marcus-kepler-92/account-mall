@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { formatDateTime } from "@/lib/utils"
 import type { ColumnDef } from "@tanstack/react-table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -190,7 +191,7 @@ export const withdrawalsColumns: ColumnDef<WithdrawalRow>[] = [
         header: ({ column }) => <DataTableColumnHeader column={column} title="申请时间" />,
         cell: ({ row }) => (
             <span className="text-muted-foreground text-sm">
-                {new Date(row.original.createdAt).toLocaleString("zh-CN")}
+                {formatDateTime(row.original.createdAt)}
             </span>
         ),
     },
