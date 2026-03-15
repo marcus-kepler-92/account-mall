@@ -147,6 +147,7 @@ export default async function AdminOrdersPage({
             quantity: order.quantity,
             amount: Number(order.amount),
             status: order.status,
+            paymentMethod: order.paymentMethod,
             paidAt: order.paidAt ? order.paidAt.toISOString() : null,
             createdAt: order.createdAt.toISOString(),
             cardsCount,

@@ -51,6 +51,7 @@ export type OrderRow = {
     quantity: number;
     amount: number;
     status: "PENDING" | "COMPLETED" | "CLOSED";
+    paymentMethod: string | null;
     paidAt: string | null;
     createdAt: string;
     cardsCount: number;
@@ -350,9 +351,14 @@ export const ordersColumns: ColumnDef<OrderRow>[] = [
         cell: ({ row }) => {
             const createdAt = row.getValue("createdAt") as string;
             const paidAt = row.original.paidAt;
+            const paymentMethod = row.original.paymentMethod;
+            const pmLabel = paymentMethod === "wxpay" ? "微信" : paymentMethod === "qqpay" ? "QQ钱包" : "支付宝";
             return (
                 <div className="flex flex-col items-end text-xs">
-                    <span>{formatDateTime(createdAt)}</span>
+                    <div className="flex items-center gap-1.5">
+                        <span className="text-muted-foreground">{pmLabel}</span>
+                        <span>{formatDateTime(createdAt)}</span>
+                    </div>
                     {paidAt && (
                         <span className="text-muted-foreground">
                             支付于 {formatDateTime(paidAt)}

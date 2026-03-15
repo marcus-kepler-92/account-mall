@@ -20,12 +20,21 @@ import {
 import { Eye, EyeOff, Loader2 } from "lucide-react"
 import { addOrUpdateOrder } from "@/lib/order-history-storage"
 import { applyFieldErrors } from "@/lib/form-utils"
-import { createOrderFormSchema, type OrderFormSchema } from "@/lib/validations/order"
+import { createOrderFormSchema, type OrderFormSchema, type PaymentMethod } from "@/lib/validations/order"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Label } from "@/components/ui/label"
 import { configClient } from "@/lib/config-client"
 import { useProductPriceSyncStore } from "@/lib/stores/product-price-sync"
 import { ProductOrderQuantityPicker } from "./product-order-quantity-picker"
 import { ProductOrderTurnstile } from "./product-order-turnstile"
 import { useFingerprint } from "@/hooks/use-fingerprint"
+import { SiAlipay, SiWechat, SiQq } from "react-icons/si"
+
+const PAYMENT_METHOD_CONFIG: Record<PaymentMethod, { label: string; icon: typeof SiAlipay; color: string }> = {
+    alipay: { label: "支付宝", icon: SiAlipay, color: "#1677FF" },
+    wxpay: { label: "微信支付", icon: SiWechat, color: "#07C160" },
+    qqpay: { label: "QQ 钱包", icon: SiQq, color: "#1B8FE6" },
+}
 
 const ORDER_FORM_LOADING_EVENT = "product-order-loading"
 
@@ -118,7 +127,7 @@ export function ProductOrderForm({
     const form = useForm<OrderFormSchema>({
         resolver: zodResolver(createOrderFormSchema(maxQuantity)),
         mode: "onTouched",
-        defaultValues: { email: "", orderPassword: "", quantity: 1 },
+        defaultValues: { email: "", orderPassword: "", quantity: 1, paymentMethod: "alipay" as PaymentMethod },
     })
 
     // 指纹就绪时写入表单，保持所有字段数据来源统一
@@ -127,6 +136,12 @@ export function ProductOrderForm({
             form.setValue("fingerprintHash", fingerprintHash)
         }
     }, [fingerprintHash, form])
+
+    const disabledSet = new Set(configClient.yipayDisabledPaymentTypes)
+    const allPaymentMethods = configClient.yipayPaymentTypes
+        .map((id) => ({ id: id as PaymentMethod, disabled: disabledSet.has(id), ...PAYMENT_METHOD_CONFIG[id as PaymentMethod] }))
+        .filter(Boolean)
+    const showPaymentSelector = !isFree && allPaymentMethods.length >= 1
 
     const quantity = form.watch("quantity")
     const effectiveQuantity = isAutoFetch ? 1 : quantity
@@ -177,6 +192,7 @@ export function ProductOrderForm({
                 email: data.email.trim(),
                 orderPassword: data.orderPassword,
                 quantity: effectiveQuantity,
+                paymentMethod: data.paymentMethod,
                 fingerprintHash: data.fingerprintHash,
                 ...(turnstileToken && { turnstileToken }),
             }
@@ -317,6 +333,54 @@ export function ProductOrderForm({
                         promoValidating={promoValidating}
                         promoValidation={promoValidation}
                     />
+
+                    {showPaymentSelector && (
+                        <FormField
+                            control={form.control}
+                            name="paymentMethod"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>支付方式</FormLabel>
+                                    <FormControl>
+                                        <RadioGroup
+                                            value={field.value}
+                                            onValueChange={(v) => {
+                                                if (!disabledSet.has(v as PaymentMethod)) field.onChange(v)
+                                            }}
+                                            className="flex flex-wrap gap-2"
+                                            disabled={!inStock}
+                                        >
+                                            {allPaymentMethods.map((method) => (
+                                                <Label
+                                                    key={method.id}
+                                                    htmlFor={`pm-${method.id}`}
+                                                    className={[
+                                                        "flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                                                        method.disabled
+                                                            ? "opacity-50 cursor-not-allowed border-input bg-muted text-muted-foreground"
+                                                            : field.value === method.id
+                                                              ? "cursor-pointer border-primary bg-primary/5 text-primary"
+                                                              : "cursor-pointer border-input bg-background text-muted-foreground hover:border-primary/50 hover:text-foreground",
+                                                        !inStock ? "opacity-50 cursor-not-allowed" : "",
+                                                    ].join(" ")}
+                                                >
+                                                    <RadioGroupItem
+                                                        id={`pm-${method.id}`}
+                                                        value={method.id}
+                                                        className="sr-only"
+                                                        disabled={method.disabled}
+                                                    />
+                                                    <method.icon size={18} color={method.disabled ? undefined : method.color} />
+                                                    {method.label}
+                                                </Label>
+                                            ))}
+                                        </RadioGroup>
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    )}
 
                     {requireTurnstile && (
                         <ProductOrderTurnstile

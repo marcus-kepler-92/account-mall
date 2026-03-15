@@ -177,6 +177,7 @@ model Order {
   promoCode               String?     // 下单时使用的推荐码（冗余存储，便于查询）
   createdAt               DateTime    @default(now())
   updatedAt               DateTime    @updatedAt
+  paymentMethod           String?     @default("alipay") // 支付渠道: alipay, wxpay, qqpay
   clientIp                String?     // For rate limit: max PENDING orders per IP
   fingerprintHash         String?     // 浏览器指纹，用于免费商品多因素领取限制
   exitDiscountMeta        String?     @db.Text // Exit intent 折扣信号 JSON，订单 COMPLETED 后转存到 ExitDiscountUsage

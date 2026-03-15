@@ -35,6 +35,7 @@ describe("getPaymentUrlForOrder", () => {
             orderNo: baseParams.orderNo,
             totalAmount: baseParams.totalAmount,
             subject: baseParams.subject,
+            type: "alipay",
         })
     })
 
@@ -90,5 +91,38 @@ describe("getPaymentUrlForOrder", () => {
         alipay.getAlipayPagePayUrl.mockReturnValue(null)
         const url = getPaymentUrlForOrder(baseParams)
         expect(url).toBeNull()
+    })
+
+    it("passes paymentMethod as type to yipay when specified", () => {
+        const yipay = require("@/lib/yipay")
+        yipay.isYipayConfigured.mockReturnValue(true)
+        yipay.getYipayPagePayUrl.mockReturnValue("https://yipay.example/pay")
+        getPaymentUrlForOrder({ ...baseParams, paymentMethod: "wxpay" })
+        expect(yipay.getYipayPagePayUrl).toHaveBeenCalledWith({
+            orderNo: baseParams.orderNo,
+            totalAmount: baseParams.totalAmount,
+            subject: baseParams.subject,
+            type: "wxpay",
+        })
+    })
+
+    it("defaults paymentMethod to alipay when omitted", () => {
+        const yipay = require("@/lib/yipay")
+        yipay.isYipayConfigured.mockReturnValue(true)
+        yipay.getYipayPagePayUrl.mockReturnValue("https://yipay.example/pay")
+        getPaymentUrlForOrder(baseParams)
+        expect(yipay.getYipayPagePayUrl).toHaveBeenCalledWith(
+            expect.objectContaining({ type: "alipay" }),
+        )
+    })
+
+    it("ignores paymentMethod when using alipay SDK (yipay not configured)", () => {
+        const yipay = require("@/lib/yipay")
+        const alipay = require("@/lib/alipay")
+        yipay.isYipayConfigured.mockReturnValue(false)
+        alipay.getAlipayPagePayUrl.mockReturnValue("https://alipay.example/page")
+        const url = getPaymentUrlForOrder({ ...baseParams, paymentMethod: "wxpay" })
+        expect(url).toBe("https://alipay.example/page")
+        expect(yipay.getYipayPagePayUrl).not.toHaveBeenCalled()
     })
 })

@@ -43,11 +43,13 @@ export function buildSubmitUrl(params: Record<string, string>, key: string): str
 /**
  * Generate Yipay page pay URL. Uses orderNo, totalAmount, subject; notify_url and return_url from config.siteUrl.
  * Returns null if Yipay is not configured.
+ * @param params.type - Payment channel: "alipay" | "wxpay" | "qqpay" (default: "alipay")
  */
 export function getYipayPagePayUrl(params: {
     orderNo: string
     totalAmount: string
     subject: string
+    type?: string
 }): string | null {
     if (!isYipayConfigured()) return null
     const base = config.siteUrl
@@ -64,7 +66,7 @@ export function getYipayPagePayUrl(params: {
         return_url: `${base}/orders/pay-return`,
         out_trade_no: params.orderNo,
         sitename: siteName,
-        type: "alipay",
+        type: params.type ?? "alipay",
     }
     try {
         return buildSubmitUrl(requestParams, key)

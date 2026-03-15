@@ -49,13 +49,6 @@ jest.mock("@/lib/config", () => ({
 jest.mock("@/lib/get-payment-url", () => ({
     getPaymentUrlForOrder: jest.fn().mockReturnValue("https://pay.example/pay"),
 }))
-jest.mock("@/lib/alipay", () => ({
-    getAlipayPagePayUrl: jest.fn().mockReturnValue(null),
-}))
-jest.mock("@/lib/yipay", () => ({
-    isYipayConfigured: jest.fn().mockReturnValue(false),
-    getYipayPagePayUrl: jest.fn().mockReturnValue(null),
-}))
 jest.mock("@/lib/turnstile", () => ({
     verifyTurnstileToken: jest.fn(),
 }))

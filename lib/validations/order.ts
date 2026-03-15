@@ -4,6 +4,15 @@ import * as z from "zod"
 
 export const orderStatusSchema = z.enum(["PENDING", "COMPLETED", "CLOSED"])
 
+export const paymentMethodSchema = z.enum(["alipay", "wxpay", "qqpay"])
+export type PaymentMethod = z.infer<typeof paymentMethodSchema>
+
+export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+    alipay: "支付宝",
+    wxpay: "微信支付",
+    qqpay: "QQ 钱包",
+}
+
 export const publicOrderLookupSchema = z.object({
     orderNo: z.string().min(1),
     password: z.string().min(6),
@@ -30,6 +39,7 @@ export const createOrderSchema = z.object({
     email: z.string().min(1).pipe(z.email()),
     orderPassword: z.string().min(6),
     quantity: z.number().int().min(1),
+    paymentMethod: paymentMethodSchema.optional().default("alipay"),
     turnstileToken: z.string().optional(),
     promoCode: z.string().max(64).optional(),
     exitDiscountToken: z.string().optional(),
@@ -69,6 +79,7 @@ export function createOrderFormSchema(maxQuantity: number) {
         email: z.string().min(1, "请输入邮箱").pipe(z.email({ error: "请输入有效的邮箱地址" })),
         orderPassword: z.string().min(6, "订单密码至少 6 位"),
         quantity: z.number().int().min(1, "数量至少为 1").max(maxQuantity, `数量不能超过 ${maxQuantity}`),
+        paymentMethod: paymentMethodSchema.default("alipay"),
         fingerprintHash: z.string().min(1),
     })
 }

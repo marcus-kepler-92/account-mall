@@ -1,6 +1,33 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # Account Mall — AI 编码指南
 
 > 卡密自动发卡平台。Next.js 16 App Router + React 19 + TypeScript + Prisma + PostgreSQL。
+
+## 常用命令
+
+```bash
+# 开发
+npm run dev              # 启动开发服务器
+npm run build            # 构建（prisma generate + next build）
+npm run lint             # ESLint 检查
+npm run lint:fix         # ESLint 自动修复
+
+# 数据库
+npm run db:migrate       # 创建并运行迁移（开发）
+npm run db:generate      # 仅生成 Prisma Client
+npm run db:push          # 推送 schema 变更（无迁移文件，适合原型）
+npm run db:studio        # 打开 Prisma Studio
+npm run db:seed          # 运行 seed 脚本
+
+# 测试
+npm test                 # 运行所有 Jest 单元测试
+npm run test:watch       # Jest watch 模式
+npx jest path/to/test    # 运行单个测试文件
+npm run test:e2e         # 运行 Playwright E2E 测试
+```
 
 ## 技术栈速查
 
@@ -211,7 +238,13 @@ app/admin/(main)/{resource}/
 
 ### URL 状态同步
 
-以 URL 为单一数据源，不用 useState 复制 URL 参数。详见 `.cursor/rules/url-state-sync.mdc`。
+以 URL 为单一数据源，不用 useState 复制 URL 参数。适用于列表筛选、分类、分页等可分享链接场景。
+
+- 用 `useSearchParams()` 读 query，展示值直接从 URL 派生，**不**用 `useState` 存同含义的数据。
+- 仅在**事件处理函数**里 `router.replace(pathname + '?' + newQuery, { scroll: false })`，**不**用 `useEffect` 写 URL（易死循环）。
+- 依赖 URL 的 effect 用**稳定原始类型**（如 `searchParams.get("tag") ?? ""`）做依赖，不用解析后的引用类型（如数组），否则每次渲染新引用 → effect 无限触发。
+- 实现参考：`app/components/product-catalog.tsx`。
+- 复杂 query 可考虑 [nuqs](https://github.com/47ng/nuqs)。
 
 ## 认证与授权
 

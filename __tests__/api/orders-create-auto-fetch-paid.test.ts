@@ -27,13 +27,8 @@ jest.mock("@/lib/rate-limit", () => ({
     MAX_PENDING_ORDERS_PER_IP: 3,
 }))
 
-jest.mock("@/lib/alipay", () => ({
-    getAlipayPagePayUrl: jest.fn().mockReturnValue("https://alipay.example.com/pay"),
-}))
-
-jest.mock("@/lib/yipay", () => ({
-    isYipayConfigured: jest.fn().mockReturnValue(false),
-    getYipayPagePayUrl: jest.fn().mockReturnValue("https://yipay.example.com/pay"),
+jest.mock("@/lib/get-payment-url", () => ({
+    getPaymentUrlForOrder: jest.fn().mockReturnValue("https://pay.example.com/pay"),
 }))
 
 jest.mock("@/lib/config", () => {

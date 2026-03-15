@@ -27,8 +27,8 @@ jest.mock("@/lib/rate-limit", () => ({
     MAX_PENDING_ORDERS_PER_IP: 3,
 }))
 
-jest.mock("@/lib/alipay", () => ({
-    getAlipayPagePayUrl: jest.fn().mockReturnValue(null),
+jest.mock("@/lib/get-payment-url", () => ({
+    getPaymentUrlForOrder: jest.fn().mockReturnValue(null),
 }))
 
 jest.mock("@/lib/config", () => {
@@ -40,11 +40,6 @@ jest.mock("@/lib/config", () => {
     ;(global as { __configMock?: typeof mock }).__configMock = mock
     return { config: mock, getConfig: () => mock }
 })
-
-jest.mock("@/lib/yipay", () => ({
-    isYipayConfigured: jest.fn().mockReturnValue(false),
-    getYipayPagePayUrl: jest.fn().mockReturnValue(null),
-}))
 
 jest.mock("@/lib/turnstile", () => ({
     verifyTurnstileToken: jest.fn(),
@@ -371,6 +366,136 @@ describe("POST /api/orders (create order)", () => {
             where: { id: { in: ["card_1", "card_2"] } },
             data: { status: "RESERVED", orderId: "order_new" },
         })
+    })
+
+    it("stores paymentMethod in order and passes it to getPaymentUrlForOrder", async () => {
+        const { getPaymentUrlForOrder } = require("@/lib/get-payment-url")
+        ;(getPaymentUrlForOrder as jest.Mock).mockReturnValue("https://yipay.example/wxpay")
+        const product = {
+            id: "prod_1",
+            name: "Test Product",
+            price: 50,
+            maxQuantity: 5,
+            status: "ACTIVE",
+        }
+        prismaMock.product.findUnique.mockResolvedValueOnce(product)
+        prismaMock.card.count.mockResolvedValueOnce(3)
+
+        const createdOrder = {
+            id: "order_new",
+            orderNo: "uuid-wxpay",
+            productId: "prod_1",
+            email: "user@example.com",
+            passwordHash: "hashed-password",
+            quantity: 1,
+            amount: 50,
+            status: "PENDING",
+            paidAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+        }
+        const mockTx = {
+            order: { create: jest.fn().mockResolvedValue(createdOrder) },
+            card: {
+                findMany: jest.fn().mockResolvedValue([{ id: "card_1" }]),
+                updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+            },
+        }
+        ;(prismaMock.$transaction as jest.Mock).mockImplementation((cb: (tx: unknown) => Promise<unknown>) =>
+            cb(mockTx)
+        )
+
+        const res = await POST(
+            createJsonRequest({
+                productId: "prod_1",
+                email: "user@example.com",
+                orderPassword: "password123",
+                quantity: 1,
+                paymentMethod: "wxpay",
+            })
+        )
+        const data = await res.json()
+
+        expect(res.status).toBe(200)
+        expect(data.paymentUrl).toBe("https://yipay.example/wxpay")
+        expect(mockTx.order.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                paymentMethod: "wxpay",
+            }),
+        })
+        expect(getPaymentUrlForOrder).toHaveBeenCalledWith(
+            expect.objectContaining({ paymentMethod: "wxpay" }),
+        )
+    })
+
+    it("defaults paymentMethod to alipay when not provided", async () => {
+        const { getPaymentUrlForOrder } = require("@/lib/get-payment-url")
+        const product = {
+            id: "prod_1",
+            name: "Test Product",
+            price: 50,
+            maxQuantity: 5,
+            status: "ACTIVE",
+        }
+        prismaMock.product.findUnique.mockResolvedValueOnce(product)
+        prismaMock.card.count.mockResolvedValueOnce(3)
+
+        const createdOrder = {
+            id: "order_new",
+            orderNo: "uuid-default",
+            productId: "prod_1",
+            email: "user@example.com",
+            passwordHash: "hashed-password",
+            quantity: 1,
+            amount: 50,
+            status: "PENDING",
+            paidAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+        }
+        const mockTx = {
+            order: { create: jest.fn().mockResolvedValue(createdOrder) },
+            card: {
+                findMany: jest.fn().mockResolvedValue([{ id: "card_1" }]),
+                updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+            },
+        }
+        ;(prismaMock.$transaction as jest.Mock).mockImplementation((cb: (tx: unknown) => Promise<unknown>) =>
+            cb(mockTx)
+        )
+
+        await POST(
+            createJsonRequest({
+                productId: "prod_1",
+                email: "user@example.com",
+                orderPassword: "password123",
+                quantity: 1,
+            })
+        )
+
+        expect(mockTx.order.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                paymentMethod: "alipay",
+            }),
+        })
+        expect(getPaymentUrlForOrder).toHaveBeenCalledWith(
+            expect.objectContaining({ paymentMethod: "alipay" }),
+        )
+    })
+
+    it("rejects invalid paymentMethod value", async () => {
+        const res = await POST(
+            createJsonRequest({
+                productId: "prod_1",
+                email: "user@example.com",
+                orderPassword: "password123",
+                quantity: 1,
+                paymentMethod: "bitcoin",
+            })
+        )
+        expect(res.status).toBe(400)
+        const data = await res.json()
+        expect(data.error).toBe("Validation failed")
     })
 
     it("ignores client-submitted price and amount; order amount is computed from product.price only", async () => {

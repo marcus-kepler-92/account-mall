@@ -5,8 +5,7 @@ import { hashPassword } from "better-auth/crypto"
 import { getAdminSession } from "@/lib/auth-guard"
 import { createOrderSchema, orderListQuerySchema } from "@/lib/validations/order"
 import { formatDateTimeShort } from "@/lib/utils"
-import { getAlipayPagePayUrl } from "@/lib/alipay"
-import { isYipayConfigured, getYipayPagePayUrl } from "@/lib/yipay"
+import { getPaymentUrlForOrder } from "@/lib/get-payment-url"
 import {
     checkOrderCreateRateLimit,
     getClientIp,
@@ -56,8 +55,9 @@ async function createAutoFetchOrder(params: {
     distributorDiscountPercent: number | null
     promoCode: string | null
     fingerprintHash: string | null
+    paymentMethod: string
 }): Promise<NextResponse> {
-    const { productId, product, email, orderPassword, clientIp, distributorId, distributorDiscountPercent, promoCode, fingerprintHash } = params
+    const { productId, product, email, orderPassword, clientIp, distributorId, distributorDiscountPercent, promoCode, fingerprintHash, paymentMethod } = params
     const sourceUrl = (product.sourceUrl?.trim() || config.autoFetchSourceUrl?.trim()) ?? ""
     if (!sourceUrl) {
         return badRequest("该商品暂时无法领取，请联系客服。")
@@ -207,6 +207,7 @@ async function createAutoFetchOrder(params: {
                         quantity: 1,
                         amount,
                         status: "PENDING",
+                        paymentMethod,
                         ...(clientIp !== "unknown" && { clientIp }),
                         ...(distributorId && { distributorId }),
                         ...(promoCode && { promoCode }),
@@ -244,22 +245,12 @@ async function createAutoFetchOrder(params: {
         }
 
         // 获取支付链接
-        const paymentUrl = await (async () => {
-            const totalAmount = String(amount)
-            const subject = product.name
-            if (isYipayConfigured()) {
-                return getYipayPagePayUrl({
-                    orderNo: paidOrder.orderNo,
-                    totalAmount,
-                    subject,
-                })
-            }
-            return getAlipayPagePayUrl({
-                orderNo: paidOrder.orderNo,
-                totalAmount,
-                subject,
-            })
-        })()
+        const paymentUrl = getPaymentUrlForOrder({
+            orderNo: paidOrder.orderNo,
+            totalAmount: String(amount),
+            subject: product.name,
+            paymentMethod,
+        })
 
         return NextResponse.json({
             orderNo: paidOrder.orderNo,
@@ -435,7 +426,7 @@ export async function POST(request: NextRequest) {
         return validationError(parsed.error.flatten())
     }
 
-    const { productId, email, orderPassword, quantity, turnstileToken, promoCode: bodyPromoCode, exitDiscountToken, fingerprintHash: rawFingerprintHash } = parsed.data
+    const { productId, email, orderPassword, quantity, paymentMethod, turnstileToken, promoCode: bodyPromoCode, exitDiscountToken, fingerprintHash: rawFingerprintHash } = parsed.data
     const fingerprintHash = rawFingerprintHash?.trim() || null
 
     // Resolve distributor from promoCode (cookie or body); include discount settings for 同码优惠
@@ -524,6 +515,7 @@ export async function POST(request: NextRequest) {
             distributorDiscountPercent,
             promoCode,
             fingerprintHash,
+            paymentMethod,
         })
     }
 
@@ -591,6 +583,7 @@ export async function POST(request: NextRequest) {
                         amount: amountRounded,
                         ...(discountPercentApplied != null && { discountPercentApplied }),
                         status: "PENDING",
+                        paymentMethod,
                         ...(clientIp !== "unknown" && { clientIp }),
                         ...(fingerprintHash && { fingerprintHash }),
                         ...(exitDiscountMeta && { exitDiscountMeta }),
@@ -664,9 +657,12 @@ export async function POST(request: NextRequest) {
 
     const amountStr = Number(order.amount).toFixed(2)
     const subject = product.name ?? `订单 ${order.orderNo}`
-    const paymentUrl = isYipayConfigured()
-        ? getYipayPagePayUrl({ orderNo: order.orderNo, totalAmount: amountStr, subject })
-        : getAlipayPagePayUrl({ orderNo: order.orderNo, totalAmount: amountStr, subject })
+    const paymentUrl = getPaymentUrlForOrder({
+        orderNo: order.orderNo,
+        totalAmount: amountStr,
+        subject,
+        paymentMethod,
+    })
 
     // Non-development: return payment URL (or null if no payment configured)
     return NextResponse.json({

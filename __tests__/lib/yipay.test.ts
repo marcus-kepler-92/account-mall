@@ -112,6 +112,27 @@ describe("getYipayPagePayUrl", () => {
         expect(url!).toContain("notify_url=https://example.com/api/payment/yipay/notify")
     })
 
+    it("includes custom type parameter in URL when specified", () => {
+        const url = getYipayPagePayUrl({
+            orderNo: "ord-456",
+            totalAmount: "20.00",
+            subject: "WeChat Order",
+            type: "wxpay",
+        })
+        expect(url).not.toBeNull()
+        expect(url!).toContain("type=wxpay")
+    })
+
+    it("defaults type to alipay when omitted", () => {
+        const url = getYipayPagePayUrl({
+            orderNo: "ord-789",
+            totalAmount: "30.00",
+            subject: "Default Type",
+        })
+        expect(url).not.toBeNull()
+        expect(url!).toContain("type=alipay")
+    })
+
     it("returns null when Yipay is not configured", () => {
         const { config } = require("@/lib/config")
         const orig = config.yipayPid

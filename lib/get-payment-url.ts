@@ -8,6 +8,8 @@ export interface GetPaymentUrlParams {
     totalAmount: string
     subject: string
     clientType?: ClientType
+    /** 支付渠道: "alipay" | "wxpay" | "qqpay"，仅在使用易支付时生效 */
+    paymentMethod?: string
 }
 
 /**
@@ -15,9 +17,9 @@ export interface GetPaymentUrlParams {
  * 未配置支付或生成失败时返回 null。
  */
 export function getPaymentUrlForOrder(params: GetPaymentUrlParams): string | null {
-    const { orderNo, totalAmount, subject, clientType = "pc" } = params
+    const { orderNo, totalAmount, subject, clientType = "pc", paymentMethod = "alipay" } = params
     return isYipayConfigured()
-        ? getYipayPagePayUrl({ orderNo, totalAmount, subject })
+        ? getYipayPagePayUrl({ orderNo, totalAmount, subject, type: paymentMethod })
         : clientType === "wap"
           ? getAlipayWapPayUrl({ orderNo, totalAmount, subject })
           : getAlipayPagePayUrl({ orderNo, totalAmount, subject })

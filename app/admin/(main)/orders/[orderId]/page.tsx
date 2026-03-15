@@ -141,6 +141,16 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
                             </p>
                         </div>
                         <div>
+                            <p className="text-muted-foreground">支付方式</p>
+                            <p>
+                                {order.paymentMethod === "wxpay"
+                                    ? "微信支付"
+                                    : order.paymentMethod === "qqpay"
+                                      ? "QQ 钱包"
+                                      : "支付宝"}
+                            </p>
+                        </div>
+                        <div>
                             <p className="text-muted-foreground">创建时间</p>
                             <p>{formatDateTime(order.createdAt)}</p>
                         </div>
