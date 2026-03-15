@@ -79,7 +79,7 @@ export function createOrderFormSchema(maxQuantity: number) {
         email: z.string().min(1, "请输入邮箱").pipe(z.email({ error: "请输入有效的邮箱地址" })),
         orderPassword: z.string().min(6, "订单密码至少 6 位"),
         quantity: z.number().int().min(1, "数量至少为 1").max(maxQuantity, `数量不能超过 ${maxQuantity}`),
-        paymentMethod: paymentMethodSchema.default("alipay"),
+        paymentMethod: paymentMethodSchema,
         fingerprintHash: z.string().min(1),
     })
 }
