@@ -46,7 +46,7 @@ export function InviteesDataTable({ data, level2RatePercent }: InviteesDataTable
             <DataTable
                 table={table}
                 columns={inviteesColumns}
-                emptyMessage="暂无下线，发送邀请后将在此展示。"
+                emptyMessage="暂无团队成员，发送邀请后将在此展示。"
             />
         </div>
     )

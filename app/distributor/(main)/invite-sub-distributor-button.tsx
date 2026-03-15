@@ -71,14 +71,14 @@ export function InviteSubDistributorButton({
     <>
       <Button onClick={() => setOpen(true)}>
         <UserPlus className="mr-2 size-4" />
-        邀请下线
+        邀请团队成员
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>邀请下线</DialogTitle>
+            <DialogTitle>邀请团队成员</DialogTitle>
             <DialogDescription>
-              输入对方邮箱发送邀请，对方注册后每笔成交，您持续获得其佣金的 {level2RatePercent}%。
+              输入对方邮箱发送邀请，对方加入后每笔成交，您持续获得团队销售分润。
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>

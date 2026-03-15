@@ -195,8 +195,8 @@ export function ApplyWithdrawalForm({
                             {feePercent > 0 && hasValidAmount && (
                                 <div className="mt-2 rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground space-y-0.5">
                                     <div className="flex justify-between">
-                                        <span>手续费（{feePercent}%）</span>
-                                        <span aria-label={`手续费 ${estimatedFee.toFixed(2)} 元`}>- ¥{estimatedFee.toFixed(2)}</span>
+                                        <span>服务费（{feePercent}%）</span>
+                                        <span aria-label={`服务费 ${estimatedFee.toFixed(2)} 元`}>- ¥{estimatedFee.toFixed(2)}</span>
                                     </div>
                                     <div className="flex justify-between font-medium text-foreground">
                                         <span>预计到账</span>
@@ -309,7 +309,7 @@ export function ApplyWithdrawalForm({
                         <Link href="/distributor/withdrawals">查看提现记录</Link>
                     </Button>
                     <p className="text-xs text-muted-foreground">
-                        打款由管理员线下处理，到账时间以实际为准。{feePercent > 0 && `实际到账金额扣除 ${feePercent}% 手续费。`}
+                        打款由管理员线下处理，到账时间以实际为准。{feePercent > 0 && `实际到账金额扣除 ${feePercent}% 服务费。`}
                     </p>
                 </div>
             </form>

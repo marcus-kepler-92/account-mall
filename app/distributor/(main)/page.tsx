@@ -8,6 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Link2, TrendingUp } from "lucide-react";
+import { CommissionRateDetail } from "./commission-rate-detail";
 import { config } from "@/lib/config";
 import { prisma } from "@/lib/prisma";
 import { CopyButtonClient } from "@/app/components/copy-promo-button";
@@ -151,19 +152,12 @@ export default async function DistributorDashboardPage() {
                     第 {tierSummary.currentTier!.sortOrder + 1} 档 · 区间 ¥{tierSummary.currentTier!.minAmount.toFixed(2)} – ¥{tierSummary.currentTier!.maxAmount.toFixed(2)}
                   </p>
                 </div>
-                <div className="rounded-lg border bg-muted/30 px-4 py-3">
-                  <p className="text-xs text-muted-foreground mb-1">您的实际佣金比例</p>
-                  <p className="text-3xl font-bold tabular-nums">{myRate}%</p>
-                  {hasInviter ? (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      阶梯 {rate}%，上线抽 {level2Rate}% 后实得 {myRate}% · 每 ¥100 到手 ¥{(100 * myRate / 100).toFixed(2)}
-                    </p>
-                  ) : (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      无上线，全额归您 · 每 ¥100 到手 ¥{(100 * myRate / 100).toFixed(2)}
-                    </p>
-                  )}
-                </div>
+                <CommissionRateDetail
+                  myRate={myRate}
+                  tierRate={rate}
+                  level2Rate={level2Rate}
+                  hasInviter={hasInviter}
+                />
               </div>
             );
           })()}

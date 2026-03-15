@@ -41,20 +41,20 @@ export function DashboardKpiSection({
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">累计一级佣金</CardTitle>
+          <CardTitle className="text-sm font-medium">累计推广佣金</CardTitle>
           <Coins className="size-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
           <p className="text-2xl font-bold">
             ¥{level1CommissionTotal.toFixed(2)}
           </p>
-          <p className="text-xs text-muted-foreground">直接推广所得</p>
+          <p className="text-xs text-muted-foreground">直接销售所得</p>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">累计二级佣金</CardTitle>
+          <CardTitle className="text-sm font-medium">累计团队佣金</CardTitle>
           <Users className="size-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
@@ -62,7 +62,7 @@ export function DashboardKpiSection({
             ¥{level2CommissionTotal.toFixed(2)}
           </p>
           <p className="text-xs text-muted-foreground">
-            下线成交所得 · {inviteeCount} 人下线
+            团队销售分润 · {inviteeCount} 人团队
           </p>
         </CardContent>
       </Card>

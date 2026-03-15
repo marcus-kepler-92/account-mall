@@ -49,18 +49,18 @@ export const distributorCommissionsColumns: ColumnDef<DistributorCommissionRow>[
                     <TooltipProvider>
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <Badge variant="outline" className="cursor-default">二级推广</Badge>
+                                <Badge variant="outline" className="cursor-default">团队推广</Badge>
                             </TooltipTrigger>
                             {row.original.sourceDistributorName && (
                                 <TooltipContent>
-                                    <p>来自下线：{row.original.sourceDistributorName}</p>
+                                    <p>来自团队：{row.original.sourceDistributorName}</p>
                                 </TooltipContent>
                             )}
                         </Tooltip>
                     </TooltipProvider>
                 )
             }
-            return <Badge variant="default">一级推广</Badge>
+            return <Badge variant="default">直接推广</Badge>
         },
     },
     {

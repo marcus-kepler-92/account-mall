@@ -68,14 +68,14 @@ export default async function DistributorInviteesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold tracking-tight sm:text-2xl">我的下线</h1>
-        <p className="text-muted-foreground">已邀请加入的分销员列表</p>
+        <h1 className="text-xl font-bold tracking-tight sm:text-2xl">我的团队</h1>
+        <p className="text-muted-foreground">已邀请加入的团队成员</p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">下线总人数</CardTitle>
+            <CardTitle className="text-sm font-medium">团队总人数</CardTitle>
             <Users className="size-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -86,7 +86,7 @@ export default async function DistributorInviteesPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">下线带来的二级佣金</CardTitle>
+            <CardTitle className="text-sm font-medium">团队贡献佣金</CardTitle>
             <Coins className="size-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>

@@ -44,7 +44,7 @@ export const inviteesColumns: ColumnDef<InviteeRow>[] = [
     {
         accessorKey: "level2CommissionTotal",
         header: ({ column }) => (
-            <DataTableColumnHeader column={column} title="为我创造二级佣金" className="justify-end" />
+            <DataTableColumnHeader column={column} title="为我创造团队佣金" className="justify-end" />
         ),
         cell: ({ row }) => (
             <div className="text-right font-medium">

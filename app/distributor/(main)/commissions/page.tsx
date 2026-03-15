@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import { getDistributorSession } from "@/lib/auth-guard"
 import { prisma } from "@/lib/prisma"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { CommissionRateDetail } from "../commission-rate-detail"
 import { getDistributorTierSummary } from "@/lib/distributor-tier-summary"
 import {
     parseDistributorCommissionFilters,
@@ -163,19 +164,12 @@ export default async function DistributorCommissionsPage({
                             ? Math.round(rate * (1 - level2Rate / 100) * 100) / 100
                             : rate
                         return (
-                            <div className="rounded-lg border bg-muted/30 px-4 py-3">
-                                <p className="text-xs text-muted-foreground mb-1">您的实际佣金比例</p>
-                                <p className="text-3xl font-bold tabular-nums">{myRate}%</p>
-                                {hasInviter ? (
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                        阶梯 {rate}%，上线抽 {level2Rate}% 后实得 {myRate}% · 每 ¥100 到手 ¥{(100 * myRate / 100).toFixed(2)}
-                                    </p>
-                                ) : (
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                        无上线，全额归您 · 每 ¥100 到手 ¥{(100 * myRate / 100).toFixed(2)}
-                                    </p>
-                                )}
-                            </div>
+                            <CommissionRateDetail
+                                myRate={myRate}
+                                tierRate={rate}
+                                level2Rate={level2Rate}
+                                hasInviter={hasInviter}
+                            />
                         )
                     })()}
                 </CardContent>
