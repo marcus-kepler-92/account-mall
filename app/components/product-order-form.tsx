@@ -25,6 +25,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { configClient } from "@/lib/config-client"
 import { useProductPriceSyncStore } from "@/lib/stores/product-price-sync"
+import { useTurnstileStore } from "@/lib/stores/turnstile"
 import { ProductOrderQuantityPicker } from "./product-order-quantity-picker"
 import { ProductOrderTurnstile } from "./product-order-turnstile"
 import { useFingerprint } from "@/hooks/use-fingerprint"
@@ -96,9 +97,9 @@ export function ProductOrderForm({
     onExitDiscountConsumed,
 }: ProductOrderFormProps) {
     const [showOrderPassword, setShowOrderPassword] = useState(false)
-    const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
-    const [turnstileWidgetReady, setTurnstileWidgetReady] = useState(false)
     const [discountCode, setDiscountCode] = useState("")
+    const turnstileToken = useTurnstileStore((s) => s.token)
+    const turnstileStatus = useTurnstileStore((s) => s.status)
 
     const validatePromo = useCallback((code: string) => {
         return fetch(`/api/validate-promo-code?promoCode=${encodeURIComponent(code)}`, {
@@ -120,6 +121,7 @@ export function ProductOrderForm({
     const setDisplay = useProductPriceSyncStore((s) => s.setDisplay)
     const router = useRouter()
     const requireTurnstile = Boolean(TURNSTILE_SITE_KEY) && !IS_DEV
+    const turnstileLoading = requireTurnstile && turnstileStatus !== "ready" && turnstileStatus !== "unsupported"
     const isAutoFetch = productType === "AUTO_FETCH"
     const isFree = isAutoFetch && price === 0
     const fingerprintHash = useFingerprint()
@@ -184,6 +186,10 @@ export function ProductOrderForm({
 
     const onSubmit = async (data: OrderFormSchema) => {
         if (!inStock) return
+        if (requireTurnstile && !turnstileToken && turnstileStatus !== "unsupported") {
+            toast.error("安全验证尚未完成，请稍候再试")
+            return
+        }
         dispatchOrderFormLoading(true)
         let willRedirect = false
         try {
@@ -291,12 +297,12 @@ export function ProductOrderForm({
                         name="orderPassword"
                         render={({ field }) => (
                             <FormItem>
-                                <FormLabel>订单密码</FormLabel>
+                                <FormLabel>订单查询密码</FormLabel>
                                 <div className="relative">
                                     <FormControl>
                                         <Input
                                             type={showOrderPassword ? "text" : "password"}
-                                            placeholder="用于查询订单，请妥善保管"
+                                            placeholder="自行设置，非邮箱密码"
                                             disabled={!inStock}
                                             className="pr-10"
                                             {...field}
@@ -318,7 +324,7 @@ export function ProductOrderForm({
                                         )}
                                     </Button>
                                 </div>
-                                <FormDescription>6 位以上，用于后续查询订单和卡密</FormDescription>
+                                <FormDescription>与邮箱密码无关，自己设置 6 位以上，用于后续查询订单</FormDescription>
                                 <FormMessage />
                             </FormItem>
                         )}
@@ -383,14 +389,7 @@ export function ProductOrderForm({
                     )}
 
                     {requireTurnstile && (
-                        <ProductOrderTurnstile
-                            siteKey={TURNSTILE_SITE_KEY}
-                            isAutoFetch={isAutoFetch}
-                            widgetReady={turnstileWidgetReady}
-                            onWidgetReady={() => setTurnstileWidgetReady(true)}
-                            onSuccess={setTurnstileToken}
-                            onExpire={() => setTurnstileToken(null)}
-                        />
+                        <ProductOrderTurnstile siteKey={TURNSTILE_SITE_KEY} />
                     )}
 
                     <div className="hidden lg:flex items-center justify-between pt-2">
@@ -407,20 +406,24 @@ export function ProductOrderForm({
                                 !inStock ||
                                 !fingerprintHash ||
                                 form.formState.isSubmitting ||
-                                (requireTurnstile && !turnstileToken)
+                                (requireTurnstile && turnstileStatus !== "ready" && turnstileStatus !== "unsupported")
                             }
                             className="hidden lg:flex gap-2"
                         >
-                            {form.formState.isSubmitting && (
+                            {(form.formState.isSubmitting || (turnstileLoading && turnstileStatus !== "interactive")) && (
                                 <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
                             )}
                             {form.formState.isSubmitting
                                 ? "提交中…"
-                                : isFree
-                                  ? "领取一个账号"
-                                  : inStock
-                                    ? "立即购买"
-                                    : "售罄"}
+                                : turnstileStatus === "interactive"
+                                  ? "请先完成安全验证 ↑"
+                                  : turnstileLoading
+                                    ? "准备中…"
+                                    : isFree
+                                      ? "领取一个账号"
+                                      : inStock
+                                        ? "立即购买"
+                                        : "售罄"}
                         </Button>
                     </div>
                 </form>

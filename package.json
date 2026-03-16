@@ -24,7 +24,8 @@
     "test:watch": "npx jest --watch",
     "test:coverage": "npx jest --coverage",
     "test:e2e": "playwright test",
-    "audit": "npm audit --audit-level=high"
+    "audit": "npm audit --audit-level=high",
+    "dev:prod": "next build && next start"
   },
   "dependencies": {
     "@fingerprintjs/fingerprintjs": "^5.1.0",

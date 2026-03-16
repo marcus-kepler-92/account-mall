@@ -8,6 +8,7 @@ import { formatDateTimeShort } from "@/lib/utils"
 import { getPaymentUrlForOrder } from "@/lib/get-payment-url"
 import {
     checkOrderCreateRateLimit,
+    checkTurnstileFallbackRateLimit,
     getClientIp,
     MAX_PENDING_ORDERS_PER_IP,
 } from "@/lib/rate-limit"
@@ -453,21 +454,28 @@ export async function POST(request: NextRequest) {
     const turnstileEnabled = secretKey && config.nodeEnv !== "development"
     if (turnstileEnabled) {
         if (!turnstileToken || !turnstileToken.trim()) {
-            return badRequest("请完成安全验证后再提交订单。")
-        }
-        const clientIp = getClientIp(request)
-        const verifyResult = await verifyTurnstileToken(
-            turnstileToken.trim(),
-            secretKey,
-            clientIp !== "unknown" ? clientIp : undefined
-        )
-        if (!verifyResult.success) {
-            const codes = verifyResult["error-codes"] ?? []
-            const message =
-                codes.includes("timeout-or-duplicate") || codes.includes("expired")
-                    ? "验证已过期，请刷新页面后重试。"
-                    : "安全验证未通过，请重试。"
-            return badRequest(message)
+            // Graceful degradation: allow if fingerprint is present AND fallback rate limit passes
+            const clientIpForFallback = getClientIp(request)
+            if (fingerprintHash && await checkTurnstileFallbackRateLimit(clientIpForFallback)) {
+                console.warn(`[Turnstile] Missing token, fallback allowed. IP: ${clientIpForFallback}`)
+            } else {
+                return badRequest("请完成安全验证后再提交订单。")
+            }
+        } else {
+            const clientIp = getClientIp(request)
+            const verifyResult = await verifyTurnstileToken(
+                turnstileToken.trim(),
+                secretKey,
+                clientIp !== "unknown" ? clientIp : undefined
+            )
+            if (!verifyResult.success) {
+                const codes = verifyResult["error-codes"] ?? []
+                const message =
+                    codes.includes("timeout-or-duplicate") || codes.includes("expired")
+                        ? "验证已过期，请重新提交。"
+                        : "安全验证未通过，请重试。"
+                return badRequest(message)
+            }
         }
     }
 

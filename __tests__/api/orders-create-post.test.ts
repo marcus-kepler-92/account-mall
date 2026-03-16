@@ -23,6 +23,7 @@ jest.mock("better-auth/crypto", () => ({
 jest.mock("@/lib/rate-limit", () => ({
     __esModule: true,
     checkOrderCreateRateLimit: jest.fn().mockResolvedValue(null),
+    checkTurnstileFallbackRateLimit: jest.fn().mockResolvedValue(true),
     getClientIp: jest.fn().mockReturnValue("127.0.0.1"),
     MAX_PENDING_ORDERS_PER_IP: 3,
 }))
@@ -858,7 +859,74 @@ describe("POST /api/orders (create order)", () => {
             )
             const data = await res.json()
             expect(res.status).toBe(400)
-            expect(data.error).toMatch(/过期|刷新/)
+            expect(data.error).toMatch(/过期|重新提交/)
+        })
+
+        it("allows order when Turnstile token is missing but fingerprintHash is present (graceful degradation)", async () => {
+            getConfigMock().turnstileSecretKey = "test-secret"
+            prismaMock.product.findUnique.mockResolvedValueOnce({
+                id: "prod_1",
+                name: "Test",
+                price: 50,
+                maxQuantity: 5,
+                status: "ACTIVE",
+            })
+            prismaMock.card.count.mockResolvedValueOnce(3)
+            prismaMock.order.count.mockResolvedValueOnce(0)
+            const createdOrder = {
+                id: "order_new",
+                orderNo: "550e8400-e29b-41d4-a716-446655440000",
+                productId: "prod_1",
+                email: "user@example.com",
+                passwordHash: "hashed-password",
+                quantity: 1,
+                amount: 50,
+                status: "PENDING",
+                paidAt: null,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+            }
+            const mockTx = {
+                order: {
+                    create: jest.fn().mockResolvedValue(createdOrder),
+                },
+                card: {
+                    findMany: jest.fn().mockResolvedValue([{ id: "card_1" }]),
+                    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+                },
+            }
+            ;(prismaMock.$transaction as jest.Mock).mockImplementation((cb: (tx: unknown) => Promise<unknown>) =>
+                cb(mockTx)
+            )
+
+            const res = await POST(
+                createJsonRequest({
+                    productId: "prod_1",
+                    email: "user@example.com",
+                    orderPassword: "password123",
+                    quantity: 1,
+                    fingerprintHash: "abc123fingerprint",
+                })
+            )
+
+            expect(res.status).toBe(200)
+            const { verifyTurnstileToken } = require("@/lib/turnstile")
+            expect(verifyTurnstileToken).not.toHaveBeenCalled()
+        })
+
+        it("rejects order when both Turnstile token and fingerprintHash are missing", async () => {
+            getConfigMock().turnstileSecretKey = "test-secret"
+            const res = await POST(
+                createJsonRequest({
+                    productId: "prod_1",
+                    email: "user@example.com",
+                    orderPassword: "password123",
+                    quantity: 1,
+                })
+            )
+            const data = await res.json()
+            expect(res.status).toBe(400)
+            expect(data.error).toContain("安全验证")
         })
 
         it("creates order when Turnstile is configured and token verification succeeds", async () => {

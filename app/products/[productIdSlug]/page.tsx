@@ -268,6 +268,7 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
                 restockSectionId={isSoldOut ? "restock-section" : undefined}
                 formId="product-order-form"
                 isFree={isFree}
+                requireTurnstile={Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY) && process.env.NODE_ENV !== "development"}
             />
         </div>
     )

@@ -165,4 +165,22 @@ export async function checkDistributorInviteRateLimit(userId: string): Promise<R
     }
 }
 
+/** Turnstile 降级路径（无 token 仅 fingerprint）：每 IP 每 10 分钟最多 2 次 */
+const TURNSTILE_FALLBACK_POINTS = 2
+const TURNSTILE_FALLBACK_DURATION = 600
+const turnstileFallbackLimiter = new RateLimiterMemory({
+    points: TURNSTILE_FALLBACK_POINTS,
+    duration: TURNSTILE_FALLBACK_DURATION,
+})
+
+export async function checkTurnstileFallbackRateLimit(ip: string): Promise<boolean> {
+    if (ip === "unknown") return false
+    try {
+        await turnstileFallbackLimiter.consume(ip)
+        return true
+    } catch {
+        return false
+    }
+}
+
 export const MAX_PENDING_ORDERS_PER_IP = config.maxPendingOrdersPerIp

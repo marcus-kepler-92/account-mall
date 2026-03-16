@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useProductPriceSyncStore } from "@/lib/stores/product-price-sync"
+import { useTurnstileStore } from "@/lib/stores/turnstile"
 
 const ORDER_FORM_LOADING_EVENT = "product-order-loading"
 
@@ -15,6 +16,7 @@ type ProductBottomBarProps = {
     restockSectionId?: string
     formId?: string
     isFree?: boolean
+    requireTurnstile?: boolean
 }
 
 export function ProductBottomBar({
@@ -24,9 +26,11 @@ export function ProductBottomBar({
     restockSectionId,
     formId,
     isFree,
+    requireTurnstile = false,
 }: ProductBottomBarProps) {
     const [isSubmitting, setIsSubmitting] = useState(false)
     const d = useProductPriceSyncStore((s) => s.display)
+    const turnstileStatus = useTurnstileStore((s) => s.status)
 
     useEffect(() => {
         const handler = (e: CustomEvent<{ loading: boolean }>) => {
@@ -36,8 +40,15 @@ export function ProductBottomBar({
         return () => document.removeEventListener(ORDER_FORM_LOADING_EVENT, handler as EventListener)
     }, [])
 
+    const turnstileLoading =
+        requireTurnstile &&
+        turnstileStatus !== "ready" &&
+        turnstileStatus !== "unsupported"
+
     const handleClick = () => {
         if (inStock && formId && !isSubmitting) {
+            if (turnstileLoading) return
+
             const form = document.getElementById(formId) as HTMLFormElement
             if (form) {
                 form.requestSubmit()
@@ -99,15 +110,22 @@ export function ProductBottomBar({
                     size="lg"
                     className="min-h-11 min-w-28 gap-2 touch-manipulation"
                     onClick={handleClick}
-                    disabled={(!inStock && !restockSectionId) || isSubmitting}
+                    disabled={(!inStock && !restockSectionId) || isSubmitting || (inStock && turnstileLoading)}
                 >
-                    {showSubmitState && (
+                    {(showSubmitState || (inStock && turnstileLoading && turnstileStatus !== "interactive")) && (
                         <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
                     )}
-                    {showSubmitState ? "提交中…" : inStock ? (isFree ? "领取" : "立即购买") : "补货提醒"}
+                    {showSubmitState
+                        ? "提交中…"
+                        : inStock && turnstileStatus === "interactive"
+                          ? "请先完成安全验证 ↑"
+                          : inStock && turnstileLoading
+                            ? "准备中…"
+                            : inStock
+                              ? (isFree ? "领取" : "立即购买")
+                              : "补货提醒"}
                 </Button>
             </div>
         </div>
     )
 }
-
