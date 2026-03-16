@@ -3,27 +3,35 @@ import {
     buildYipayNotifyForm,
     isYipayConfiguredForE2E,
 } from "./helpers/yipay-notify"
+import {
+    createTestProduct,
+    cleanupTestProduct,
+    cleanupOrdersByEmail,
+    disconnectPrisma,
+    type TestProduct,
+} from "./helpers/test-data"
 
 const baseURL = process.env.PLAYWRIGHT_TEST_BASE_URL ?? "http://localhost:3000"
 
-/** Use the E2E seed product (slug e2e-product) so we always have stock. */
-async function getE2EProductPath(): Promise<string> {
-    const res = await fetch(`${baseURL}/api/products?page=1&pageSize=50`)
-    if (!res.ok) throw new Error(`Failed to fetch products: ${res.status}`)
-    const json = await res.json()
-    const data = json.data as Array<{ id: string; slug: string }>
-    const product = data?.find((p) => p.slug === "e2e-product")
-    if (!product)
-        throw new Error(
-            "E2E product not found. Run SEED_E2E=1 npm run db:seed before E2E.",
-        )
-    return `/products/${product.id}-${product.slug}`
-}
+const SLUG = "e2e-payment"
+const CARD_COUNT = 5
+const TEST_EMAILS = ["e2e@example.com", "e2e-getpay@example.com", "e2e-full@example.com"]
+
+let product: TestProduct
+
+test.beforeAll(async () => {
+    product = await createTestProduct({ slug: SLUG, name: "E2E Payment 测试商品", cardCount: CARD_COUNT })
+})
+
+test.afterAll(async () => {
+    await Promise.all(TEST_EMAILS.map((email) => cleanupOrdersByEmail(email)))
+    await cleanupTestProduct(product.id, CARD_COUNT)
+    await disconnectPrisma()
+})
 
 test.describe.serial("Payment flow", () => {
     test("create order and lookup shows PENDING", async ({ page }) => {
-        const productPath = await getE2EProductPath()
-        await page.goto(`${baseURL}${productPath}`)
+        await page.goto(`${baseURL}${product.path}`)
         await expect(page.getByRole("main")).toBeVisible()
         await expect(page.getByLabel(/邮箱/)).toBeEnabled({ timeout: 10_000 })
 
@@ -54,7 +62,7 @@ test.describe.serial("Payment flow", () => {
         })
 
         await page.getByLabel(/邮箱/).fill("e2e@example.com")
-        await page.getByLabel(/订单密码/).fill("e2e-password-123")
+        await page.getByLabel(/订单.*密码/).fill("e2e-password-123")
         await page.getByLabel(/购买数量/).fill("1")
         await page.getByRole("button", { name: "立即购买" }).click()
 
@@ -89,8 +97,7 @@ test.describe.serial("Payment flow", () => {
         page,
         request,
     }) => {
-        const productPath = await getE2EProductPath()
-        await page.goto(`${baseURL}${productPath}`)
+        await page.goto(`${baseURL}${product.path}`)
         await expect(page.getByRole("main")).toBeVisible()
         await expect(page.getByLabel(/邮箱/)).toBeEnabled({ timeout: 10_000 })
 
@@ -108,7 +115,7 @@ test.describe.serial("Payment flow", () => {
         })
 
         await page.getByLabel(/邮箱/).fill("e2e-getpay@example.com")
-        await page.getByLabel(/订单密码/).fill("e2e-getpay-789")
+        await page.getByLabel(/订单.*密码/).fill("e2e-getpay-789")
         await page.getByLabel(/购买数量/).fill("1")
         await page.getByRole("button", { name: "立即购买" }).click()
 
@@ -141,8 +148,7 @@ test.describe.serial("Payment flow", () => {
             test.skip(true, "需要配置 YIPAY_PID/KEY/SUBMIT_URL/SITE_NAME 环境变量")
         }
 
-        const productPath = await getE2EProductPath()
-        await page.goto(`${baseURL}${productPath}`)
+        await page.goto(`${baseURL}${product.path}`)
         await expect(page.getByRole("main")).toBeVisible()
         await expect(page.getByLabel(/邮箱/)).toBeEnabled({ timeout: 10_000 })
 
@@ -173,7 +179,7 @@ test.describe.serial("Payment flow", () => {
         })
 
         await page.getByLabel(/邮箱/).fill("e2e-full@example.com")
-        await page.getByLabel(/订单密码/).fill("e2e-full-password-456")
+        await page.getByLabel(/订单.*密码/).fill("e2e-full-password-456")
         await page.getByLabel(/购买数量/).fill("1")
         await page.getByRole("button", { name: "立即购买" }).click()
 
@@ -206,7 +212,7 @@ test.describe.serial("Payment flow", () => {
 
         await expect(page.getByText("已完成", { exact: true })).toBeVisible({ timeout: 10_000 })
         await expect(page.getByText("账号内容", { exact: true })).toBeVisible({ timeout: 5_000 })
-        const cardLocator = page.locator("code").filter({ hasText: /e2e-card-\d+/ })
+        const cardLocator = page.locator("code").filter({ hasText: new RegExp(`${SLUG}-card-\\d+`) })
         await expect(cardLocator.first()).toBeVisible({ timeout: 5_000 })
     })
 })

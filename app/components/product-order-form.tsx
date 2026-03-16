@@ -268,8 +268,8 @@ export function ProductOrderForm({
                     </h3>
                     <p className="text-xs text-muted-foreground">
                         {isFree
-                            ? "填写邮箱与订单密码用于记录，领取后请复制保存账号信息。"
-                            : "支持邮箱接收卡密，请妥善保管订单密码以便后续查询。"}
+                            ? "填写邮箱与查询密码用于记录，领取后请复制保存账号信息。"
+                            : "支持邮箱接收卡密，请妥善保管查询密码以便后续查询。"}
                     </p>
                     </div>
 

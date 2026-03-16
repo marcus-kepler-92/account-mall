@@ -3,24 +3,41 @@ import {
     buildYipayNotifyForm,
     isYipayConfiguredForE2E,
 } from "./helpers/yipay-notify"
+import {
+    createTestProduct,
+    cleanupTestProduct,
+    cleanupOrdersByEmail,
+    disconnectPrisma,
+    type TestProduct,
+} from "./helpers/test-data"
 
 const baseURL = process.env.PLAYWRIGHT_TEST_BASE_URL ?? "http://localhost:3000"
 
-/** 找到 E2E seed 商品的路径 */
-async function getProductPath(slug: string): Promise<string> {
-    const res = await fetch(`${baseURL}/api/products?page=1&pageSize=50`)
-    if (!res.ok) throw new Error(`Failed to fetch products: ${res.status}`)
-    const json = await res.json()
-    const data = json.data as Array<{ id: string; slug: string }>
-    const product = data?.find((p) => p.slug === slug)
-    if (!product)
-        throw new Error(
-            `Product with slug "${slug}" not found. Run SEED_E2E=1 npm run db:seed before E2E.`,
-        )
-    return `/products/${product.id}-${product.slug}`
-}
+const PRODUCT_SLUG = "e2e-exit-discount"
+const PRODUCT_CARD_COUNT = 5
+const LOW_STOCK_SLUG = "e2e-low-stock"
+const LOW_STOCK_CARD_COUNT = 2
 
-/** 触发桌面端 exit intent：先移入再直接 dispatch mouseleave（负坐标在 headless 下会被裁剪，mouseleave 不可靠） */
+let product: TestProduct
+let lowStockProduct: TestProduct
+
+test.beforeAll(async () => {
+    ;[product, lowStockProduct] = await Promise.all([
+        createTestProduct({ slug: PRODUCT_SLUG, name: "E2E Exit Discount 测试商品", cardCount: PRODUCT_CARD_COUNT }),
+        createTestProduct({ slug: LOW_STOCK_SLUG, name: "E2E 低库存商品", cardCount: LOW_STOCK_CARD_COUNT }),
+    ])
+})
+
+test.afterAll(async () => {
+    await cleanupOrdersByEmail("e2e-exit-discount@example.com")
+    await Promise.all([
+        cleanupTestProduct(product.id, PRODUCT_CARD_COUNT),
+        cleanupTestProduct(lowStockProduct.id, LOW_STOCK_CARD_COUNT),
+    ])
+    await disconnectPrisma()
+})
+
+/** 触发桌面端 exit intent */
 async function triggerDesktopExitIntent(page: Page) {
     await page.mouse.move(300, 300)
     await page.evaluate(() => {
@@ -35,11 +52,10 @@ async function triggerDesktopExitIntent(page: Page) {
 // ─────────────────────────────────────────────────────────────────────────────
 test.describe("Low stock warning", () => {
     test("shows 仅剩 X 件 on low-stock product detail page", async ({ page }) => {
-        const productPath = await getProductPath("e2e-low-stock-product")
-        await page.goto(`${baseURL}${productPath}`)
+        await page.goto(`${baseURL}${lowStockProduct.path}`)
         await expect(page.getByRole("main")).toBeVisible()
 
-        // 商品详情页或卡片应显示低库存警告（仅剩 2 件 或 仅剩 1 件）
+        // 低库存商品有 2 张卡，低于阈值（5），应显示低库存警告
         await expect(
             page.getByText(/仅剩\s*[12]\s*件/, { exact: false })
         ).toBeVisible({ timeout: 10_000 })
@@ -56,11 +72,10 @@ test.describe("Low stock warning", () => {
     })
 
     test("normal stock product (5 cards) shows 仅剩 5 件 within threshold", async ({ page }) => {
-        const productPath = await getProductPath("e2e-product")
-        await page.goto(`${baseURL}${productPath}`)
+        await page.goto(`${baseURL}${product.path}`)
         await expect(page.getByRole("main")).toBeVisible()
 
-        // e2e-product 有 5 张卡，正好等于默认阈值（5），应显示低库存提示
+        // 商品有 5 张卡，正好等于默认阈值（5），应显示低库存提示
         await expect(
             page.getByText(/仅剩\s*5\s*件/, { exact: false })
         ).toBeVisible({ timeout: 10_000 })
@@ -75,8 +90,6 @@ test.describe.serial("Exit discount flow", () => {
     let completedOrderNo: string | undefined
 
     function isExitDiscountConfigured(): boolean {
-        // 通过调用 API 检测是否配置了 secret（未配置时返回 eligible:false 且没有 token 字段）
-        // 这里用环境变量检查，测试时如未设置则 skip
         return !!process.env.EXIT_DISCOUNT_SECRET
     }
 
@@ -89,8 +102,7 @@ test.describe.serial("Exit discount flow", () => {
             test.skip(true, "需要配置 EXIT_DISCOUNT_SECRET 环境变量")
         }
 
-        const productPath = await getProductPath("e2e-product")
-        await page.goto(`${baseURL}${productPath}`)
+        await page.goto(`${baseURL}${product.path}`)
         await expect(page.getByRole("main")).toBeVisible()
         await expect(page.getByLabel(/邮箱/)).toBeEnabled({ timeout: 10_000 })
 
@@ -145,12 +157,12 @@ test.describe.serial("Exit discount flow", () => {
         // 等待弹窗关闭
         await expect(page.getByText(/专属优惠/i, { exact: false })).not.toBeVisible({ timeout: 5_000 })
 
-        // 验证表单区域显示折扣标识（已享 N% 优惠，页面可能有多处，取第一个）
+        // 验证表单区域显示折扣标识
         await expect(page.getByText(/已享.*%.*优惠/i, { exact: false }).first()).toBeVisible({ timeout: 5_000 })
 
         // 填写并提交订单
         await page.getByLabel(/邮箱/).fill("e2e-exit-discount@example.com")
-        await page.getByLabel(/订单密码/).fill("e2e-exit-pass-123")
+        await page.getByLabel(/订单.*密码/).fill("e2e-exit-pass-123")
         await page.getByLabel(/购买数量/).fill("1")
         await page.getByRole("button", { name: "立即购买" }).click()
 
@@ -162,8 +174,6 @@ test.describe.serial("Exit discount flow", () => {
         // 验证请求中包含 exitDiscountToken
         expect(orderRequestBody.exitDiscountToken).toBeDefined()
 
-        // 验证金额 = 0.01 * 0.95 = 0.009...（四舍五入后应 < 0.01）
-        // e2e-product 价格为 0.01，95折后 ≈ 0.01（最小金额约束，精度有限）
         expect(typeof orderBody.amount).toBe("number")
 
         completedOrderNo = orderBody.orderNo
@@ -202,12 +212,11 @@ test.describe.serial("Exit discount flow", () => {
             },
         ])
 
-        const productPath = await getProductPath("e2e-product")
-        await page.goto(`${baseURL}${productPath}`)
+        await page.goto(`${baseURL}${product.path}`)
         await expect(page.getByRole("main")).toBeVisible()
         await expect(page.getByLabel(/邮箱/)).toBeEnabled({ timeout: 10_000 })
 
-        // 监听 exit-discount API 请求——客户端预检应拦截，不应有 API 调用
+        // 监听 exit-discount API 请求
         let exitDiscountCalled = false
         await page.route((url) => url.pathname === "/api/exit-discount", async (route) => {
             exitDiscountCalled = true
@@ -224,7 +233,7 @@ test.describe.serial("Exit discount flow", () => {
         expect(exitDiscountCalled).toBe(false)
     })
 
-    // 场景 4：防滥用——同 session 第二次访问不再弹出
+    // 场景 4：防滥用
     test("abuse prevention: exit intent does not trigger again in same session (sessionStorage)", async ({
         page,
     }) => {
@@ -232,34 +241,14 @@ test.describe.serial("Exit discount flow", () => {
             test.skip(true, "需要配置 EXIT_DISCOUNT_SECRET 环境变量")
         }
 
-        const productPath = await getProductPath("e2e-product")
-        await page.goto(`${baseURL}${productPath}`)
+        await page.goto(`${baseURL}${product.path}`)
         await expect(page.getByRole("main")).toBeVisible()
 
-        // 手动模拟：直接在 sessionStorage 写入已触发标记
-        const storageKey = (await page.evaluate(() => {
-            // 获取当前 URL 中的商品 ID
-            return null
-        })) as string | null
-
-        // 直接向 sessionStorage 写入 exit-intent key（格式为 exit-intent:{productId}）
-        // 由于我们不知道具体的 productId，通过 localStorage 读取
-        await page.evaluate(() => {
-            // 查找所有 exit-intent: 开头的 sessionStorage key
-            // 通过在 session 中标记所有可能的 key 来模拟已触发状态
-            for (let i = 0; i < 100; i++) {
-                sessionStorage.setItem(`exit-intent:prod_${i}`, "1")
-            }
-            // 更通用：设置一个通配符无法精确匹配，改为通过先触发一次再刷新来检测
-        })
-
-        // 更好的方式：先正常触发一次（使用 minTimeMs=0 的默认行为不可控）
-        // 改为：让 API 返回 eligible:false 模拟已用过的情况
+        // 模拟 API 返回 eligible:false
         let exitDiscountApiCallCount = 0
         await page.route((url) => url.pathname === "/api/exit-discount", async (route) => {
             if (route.request().method() === "POST") {
                 exitDiscountApiCallCount++
-                // 返回 eligible:false 模拟已使用
                 await route.fulfill({
                     status: 200,
                     contentType: "application/json",
@@ -273,14 +262,14 @@ test.describe.serial("Exit discount flow", () => {
         await page.reload()
         await expect(page.getByLabel(/邮箱/)).toBeEnabled({ timeout: 10_000 })
 
-        // 清除 sessionStorage 模拟新 session 但 API 返回 eligible:false（指纹命中）
+        // 清除 sessionStorage 模拟新 session 但 API 返回 eligible:false
         await page.evaluate(() => sessionStorage.clear())
 
         await page.waitForTimeout(16_000)
         await triggerDesktopExitIntent(page)
         await page.waitForTimeout(2_000)
 
-        // 弹窗不应出现（API 返回 eligible:false）
+        // 弹窗不应出现
         await expect(page.getByText(/专属优惠/i, { exact: false })).not.toBeVisible()
     })
 })

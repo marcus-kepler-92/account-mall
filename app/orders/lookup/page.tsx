@@ -430,7 +430,7 @@ function OrderDetailContent({
                     <div className="flex gap-2">
                         <input
                             type="password"
-                            placeholder="输入下单时设置的订单密码"
+                            placeholder="输入下单时设置的查询密码"
                             value={refreshPassword}
                             onChange={(e) => setRefreshPassword(e.target.value)}
                             onKeyDown={(e) => e.key === "Enter" && handleRefresh()}
