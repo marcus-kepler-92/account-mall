@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { CreditCard, Package } from "lucide-react";
 import { BackButton } from "./back-button";
 import { BulkImportCards } from "./bulk-import-cards";
+import { ExportCards } from "./export-cards";
 import { ProductCardsDataTable } from "./product-cards-data-table";
 import type { ProductCardRow } from "./product-cards-columns";
 
@@ -111,7 +112,10 @@ export default async function AdminProductCardsPage({ params, searchParams }: Pa
                         </p>
                     </div>
                 </div>
-                <BulkImportCards productId={productId} defaultOpen={rawParams.action === "import"} />
+                <div className="flex items-center gap-2">
+                    <ExportCards productId={productId} statusCounts={stats} />
+                    <BulkImportCards productId={productId} defaultOpen={rawParams.action === "import"} />
+                </div>
             </div>
 
             {/* Stats */}
