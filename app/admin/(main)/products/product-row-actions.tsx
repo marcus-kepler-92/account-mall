@@ -22,6 +22,7 @@ import {
     Pin,
     PinOff,
     Trash2,
+    ShieldOff,
 } from "lucide-react"
 import {
     Dialog,
@@ -34,12 +35,14 @@ import {
 } from "@/components/ui/dialog"
 import { Loader2 } from "lucide-react"
 import { useState } from "react"
+import { ProductBlacklistModal } from "./product-blacklist-modal"
 
 type ProductRowActionsProps = {
     productId: string
     productName: string
     slug: string
     status: string
+    productType: string
     pinnedAt: string | null
 }
 
@@ -48,6 +51,7 @@ export function ProductRowActions({
     productName,
     slug,
     status,
+    productType,
     pinnedAt,
 }: ProductRowActionsProps) {
     const router = useRouter()
@@ -56,8 +60,10 @@ export function ProductRowActions({
     const [pinLoading, setPinLoading] = useState(false)
     const [deleteOpen, setDeleteOpen] = useState(false)
     const [deleteLoading, setDeleteLoading] = useState(false)
+    const [blacklistOpen, setBlacklistOpen] = useState(false)
     const isActive = status === "ACTIVE"
     const isPinned = !!pinnedAt
+    const isAutoFetch = productType === "AUTO_FETCH"
 
     const copyLink = async () => {
         const url = `${window.location.origin}/products/${productId}-${slug}`
@@ -132,6 +138,7 @@ export function ProductRowActions({
     }
 
     return (
+        <>
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="size-8">
@@ -152,6 +159,12 @@ export function ProductRowActions({
                         管理卡密
                     </Link>
                 </DropdownMenuItem>
+                {isAutoFetch && (
+                    <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setBlacklistOpen(true) }}>
+                        <ShieldOff className="size-4" />
+                        黑名单管理
+                    </DropdownMenuItem>
+                )}
                 <DropdownMenuItem asChild>
                     <a href={`/products/${productId}-${slug}`} target="_blank" rel="noopener noreferrer">
                         <ExternalLink className="size-4" />
@@ -258,5 +271,15 @@ export function ProductRowActions({
                 )}
             </DropdownMenuContent>
         </DropdownMenu>
+
+        {isAutoFetch && (
+            <ProductBlacklistModal
+                productId={productId}
+                productName={productName}
+                open={blacklistOpen}
+                onOpenChange={setBlacklistOpen}
+            />
+        )}
+    </>
     )
 }

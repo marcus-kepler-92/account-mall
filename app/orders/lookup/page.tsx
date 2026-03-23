@@ -23,7 +23,7 @@ import { SiteHeader } from "@/app/components/site-header"
 import { useSiteName } from "@/app/components/site-name-provider"
 import {
     Copy, Check, Eye, EyeOff, Loader2, Mail, Hash, Package, Search,
-    Zap, CreditCard, KeyRound, Globe, Clock, Info, RefreshCw,
+    Zap, CreditCard, KeyRound, Globe, Clock, Info, RefreshCw, ArrowLeftRight, AlertTriangle,
 } from "lucide-react"
 import { toast } from "sonner"
 import { addOrUpdateOrder } from "@/lib/order-history-storage"
@@ -51,6 +51,8 @@ interface OrderResult {
     /** AUTO_FETCH 账号内容有效期 */
     contentExpiresAt?: string
     isAutoFetch?: boolean
+    /** AUTO_FETCH：是否可使用一次性换号 */
+    canSwitch?: boolean
 }
 
 interface OrderListItem {
@@ -232,6 +234,9 @@ function OrderDetailContent({
     const [copiedId, setCopiedId] = useState<string | null>(null)
     const [refreshPassword, setRefreshPassword] = useState("")
     const [refreshLoading, setRefreshLoading] = useState(false)
+    const [switchPassword, setSwitchPassword] = useState("")
+    const [switchLoading, setSwitchLoading] = useState(false)
+    const [switchUsed, setSwitchUsed] = useState(false)
     const [continuePaymentLoading, setContinuePaymentLoading] = useState(false)
     const copiedTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
 
@@ -298,6 +303,31 @@ function OrderDetailContent({
         } catch { toast.error("网络异常，请稍后重试") }
         finally { setRefreshLoading(false) }
     }, [result.orderNo, refreshPassword])
+
+    const handleSwitch = useCallback(async () => {
+        if (!switchPassword) return
+        setSwitchLoading(true)
+        try {
+            const res = await fetch(`/api/orders/${encodeURIComponent(result.orderNo)}/switch-account`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ password: switchPassword }),
+            })
+            const data = await res.json() as { switched?: boolean; payload?: AutoFetchCardPayload; error?: string }
+            if (!res.ok) { toast.error(data.error || "切换失败"); return }
+            if (data.switched && data.payload) {
+                setResult((prev) => ({
+                    ...prev,
+                    cards: [{ content: toCardContentJson(data.payload!), ...data.payload! }],
+                    canSwitch: false,
+                }))
+                setSwitchUsed(true)
+                setSwitchPassword("")
+                toast.success("已切换到新账号")
+            }
+        } catch { toast.error("网络异常，请稍后重试") }
+        finally { setSwitchLoading(false) }
+    }, [result.orderNo, switchPassword])
 
     const handleContinuePayment = useCallback(async () => {
         const password = getPassword()
@@ -440,6 +470,31 @@ function OrderDetailContent({
                             disabled={refreshLoading || !refreshPassword} onClick={handleRefresh}>
                             <RefreshCw className={`size-3.5 ${refreshLoading ? "animate-spin" : ""}`} />
                             {refreshLoading ? "获取中…" : "获取最新密码"}
+                        </Button>
+                    </div>
+                </div>
+            )}
+
+            {/* AUTO_FETCH：一次性换号（仅未使用时显示） */}
+            {!result.isPending && result.isAutoFetch && result.status === "COMPLETED" && !isContentExpired && result.canSwitch && !switchUsed && (
+                <div className="border-t pt-3 space-y-2">
+                    <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <AlertTriangle className="size-3.5 shrink-0 text-amber-500" />
+                        账号无法正常使用？可更换一次，更换后原账号将被标记为不可用。
+                    </p>
+                    <div className="flex gap-2">
+                        <input
+                            type="password"
+                            placeholder="输入下单时设置的查询密码"
+                            value={switchPassword}
+                            onChange={(e) => setSwitchPassword(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && handleSwitch()}
+                            className="flex-1 min-w-0 rounded-md border border-input bg-background px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-ring"
+                        />
+                        <Button type="button" variant="outline" size="sm" className="shrink-0 gap-1.5"
+                            disabled={switchLoading || !switchPassword} onClick={handleSwitch}>
+                            <ArrowLeftRight className={`size-3.5 ${switchLoading ? "animate-pulse" : ""}`} />
+                            {switchLoading ? "切换中…" : "更换账号"}
                         </Button>
                     </div>
                 </div>

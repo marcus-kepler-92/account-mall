@@ -125,11 +125,12 @@ model Product {
   pinnedAt         DateTime?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
-  cards              Card[]
-  orders             Order[]
-  tags               Tag[]
+  cards                Card[]
+  orders               Order[]
+  tags                 Tag[]
   restockSubscriptions RestockSubscription[]
-  exitDiscountUsages ExitDiscountUsage[]
+  exitDiscountUsages   ExitDiscountUsage[]
+  accountBlacklist     AccountBlacklist[]
 }
 
 model Tag {
@@ -181,6 +182,8 @@ model Order {
   clientIp                String?     // For rate limit: max PENDING orders per IP
   fingerprintHash         String?     // 浏览器指纹，用于免费商品多因素领取限制
   exitDiscountMeta        String?     @db.Text // Exit intent 折扣信号 JSON，订单 COMPLETED 后转存到 ExitDiscountUsage
+  /// AUTO_FETCH：用户是否已使用一次性账号切换机会
+  hasSwitchedAccount      Boolean     @default(false)
   product                 Product     @relation(fields: [productId], references: [id])
   distributor             User?       @relation(fields: [distributorId], references: [id])
   cards                   Card[]
@@ -341,7 +344,19 @@ model ExitDiscountUsage {
   @@index([productId, ip])
 }
 
+// AUTO_FETCH：账号黑名单，按商品隔离；用户标记不可用后将账号加入黑名单，下单/刷新时不再分配该账号
+model AccountBlacklist {
+  id        String   @id @default(cuid())
+  productId String
+  account   String
+  reason    String?
+  /// 触发拉黑的订单号，用于追溯来源
+  orderId   String?
+  createdAt DateTime @default(now())
 
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-
+  @@unique([productId, account])
+  @@index([productId])
+}
 

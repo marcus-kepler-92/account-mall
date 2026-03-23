@@ -37,7 +37,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const order = await prisma.order.findUnique({
         where: { orderNo },
         include: {
-            product: { select: { productType: true, sourceUrl: true, validityHours: true } },
+            product: { select: { id: true, productType: true, sourceUrl: true, validityHours: true } },
             cards: {
                 where: { status: "SOLD" },
                 select: { id: true, content: true, lastRefreshedAt: true },
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
 
     // 爬取新账号
-    const sourceUrl = (order.product.sourceUrl?.trim() || config.autoFetchSourceUrl?.trim()) ?? ""
+    const sourceUrl = (order.product.sourceUrl?.trim() || config.autoFetchSourceUrls[0]?.trim()) ?? ""
     if (!sourceUrl) {
         return badRequest("未配置爬取来源，无法刷新")
     }
@@ -99,7 +99,24 @@ export async function POST(request: NextRequest, context: RouteContext) {
         )
     }
 
-    // 优先匹配原账号（若列表中存在同账号则用新密码，否则换新号）
+    // 过滤黑名单
+    const blacklisted = await prisma.accountBlacklist.findMany({
+        where: { productId: order.product.id },
+        select: { account: true },
+    })
+    const blackSet = new Set(blacklisted.map((b) => b.account))
+    const available = scrapedList.filter((a) => !blackSet.has(a.account))
+    if (available.length === 0) {
+        return NextResponse.json(
+            {
+                error: "当前无法获取新账号，旧数据仍有效",
+                refreshed: false,
+            },
+            { status: 503 }
+        )
+    }
+
+    // 优先匹配原账号（若未被拉黑且在列表中则用新密码，否则换新号）
     let currentPayload: { account: string } | null = null
     try {
         const parsed = JSON.parse(card.content) as { account?: string }
@@ -108,10 +125,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
         // ignore
     }
 
-    const matchedAccount = currentPayload
-        ? scrapedList.find((a) => a.account === currentPayload!.account)
-        : null
-    const picked = matchedAccount ?? scrapedList[Math.floor(Math.random() * scrapedList.length)]
+    const matchedAccount =
+        currentPayload && !blackSet.has(currentPayload.account)
+            ? available.find((a) => a.account === currentPayload!.account)
+            : null
+    const picked = matchedAccount ?? available[Math.floor(Math.random() * available.length)]
     const newPayload = sharedAccountToCardPayload(picked)
     const newContent = toCardContentJson(newPayload)
 

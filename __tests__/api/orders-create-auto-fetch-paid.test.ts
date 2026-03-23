@@ -38,7 +38,7 @@ jest.mock("@/lib/config", () => {
         siteUrl: "http://localhost:3000",
         autoFetchMaxQuantityPerOrder: 1,
         autoFetchCooldownHours: 1,
-        autoFetchSourceUrl: "https://example.com/share/accounts",
+        autoFetchSourceUrls: ["https://example.com/share/accounts"],
         pendingOrderTimeoutMs: 900_000,
         exitDiscountSecret: undefined as string | undefined,
     }
@@ -75,7 +75,7 @@ function getConfigMock() {
         __configMockAutoFetch?: {
             turnstileSecretKey?: string
             nodeEnv?: string
-            autoFetchSourceUrl?: string
+            autoFetchSourceUrls?: string[]
             autoFetchCooldownHours?: number
         }
     }).__configMockAutoFetch!
@@ -119,12 +119,13 @@ describe("POST /api/orders — paid AUTO_FETCH product", () => {
     beforeEach(() => {
         jest.clearAllMocks()
         getConfigMock().nodeEnv = "test"
-        getConfigMock().autoFetchSourceUrl = "https://example.com/share/accounts"
+        getConfigMock().autoFetchSourceUrls = ["https://example.com/share/accounts"]
         prismaMock.order.count.mockResolvedValue(0)
         prismaMock.user.findFirst.mockResolvedValue(null)
 
         // Default: scrape returns one account
         scrapeSharedAccountsMock.mockResolvedValue([SCRAPED_ACCOUNT])
+        prismaMock.accountBlacklist.findMany.mockResolvedValue([])
     })
 
     describe("爬取成功 + price>0 → 收费流程", () => {
@@ -254,7 +255,7 @@ describe("POST /api/orders — paid AUTO_FETCH product", () => {
             prismaMock.product.findUnique.mockResolvedValue(
                 makePaidAutoFetchProduct({ sourceUrl: null })
             )
-            getConfigMock().autoFetchSourceUrl = ""
+            getConfigMock().autoFetchSourceUrls = []
 
             const res = await POST(createJsonRequest(ORDER_BODY))
             const data = await res.json()

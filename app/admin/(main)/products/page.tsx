@@ -32,6 +32,7 @@ export default async function AdminProductsPage() {
         name: p.name,
         slug: p.slug,
         status: p.status,
+        productType: p.productType,
         price: Number(p.price),
         pinnedAt: p.pinnedAt?.toISOString() ?? null,
         tags: p.tags,

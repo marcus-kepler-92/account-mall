@@ -43,7 +43,7 @@ jest.mock("@/lib/config", () => {
     siteUrl: "http://localhost:3000",
     autoFetchMaxQuantityPerOrder: 1,
     autoFetchCooldownHours: 24,
-    autoFetchSourceUrl: "https://source.example.com",
+    autoFetchSourceUrls: ["https://source.example.com"],
     pendingOrderTimeoutMs: 900_000,
     exitDiscountSecret: undefined as string | undefined,
   };
@@ -149,6 +149,7 @@ describe("POST /api/orders — AUTO_FETCH 多因素限领", () => {
     prismaMock.order.count.mockResolvedValue(0);
     prismaMock.user.findFirst.mockResolvedValue(null);
     scrapeSharedAccountsMock.mockResolvedValue([SCRAPED_ACCOUNT]);
+    prismaMock.accountBlacklist.findMany.mockResolvedValue([]);
   });
 
   // ─── 免费商品拦截 ─────────────────────────────────────────────────────────

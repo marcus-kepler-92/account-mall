@@ -38,9 +38,11 @@ type ProductData = {
 export function ProductForm({
     product,
     allTags,
+    sourceUrlOptions = [],
 }: {
     product?: ProductData
     allTags: Tag[]
+    sourceUrlOptions?: string[]
 }) {
     const router = useRouter()
     const isEditing = !!product
@@ -140,7 +142,7 @@ export function ProductForm({
                                 isEditing={isEditing}
                                 onSlugManualEdit={() => setSlugManuallyEdited(true)}
                             />
-                            <ProductFormPricingFields isAutoFetch={isAutoFetch} />
+                            <ProductFormPricingFields isAutoFetch={isAutoFetch} sourceUrlOptions={sourceUrlOptions} />
                         </div>
 
                         <div className="space-y-6 lg:sticky lg:top-20 lg:self-start">

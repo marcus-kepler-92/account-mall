@@ -14,9 +14,21 @@ import {
 import { MarkdownEditor } from "@/app/components/markdown-editor"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import type { ProductFormSchema } from "@/lib/validations/product"
-import { Textarea } from "@/components/ui/textarea"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
 
-export function ProductFormPricingFields({ isAutoFetch }: { isAutoFetch: boolean }) {
+export function ProductFormPricingFields({
+    isAutoFetch,
+    sourceUrlOptions,
+}: {
+    isAutoFetch: boolean
+    sourceUrlOptions: string[]
+}) {
     const { control } = useFormContext<ProductFormSchema>()
 
     return (
@@ -105,14 +117,27 @@ export function ProductFormPricingFields({ isAutoFetch }: { isAutoFetch: boolean
                                         <FormLabel>
                                             来源 URL <span className="text-destructive">*</span>
                                         </FormLabel>
-                                        <FormControl>
-                                            <Textarea
-                                                placeholder="https://example.com/share/accounts"
-                                                className="font-mono text-sm"
-                                                rows={2}
-                                                {...field}
-                                            />
-                                        </FormControl>
+                                        <Select
+                                            value={field.value ?? ""}
+                                            onValueChange={field.onChange}
+                                        >
+                                            <FormControl>
+                                                <SelectTrigger className="font-mono text-sm">
+                                                    <SelectValue placeholder="请选择爬取来源" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                {sourceUrlOptions.map((url) => (
+                                                    <SelectItem
+                                                        key={url}
+                                                        value={url}
+                                                        className="font-mono text-xs"
+                                                    >
+                                                        {url}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
                                         <FormDescription>自动获取账号的来源页面地址</FormDescription>
                                         <FormMessage />
                                     </FormItem>

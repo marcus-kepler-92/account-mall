@@ -24,7 +24,7 @@ jest.mock("@/lib/scrape-shared-accounts", () => ({
 
 jest.mock("@/lib/config", () => ({
     config: {
-        autoFetchSourceUrl: "https://source.example.com",
+        autoFetchSourceUrls: ["https://source.example.com"],
         nodeEnv: "test",
     },
 }))
@@ -56,6 +56,7 @@ function makeCompletedAutoFetchOrder(overrides?: Record<string, unknown>) {
         passwordHash: "hashed-pw",
         expiresAt: null,
         product: {
+            id: "prod_1",
             productType: "AUTO_FETCH",
             sourceUrl: "https://source.example.com",
             validityHours: 24,
@@ -94,6 +95,7 @@ describe("POST /api/orders/[orderId]/refresh", () => {
         jest.clearAllMocks()
         verifyPasswordMock.mockResolvedValue(true)
         scrapeSharedAccountsMock.mockResolvedValue([SCRAPED_ACCOUNT])
+        prismaMock.accountBlacklist.findMany.mockResolvedValue([])
     })
 
     // ─── 请求校验 ─────────────────────────────────────────────────────────────
@@ -254,15 +256,15 @@ describe("POST /api/orders/[orderId]/refresh", () => {
             prismaMock.order.findUnique.mockResolvedValue(order)
             // 覆盖全局配置
             const { config } = require("@/lib/config")
-            const originalUrl = config.autoFetchSourceUrl
-            config.autoFetchSourceUrl = ""
+            const originalUrls = config.autoFetchSourceUrls
+            config.autoFetchSourceUrls = []
 
             const res = await POST(makeRequest(BODY), makeContext())
             expect(res.status).toBe(400)
             const data = await res.json()
             expect(data.error).toContain("未配置爬取来源")
 
-            config.autoFetchSourceUrl = originalUrl
+            config.autoFetchSourceUrls = originalUrls
         })
     })
 

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma"
+import { config } from "@/lib/config"
 import { ProductForm } from "@/app/components/product-form"
 
 export const dynamic = "force-dynamic"
@@ -9,5 +10,5 @@ export default async function AdminNewProductPage() {
         orderBy: { name: "asc" },
     })
 
-    return <ProductForm allTags={tags} />
+    return <ProductForm allTags={tags} sourceUrlOptions={config.autoFetchSourceUrls} />
 }

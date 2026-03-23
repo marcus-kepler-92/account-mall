@@ -59,7 +59,7 @@ async function createAutoFetchOrder(params: {
     paymentMethod: string
 }): Promise<NextResponse> {
     const { productId, product, email, orderPassword, clientIp, distributorId, distributorDiscountPercent, promoCode, fingerprintHash, paymentMethod } = params
-    const sourceUrl = (product.sourceUrl?.trim() || config.autoFetchSourceUrl?.trim()) ?? ""
+    const sourceUrl = (product.sourceUrl?.trim() || config.autoFetchSourceUrls[0]?.trim()) ?? ""
     if (!sourceUrl) {
         return badRequest("该商品暂时无法领取，请联系客服。")
     }
@@ -125,7 +125,17 @@ async function createAutoFetchOrder(params: {
         return badRequest("暂无可领取账号，请稍后再试。")
     }
 
-    const picked = scrapedList[Math.floor(Math.random() * scrapedList.length)]
+    const blacklisted = await prisma.accountBlacklist.findMany({
+        where: { productId },
+        select: { account: true },
+    })
+    const blackSet = new Set(blacklisted.map((b) => b.account))
+    const available = scrapedList.filter((a) => !blackSet.has(a.account))
+    if (available.length === 0) {
+        return badRequest("暂无可用账号，请稍后再试。")
+    }
+
+    const picked = available[Math.floor(Math.random() * available.length)]
     const cardPayload = sharedAccountToCardPayload(picked)
     const cardContent = toCardContentJson(cardPayload)
     const passwordHash = await hashPassword(orderPassword)

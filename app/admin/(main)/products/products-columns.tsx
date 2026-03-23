@@ -11,6 +11,7 @@ export type ProductRow = {
     name: string
     slug: string
     status: string
+    productType: string
     price: number
     pinnedAt: string | null
     tags: { id: string; name: string; slug: string }[]
@@ -83,6 +84,7 @@ export const productsColumns: ColumnDef<ProductRow>[] = [
                     productName={row.original.name}
                     slug={row.original.slug}
                     status={row.original.status}
+                    productType={row.original.productType}
                     pinnedAt={row.original.pinnedAt}
                 />
             </div>

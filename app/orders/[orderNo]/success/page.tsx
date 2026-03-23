@@ -92,6 +92,10 @@ export default async function OrderSuccessPage({ params, searchParams }: PagePro
     const productName = order.productNameSnapshot ?? order.product?.name ?? "商品"
     const isAutoFetch = order.product?.productType === "AUTO_FETCH"
     const expiresAt = order.expiresAt ? order.expiresAt.toISOString() : null
+    const canSwitch =
+        isAutoFetch &&
+        !order.hasSwitchedAccount &&
+        (!order.expiresAt || order.expiresAt > new Date())
 
     return (
         <div className="flex min-h-screen flex-col">
@@ -124,6 +128,7 @@ export default async function OrderSuccessPage({ params, searchParams }: PagePro
                                     orderNo={orderNo}
                                     expiresAt={expiresAt}
                                     initialCards={cards}
+                                    canSwitch={canSwitch}
                                 />
                             ) : (
                                 <OrderSuccessCopySection cards={cards} />

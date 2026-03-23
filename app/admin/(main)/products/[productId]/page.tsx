@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation"
 import { prisma } from "@/lib/prisma"
+import { config } from "@/lib/config"
 import { ProductForm } from "@/app/components/product-form"
 import { DeactivateProductButton } from "./product-actions"
 
@@ -39,6 +40,7 @@ export default async function AdminEditProductPage({ params }: PageProps) {
                     price: Number(product.price),
                 }}
                 allTags={tags}
+                sourceUrlOptions={config.autoFetchSourceUrls}
             />
 
             {/* Danger zone */}

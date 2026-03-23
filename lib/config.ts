@@ -59,26 +59,26 @@ const envSchema = z
     autoFetchScrapeUserAgent: z.string().optional(),
     /** AUTO_FETCH：同一 IP/邮箱 同一商品 领取冷却时间（小时），仅生产/测试环境生效 */
     autoFetchCooldownHours: z.coerce.number().positive().default(1),
-    /** AUTO_FETCH：全局默认爬取来源 URL（商品 sourceUrl 为空时回退用；未配置时使用默认地址） */
-    autoFetchSourceUrl: z
+    /** AUTO_FETCH：全局爬取来源 URL 列表（逗号分隔；商品 sourceUrl 为空时取第一个；未配置时使用默认地址） */
+    autoFetchSourceUrls: z
       .string()
       .optional()
       .or(z.literal(""))
-      .refine(
-        (s) =>
-          !s ||
-          s === "" ||
-          (() => {
+      .default("https://id.ali-door.top/share/yedamai")
+      .transform((s) => {
+        if (!s || s === "") return ["https://id.ali-door.top/share/yedamai"]
+        return s
+          .split(",")
+          .map((u) => u.trim())
+          .filter((u) => {
             try {
-              new URL(s);
-              return true;
+              new URL(u)
+              return true
             } catch {
-              return false;
+              return false
             }
-          })(),
-        { message: "Invalid URL" },
-      )
-      .default("https://id.ali-door.top/share/yedamai"),
+          })
+      }),
     /** AUTO_FETCH：单笔领取数量（固定为 1，可配置） */
     autoFetchMaxQuantityPerOrder: z.coerce.number().int().min(1).default(1),
     /** 推荐码/优惠码：最大长度（字符），用于校验与防抖校验 API */
@@ -236,7 +236,8 @@ function getEnvInput() {
       e.AUTO_FETCH_SCRAPE_USER_AGENT ?? e.FREE_SHARED_SCRAPE_USER_AGENT,
     autoFetchCooldownHours:
       e.AUTO_FETCH_COOLDOWN_HOURS ?? e.FREE_SHARED_COOLDOWN_HOURS,
-    autoFetchSourceUrl: e.AUTO_FETCH_SOURCE_URL ?? e.FREE_SHARED_SOURCE_URL,
+    autoFetchSourceUrls:
+      e.AUTO_FETCH_SOURCE_URLS ?? e.AUTO_FETCH_SOURCE_URL ?? e.FREE_SHARED_SOURCE_URL,
     autoFetchMaxQuantityPerOrder:
       e.AUTO_FETCH_MAX_QUANTITY_PER_ORDER ??
       e.FREE_SHARED_MAX_QUANTITY_PER_ORDER,

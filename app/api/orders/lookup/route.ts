@@ -52,6 +52,8 @@ interface LookupResponseCompleted extends LookupResponseBase {
     /** AUTO_FETCH 订单的账号有效期 */
     contentExpiresAt?: string
     isAutoFetch?: boolean
+    /** AUTO_FETCH：用户是否可以使用一次性换号机会 */
+    canSwitch?: boolean
 }
 
 /**
@@ -144,6 +146,11 @@ export async function POST(request: NextRequest) {
 
         const successToken = createOrderSuccessToken(order.orderNo)
         const isAutoFetch = order.product.productType === "AUTO_FETCH"
+        const canSwitch =
+            isAutoFetch &&
+            order.status === "COMPLETED" &&
+            !order.hasSwitchedAccount &&
+            (!order.expiresAt || order.expiresAt > new Date())
         const payload: LookupResponseCompleted = {
             orderNo: order.orderNo,
             productName: order.productNameSnapshot ?? order.product.name,
@@ -154,6 +161,7 @@ export async function POST(request: NextRequest) {
             ...(successToken && { successToken }),
             ...(isAutoFetch && { isAutoFetch: true }),
             ...(isAutoFetch && order.expiresAt && { contentExpiresAt: order.expiresAt.toISOString() }),
+            ...(isAutoFetch && { canSwitch }),
         }
         return NextResponse.json(payload)
     } catch (error) {
