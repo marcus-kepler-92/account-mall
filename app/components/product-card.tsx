@@ -2,28 +2,19 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { Card, CardContent, CardFooter } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ImageIcon, Bell } from "lucide-react"
+import { Package, Bell, ShoppingCart } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { descriptionToPlainText } from "@/lib/description"
 import { SoldOutOverlay } from "@/app/components/sold-out-overlay"
 import { configClient } from "@/lib/config-client"
 
-// Primary-based gradients for theme consistency
 /** Relative or same-origin URLs use next/image; data: or external URLs use img (no optimization). */
 function isOptimizableImage(src: string): boolean {
     return src.startsWith("/")
 }
-
-const CARD_GRADIENTS = [
-    "from-primary/20 to-primary/40",
-    "from-primary/15 to-primary/35",
-    "from-primary/10 to-primary/30",
-    "from-primary/25 to-primary/45",
-    "from-primary/18 to-primary/38",
-] as const
 
 export type ProductCardData = {
     id: string
@@ -49,7 +40,6 @@ type ProductCardProps = {
  * Product card with equal height in grid, cover maintains aspect ratio (1:1).
  */
 export function ProductCard({ product, gradientIndex = 0, className, code }: ProductCardProps) {
-    const gradient = CARD_GRADIENTS[gradientIndex % CARD_GRADIENTS.length]
     const descriptionFallback = descriptionToPlainText(product.description, 80)
     const briefRaw = product.summary?.trim() || descriptionFallback
     const brief = briefRaw.slice(0, 80)
@@ -72,7 +62,7 @@ export function ProductCard({ product, gradientIndex = 0, className, code }: Pro
         <Link href={detailHref} className={cn("group block h-full", className)}>
             <Card
                 className={cn(
-                    "relative flex h-full flex-col overflow-hidden border p-0 shadow-sm transition-all duration-300 hover:shadow-lg hover:-translate-y-1 hover:border-primary/20 group-focus-within:ring-2 group-focus-within:ring-ring"
+                    "relative flex h-full flex-col gap-0 overflow-hidden border p-0 shadow-sm transition-all duration-300 hover:shadow-lg hover:-translate-y-1 hover:border-primary/20 group-focus-within:ring-2 group-focus-within:ring-ring"
                 )}
             >
                 {/* Cover: 1:1 aspect ratio, image preserves ratio via object-cover */}
@@ -83,9 +73,9 @@ export function ProductCard({ product, gradientIndex = 0, className, code }: Pro
                                 src={product.image}
                                 alt={product.name}
                                 fill
-                                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, (max-width: 1536px) 25vw, (max-width: 1600px) 20vw, 16vw"
+                                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, (max-width: 1536px) 25vw, (max-width: 1600px) 20vw, 16vw"
                                 className={cn(
-                                    "object-cover transition-all duration-300 group-hover:scale-105",
+                                    "object-fill transition-all duration-300 group-hover:scale-105",
                                     isSoldOut && "grayscale"
                                 )}
                                 priority={gradientIndex === 0}
@@ -98,26 +88,21 @@ export function ProductCard({ product, gradientIndex = 0, className, code }: Pro
                                 loading={gradientIndex === 0 ? "eager" : "lazy"}
                                 fetchPriority={gradientIndex === 0 ? "high" : "low"}
                                 className={cn(
-                                    "size-full object-cover transition-all duration-300 group-hover:scale-105",
+                                    "size-full object-fill transition-all duration-300 group-hover:scale-105",
                                     isSoldOut && "grayscale"
                                 )}
                             />
                         )
                     ) : (
-                        <div
-                            className={cn(
-                                "flex size-full items-center justify-center bg-gradient-to-br",
-                                gradient
-                            )}
-                        >
-                            <ImageIcon className="size-12 text-muted-foreground/50 transition-transform duration-300 group-hover:scale-110" />
+                        <div className="flex size-full items-center justify-center">
+                            <Package className="size-8 text-muted-foreground/40 transition-transform duration-300 group-hover:scale-110 sm:size-12" />
                         </div>
                     )}
                     {isSoldOut && <SoldOutOverlay />}
                 </div>
 
-                <CardContent className="flex min-h-0 flex-1 flex-col gap-3 p-4">
-                    <div className="flex flex-wrap gap-1">
+                <CardContent className="flex min-h-0 flex-1 flex-col gap-1 px-3 py-2 sm:gap-3 sm:p-4">
+                    <div className="hidden flex-wrap gap-1 sm:flex">
                         {product.tags.map((tag) => (
                             <Badge
                                 key={tag.id}
@@ -128,23 +113,23 @@ export function ProductCard({ product, gradientIndex = 0, className, code }: Pro
                             </Badge>
                         ))}
                     </div>
-                    <h3 className="line-clamp-2 text-base font-semibold leading-tight transition-colors group-hover:text-primary">
+                    <h3 className="line-clamp-2 text-sm font-semibold leading-tight transition-colors group-hover:text-primary sm:text-base">
                         {product.name}
                     </h3>
                     {brief && (
-                        <p className="line-clamp-2 flex-1 text-sm text-muted-foreground">
+                        <p className="line-clamp-2 hidden flex-1 text-sm text-muted-foreground sm:block">
                             {brief}
                             {briefRaw.length > 80 ? "…" : ""}
                         </p>
                     )}
                 </CardContent>
 
-                <CardFooter className="shrink-0 border-t px-4 py-3">
-                    <div className="flex w-full items-center justify-between gap-3">
+                <div className="shrink-0 border-t px-3 py-2 sm:px-4 sm:py-3">
+                    <div className="flex w-full items-center justify-between gap-2">
                         <div className="min-w-0 flex-1">
                             {isFree ? (
                                 <>
-                                    <span className="text-lg font-bold tabular-nums text-primary">免费</span>
+                                    <span className="text-base font-bold tabular-nums text-primary sm:text-lg">免费</span>
                                     <span className="ml-1.5 block text-[11px] text-muted-foreground">
                                         可领取
                                     </span>
@@ -153,7 +138,7 @@ export function ProductCard({ product, gradientIndex = 0, className, code }: Pro
                                 <>
                                     <span
                                         className={cn(
-                                            "text-lg font-bold tabular-nums",
+                                            "text-base font-bold tabular-nums sm:text-lg",
                                             isSoldOut && "text-muted-foreground line-through"
                                         )}
                                     >
@@ -183,16 +168,22 @@ export function ProductCard({ product, gradientIndex = 0, className, code }: Pro
                             {isSoldOut ? (
                                 <>
                                     <Bell className="size-3.5" />
-                                    补货提醒
+                                    <span className="hidden sm:inline">补货提醒</span>
                                 </>
                             ) : isFree ? (
-                                "领取"
+                                <>
+                                    <ShoppingCart className="size-3.5 sm:hidden" />
+                                    <span className="hidden sm:inline">领取</span>
+                                </>
                             ) : (
-                                "购买"
+                                <>
+                                    <ShoppingCart className="size-3.5 sm:hidden" />
+                                    <span className="hidden sm:inline">购买</span>
+                                </>
                             )}
                         </Button>
                     </div>
-                </CardFooter>
+                </div>
             </Card>
         </Link>
     )
@@ -205,12 +196,12 @@ export function ProductCardSkeleton({ className }: { className?: string }) {
     return (
         <div className={cn("flex h-full flex-col overflow-hidden rounded-xl border", className)}>
             <div className="aspect-square shrink-0 animate-pulse bg-muted" />
-            <div className="flex min-h-0 flex-1 flex-col gap-3 p-4">
+            <div className="flex min-h-0 flex-1 flex-col gap-1 px-3 py-2 sm:gap-3 sm:p-4">
                 <div className="h-4 w-2/3 animate-pulse rounded bg-muted" />
                 <div className="h-3 w-full animate-pulse rounded bg-muted" />
-                <div className="h-3 w-1/2 animate-pulse rounded bg-muted" />
+                <div className="hidden h-3 w-1/2 animate-pulse rounded bg-muted sm:block" />
             </div>
-            <div className="flex shrink-0 items-center justify-between border-t p-4">
+            <div className="flex shrink-0 items-center justify-between border-t px-3 py-2 sm:px-4 sm:py-3">
                 <div className="h-6 w-16 animate-pulse rounded bg-muted" />
                 <div className="h-8 w-14 animate-pulse rounded bg-muted" />
             </div>

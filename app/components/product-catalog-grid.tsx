@@ -26,7 +26,7 @@ export function ProductCatalogGrid({
     onRetry,
 }: Props) {
     const gridClass =
-        "grid grid-cols-1 items-stretch gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 min-[1600px]:grid-cols-6"
+        "grid grid-cols-2 items-stretch gap-3 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 min-[1600px]:grid-cols-6"
 
     if (loading) {
         return (
