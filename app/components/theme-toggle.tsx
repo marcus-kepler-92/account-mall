@@ -1,7 +1,7 @@
 "use client"
 
 import { useTheme } from "next-themes"
-import { useEffect, useState } from "react"
+import { useEffect, useEffectEvent, useState } from "react"
 import { Monitor, Moon, Sun, Sunrise } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -26,14 +26,18 @@ export function ThemeToggle() {
   const [mounted, setMounted] = useState(false)
   const [mode, setMode] = useState<ThemeMode>(getStoredMode)
 
-  useEffect(() => {
-    if (mode === "sunrise-sunset") {
+  const applyTheme = useEffectEvent((currentMode: ThemeMode) => {
+    if (currentMode === "sunrise-sunset") {
       setTheme(getSunriseSunsetTheme())
     } else {
       setTheme("system")
     }
+  })
+
+  useEffect(() => {
+    applyTheme(mode)
     queueMicrotask(() => setMounted(true))
-  }, [setTheme, mode])
+  }, [mode])
 
   const handleSelect = (value: string) => {
     const next = value as ThemeMode

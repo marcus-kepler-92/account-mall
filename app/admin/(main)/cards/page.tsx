@@ -91,6 +91,8 @@ export default async function AdminCardsPage({
                         id: true,
                         name: true,
                         slug: true,
+                        productType: true,
+                        price: true,
                     },
                 },
                 order: {
@@ -128,6 +130,7 @@ export default async function AdminCardsPage({
             id: card.product.id,
             name: card.product.name,
             slug: card.product.slug,
+            isFree: card.product.productType === "AUTO_FETCH" && Number(card.product.price) === 0,
         },
         createdAt: card.createdAt.toISOString(),
     }));

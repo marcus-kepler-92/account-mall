@@ -76,7 +76,6 @@ const STATUS_CONFIG: Record<string, { label: string; variant: "default" | "secon
     CLOSED: { label: "已关闭", variant: "outline" },
 }
 
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ApiOk = { ok: true; data: Record<string, any> }
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -123,10 +122,6 @@ function formatCountdownMs(ms: number): string {
 /*  Sub-components                                                     */
 /* ------------------------------------------------------------------ */
 
-function StatusBadge({ status }: { status: string }) {
-    const cfg = STATUS_CONFIG[status]
-    return <Badge variant={cfg?.variant ?? "outline"}>{cfg?.label ?? status}</Badge>
-}
 
 function AutoFetchCardRow({
     card, index, copiedId, onCopy,
@@ -366,16 +361,7 @@ function OrderDetailContent({
                         <span className="font-medium">{result.cards.length} 条</span>
                     </div>
                 )}
-                <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">订单状态</span>
-                    <div className="flex items-center gap-1.5">
-                        <StatusBadge status={result.status} />
-                        {isContentExpired && (
-                            <Badge variant="destructive" className="text-[10px]">已过期</Badge>
-                        )}
-                    </div>
-                </div>
-                {!result.isPending && result.isAutoFetch && result.status === "COMPLETED" && result.contentExpiresAt && (
+{!result.isPending && result.isAutoFetch && result.status === "COMPLETED" && result.contentExpiresAt && (
                     <div className="flex items-center justify-between">
                         <span className="text-muted-foreground">可用时间</span>
                         {isContentExpired ? (
@@ -480,7 +466,7 @@ function OrderDetailContent({
                 <div className="border-t pt-3 space-y-2">
                     <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                         <AlertTriangle className="size-3.5 shrink-0 text-amber-500" />
-                        账号无法正常使用？可更换一次，更换后原账号将被标记为不可用。
+                        账号无法正常使用？可更换一次。
                     </p>
                     <div className="flex gap-2">
                         <input

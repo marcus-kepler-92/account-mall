@@ -89,14 +89,14 @@ export function BulkImportCards({ productId, trigger, defaultOpen = false }: Bul
                     </Button>
                 )}
             </DialogTrigger>
-            <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+            <DialogContent className="sm:max-w-lg max-h-[85vh] flex flex-col">
                 <DialogHeader>
                     <DialogTitle>批量导入卡密</DialogTitle>
                     <DialogDescription>
                         每行输入一条卡密内容，支持最多 {MAX_LINES} 条。重复行将在导入时去重。
                     </DialogDescription>
                 </DialogHeader>
-                <div className="space-y-2">
+                <div className="space-y-2 flex-1 overflow-y-auto min-h-0">
                     <Textarea
                         placeholder={`例如：
 账号1|密码1
@@ -104,7 +104,7 @@ export function BulkImportCards({ productId, trigger, defaultOpen = false }: Bul
 ...`}
                         value={text}
                         onChange={(e) => setText(e.target.value)}
-                        className="min-h-[180px] font-mono text-sm max-h-[80vh]"
+                        className="min-h-[180px] font-mono text-sm max-h-[50vh]"
                         disabled={loading}
                     />
                     <div className="flex justify-between text-sm text-muted-foreground">

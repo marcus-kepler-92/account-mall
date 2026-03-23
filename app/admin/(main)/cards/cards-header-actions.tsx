@@ -28,6 +28,8 @@ type ProductOption = {
     id: string
     name: string
     slug: string
+    productType?: string
+    price?: number
 }
 
 export function CardsHeaderActions() {
@@ -61,11 +63,13 @@ export function CardsHeaderActions() {
                 const data = await res.json()
                 if (cancelled) return
 
-                const items: ProductOption[] = (data.data ?? []).map((p: ProductOption) => ({
-                    id: p.id,
-                    name: p.name,
-                    slug: p.slug,
-                }))
+                const items: ProductOption[] = (data.data ?? [])
+                    .filter((p: ProductOption) => !(p.productType === "AUTO_FETCH" && Number(p.price) === 0))
+                    .map((p: ProductOption) => ({
+                        id: p.id,
+                        name: p.name,
+                        slug: p.slug,
+                    }))
 
                 setProducts(items)
                 if (!selectedProductId && items.length > 0) {
@@ -139,14 +143,14 @@ export function CardsHeaderActions() {
             </div>
 
             <Dialog open={open} onOpenChange={handleOpenChange}>
-                <DialogContent className="sm:max-w-lg">
+                <DialogContent className="sm:max-w-lg max-h-[85vh] flex flex-col">
                     <DialogHeader>
                         <DialogTitle>批量导入卡密</DialogTitle>
                         <DialogDescription>
                             选择商品后可直接在此粘贴卡密（每行一条，最多 {MAX_LINES} 条），或前往该商品卡密页操作。
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-4">
+                    <div className="space-y-4 flex-1 overflow-y-auto min-h-0">
                         <div className="space-y-2">
                             <p className="text-sm text-muted-foreground">
                                 选择商品（仅展示可用商品）
@@ -180,7 +184,7 @@ export function CardsHeaderActions() {
                                     placeholder={`每行一条卡密，例如：\n账号1|密码1\n账号2|密码2`}
                                     value={text}
                                     onChange={(e) => setText(e.target.value)}
-                                    className="min-h-[160px] font-mono text-sm max-h-[60vh] overflow-y-auto"
+                                    className="min-h-[160px] font-mono text-sm max-h-[50vh]"
                                     disabled={importLoading}
                                 />
                                 <div className="flex justify-between text-sm text-muted-foreground">

@@ -297,7 +297,7 @@ function ProductMediaSection({ image, name, isSoldOut }: ProductMediaSectionProp
                         alt={name}
                         fill
                         sizes="(max-width: 1024px) 100vw, 50vw"
-                        className={cn("object-cover object-center", isSoldOut && "grayscale")}
+                        className={cn("object-fill", isSoldOut && "grayscale")}
                         priority
                     />
                 ) : (
@@ -307,7 +307,7 @@ function ProductMediaSection({ image, name, isSoldOut }: ProductMediaSectionProp
                         alt={name}
                         loading="eager"
                         fetchPriority="high"
-                        className={cn("size-full object-cover object-center", isSoldOut && "grayscale")}
+                        className={cn("size-full object-fill", isSoldOut && "grayscale")}
                     />
                 )}
                 {isSoldOut && <SoldOutOverlay badgePosition="right-3 top-3" />}

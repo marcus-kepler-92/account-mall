@@ -85,6 +85,7 @@ export const productsColumns: ColumnDef<ProductRow>[] = [
                     slug={row.original.slug}
                     status={row.original.status}
                     productType={row.original.productType}
+                    isFree={row.original.productType === "AUTO_FETCH" && row.original.price === 0}
                     pinnedAt={row.original.pinnedAt}
                 />
             </div>

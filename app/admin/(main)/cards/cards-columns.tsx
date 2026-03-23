@@ -56,6 +56,7 @@ export type CardRow = {
         id: string;
         name: string;
         slug: string;
+        isFree: boolean;
     };
     createdAt: string;
 };
@@ -151,12 +152,14 @@ function CardRowActions({ card }: { card: CardRow }) {
                         <Eye className="mr-2 h-4 w-4" />
                         查看完整内容
                     </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                        <Link href={`/admin/products/${card.product.id}/cards`}>
-                            <ExternalLink className="mr-2 h-4 w-4" />
-                            前往商品卡密页
-                        </Link>
-                    </DropdownMenuItem>
+                    {!card.product.isFree && (
+                        <DropdownMenuItem asChild>
+                            <Link href={`/admin/products/${card.product.id}/cards`}>
+                                <ExternalLink className="mr-2 h-4 w-4" />
+                                前往商品卡密页
+                            </Link>
+                        </DropdownMenuItem>
+                    )}
                     {canToggle && (
                         <>
                             <DropdownMenuSeparator />
@@ -271,12 +274,16 @@ export const cardsColumns: ColumnDef<CardRow>[] = [
             const product = row.original.product;
             return (
                 <div className="flex flex-col">
-                    <Link
-                        href={`/admin/products/${product.id}/cards`}
-                        className="text-sm font-medium hover:underline"
-                    >
-                        {product.name}
-                    </Link>
+                    {product.isFree ? (
+                        <span className="text-sm font-medium">{product.name}</span>
+                    ) : (
+                        <Link
+                            href={`/admin/products/${product.id}/cards`}
+                            className="text-sm font-medium hover:underline"
+                        >
+                            {product.name}
+                        </Link>
+                    )}
                     <span className="text-xs text-muted-foreground">/{product.slug}</span>
                 </div>
             );

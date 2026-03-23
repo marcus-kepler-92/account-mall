@@ -43,6 +43,7 @@ type ProductRowActionsProps = {
     slug: string
     status: string
     productType: string
+    isFree: boolean
     pinnedAt: string | null
 }
 
@@ -52,6 +53,7 @@ export function ProductRowActions({
     slug,
     status,
     productType,
+    isFree,
     pinnedAt,
 }: ProductRowActionsProps) {
     const router = useRouter()
@@ -153,12 +155,14 @@ export function ProductRowActions({
                         编辑
                     </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                    <Link href={`/admin/products/${productId}/cards`}>
-                        <CreditCard className="size-4" />
-                        管理卡密
-                    </Link>
-                </DropdownMenuItem>
+                {!isFree && (
+                    <DropdownMenuItem asChild>
+                        <Link href={`/admin/products/${productId}/cards`}>
+                            <CreditCard className="size-4" />
+                            管理卡密
+                        </Link>
+                    </DropdownMenuItem>
+                )}
                 {isAutoFetch && (
                     <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setBlacklistOpen(true) }}>
                         <ShieldOff className="size-4" />
