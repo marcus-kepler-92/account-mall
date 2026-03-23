@@ -1,62 +1,49 @@
-/*
-  Warnings:
+-- DropForeignKey (tables may already be gone via 20250307000000_remove_automation_tables)
+DO $$ BEGIN
+  ALTER TABLE "AutomationTask" DROP CONSTRAINT "AutomationTask_presetId_fkey";
+EXCEPTION WHEN undefined_table OR undefined_object THEN NULL; END $$;
 
-  - You are about to drop the `AutomationTask` table. If the table is not empty, all the data it contains will be lost.
-  - You are about to drop the `AutomationTaskItem` table. If the table is not empty, all the data it contains will be lost.
-  - You are about to drop the `AutomationTaskLog` table. If the table is not empty, all the data it contains will be lost.
-  - You are about to drop the `ProductAutomationPreset` table. If the table is not empty, all the data it contains will be lost.
+DO $$ BEGIN
+  ALTER TABLE "AutomationTask" DROP CONSTRAINT "AutomationTask_productId_fkey";
+EXCEPTION WHEN undefined_table OR undefined_object THEN NULL; END $$;
 
-*/
--- DropForeignKey
-ALTER TABLE "AutomationTask" DROP CONSTRAINT "AutomationTask_presetId_fkey";
+DO $$ BEGIN
+  ALTER TABLE "AutomationTaskItem" DROP CONSTRAINT "AutomationTaskItem_cardId_fkey";
+EXCEPTION WHEN undefined_table OR undefined_object THEN NULL; END $$;
 
--- DropForeignKey
-ALTER TABLE "AutomationTask" DROP CONSTRAINT "AutomationTask_productId_fkey";
+DO $$ BEGIN
+  ALTER TABLE "AutomationTaskItem" DROP CONSTRAINT "AutomationTaskItem_taskId_fkey";
+EXCEPTION WHEN undefined_table OR undefined_object THEN NULL; END $$;
 
--- DropForeignKey
-ALTER TABLE "AutomationTaskItem" DROP CONSTRAINT "AutomationTaskItem_cardId_fkey";
+DO $$ BEGIN
+  ALTER TABLE "AutomationTaskLog" DROP CONSTRAINT "AutomationTaskLog_itemId_fkey";
+EXCEPTION WHEN undefined_table OR undefined_object THEN NULL; END $$;
 
--- DropForeignKey
-ALTER TABLE "AutomationTaskItem" DROP CONSTRAINT "AutomationTaskItem_taskId_fkey";
+DO $$ BEGIN
+  ALTER TABLE "AutomationTaskLog" DROP CONSTRAINT "AutomationTaskLog_taskId_fkey";
+EXCEPTION WHEN undefined_table OR undefined_object THEN NULL; END $$;
 
--- DropForeignKey
-ALTER TABLE "AutomationTaskLog" DROP CONSTRAINT "AutomationTaskLog_itemId_fkey";
-
--- DropForeignKey
-ALTER TABLE "AutomationTaskLog" DROP CONSTRAINT "AutomationTaskLog_taskId_fkey";
-
--- DropForeignKey
-ALTER TABLE "ProductAutomationPreset" DROP CONSTRAINT "ProductAutomationPreset_productId_fkey";
+DO $$ BEGIN
+  ALTER TABLE "ProductAutomationPreset" DROP CONSTRAINT "ProductAutomationPreset_productId_fkey";
+EXCEPTION WHEN undefined_table OR undefined_object THEN NULL; END $$;
 
 -- AlterTable
 ALTER TABLE "CommissionTier" ALTER COLUMN "ratePercent" DROP DEFAULT;
 
 -- AlterTable
-ALTER TABLE "Order" ADD COLUMN     "hasSwitchedAccount" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "hasSwitchedAccount" BOOLEAN NOT NULL DEFAULT false;
 
 -- DropTable
-DROP TABLE "AutomationTask";
-
--- DropTable
-DROP TABLE "AutomationTaskItem";
-
--- DropTable
-DROP TABLE "AutomationTaskLog";
-
--- DropTable
-DROP TABLE "ProductAutomationPreset";
+DROP TABLE IF EXISTS "AutomationTask";
+DROP TABLE IF EXISTS "AutomationTaskItem";
+DROP TABLE IF EXISTS "AutomationTaskLog";
+DROP TABLE IF EXISTS "ProductAutomationPreset";
 
 -- DropEnum
-DROP TYPE "AutomationCategory";
-
--- DropEnum
-DROP TYPE "AutomationPresetType";
-
--- DropEnum
-DROP TYPE "AutomationTaskItemStatus";
-
--- DropEnum
-DROP TYPE "AutomationTaskStatus";
+DROP TYPE IF EXISTS "AutomationCategory";
+DROP TYPE IF EXISTS "AutomationPresetType";
+DROP TYPE IF EXISTS "AutomationTaskItemStatus";
+DROP TYPE IF EXISTS "AutomationTaskStatus";
 
 -- CreateTable
 CREATE TABLE "AccountBlacklist" (
