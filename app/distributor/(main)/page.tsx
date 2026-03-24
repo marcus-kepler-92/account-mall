@@ -75,7 +75,7 @@ export default async function DistributorDashboardPage() {
     prisma.user.count({ where: { inviterId: user.id } }),
     prisma.user.findUnique({
       where: { id: user.id },
-      select: { inviterId: true },
+      select: { inviterId: true, discountCodeEnabled: true, discountPercent: true },
     }),
   ]);
 
@@ -120,6 +120,8 @@ export default async function DistributorDashboardPage() {
         pendingWithdrawalTotal={pendingTotal}
         distributorCode={distributorCode}
         inviteeCount={inviteeCount}
+        discountCodeEnabled={selfUser?.discountCodeEnabled ?? false}
+        discountPercent={selfUser?.discountPercent != null ? Number(selfUser.discountPercent) : null}
       />
 
       {/* 当周业绩与阶梯 */}

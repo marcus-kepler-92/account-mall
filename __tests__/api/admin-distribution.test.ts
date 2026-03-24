@@ -8,7 +8,10 @@ import {
   DELETE as TierDelete,
 } from "@/app/api/admin/commission-tiers/[id]/route";
 import { GET as DistributorsGet } from "@/app/api/admin/distributors/route";
-import { PATCH as DistributorPatch } from "@/app/api/admin/distributors/[id]/route";
+import {
+  PATCH as DistributorPatch,
+  DELETE as DistributorDelete,
+} from "@/app/api/admin/distributors/[id]/route";
 import { GET as WithdrawalsGet } from "@/app/api/admin/withdrawals/route";
 import { PATCH as WithdrawalPatch } from "@/app/api/admin/withdrawals/[id]/route";
 import { prismaMock } from "../../__mocks__/prisma";
@@ -477,6 +480,126 @@ describe("PATCH /api/admin/distributors/[id]", () => {
     expect(res.status).toBe(400);
     const data = await res.json();
     expect(data.error).toBeDefined();
+  });
+});
+
+describe("DELETE /api/admin/distributors/[id]", () => {
+  const context = { params: Promise.resolve({ id: "dist_1" }) };
+
+  beforeEach(() => getAdminSession.mockReset());
+
+  it("returns 401 when no session", async () => {
+    getAdminSession.mockResolvedValue(null);
+    const res = await DistributorDelete({} as NextRequest, context);
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 404 when distributor does not exist", async () => {
+    withSession();
+    prismaMock.user.findFirst.mockResolvedValue(null);
+    const res = await DistributorDelete({} as NextRequest, context);
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 400 when distributor is not disabled", async () => {
+    withSession();
+    prismaMock.user.findFirst.mockResolvedValue({
+      id: "dist_1",
+      disabledAt: null,
+    } as never);
+    const res = await DistributorDelete({} as NextRequest, context);
+    const data = await res.json();
+    expect(res.status).toBe(400);
+    expect(data.error).toMatch(/停用/);
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when distributor has orders", async () => {
+    withSession();
+    prismaMock.user.findFirst.mockResolvedValue({
+      id: "dist_1",
+      disabledAt: new Date(),
+    } as never);
+    prismaMock.order.count.mockResolvedValue(1);
+    prismaMock.commission.count.mockResolvedValue(0);
+    prismaMock.withdrawal.count.mockResolvedValue(0);
+    prismaMock.user.count.mockResolvedValue(0);
+    const res = await DistributorDelete({} as NextRequest, context);
+    const data = await res.json();
+    expect(res.status).toBe(400);
+    expect(data.error).toMatch(/订单/);
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when distributor has commissions", async () => {
+    withSession();
+    prismaMock.user.findFirst.mockResolvedValue({
+      id: "dist_1",
+      disabledAt: new Date(),
+    } as never);
+    prismaMock.order.count.mockResolvedValue(0);
+    prismaMock.commission.count.mockResolvedValue(2);
+    prismaMock.withdrawal.count.mockResolvedValue(0);
+    prismaMock.user.count.mockResolvedValue(0);
+    const res = await DistributorDelete({} as NextRequest, context);
+    const data = await res.json();
+    expect(res.status).toBe(400);
+    expect(data.error).toMatch(/佣金/);
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when distributor has withdrawals", async () => {
+    withSession();
+    prismaMock.user.findFirst.mockResolvedValue({
+      id: "dist_1",
+      disabledAt: new Date(),
+    } as never);
+    prismaMock.order.count.mockResolvedValue(0);
+    prismaMock.commission.count.mockResolvedValue(0);
+    prismaMock.withdrawal.count.mockResolvedValue(1);
+    prismaMock.user.count.mockResolvedValue(0);
+    const res = await DistributorDelete({} as NextRequest, context);
+    const data = await res.json();
+    expect(res.status).toBe(400);
+    expect(data.error).toMatch(/提现/);
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when distributor has invitees", async () => {
+    withSession();
+    prismaMock.user.findFirst.mockResolvedValue({
+      id: "dist_1",
+      disabledAt: new Date(),
+    } as never);
+    prismaMock.order.count.mockResolvedValue(0);
+    prismaMock.commission.count.mockResolvedValue(0);
+    prismaMock.withdrawal.count.mockResolvedValue(0);
+    prismaMock.user.count.mockResolvedValue(3);
+    const res = await DistributorDelete({} as NextRequest, context);
+    const data = await res.json();
+    expect(res.status).toBe(400);
+    expect(data.error).toMatch(/下线/);
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("returns 200 and runs transaction when all checks pass", async () => {
+    withSession();
+    prismaMock.user.findFirst.mockResolvedValue({
+      id: "dist_1",
+      disabledAt: new Date(),
+    } as never);
+    prismaMock.order.count.mockResolvedValue(0);
+    prismaMock.commission.count.mockResolvedValue(0);
+    prismaMock.withdrawal.count.mockResolvedValue(0);
+    prismaMock.user.count.mockResolvedValue(0);
+    prismaMock.distributorInvitation.deleteMany.mockResolvedValue({ count: 0 });
+    prismaMock.user.delete.mockResolvedValue({} as never);
+    prismaMock.$transaction.mockResolvedValue([{ count: 0 }, {}]);
+    const res = await DistributorDelete({} as NextRequest, context);
+    const data = await res.json();
+    expect(res.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(prismaMock.$transaction).toHaveBeenCalled();
   });
 });
 

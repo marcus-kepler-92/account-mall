@@ -6,6 +6,7 @@ import {
 } from "@/components/ui/card";
 import { ShoppingCart, Coins, Wallet, Users } from "lucide-react";
 import { CopyButtonClient } from "@/app/components/copy-promo-button";
+import { Badge } from "@/components/ui/badge";
 
 interface DashboardKpiSectionProps {
   orderCount: number;
@@ -15,6 +16,8 @@ interface DashboardKpiSectionProps {
   pendingWithdrawalTotal: number;
   distributorCode: string;
   inviteeCount: number;
+  discountCodeEnabled: boolean;
+  discountPercent: number | null;
 }
 
 export function DashboardKpiSection({
@@ -25,6 +28,8 @@ export function DashboardKpiSection({
   pendingWithdrawalTotal,
   distributorCode,
   inviteeCount,
+  discountCodeEnabled,
+  discountPercent,
 }: DashboardKpiSectionProps) {
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
@@ -86,7 +91,16 @@ export function DashboardKpiSection({
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">推广优惠码 (找管理员开通)</CardTitle>
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            推广优惠码
+            {discountCodeEnabled ? (
+              <Badge variant="success">
+                已启用{discountPercent != null ? ` · ${discountPercent}%` : ""}
+              </Badge>
+            ) : (
+              <Badge variant="secondary">未开通</Badge>
+            )}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-2">
@@ -99,6 +113,11 @@ export function DashboardKpiSection({
               className="h-7 px-2 text-xs text-muted-foreground"
             />
           </div>
+          {discountCodeEnabled && discountPercent != null && (
+            <p className="text-xs text-muted-foreground mt-1">
+              客户使用此码下单可享 {discountPercent}% 折扣
+            </p>
+          )}
         </CardContent>
       </Card>
     </div>

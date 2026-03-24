@@ -4,15 +4,26 @@ import { ColumnDef } from "@tanstack/react-table"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"
-import { MoreHorizontal, UserCheck, UserX, Copy, Loader2, Percent } from "lucide-react"
+import { MoreHorizontal, UserCheck, UserX, Copy, Loader2, Percent, Trash2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import {
     Tooltip,
     TooltipContent,
@@ -112,6 +123,8 @@ function DistributorRowActions({ row }: { row: DistributorRow }) {
     const router = useRouter()
     const [loading, setLoading] = useState(false)
     const [discountOpen, setDiscountOpen] = useState(false)
+    const [deleteOpen, setDeleteOpen] = useState(false)
+    const [deleteLoading, setDeleteLoading] = useState(false)
     const disabled = !!row.disabledAt
 
     const handleToggle = async () => {
@@ -143,6 +156,25 @@ function DistributorRowActions({ row }: { row: DistributorRow }) {
             toast.success("已复制推荐码")
         } catch {
             toast.error("复制失败")
+        }
+    }
+
+    const handleDelete = async () => {
+        setDeleteLoading(true)
+        try {
+            const res = await fetch(`/api/admin/distributors/${row.id}`, { method: "DELETE" })
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}))
+                toast.error(err?.error ?? "删除失败")
+                return
+            }
+            setDeleteOpen(false)
+            toast.success("分销员已删除")
+            router.refresh()
+        } catch {
+            toast.error("删除失败")
+        } finally {
+            setDeleteLoading(false)
         }
     }
 
@@ -183,6 +215,21 @@ function DistributorRowActions({ row }: { row: DistributorRow }) {
                         <Percent className="mr-2 h-4 w-4" />
                         优惠码设置
                     </DropdownMenuItem>
+                    {disabled && (
+                        <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onSelect={(e) => {
+                                    e.preventDefault()
+                                    setDeleteOpen(true)
+                                }}
+                            >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                删除
+                            </DropdownMenuItem>
+                        </>
+                    )}
                 </DropdownMenuContent>
             </DropdownMenu>
             <EditDiscountDialog
@@ -194,6 +241,30 @@ function DistributorRowActions({ row }: { row: DistributorRow }) {
                 discountPercent={row.discountPercent}
                 onSuccess={() => router.refresh()}
             />
+            <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>删除分销员</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            确定要永久删除该分销员吗？此操作不可恢复。
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={deleteLoading}>取消</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={(e) => {
+                                e.preventDefault()
+                                handleDelete()
+                            }}
+                            disabled={deleteLoading}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                            {deleteLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            删除
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </>
     )
 }
