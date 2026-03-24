@@ -24,26 +24,28 @@ export function SiteHeader() {
                     </span>
                 </Link>
                 <nav className="flex shrink-0 min-w-0 items-center justify-end gap-0.5 sm:gap-2 overflow-x-auto [-webkit-overflow-scrolling:touch]" aria-label="主导航">
-                    <Button variant="ghost" size="sm" className="size-9 min-w-9 shrink-0 p-0 sm:size-auto sm:px-3 touch-manipulation" asChild>
+                    <Button variant="ghost" size="sm" className="h-9 shrink-0 px-2 sm:px-3 touch-manipulation" asChild>
                         <Link
                             href="/orders/lookup"
                             title="订单查询"
                             aria-label="订单查询"
-                            className="gap-1.5 sm:gap-2"
+                            className="gap-1.5"
                         >
-                            <Search className="size-4 shrink-0" aria-hidden />
+                            <Search className="hidden sm:block size-4 shrink-0" aria-hidden />
+                            <span className="text-xs sm:hidden">查单</span>
                             <span className="hidden sm:inline">订单查询</span>
                         </Link>
                     </Button>
                     <MyOrderHistory />
-                    <Button variant="ghost" size="sm" className="size-9 min-w-9 shrink-0 p-0 sm:size-auto sm:px-3 touch-manipulation" asChild>
+                    <Button variant="ghost" size="sm" className="h-9 shrink-0 px-2 sm:px-3 touch-manipulation" asChild>
                         <Link
                             href="/distributor"
                             title="分销中心"
                             aria-label="分销中心"
-                            className="gap-1.5 sm:gap-2"
+                            className="gap-1.5"
                         >
-                            <LayoutDashboard className="size-4 shrink-0" aria-hidden />
+                            <LayoutDashboard className="hidden sm:block size-4 shrink-0" aria-hidden />
+                            <span className="text-xs sm:hidden">分销</span>
                             <span className="hidden sm:inline">分销中心</span>
                         </Link>
                     </Button>

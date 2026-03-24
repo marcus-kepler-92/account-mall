@@ -20,17 +20,18 @@ export function MyOrderHistory() {
         <Button
             variant="ghost"
             size="sm"
-            className="size-9 shrink-0 gap-1.5 p-0 sm:size-auto sm:px-3 sm:gap-2"
+            className="h-9 shrink-0 px-2 sm:px-3 touch-manipulation"
             asChild
         >
             <Link
                 href="/orders/my"
                 title={`我的订单 (${count})`}
                 aria-label={`我的订单，共 ${count} 笔`}
-                className="gap-1.5 sm:gap-2"
+                className="gap-1.5"
             >
-                <Package className="size-4 shrink-0" aria-hidden />
-                <span className="hidden text-muted-foreground sm:inline">我的订单 ({count})</span>
+                <Package className="hidden sm:block size-4 shrink-0" aria-hidden />
+                <span className="text-xs sm:hidden">订单({count})</span>
+                <span className="hidden sm:inline text-muted-foreground">我的订单 ({count})</span>
             </Link>
         </Button>
     )

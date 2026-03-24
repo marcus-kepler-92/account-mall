@@ -141,7 +141,7 @@ function AutoFetchCardRow({
                         <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">账号</span>
                     </div>
                     <div className="flex items-center gap-2 min-w-0 flex-1 justify-end">
-                        <code className="truncate font-mono text-sm text-foreground" title={card.account}>{card.account}</code>
+                        <code className="min-w-0 truncate font-mono text-sm text-foreground" title={card.account}>{card.account}</code>
                         <Button variant="ghost" size="icon" className="size-8 shrink-0 rounded-full hover:bg-background cursor-pointer"
                             onClick={() => onCopy(card.account, `${prefix}-account`)} aria-label="复制账号">
                             {copiedId === `${prefix}-account` ? <Check className="size-4 text-emerald-600" /> : <Copy className="size-4" />}
@@ -154,7 +154,7 @@ function AutoFetchCardRow({
                         <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">密码</span>
                     </div>
                     <div className="flex items-center gap-2 min-w-0 flex-1 justify-end">
-                        <code className="truncate font-mono text-sm text-foreground" title={card.password}>{card.password}</code>
+                        <code className="min-w-0 truncate font-mono text-sm text-foreground" title={card.password}>{card.password}</code>
                         <Button variant="ghost" size="icon" className="size-8 shrink-0 rounded-full hover:bg-background cursor-pointer"
                             onClick={() => onCopy(card.password, `${prefix}-password`)} aria-label="复制密码">
                             {copiedId === `${prefix}-password` ? <Check className="size-4 text-emerald-600" /> : <Copy className="size-4" />}
@@ -782,7 +782,7 @@ function OrderLookupPageContent() {
                                                 <Button
                                                     key={order.orderNo}
                                                     variant="outline"
-                                                    className={`h-auto flex-col items-start gap-1.5 p-3 text-left ${isSelected ? "border-primary" : ""}`}
+                                                    className={`h-auto w-full min-w-0 flex-col items-start gap-1.5 p-3 text-left ${isSelected ? "border-primary" : ""}`}
                                                     onClick={() => handleOrderClick(order.orderNo)}
                                                     disabled={isLoadingThis}
                                                 >
@@ -828,7 +828,7 @@ function OrderLookupPageContent() {
 
             {/* 订单详情 Sheet — 两种查询方式共用同一个组件 */}
             <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-                <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+                <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto overflow-x-hidden">
                     {sheetLoading ? (
                         <>
                             <SheetHeader>

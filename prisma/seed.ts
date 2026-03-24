@@ -70,6 +70,58 @@ async function seed() {
     process.exit(1);
   }
 
+  // Seed dev distributor account
+  const devDistEmail = "distributor@example.com";
+  const devDistPassword = "distributor123";
+  console.log(`  Creating distributor account: ${devDistEmail}`);
+
+  try {
+    const existingDist = await prisma.user.findUnique({
+      where: { email: devDistEmail },
+    });
+
+    if (existingDist) {
+      console.log("  ✅ Distributor account already exists, skipping.");
+    } else {
+      const now = new Date();
+      const hashedPassword = await hashPassword(devDistPassword);
+
+      const distUser = await prisma.user.create({
+        data: {
+          email: devDistEmail,
+          name: "测试分销员",
+          emailVerified: true,
+          role: "DISTRIBUTOR",
+          distributorCode: "DDEV0001",
+          createdAt: now,
+          updatedAt: now,
+        },
+      });
+
+      await prisma.account.create({
+        data: {
+          userId: distUser.id,
+          accountId: distUser.id,
+          providerId: "credential",
+          password: hashedPassword,
+          createdAt: now,
+          updatedAt: now,
+        },
+      });
+
+      console.log("  ✅ Distributor account created successfully!");
+      console.log("");
+      console.log("  ╔══════════════════════════════════════╗");
+      console.log(`  ║  Email:    ${devDistEmail.padEnd(26)}║`);
+      console.log(`  ║  Password: ${devDistPassword.padEnd(26)}║`);
+      console.log("  ╚══════════════════════════════════════╝");
+      console.log("");
+    }
+  } catch (error) {
+    console.error("  ❌ Failed to create distributor account:", error);
+    process.exit(1);
+  }
+
   // 阶梯佣金预设：L1–L5 固定档位（若无任何档位则写入）
   const tierCount = await prisma.commissionTier.count();
   if (tierCount === 0) {

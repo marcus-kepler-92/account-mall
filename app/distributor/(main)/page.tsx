@@ -106,23 +106,25 @@ export default async function DistributorDashboardPage() {
     level1Settled + level2Settled - paidTotal - pendingTotal;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4 md:space-y-6">
       <div>
         <h1 className="text-xl font-bold tracking-tight sm:text-2xl">仪表盘</h1>
         <p className="text-muted-foreground">推广链接与数据概览</p>
       </div>
 
-      <DashboardKpiSection
-        orderCount={orderCount}
-        level1CommissionTotal={level1Total}
-        level2CommissionTotal={level2Total}
-        withdrawableBalance={withdrawableBalance}
-        pendingWithdrawalTotal={pendingTotal}
-        distributorCode={distributorCode}
-        inviteeCount={inviteeCount}
-        discountCodeEnabled={selfUser?.discountCodeEnabled ?? false}
-        discountPercent={selfUser?.discountPercent != null ? Number(selfUser.discountPercent) : null}
-      />
+      {/* 整站推广链接 — primary CTA */}
+      <Card>
+        <CardContent className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:gap-4">
+          <div className="flex items-center gap-2 shrink-0">
+            <Link2 className="size-4 text-primary" />
+            <span className="text-sm font-semibold">推广链接</span>
+          </div>
+          <code className="flex-1 min-w-0 rounded bg-muted px-3 py-2 text-xs break-all sm:text-sm">
+            {promoUrl}
+          </code>
+          <CopyButtonClient text={promoUrl} successMessage="推广链接已复制到剪贴板" />
+        </CardContent>
+      </Card>
 
       {/* 当周业绩与阶梯 */}
       <Card>
@@ -169,26 +171,17 @@ export default async function DistributorDashboardPage() {
         </CardContent>
       </Card>
 
-      {/* 整站推广链接 */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Link2 className="size-5" />
-            整站推广链接
-          </CardTitle>
-          <CardDescription>
-            复制即用，链接已含您的推广优惠码，访客通过此链接下单将归属您的佣金。使用您本人账号邮箱下单的订单不记佣金。
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <code className="flex-1 min-w-0 rounded bg-muted px-3 py-2 text-sm break-all">
-              {promoUrl}
-            </code>
-            <CopyButtonClient text={promoUrl} successMessage="推广链接已复制到剪贴板" />
-          </div>
-        </CardContent>
-      </Card>
+      <DashboardKpiSection
+        orderCount={orderCount}
+        level1CommissionTotal={level1Total}
+        level2CommissionTotal={level2Total}
+        withdrawableBalance={withdrawableBalance}
+        pendingWithdrawalTotal={pendingTotal}
+        distributorCode={distributorCode}
+        inviteeCount={inviteeCount}
+        discountCodeEnabled={selfUser?.discountCodeEnabled ?? false}
+        discountPercent={selfUser?.discountPercent != null ? Number(selfUser.discountPercent) : null}
+      />
 
     </div>
   );

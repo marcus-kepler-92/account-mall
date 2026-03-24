@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/sidebar"
 import { useSiteName } from "@/app/components/site-name-provider"
 
-const navItems = [
+export const navItems = [
     { title: "仪表盘", href: "/distributor", icon: LayoutDashboard },
     { title: "入门手册", href: "/distributor/guide", icon: BookOpen },
     { title: "我的团队", href: "/distributor/invitees", icon: Users },
