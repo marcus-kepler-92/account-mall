@@ -10,6 +10,13 @@ function getWeekStart(date: Date): Date {
     return d
 }
 
+/** Adjust raw tier rate for upline deduction. If distributor has an inviter,
+ *  the inviter takes level2Rate% of the commission, so the effective rate is
+ *  rawRate × (1 - level2Rate/100). */
+export function adjustRate(rawRate: number, level2Rate: number, hasInviter: boolean): number {
+    return hasInviter ? Math.round(rawRate * (1 - level2Rate / 100) * 100) / 100 : rawRate
+}
+
 export type TierSummaryItem = {
     minAmount: number
     maxAmount: number
@@ -23,17 +30,19 @@ export type DistributorTierSummary = {
     tiersList: TierSummaryItem[]
     nextTier: TierSummaryItem | null
     encouragementMessage: string
+    hasInviter: boolean
 }
 
 export async function getDistributorTierSummary(
-    distributorId: string
+    distributorId: string,
+    level2Rate: number,
 ): Promise<DistributorTierSummary> {
     const now = new Date()
     const weekStart = getWeekStart(now)
     const weekEnd = new Date(weekStart)
     weekEnd.setUTCDate(weekEnd.getUTCDate() + 7)
 
-    const [weekOrders, tiers] = await Promise.all([
+    const [weekOrders, tiers, selfUser] = await Promise.all([
         prisma.order.findMany({
             where: {
                 distributorId,
@@ -45,8 +54,13 @@ export async function getDistributorTierSummary(
         prisma.commissionTier.findMany({
             orderBy: { sortOrder: "asc" },
         }),
+        prisma.user.findUnique({
+            where: { id: distributorId },
+            select: { inviterId: true },
+        }),
     ])
 
+    const hasInviter = !!selfUser?.inviterId
     const weeklySalesTotal = weekOrders.reduce((sum, o) => sum + Number(o.amount), 0)
     const tiersList: TierSummaryItem[] = tiers.map((t) => ({
         minAmount: Number(t.minAmount),
@@ -94,16 +108,18 @@ export async function getDistributorTierSummary(
     if (currentTier) {
         if (nextTier) {
             const gap = nextTier.minAmount - weeklySalesTotal
-            encouragementMessage = `再完成 ¥${gap.toFixed(2)} 即可晋级下一档（佣金比例 ${nextTier.ratePercent}%）`
+            const displayRate = adjustRate(nextTier.ratePercent, level2Rate, hasInviter)
+            encouragementMessage = `再完成 ¥${gap.toFixed(2)} 即可晋级下一档（奖金比例 ${displayRate}%）`
         } else {
             encouragementMessage = "您已处于最高档，继续保持！"
         }
     } else {
         if (nextTier) {
             const gap = nextTier.minAmount - weeklySalesTotal
-            encouragementMessage = `再完成 ¥${gap.toFixed(2)} 即可达到第一档（佣金比例 ${nextTier.ratePercent}%）`
+            const displayRate = adjustRate(nextTier.ratePercent, level2Rate, hasInviter)
+            encouragementMessage = `再完成 ¥${gap.toFixed(2)} 即可达到第一档（奖金比例 ${displayRate}%）`
         } else {
-            encouragementMessage = "暂无阶梯档位，完成订单即可获得基础佣金。"
+            encouragementMessage = "暂无阶梯档位，完成订单即可获得基础奖金。"
         }
     }
 
@@ -113,5 +129,6 @@ export async function getDistributorTierSummary(
         tiersList,
         nextTier,
         encouragementMessage,
+        hasInviter,
     }
 }

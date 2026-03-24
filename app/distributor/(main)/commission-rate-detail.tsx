@@ -13,7 +13,7 @@ interface CommissionRateDetailProps {
 export function CommissionRateDetail({ myRate, tierRate, level2Rate, hasInviter }: CommissionRateDetailProps) {
     return (
         <div className="rounded-lg border bg-muted/30 px-4 py-3">
-            <p className="text-xs text-muted-foreground mb-1">您的实际佣金比例</p>
+            <p className="text-xs text-muted-foreground mb-1">您的实际奖金比例</p>
             <div className="flex items-baseline gap-2">
                 <p className="text-3xl font-bold tabular-nums">{myRate}%</p>
                 {hasInviter && (
@@ -25,7 +25,7 @@ export function CommissionRateDetail({ myRate, tierRate, level2Rate, hasInviter 
                             </button>
                         </PopoverTrigger>
                         <PopoverContent side="bottom" align="start" className="text-sm w-auto">
-                            <p>当前档位佣金 {tierRate}% − 推荐人奖励 {level2Rate}% = 您实得 {myRate}%</p>
+                            <p>档位比例 {tierRate}%，其中 {level2Rate}% 作为推荐人分润，您到手 {myRate}%</p>
                         </PopoverContent>
                     </Popover>
                 )}

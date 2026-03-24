@@ -14,7 +14,7 @@ import {
 const routeLabels: Record<string, string> = {
     guide: "入门手册",
     orders: "我的订单",
-    commissions: "我的佣金",
+    commissions: "我的奖金",
     withdrawals: "提现记录",
     invitees: "我的团队",
 }

@@ -36,7 +36,7 @@ export const navItems = [
     { title: "入门手册", href: "/distributor/guide", icon: BookOpen },
     { title: "我的团队", href: "/distributor/invitees", icon: Users },
     { title: "我的订单", href: "/distributor/orders", icon: ShoppingCart },
-    { title: "我的佣金", href: "/distributor/commissions", icon: Coins },
+    { title: "我的奖金", href: "/distributor/commissions", icon: Coins },
     { title: "提现记录", href: "/distributor/withdrawals", icon: Wallet },
 ]
 

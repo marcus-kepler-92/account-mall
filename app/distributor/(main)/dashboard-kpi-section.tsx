@@ -85,7 +85,7 @@ export function DashboardKpiSection({
       <Card>
         <CardHeader className="pb-2">
           <Coins className="size-4 text-muted-foreground" />
-          <CardTitle className="text-sm font-medium">累计推广佣金</CardTitle>
+          <CardTitle className="text-sm font-medium">累计推广奖金</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-xl sm:text-2xl font-bold">
@@ -109,7 +109,7 @@ export function DashboardKpiSection({
       <Card>
         <CardHeader className="pb-2">
           <Users className="size-4 text-muted-foreground" />
-          <CardTitle className="text-sm font-medium">累计团队佣金</CardTitle>
+          <CardTitle className="text-sm font-medium">累计团队奖金</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-xl sm:text-2xl font-bold">

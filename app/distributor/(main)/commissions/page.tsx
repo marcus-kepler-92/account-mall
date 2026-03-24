@@ -3,7 +3,7 @@ import { getDistributorSession } from "@/lib/auth-guard"
 import { prisma } from "@/lib/prisma"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { CommissionRateDetail } from "../commission-rate-detail"
-import { getDistributorTierSummary } from "@/lib/distributor-tier-summary"
+import { getDistributorTierSummary, adjustRate } from "@/lib/distributor-tier-summary"
 import {
     parseDistributorCommissionFilters,
     type DistributorCommissionFiltersInput,
@@ -41,6 +41,8 @@ export default async function DistributorCommissionsPage({
         where.order = { orderNo: { contains: filters.search.trim() } }
     }
 
+    const level2Rate = config.level2CommissionRatePercent
+
     const [
         commissions,
         total,
@@ -51,7 +53,6 @@ export default async function DistributorCommissionsPage({
         pendingSum,
         tierSummary,
         inviteeCount,
-        selfUser,
     ] = await Promise.all([
         prisma.commission.findMany({
             where,
@@ -84,16 +85,11 @@ export default async function DistributorCommissionsPage({
             where: { distributorId: user.id, status: "PENDING" },
             _sum: { amount: true },
         }),
-        getDistributorTierSummary(user.id),
+        getDistributorTierSummary(user.id, level2Rate),
         prisma.user.count({ where: { inviterId: user.id } }),
-        prisma.user.findUnique({
-            where: { id: user.id },
-            select: { inviterId: true },
-        }),
     ])
 
-    const hasInviter = !!selfUser?.inviterId
-    const level2Rate = config.level2CommissionRatePercent
+    const hasInviter = tierSummary.hasInviter
     const level1SettledTotal = Number(level1Settled._sum.amount ?? 0)
     const level2SettledTotal = Number(level2Settled._sum.amount ?? 0)
     const paidTotal = Number(paidSum._sum.amount ?? 0)
@@ -139,10 +135,10 @@ export default async function DistributorCommissionsPage({
     return (
         <div className="space-y-6">
             <div>
-                <h2 className="text-2xl font-bold tracking-tight">我的佣金</h2>
-                <p className="text-muted-foreground">佣金明细与可提现余额</p>
+                <h2 className="text-2xl font-bold tracking-tight">我的奖金</h2>
+                <p className="text-muted-foreground">奖金明细与可提现余额</p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                    使用您本人账号邮箱下单的订单不记佣金。
+                    使用您本人账号邮箱下单的订单不记奖金。
                 </p>
             </div>
 
@@ -152,20 +148,18 @@ export default async function DistributorCommissionsPage({
                     <CardDescription>
                         当周累计销售额 ¥{tierSummary.weeklySalesTotal.toFixed(2)}
                         {tierSummary.currentTier
-                            ? ` · 当前第 ${tierSummary.currentTier.sortOrder + 1} 档，佣金比例 ${tierSummary.currentTier.ratePercent}%`
+                            ? ` · 当前第 ${tierSummary.currentTier.sortOrder + 1} 档，奖金比例 ${adjustRate(tierSummary.currentTier.ratePercent, level2Rate, hasInviter)}%`
                             : " · 暂无档位"}
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
                     <p className="text-muted-foreground text-sm">{tierSummary.encouragementMessage}</p>
-                    {tierSummary.currentTier && (() => {
-                        const rate = tierSummary.currentTier!.ratePercent
-                        const myRate = hasInviter
-                            ? Math.round(rate * (1 - level2Rate / 100) * 100) / 100
-                            : rate
+                    {(tierSummary.currentTier ?? tierSummary.nextTier) && (() => {
+                        const displayTier = tierSummary.currentTier ?? tierSummary.nextTier!
+                        const rate = displayTier.ratePercent
                         return (
                             <CommissionRateDetail
-                                myRate={myRate}
+                                myRate={adjustRate(rate, level2Rate, hasInviter)}
                                 tierRate={rate}
                                 level2Rate={level2Rate}
                                 hasInviter={hasInviter}
@@ -187,9 +181,9 @@ export default async function DistributorCommissionsPage({
             />
 
             <div>
-                <h3 className="text-lg font-semibold">佣金明细</h3>
+                <h3 className="text-lg font-semibold">奖金明细</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                    共 {total} 笔。使用本人账号邮箱下单的订单不记佣金。
+                    共 {total} 笔。使用本人账号邮箱下单的订单不记奖金。
                 </p>
                 <DistributorCommissionsDataTable
                     data={rows}

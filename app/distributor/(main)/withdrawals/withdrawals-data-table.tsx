@@ -67,7 +67,7 @@ export function DistributorWithdrawalsDataTable({
             <DataTable
                 table={table}
                 columns={distributorWithdrawalsColumns}
-                emptyMessage="暂无提现记录，在「我的佣金」页可提现余额处填写金额并上传收款码，提交后记录将在此展示。"
+                emptyMessage="暂无提现记录，在「我的奖金」页可提现余额处填写金额并上传收款码，提交后记录将在此展示。"
             />
 
             <DataTablePagination table={table} total={total} />

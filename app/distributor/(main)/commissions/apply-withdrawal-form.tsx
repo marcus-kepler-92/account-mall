@@ -115,7 +115,7 @@ export function ApplyWithdrawalForm({
                 <p className="mt-1 text-sm text-muted-foreground">
                     {pendingWithdrawalTotal > 0
                         ? `您有 ¥${pendingWithdrawalTotal.toFixed(2)} 正在提现处理中，到账后可继续申请。`
-                        : "订单佣金结算后将可申请提现"}
+                        : "订单奖金结算后将可申请提现"}
                 </p>
                 <Button
                     variant="outline"

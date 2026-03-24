@@ -12,7 +12,7 @@ import { CommissionRateDetail } from "./commission-rate-detail";
 import { config } from "@/lib/config";
 import { prisma } from "@/lib/prisma";
 import { CopyButtonClient } from "@/app/components/copy-promo-button";
-import { getDistributorTierSummary } from "@/lib/distributor-tier-summary";
+import { getDistributorTierSummary, adjustRate } from "@/lib/distributor-tier-summary";
 import { DashboardKpiSection } from "./dashboard-kpi-section";
 
 export const dynamic = "force-dynamic";
@@ -41,6 +41,8 @@ export default async function DistributorDashboardPage() {
   }
 
   const promoUrl = `${config.siteUrl}/?promoCode=${encodeURIComponent(distributorCode)}`;
+
+  const level2Rate = config.level2CommissionRatePercent;
 
   const [
     orderCount,
@@ -71,16 +73,15 @@ export default async function DistributorDashboardPage() {
       where: { distributorId: user.id, status: "PENDING" },
       _sum: { amount: true },
     }),
-    getDistributorTierSummary(user.id),
+    getDistributorTierSummary(user.id, level2Rate),
     prisma.user.count({ where: { inviterId: user.id } }),
     prisma.user.findUnique({
       where: { id: user.id },
-      select: { inviterId: true, discountCodeEnabled: true, discountPercent: true },
+      select: { discountCodeEnabled: true, discountPercent: true },
     }),
   ]);
 
-  const hasInviter = !!selfUser?.inviterId;
-  const level2Rate = config.level2CommissionRatePercent;
+  const hasInviter = tierSummary.hasInviter;
 
   const level1Total = Number(level1Sum._sum.amount ?? 0);
   const level2Total = Number(level2Sum._sum.amount ?? 0);
@@ -134,7 +135,7 @@ export default async function DistributorDashboardPage() {
             当周业绩与阶梯
           </CardTitle>
           <CardDescription>
-            按自然周累计销售额确定当前档位，阶梯佣金 = 订单金额 × 该档佣金比例%
+            按自然周累计销售额确定当前档位，阶梯奖金 = 订单金额 × 该档奖金比例%
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -144,20 +145,20 @@ export default async function DistributorDashboardPage() {
               ¥{tierSummary.weeklySalesTotal.toFixed(2)}
             </p>
           </div>
-          {tierSummary.currentTier && (() => {
-            const rate = tierSummary.currentTier!.ratePercent;
-            const myRate = hasInviter
-              ? Math.round(rate * (1 - level2Rate / 100) * 100) / 100
-              : rate;
+          {(tierSummary.currentTier ?? tierSummary.nextTier) && (() => {
+            const displayTier = tierSummary.currentTier ?? tierSummary.nextTier!;
+            const rate = displayTier.ratePercent;
             return (
               <div className="space-y-3">
-                <div>
-                  <p className="text-xs text-muted-foreground">
-                    第 {tierSummary.currentTier!.sortOrder + 1} 档 · 区间 ¥{tierSummary.currentTier!.minAmount.toFixed(2)} – ¥{tierSummary.currentTier!.maxAmount.toFixed(2)}
-                  </p>
-                </div>
+                {tierSummary.currentTier && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">
+                      第 {tierSummary.currentTier.sortOrder + 1} 档 · 区间 ¥{tierSummary.currentTier.minAmount.toFixed(2)} – ¥{tierSummary.currentTier.maxAmount.toFixed(2)}
+                    </p>
+                  </div>
+                )}
                 <CommissionRateDetail
-                  myRate={myRate}
+                  myRate={adjustRate(rate, level2Rate, hasInviter)}
                   tierRate={rate}
                   level2Rate={level2Rate}
                   hasInviter={hasInviter}

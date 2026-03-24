@@ -66,7 +66,7 @@ export const distributorCommissionsColumns: ColumnDef<DistributorCommissionRow>[
     {
         accessorKey: "amount",
         header: ({ column }) => (
-            <DataTableColumnHeader column={column} title="佣金金额" />
+            <DataTableColumnHeader column={column} title="奖金金额" />
         ),
         cell: ({ row }) => (
             <span className="text-right font-medium">

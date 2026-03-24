@@ -38,7 +38,7 @@ export function CommissionsBalanceSection({
           <div className="flex flex-col gap-2">
             <CardTitle>可提现余额</CardTitle>
             <CardDescription>
-              （推广佣金 ¥{level1Settled.toFixed(2)} + 团队佣金 ¥{level2Settled.toFixed(2)}）− 已打款 ¥{paidTotal.toFixed(2)} − 提现中 ¥{pendingTotal.toFixed(2)} = 可提现余额{feePercent > 0 ? `；提现时扣除 ${feePercent}% 服务费` : ""}
+              （推广奖金 ¥{level1Settled.toFixed(2)} + 团队奖金 ¥{level2Settled.toFixed(2)}）− 已打款 ¥{paidTotal.toFixed(2)} − 提现中 ¥{pendingTotal.toFixed(2)} = 可提现余额{feePercent > 0 ? `；提现时扣除 ${feePercent}% 服务费` : ""}
             </CardDescription>
           </div>
           <Button variant="outline" size="sm" className="min-h-9 touch-manipulation" asChild>
@@ -61,11 +61,11 @@ export function CommissionsBalanceSection({
         </CardContent>
       </Card>
 
-      {/* 二级佣金汇总卡片 */}
+      {/* 二级奖金汇总卡片 */}
       {(level2Settled > 0 || inviteeCount > 0) && (
         <Card>
           <CardHeader>
-            <CardTitle>团队佣金收益（团队成员销售分润）</CardTitle>
+            <CardTitle>团队奖金收益（团队成员销售分润）</CardTitle>
             <CardDescription>
               团队成员每笔成交，您自动获得销售分润
             </CardDescription>
@@ -73,7 +73,7 @@ export function CommissionsBalanceSection({
           <CardContent className="space-y-3">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-sm text-muted-foreground">累计团队佣金</p>
+                <p className="text-sm text-muted-foreground">累计团队奖金</p>
                 <p className="text-2xl font-bold">¥{level2Settled.toFixed(2)}</p>
               </div>
               <div>

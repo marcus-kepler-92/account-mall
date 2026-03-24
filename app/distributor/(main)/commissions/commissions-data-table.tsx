@@ -67,7 +67,7 @@ export function DistributorCommissionsDataTable({
             <DataTable
                 table={table}
                 columns={distributorCommissionsColumns}
-                emptyMessage="暂无佣金记录，订单完成后将在此展示。"
+                emptyMessage="暂无奖金记录，订单完成后将在此展示。"
             />
 
             <DataTablePagination table={table} total={total} />

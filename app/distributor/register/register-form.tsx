@@ -85,7 +85,7 @@ export function RegisterForm() {
                 <CardDescription>
                     {inviteCode
                         ? "您正在通过邀请链接注册，注册成功后将绑定邀请人。"
-                        : "注册成为分销员，获取推广链接与佣金"}
+                        : "注册成为分销员，获取推广链接与奖金"}
                 </CardDescription>
             </CardHeader>
             <CardContent>
