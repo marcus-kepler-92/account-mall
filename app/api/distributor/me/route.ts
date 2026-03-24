@@ -62,5 +62,7 @@ export async function GET() {
     tiersList: tierSummary.tiersList,
     nextTier: tierSummary.nextTier,
     encouragementMessage: tierSummary.encouragementMessage,
+    hasInviter: tierSummary.hasInviter,
+    level2Rate,
   });
 }

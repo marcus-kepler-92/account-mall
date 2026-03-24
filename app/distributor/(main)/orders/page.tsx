@@ -5,6 +5,7 @@ import {
     parseDistributorOrderFilters,
     type DistributorOrderFiltersInput,
 } from "./orders-filters"
+import { Suspense } from "react"
 import { DistributorOrdersDataTable } from "./orders-data-table"
 import type { DistributorOrderRow } from "./orders-columns"
 
@@ -71,11 +72,13 @@ export default async function DistributorOrdersPage({
                 <p className="text-muted-foreground">归属您的全部订单明细</p>
             </div>
 
-            <DistributorOrdersDataTable
-                data={rows}
-                total={total}
-                statusCounts={orderStats}
-            />
+            <Suspense fallback={null}>
+                <DistributorOrdersDataTable
+                    data={rows}
+                    total={total}
+                    statusCounts={orderStats}
+                />
+            </Suspense>
         </div>
     )
 }

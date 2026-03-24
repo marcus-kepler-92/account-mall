@@ -7,6 +7,7 @@ import {
     parseDistributorWithdrawalFilters,
     type DistributorWithdrawalFiltersInput,
 } from "./withdrawals-filters"
+import { Suspense } from "react"
 import { DistributorWithdrawalsDataTable } from "./withdrawals-data-table"
 import type { DistributorWithdrawalRow } from "./withdrawals-columns"
 
@@ -78,11 +79,13 @@ export default async function DistributorWithdrawalsPage({
                 <p className="text-sm text-muted-foreground mb-4">
                     共 {total} 条，打款由管理员线下处理
                 </p>
-                <DistributorWithdrawalsDataTable
-                    data={rows}
-                    total={total}
-                    statusCounts={withdrawalStats}
-                />
+                <Suspense fallback={null}>
+                    <DistributorWithdrawalsDataTable
+                        data={rows}
+                        total={total}
+                        statusCounts={withdrawalStats}
+                    />
+                </Suspense>
             </div>
         </div>
     )

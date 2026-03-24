@@ -47,14 +47,6 @@ export function ThemeToggle() {
 
   const isDark = resolvedTheme === "dark"
 
-  if (!mounted) {
-    return (
-      <Button variant="ghost" size="icon" className="size-9" aria-label="切换主题">
-        <Sun className="size-4" />
-      </Button>
-    )
-  }
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -64,7 +56,7 @@ export function ThemeToggle() {
           className="size-9"
           aria-label="切换主题"
         >
-          {isDark ? <Moon className="size-4" /> : <Sun className="size-4" />}
+          {mounted && isDark ? <Moon className="size-4" /> : <Sun className="size-4" />}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">

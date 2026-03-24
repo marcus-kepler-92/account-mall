@@ -8,6 +8,7 @@ import {
     parseDistributorCommissionFilters,
     type DistributorCommissionFiltersInput,
 } from "./commissions-filters"
+import { Suspense } from "react"
 import { DistributorCommissionsDataTable } from "./commissions-data-table"
 import type { DistributorCommissionRow } from "./commissions-columns"
 import { CommissionsBalanceSection } from "./commissions-balance-section"
@@ -185,11 +186,13 @@ export default async function DistributorCommissionsPage({
                 <p className="text-sm text-muted-foreground mb-4">
                     共 {total} 笔。使用本人账号邮箱下单的订单不记奖金。
                 </p>
-                <DistributorCommissionsDataTable
-                    data={rows}
-                    total={total}
-                    statusCounts={commissionStats}
-                />
+                <Suspense fallback={null}>
+                    <DistributorCommissionsDataTable
+                        data={rows}
+                        total={total}
+                        statusCounts={commissionStats}
+                    />
+                </Suspense>
             </div>
         </div>
     )

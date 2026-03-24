@@ -4,7 +4,7 @@ import { getDistributorSession } from "@/lib/auth-guard"
 import { DistributorSidebar } from "@/app/components/distributor-sidebar"
 import { DistributorBreadcrumb } from "@/app/components/distributor-breadcrumb"
 import { DistributorTopbarActions } from "@/app/components/distributor-topbar-actions"
-import { DistributorMobileNavWrapper } from "./distributor-mobile-nav-wrapper"
+import { DistributorMobileNav } from "./distributor-mobile-nav"
 
 export default async function DistributorMainLayout({
     children,
@@ -18,7 +18,7 @@ export default async function DistributorMainLayout({
 
     return (
         <SidebarProvider>
-            <DistributorMobileNavWrapper />
+            <DistributorMobileNav />
             <DistributorSidebar />
             <SidebarInset className="pl-14 md:pl-0">
                 <header className="sticky top-0 z-50 flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4">

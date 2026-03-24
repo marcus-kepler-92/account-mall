@@ -1,16 +1,17 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import {
     useReactTable,
     getCoreRowModel,
     type VisibilityState,
 } from "@tanstack/react-table"
+import { Badge } from "@/components/ui/badge"
 import {
     DataTable,
     DataTableToolbar,
     DataTablePagination,
-    DataTableFacetedFilter,
 } from "@/app/admin/components"
 import { distributorWithdrawalsColumns, type DistributorWithdrawalRow } from "./withdrawals-columns"
 
@@ -25,6 +26,7 @@ interface DistributorWithdrawalsDataTableProps {
 }
 
 const statusOptions = [
+    { label: "全部", value: "" },
     { label: "待处理", value: "PENDING" },
     { label: "已打款", value: "PAID" },
     { label: "已拒绝", value: "REJECTED" },
@@ -35,6 +37,8 @@ export function DistributorWithdrawalsDataTable({
     total,
     statusCounts,
 }: DistributorWithdrawalsDataTableProps) {
+    const router = useRouter()
+    const searchParams = useSearchParams()
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
 
     const table = useReactTable({
@@ -48,20 +52,35 @@ export function DistributorWithdrawalsDataTable({
         manualFiltering: true,
     })
 
-    const statusOptionsWithCounts = statusOptions.map((opt) => ({
-        ...opt,
-        count: statusCounts[opt.value as keyof typeof statusCounts],
-    }))
+    const currentStatus = searchParams.get("status") ?? ""
+
+    const handleStatusFilter = (value: string) => {
+        const params = new URLSearchParams(searchParams.toString())
+        if (value) {
+            params.set("status", value)
+        } else {
+            params.delete("status")
+        }
+        params.set("page", "1")
+        router.push(`?${params.toString()}`)
+    }
 
     return (
         <div className="space-y-4">
-            <DataTableToolbar table={table}>
-                <DataTableFacetedFilter
-                    column={table.getColumn("status")}
-                    title="状态"
-                    options={statusOptionsWithCounts}
-                    paramKey="status"
-                />
+            <DataTableToolbar table={table} searchParamKey="search">
+                <div className="flex items-center gap-1 flex-wrap">
+                    {statusOptions.map((opt) => (
+                        <Badge
+                            key={opt.value}
+                            variant={currentStatus === opt.value ? "default" : "outline"}
+                            className="cursor-pointer"
+                            onClick={() => handleStatusFilter(opt.value)}
+                        >
+                            {opt.label}
+                            {opt.value && ` (${statusCounts[opt.value as keyof typeof statusCounts]})`}
+                        </Badge>
+                    ))}
+                </div>
             </DataTableToolbar>
 
             <DataTable

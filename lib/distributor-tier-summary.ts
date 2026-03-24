@@ -83,6 +83,11 @@ export async function getDistributorTierSummary(
             break
         }
     }
+    // Mirror the fallback in complete-pending-order.ts: when weekly sales don't
+    // match any tier bracket, the effective rate is still tiers[0].
+    if (currentTier === null && tiersList.length > 0) {
+        currentTier = tiersList[0]
+    }
 
     let nextTier: TierSummaryItem | null = null
     if (currentTier) {
