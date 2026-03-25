@@ -1,51 +1,62 @@
-"use client"
+"use client";
 
-import { useTheme } from "next-themes"
-import { useEffect, useEffectEvent, useState } from "react"
-import { Monitor, Moon, Sun, Sunrise } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { useTheme } from "next-themes";
+import { useEffect, useEffectEvent, useState, useSyncExternalStore } from "react";
+import { Monitor, Moon, Sun, Sunrise } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { getSunriseSunsetTheme } from "@/lib/sunrise-sunset"
+} from "@/components/ui/dropdown-menu";
+import { getSunriseSunsetTheme } from "@/lib/sunrise-sunset";
 
-type ThemeMode = "system" | "sunrise-sunset"
+type ThemeMode = "system" | "sunrise-sunset";
 
-const STORAGE_KEY = "theme-mode"
+const STORAGE_KEY = "theme-mode";
+
+function subscribeToStorage(cb: () => void) {
+  window.addEventListener("storage", cb);
+  return () => window.removeEventListener("storage", cb);
+}
 
 function getStoredMode(): ThemeMode {
-  if (typeof window === "undefined") return "system"
-  return (localStorage.getItem(STORAGE_KEY) as ThemeMode) || "system"
+  return (localStorage.getItem(STORAGE_KEY) as ThemeMode) || "system";
 }
 
 export function ThemeToggle() {
-  const { setTheme, resolvedTheme } = useTheme()
-  const [mounted, setMounted] = useState(false)
-  const [mode, setMode] = useState<ThemeMode>(getStoredMode)
+  const { setTheme, resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  const mode = useSyncExternalStore(
+    subscribeToStorage,
+    getStoredMode,
+    () => "system" as ThemeMode
+  );
 
   const applyTheme = useEffectEvent((currentMode: ThemeMode) => {
     if (currentMode === "sunrise-sunset") {
-      setTheme(getSunriseSunsetTheme())
+      setTheme(getSunriseSunsetTheme());
     } else {
-      setTheme("system")
+      setTheme("system");
     }
-  })
+  });
 
   useEffect(() => {
-    applyTheme(mode)
-    queueMicrotask(() => setMounted(true))
-  }, [mode])
+    applyTheme(mode);
+  }, [mode]);
+
+  useEffect(() => {
+    queueMicrotask(() => setMounted(true));
+  }, []);
 
   const handleSelect = (value: string) => {
-    const next = value as ThemeMode
-    setMode(next)
-    localStorage.setItem(STORAGE_KEY, next)
-  }
+    localStorage.setItem(STORAGE_KEY, value);
+    window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }));
+  };
 
-  const isDark = resolvedTheme === "dark"
+  const isDark = resolvedTheme === "dark";
 
   return (
     <DropdownMenu>
@@ -56,7 +67,11 @@ export function ThemeToggle() {
           className="size-9"
           aria-label="切换主题"
         >
-          {mounted && isDark ? <Moon className="size-4" /> : <Sun className="size-4" />}
+          {mounted && isDark ? (
+            <Moon className="size-4" />
+          ) : (
+            <Sun className="size-4" />
+          )}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
@@ -76,5 +91,5 @@ export function ThemeToggle() {
         </DropdownMenuCheckboxItem>
       </DropdownMenuContent>
     </DropdownMenu>
-  )
+  );
 }
