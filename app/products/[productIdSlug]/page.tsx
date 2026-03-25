@@ -4,6 +4,7 @@ import type { Metadata } from "next"
 import { Suspense } from "react"
 import { prisma } from "@/lib/prisma"
 import { config } from "@/lib/config"
+import { Zap, Clock, ShieldCheck } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
@@ -399,11 +400,21 @@ function ProductInfoSection({ name, tags, price, stockCount, isSoldOut, isFree, 
 
 function ProductMetaNoticeSection() {
     return (
-        <section className="rounded-xl border bg-muted/40 p-3 text-xs text-muted-foreground sm:p-3.5">
-            <div className="space-y-1.5">
-                <p>虚拟商品自动发货，购买后可通过邮箱接收卡密信息。</p>
-                <p>下单前请仔细阅读商品说明，确认无误后再提交订单。</p>
-            </div>
+        <section className="rounded-xl border bg-muted/40 p-3 sm:p-3.5">
+            <ul className="space-y-2">
+                <li className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Zap className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                    自动发货，付款后秒到
+                </li>
+                <li className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Clock className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                    7×24 小时自助下单，随时可买
+                </li>
+                <li className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <ShieldCheck className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                    安全支付，信息加密传输
+                </li>
+            </ul>
         </section>
     )
 }

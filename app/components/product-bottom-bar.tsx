@@ -122,7 +122,7 @@ export function ProductBottomBar({
                           : inStock && turnstileLoading
                             ? "准备中…"
                             : inStock
-                              ? (isFree ? "领取" : "立即购买")
+                              ? (isFree ? "免费领取" : "立即购买")
                               : "补货提醒"}
                 </Button>
             </div>

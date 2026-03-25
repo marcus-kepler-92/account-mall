@@ -171,9 +171,9 @@ export function ProductCard({ product, gradientIndex = 0, className, code }: Pro
                                     <span className="text-xs sm:text-sm">补货提醒</span>
                                 </>
                             ) : isFree ? (
-                                <span className="text-xs sm:text-sm">领取</span>
+                                <span className="text-xs sm:text-sm">免费领取</span>
                             ) : (
-                                <span className="text-xs sm:text-sm">购买</span>
+                                <span className="text-xs sm:text-sm">立即购买</span>
                             )}
                         </Button>
                     </div>

@@ -420,7 +420,7 @@ export function ProductOrderForm({
                                   : turnstileLoading
                                     ? "准备中…"
                                     : isFree
-                                      ? "领取一个账号"
+                                      ? "免费领取"
                                       : inStock
                                         ? "立即购买"
                                         : "售罄"}
