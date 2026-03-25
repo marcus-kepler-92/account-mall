@@ -64,9 +64,9 @@ const envSchema = z
       .string()
       .optional()
       .or(z.literal(""))
-      .default("https://id.ali-door.top/share/yedamai")
+      .default("https://id.ali-door.top/share/yedamai,https://ccbaohe.com/appleID/")
       .transform((s) => {
-        if (!s || s === "") return ["https://id.ali-door.top/share/yedamai"]
+        if (!s || s === "") return ["https://id.ali-door.top/share/yedamai", "https://ccbaohe.com/appleID/"]
         return s
           .split(",")
           .map((u) => u.trim())

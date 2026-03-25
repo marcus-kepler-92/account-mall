@@ -19,7 +19,18 @@ export const createProductSchema = z.object({
     maxQuantity: z.number().int().min(1, "Must be at least 1").max(1000).optional(),
     status: z.enum(["ACTIVE", "INACTIVE"]).optional(),
     productType: productTypeEnum.optional(),
-    sourceUrl: z.string().url().optional().nullable().or(z.literal("")),
+    sourceUrl: z
+        .string()
+        .optional()
+        .nullable()
+        .or(z.literal(""))
+        .refine(
+            (val) => {
+                if (!val || val === "") return true
+                return val.split(",").every((u) => { try { new URL(u.trim()); return true } catch { return false } })
+            },
+            { message: "来源 URL 格式不正确" }
+        ),
     validityHours: z.number().int().min(1).max(8760).optional().nullable(),
     allowAccountSwitch: z.boolean().optional(),
     accountSwitchLimit: z.number().int().min(1).max(100).optional(),
@@ -44,7 +55,18 @@ export const updateProductSchema = z.object({
     maxQuantity: z.number().int().min(1).max(1000).optional(),
     status: z.enum(["ACTIVE", "INACTIVE"]).optional(),
     productType: productTypeEnum.optional(),
-    sourceUrl: z.string().url().optional().nullable().or(z.literal("")),
+    sourceUrl: z
+        .string()
+        .optional()
+        .nullable()
+        .or(z.literal(""))
+        .refine(
+            (val) => {
+                if (!val || val === "") return true
+                return val.split(",").every((u) => { try { new URL(u.trim()); return true } catch { return false } })
+            },
+            { message: "来源 URL 格式不正确" }
+        ),
     validityHours: z.number().int().min(1).max(8760).optional().nullable(),
     allowAccountSwitch: z.boolean().optional(),
     accountSwitchLimit: z.number().int().min(1).max(100).optional(),

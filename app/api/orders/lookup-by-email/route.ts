@@ -5,6 +5,8 @@ import { verifyPassword } from "better-auth/crypto"
 import { checkOrderQueryRateLimit } from "@/lib/rate-limit"
 import { invalidJsonBody, validationError, badRequest, internalServerError } from "@/lib/api-response"
 import { parseAutoFetchCardContent } from "@/lib/auto-fetch-card"
+import { createOrderSuccessToken } from "@/lib/order-success-token"
+import { config } from "@/lib/config"
 
 /**
  * POST /api/orders/lookup-by-email
@@ -57,6 +59,8 @@ export async function POST(request: NextRequest) {
                     select: {
                         name: true,
                         productType: true,
+                        allowAccountSwitch: true,
+                        accountSwitchLimit: true,
                     },
                 },
                 cards: {
@@ -66,6 +70,7 @@ export async function POST(request: NextRequest) {
                         status: true,
                     },
                 },
+                switchAccountCount: true,
             },
             orderBy: {
                 createdAt: "desc",
@@ -112,13 +117,21 @@ export async function POST(request: NextRequest) {
 
             // For PENDING orders, return order info without cards
             if (order.status === "PENDING") {
+                const elapsed = Date.now() - new Date(order.createdAt).getTime()
+                const canPay = elapsed < config.pendingOrderTimeoutMs
+                const expiresAt = new Date(
+                    new Date(order.createdAt).getTime() + config.pendingOrderTimeoutMs,
+                ).toISOString()
                 return NextResponse.json({
                     orderNo: order.orderNo,
                     productName: order.productNameSnapshot ?? order.product.name,
                     createdAt: order.createdAt instanceof Date ? order.createdAt.toISOString() : order.createdAt,
                     status: order.status,
+                    amount: Number(order.amount),
                     cards: [],
                     isPending: true,
+                    canPay,
+                    expiresAt,
                 })
             }
 
@@ -134,14 +147,27 @@ export async function POST(request: NextRequest) {
                 })
 
             const isAutoFetch = order.product?.productType === "AUTO_FETCH"
+            const successToken = createOrderSuccessToken(order.orderNo)
+            const switchLimit = order.product?.accountSwitchLimit ?? 1
+            const remainingSwitches = Math.max(0, switchLimit - order.switchAccountCount)
+            const canSwitch =
+                isAutoFetch &&
+                order.status === "COMPLETED" &&
+                (order.product?.allowAccountSwitch ?? true) &&
+                remainingSwitches > 0 &&
+                (!order.expiresAt || new Date(order.expiresAt) > new Date())
             return NextResponse.json({
                 orderNo: order.orderNo,
                 productName: order.productNameSnapshot ?? order.product?.name ?? "",
                 createdAt: order.createdAt instanceof Date ? order.createdAt.toISOString() : order.createdAt,
                 status: order.status,
+                amount: Number(order.amount),
                 cards,
+                ...(successToken && { successToken }),
                 ...(isAutoFetch && { isAutoFetch: true }),
-                ...(isAutoFetch && order.expiresAt && { contentExpiresAt: order.expiresAt.toISOString() }),
+                ...(isAutoFetch && order.expiresAt && { contentExpiresAt: new Date(order.expiresAt).toISOString() }),
+                ...(isAutoFetch && { canSwitch }),
+                ...(isAutoFetch && { remainingSwitches }),
             })
         } else {
             // Multiple orders - return list

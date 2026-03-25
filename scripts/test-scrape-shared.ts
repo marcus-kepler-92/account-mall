@@ -6,7 +6,8 @@
 import { writeFileSync } from "fs"
 import { scrapeSharedAccounts } from "../lib/scrape-shared-accounts"
 
-const SOURCE_URL = "https://id.ali-door.top/share/yedamai"
+const urlArg = process.argv.find((a) => a.startsWith("http"))
+const SOURCE_URL = urlArg ?? "https://id.ali-door.top/share/yedamai"
 
 async function main() {
     const dumpHtml = process.argv.includes("--dump-html")

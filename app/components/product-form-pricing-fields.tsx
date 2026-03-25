@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { useFormContext } from "react-hook-form"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
@@ -14,14 +15,12 @@ import {
 } from "@/components/ui/form"
 import { MarkdownEditor } from "@/app/components/markdown-editor"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Command, CommandItem, CommandList, CommandGroup } from "@/components/ui/command"
+import { Button } from "@/components/ui/button"
+import { Check, ChevronsUpDown } from "lucide-react"
+import { cn } from "@/lib/utils"
 import type { ProductFormSchema } from "@/lib/validations/product"
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select"
 
 export function ProductFormPricingFields({
     isAutoFetch,
@@ -32,6 +31,7 @@ export function ProductFormPricingFields({
 }) {
     const { control, watch } = useFormContext<ProductFormSchema>()
     const allowAccountSwitch = watch("allowAccountSwitch") ?? true
+    const [sourceUrlOpen, setSourceUrlOpen] = useState(false)
 
     return (
         <>
@@ -114,36 +114,71 @@ export function ProductFormPricingFields({
                             <FormField
                                 control={control}
                                 name="sourceUrl"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>
-                                            来源 URL <span className="text-destructive">*</span>
-                                        </FormLabel>
-                                        <Select
-                                            value={field.value ?? ""}
-                                            onValueChange={field.onChange}
-                                        >
-                                            <FormControl>
-                                                <SelectTrigger className="font-mono text-sm">
-                                                    <SelectValue placeholder="请选择爬取来源" />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                {sourceUrlOptions.map((url) => (
-                                                    <SelectItem
-                                                        key={url}
-                                                        value={url}
-                                                        className="font-mono text-xs"
+                                render={({ field }) => {
+                                    const selected = (field.value ?? "")
+                                        .split(",")
+                                        .map((s) => s.trim())
+                                        .filter(Boolean)
+                                    const toggle = (url: string) => {
+                                        const next = selected.includes(url)
+                                            ? selected.filter((u) => u !== url)
+                                            : [...selected, url]
+                                        field.onChange(next.join(","))
+                                    }
+                                    return (
+                                        <FormItem>
+                                            <FormLabel>
+                                                来源 URL <span className="text-destructive">*</span>
+                                            </FormLabel>
+                                            <Popover open={sourceUrlOpen} onOpenChange={setSourceUrlOpen}>
+                                                <PopoverTrigger asChild>
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        role="combobox"
+                                                        className={cn(
+                                                            "w-full justify-between font-mono text-xs font-normal",
+                                                            !selected.length && "text-muted-foreground"
+                                                        )}
                                                     >
-                                                        {url}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        <FormDescription>自动获取账号的来源页面地址</FormDescription>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
+                                                        <span className="truncate">
+                                                            {selected.length
+                                                                ? selected.join(", ")
+                                                                : "请选择爬取来源"}
+                                                        </span>
+                                                        <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
+                                                    </Button>
+                                                </PopoverTrigger>
+                                                <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
+                                                    <Command>
+                                                        <CommandList>
+                                                            <CommandGroup>
+                                                                {sourceUrlOptions.map((url) => (
+                                                                    <CommandItem
+                                                                        key={url}
+                                                                        value={url}
+                                                                        onSelect={() => toggle(url)}
+                                                                        className="font-mono text-xs"
+                                                                    >
+                                                                        <Check
+                                                                            className={cn(
+                                                                                "mr-2 size-4",
+                                                                                selected.includes(url) ? "opacity-100" : "opacity-0"
+                                                                            )}
+                                                                        />
+                                                                        {url}
+                                                                    </CommandItem>
+                                                                ))}
+                                                            </CommandGroup>
+                                                        </CommandList>
+                                                    </Command>
+                                                </PopoverContent>
+                                            </Popover>
+                                            <FormDescription>可多选，同时从多个来源爬取账号并合并</FormDescription>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )
+                                }}
                             />
                             <FormField
                                 control={control}

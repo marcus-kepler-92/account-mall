@@ -15,7 +15,7 @@ import {
 import { config } from "@/lib/config"
 import { verifyTurnstileToken } from "@/lib/turnstile"
 import { verifyExitDiscountToken, type ExitDiscountPayload } from "@/lib/exit-discount"
-import { scrapeSharedAccounts } from "@/lib/scrape-shared-accounts"
+import { scrapeMultipleUrls } from "@/lib/scrape-shared-accounts"
 import { sharedAccountToCardPayload, toCardContentJson } from "@/lib/auto-fetch-card"
 import { createOrderSuccessToken } from "@/lib/order-success-token"
 import { completePendingOrder } from "@/lib/complete-pending-order"
@@ -114,7 +114,7 @@ async function createAutoFetchOrder(params: {
     if (config.nodeEnv === "development") {
         console.log("[AUTO_FETCH] 即将爬取 sourceUrl:", sourceUrl)
     }
-    const scrapedList = await scrapeSharedAccounts(sourceUrl)
+    const scrapedList = await scrapeMultipleUrls(sourceUrl)
     if (config.nodeEnv === "development") {
         console.log("[AUTO_FETCH] 爬取结果数量:", scrapedList.length)
         if (scrapedList.length > 0) {

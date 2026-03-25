@@ -37,8 +37,8 @@ function parseAccountsFromHtml(html: string): SharedAccount[] {
 
     // 状态值正则（用于解析与过滤）：状态: 正常 / 状态：异常 等
     const statusValueRe = /状态[：:]\s*([^\s\n]+)/
-    // 上次检查：完整到时分秒，如 2026-03-01 15:39:23
-    const lastCheckedRe = /上次检查[：:]\s*(\d{4}-\d{2}-\d{2}(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?)/
+    // 上次检查/检测时间：完整到时分秒，如 2026-03-01 15:39:23
+    const lastCheckedRe = /(?:上次检查|检测时间)[：:]\s*(\d{4}-\d{2}-\d{2}(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?)/
     // 装好状态：装好状态: xxx 或 装好[：:]?\s*xxx
     const installStatusRe = /装好(?:状态)?[：:]\s*([^\s\n]+)/
     const accountRe = /账号[：:]\s*([^\s\n]+)|([^\s]+@[^\s]+)/
@@ -84,7 +84,64 @@ function parseAccountsFromHtml(html: string): SharedAccount[] {
 
     if (results.length > 0) return results
 
-    // 策略1：按表格行（tr）解析，仅保留状态为「正常」的行
+    // 策略1：Bootstrap card + Cloudflare 邮箱解码 + copy() onclick（ccbaohe.com）
+    // 指纹：.card-header + .card-body 同时存在，且页面含 [data-cfemail] 编码邮箱
+    if ($(".card-header").length > 0 && $("[data-cfemail]").length > 0) {
+        const onclickPasswordRe = /copy\(['"]([^'"]+)['"]\)/
+        const regionBracketRe = /【([^】]+)】/
+
+        $(".card").each((_, card) => {
+            const $card = $(card)
+            const $header = $card.find(".card-header")
+            const $body = $card.find(".card-body")
+            if (!$header.length || !$body.length) return
+
+            const cardTitleText = $body.find(".card-title").text()
+            if (!cardTitleText.includes(ALLOWED_STATUS)) return
+            const bodyText = $body.text()
+            const { lastCheckedAt, installStatus } = parseBlock(bodyText)
+
+            const headerText = $header.text()
+            const region =
+                extractGroup(headerText, regionBracketRe) ||
+                extractGroup(headerText, regionRe) ||
+                "未知"
+
+            // Cloudflare 邮箱解码：data-cfemail 十六进制 XOR 解码
+            let account = ""
+            const cfemail = $body.find("[data-cfemail]").first().attr("data-cfemail") ?? ""
+            if (cfemail) {
+                try {
+                    const key = parseInt(cfemail.substring(0, 2), 16)
+                    let decoded = ""
+                    for (let i = 2; i < cfemail.length; i += 2) {
+                        decoded += String.fromCharCode(parseInt(cfemail.substring(i, i + 2), 16) ^ key)
+                    }
+                    account = decoded
+                } catch {
+                    account = ""
+                }
+            }
+            if (!account) account = extractGroup(headerText + " " + bodyText, accountRe) ?? ""
+
+            let password: string | null = null
+            $body.find("button[onclick]").each((_, btn) => {
+                const onclick = $(btn).attr("onclick") ?? ""
+                const m = onclick.match(onclickPasswordRe)
+                if (m) { password = m[1]; return false }
+            })
+            password = password || extractGroup(bodyText, passwordRe)
+
+            if (account && password && !seen.has(account) && isAllowedRegion(region)) {
+                seen.add(account)
+                results.push({ account, password, region, status: ALLOWED_STATUS, lastCheckedAt, installStatus })
+            }
+        })
+
+        if (results.length > 0) return results
+    }
+
+    // 策略2：按表格行（tr）解析，仅保留状态为「正常」的行
     $("tr").each((_, tr) => {
         const $tr = $(tr)
         const text = $tr.text()
@@ -211,4 +268,27 @@ export async function scrapeSharedAccounts(sourceUrl: string): Promise<SharedAcc
         console.warn("[scrape] 爬取失败:", err instanceof Error ? err.message : err)
         return []
     }
+}
+
+/**
+ * 支持逗号分隔的多 URL 并发爬取，结果合并去重（以 account 为 key）。
+ * 单 URL 时直接委托 scrapeSharedAccounts。
+ */
+export async function scrapeMultipleUrls(sourceUrl: string): Promise<SharedAccount[]> {
+    const urls = sourceUrl.split(",").map((u) => u.trim()).filter((u) => u.startsWith("http"))
+    if (urls.length === 0) return []
+    if (urls.length === 1) return scrapeSharedAccounts(urls[0])
+
+    const lists = await Promise.all(urls.map((u) => scrapeSharedAccounts(u)))
+    const seen = new Set<string>()
+    const merged: SharedAccount[] = []
+    for (const list of lists) {
+        for (const acc of list) {
+            if (!seen.has(acc.account)) {
+                seen.add(acc.account)
+                merged.push(acc)
+            }
+        }
+    }
+    return merged
 }

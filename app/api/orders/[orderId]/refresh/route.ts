@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verifyOrderSuccessToken } from "@/lib/order-success-token"
-import { scrapeSharedAccounts } from "@/lib/scrape-shared-accounts"
+import { scrapeMultipleUrls } from "@/lib/scrape-shared-accounts"
 import { sharedAccountToCardPayload, toCardContentJson } from "@/lib/auto-fetch-card"
 import { config } from "@/lib/config"
 import { badRequest, notFound, invalidJsonBody, internalServerError } from "@/lib/api-response"
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
 
     const [scrapedList, blacklisted] = await Promise.all([
-        scrapeSharedAccounts(sourceUrl),
+        scrapeMultipleUrls(sourceUrl),
         prisma.accountBlacklist.findMany({
             where: { productId: order.product.id },
             select: { account: true },

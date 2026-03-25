@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getAdminSession } from "@/lib/auth-guard"
 import { unauthorized, notFound, badRequest, invalidJsonBody } from "@/lib/api-response"
-import { scrapeSharedAccounts } from "@/lib/scrape-shared-accounts"
+import { scrapeMultipleUrls } from "@/lib/scrape-shared-accounts"
 import { config } from "@/lib/config"
 
 type RouteContext = {
@@ -35,7 +35,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     let scraped: Array<{ account: string; password: string }> = []
     if (sourceUrl) {
         try {
-            scraped = await scrapeSharedAccounts(sourceUrl)
+            scraped = await scrapeMultipleUrls(sourceUrl)
         } catch {
             // Scrape failure is non-fatal: passwords will show as null
         }
