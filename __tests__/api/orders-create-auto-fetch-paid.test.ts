@@ -4,6 +4,7 @@
 import { type NextRequest } from "next/server"
 import { POST } from "@/app/api/orders/route"
 import { prismaMock } from "../../__mocks__/prisma"
+import { Prisma } from "@prisma/client"
 
 jest.mock("@/lib/prisma", () => {
     const { prismaMock } = require("../../__mocks__/prisma")
@@ -59,14 +60,14 @@ jest.mock("@/lib/order-success-token", () => ({
 }))
 
 jest.mock("@/lib/scrape-shared-accounts", () => ({
-    scrapeSharedAccounts: jest.fn(),
+    scrapeMultipleUrls: jest.fn(),
 }))
 
-import { scrapeSharedAccounts } from "@/lib/scrape-shared-accounts"
+import { scrapeMultipleUrls } from "@/lib/scrape-shared-accounts"
 import { getAlipayPagePayUrl } from "@/lib/alipay"
 import { completePendingOrder } from "@/lib/complete-pending-order"
 
-const scrapeSharedAccountsMock = scrapeSharedAccounts as jest.Mock
+const scrapeMultipleUrlsMock = scrapeMultipleUrls as jest.Mock
 const getAlipayPagePayUrlMock = getAlipayPagePayUrl as jest.Mock
 const completePendingOrderMock = completePendingOrder as jest.Mock
 
@@ -92,13 +93,23 @@ function makePaidAutoFetchProduct(overrides?: Record<string, unknown>) {
     return {
         id: "prod_auto",
         name: "Test Auto Account",
-        price: 19.9,
+        slug: "test-auto-account",
+        summary: null,
+        description: null,
+        image: null,
+        price: new Prisma.Decimal("19.9"),
         maxQuantity: 1,
         status: "ACTIVE",
         productType: "AUTO_FETCH",
         sourceUrl: "https://example.com/share/accounts",
+        validityHours: null,
+        allowAccountSwitch: true,
+        accountSwitchLimit: 1,
+        pinnedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
         ...overrides,
-    }
+    } as any
 }
 
 function createJsonRequest(body: unknown): NextRequest {
@@ -124,14 +135,14 @@ describe("POST /api/orders — paid AUTO_FETCH product", () => {
         prismaMock.user.findFirst.mockResolvedValue(null)
 
         // Default: scrape returns one account
-        scrapeSharedAccountsMock.mockResolvedValue([SCRAPED_ACCOUNT])
+        scrapeMultipleUrlsMock.mockResolvedValue([SCRAPED_ACCOUNT])
         prismaMock.accountBlacklist.findMany.mockResolvedValue([])
     })
 
     describe("爬取成功 + price>0 → 收费流程", () => {
         it("创建 PENDING 订单 + RESERVED 卡 + 返回 paymentUrl", async () => {
             prismaMock.product.findUnique.mockResolvedValue(makePaidAutoFetchProduct())
-            prismaMock.$transaction.mockImplementation(async (fn: Function) => {
+            ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: Function) => {
                 const tx = {
                     order: {
                         create: jest.fn().mockResolvedValue({
@@ -159,16 +170,16 @@ describe("POST /api/orders — paid AUTO_FETCH product", () => {
         })
 
         it("PENDING 订单 amount 正确（含折扣计算）", async () => {
-            prismaMock.product.findUnique.mockResolvedValue(makePaidAutoFetchProduct({ price: 19.9 }))
+            prismaMock.product.findUnique.mockResolvedValue(makePaidAutoFetchProduct({ price: new Prisma.Decimal("19.9") }))
             // 分销商有 10% 折扣
             prismaMock.user.findFirst.mockResolvedValue({
                 id: "dist_1",
                 discountCodeEnabled: true,
-                discountPercent: 10,
-            })
+                discountPercent: new Prisma.Decimal("10"),
+            } as any)
 
             let capturedAmount: number | undefined
-            prismaMock.$transaction.mockImplementation(async (fn: Function) => {
+            (prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: Function) => {
                 const tx = {
                     order: {
                         create: jest.fn().mockImplementation(async (args: any) => {
@@ -190,7 +201,7 @@ describe("POST /api/orders — paid AUTO_FETCH product", () => {
         it("卡密状态应为 RESERVED", async () => {
             prismaMock.product.findUnique.mockResolvedValue(makePaidAutoFetchProduct())
             let capturedCardStatus: string | undefined
-            prismaMock.$transaction.mockImplementation(async (fn: Function) => {
+            (prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: Function) => {
                 const tx = {
                     order: {
                         create: jest.fn().mockResolvedValue({ id: "ord_1", orderNo: "order-uuid-1" }),
@@ -214,11 +225,11 @@ describe("POST /api/orders — paid AUTO_FETCH product", () => {
     describe("爬取成功 + price=0 → 免费流程（回归）", () => {
         it("直接创建 COMPLETED 订单 + 返回 successToken", async () => {
             prismaMock.product.findUnique.mockResolvedValue(
-                makePaidAutoFetchProduct({ price: 0 })
+                makePaidAutoFetchProduct({ price: new Prisma.Decimal("0") })
             )
             getConfigMock().nodeEnv = "development" // 跳过冷却检查
 
-            prismaMock.$transaction.mockImplementation(async (fn: Function) => {
+            ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: Function) => {
                 const tx = {
                     order: {
                         create: jest.fn().mockResolvedValue({ id: "ord_1", orderNo: "order-uuid-1" }),
@@ -242,7 +253,7 @@ describe("POST /api/orders — paid AUTO_FETCH product", () => {
     describe("爬取失败", () => {
         it("爬取返回空列表 → 返回 400 '暂无可领取账号'", async () => {
             prismaMock.product.findUnique.mockResolvedValue(makePaidAutoFetchProduct())
-            scrapeSharedAccountsMock.mockResolvedValue([])
+            scrapeMultipleUrlsMock.mockResolvedValue([])
 
             const res = await POST(createJsonRequest(ORDER_BODY))
             const data = await res.json()
@@ -281,8 +292,8 @@ describe("POST /api/orders — paid AUTO_FETCH product", () => {
     describe("development 环境快捷通道", () => {
         it("dev 环境下收费 AUTO_FETCH 调用 completePendingOrder", async () => {
             getConfigMock().nodeEnv = "development"
-            prismaMock.product.findUnique.mockResolvedValue(makePaidAutoFetchProduct({ price: 19.9 }))
-            prismaMock.$transaction.mockImplementation(async (fn: Function) => {
+            prismaMock.product.findUnique.mockResolvedValue(makePaidAutoFetchProduct({ price: new Prisma.Decimal("19.9") }))
+            ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: Function) => {
                 const tx = {
                     order: {
                         create: jest.fn().mockResolvedValue({ id: "ord_1", orderNo: "order-uuid-1" }),
@@ -308,7 +319,7 @@ describe("POST /api/orders — paid AUTO_FETCH product", () => {
             prismaMock.product.findUnique.mockResolvedValue(makePaidAutoFetchProduct())
 
             let capturedOrderData: Record<string, unknown> | undefined
-            prismaMock.$transaction.mockImplementation(async (fn: Function) => {
+            (prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: Function) => {
                 const tx = {
                     order: {
                         create: jest.fn().mockImplementation(async (args: { data: Record<string, unknown> }) => {
@@ -331,7 +342,7 @@ describe("POST /api/orders — paid AUTO_FETCH product", () => {
             prismaMock.product.findUnique.mockResolvedValue(makePaidAutoFetchProduct())
 
             let capturedOrderData: Record<string, unknown> | undefined
-            prismaMock.$transaction.mockImplementation(async (fn: Function) => {
+            (prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: Function) => {
                 const tx = {
                     order: {
                         create: jest.fn().mockImplementation(async (args: { data: Record<string, unknown> }) => {

@@ -62,7 +62,7 @@ describe("DELETE /api/cards/[cardId]", () => {
         prismaMock.card.findUnique.mockResolvedValueOnce({
             id: "card_1",
             status: "SOLD",
-        })
+        } as any)
 
         const res = await DELETE(
             {} as NextRequest,
@@ -82,7 +82,7 @@ describe("DELETE /api/cards/[cardId]", () => {
         prismaMock.card.findUnique.mockResolvedValueOnce({
             id: "card_1",
             status: "UNSOLD",
-        })
+        } as any)
         prismaMock.card.delete.mockResolvedValueOnce({} as any)
 
         const res = await DELETE(
@@ -146,7 +146,7 @@ describe("PATCH /api/cards/[cardId]", () => {
         prismaMock.card.findUnique.mockResolvedValueOnce({
             id: "card_1",
             status: "SOLD",
-        })
+        } as any)
 
         const res = await PATCH(
             new Request("http://x", {
@@ -167,7 +167,7 @@ describe("PATCH /api/cards/[cardId]", () => {
         prismaMock.card.findUnique.mockResolvedValueOnce({
             id: "card_1",
             status: "UNSOLD",
-        })
+        } as any)
         prismaMock.card.update.mockResolvedValueOnce({} as any)
 
         const res = await PATCH(
@@ -192,7 +192,7 @@ describe("PATCH /api/cards/[cardId]", () => {
         prismaMock.card.findUnique.mockResolvedValueOnce({
             id: "card_1",
             status: "UNSOLD",
-        })
+        } as any)
 
         const res = await PATCH(
             new Request("http://x", {
@@ -213,7 +213,7 @@ describe("PATCH /api/cards/[cardId]", () => {
         prismaMock.card.findUnique.mockResolvedValueOnce({
             id: "card_1",
             status: "DISABLED",
-        })
+        } as any)
         prismaMock.card.update.mockResolvedValueOnce({} as any)
 
         const res = await PATCH(

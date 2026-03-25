@@ -19,7 +19,7 @@ jest.mock("@/lib/order-success-token", () => ({
 }))
 
 jest.mock("@/lib/scrape-shared-accounts", () => ({
-    scrapeSharedAccounts: jest.fn(),
+    scrapeMultipleUrls: jest.fn(),
 }))
 
 jest.mock("@/lib/config", () => ({
@@ -30,10 +30,10 @@ jest.mock("@/lib/config", () => ({
 }))
 
 import { verifyOrderSuccessToken } from "@/lib/order-success-token"
-import { scrapeSharedAccounts } from "@/lib/scrape-shared-accounts"
+import { scrapeMultipleUrls } from "@/lib/scrape-shared-accounts"
 
 const verifyOrderSuccessTokenMock = verifyOrderSuccessToken as jest.Mock
-const scrapeSharedAccountsMock = scrapeSharedAccounts as jest.Mock
+const scrapeMultipleUrlsMock = scrapeMultipleUrls as jest.Mock
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -96,7 +96,7 @@ describe("POST /api/orders/[orderId]/refresh", () => {
     beforeEach(() => {
         jest.clearAllMocks()
         verifyOrderSuccessTokenMock.mockReturnValue(true)
-        scrapeSharedAccountsMock.mockResolvedValue([SCRAPED_ACCOUNT])
+        scrapeMultipleUrlsMock.mockResolvedValue([SCRAPED_ACCOUNT])
         prismaMock.accountBlacklist.findMany.mockResolvedValue([])
     })
 
@@ -274,7 +274,7 @@ describe("POST /api/orders/[orderId]/refresh", () => {
     describe("爬取结果处理", () => {
         it("爬取返回空列表 → 503，refreshed: false", async () => {
             prismaMock.order.findUnique.mockResolvedValue(makeCompletedAutoFetchOrder())
-            scrapeSharedAccountsMock.mockResolvedValue([])
+            scrapeMultipleUrlsMock.mockResolvedValue([])
 
             const res = await POST(makeRequest(BODY), makeContext())
             expect(res.status).toBe(503)
@@ -285,7 +285,7 @@ describe("POST /api/orders/[orderId]/refresh", () => {
 
         it("爬取成功，原账号在列表中 → 更新密码，accountChanged: false", async () => {
             prismaMock.order.findUnique.mockResolvedValue(makeCompletedAutoFetchOrder())
-            scrapeSharedAccountsMock.mockResolvedValue([SCRAPED_ACCOUNT]) // 同账号，密码已变
+            scrapeMultipleUrlsMock.mockResolvedValue([SCRAPED_ACCOUNT]) // 同账号，密码已变
             prismaMock.card.update.mockResolvedValue({} as any)
 
             const res = await POST(makeRequest(BODY), makeContext())
@@ -301,7 +301,7 @@ describe("POST /api/orders/[orderId]/refresh", () => {
 
         it("爬取成功，原账号不在列表中 → 换新账号，accountChanged: true", async () => {
             prismaMock.order.findUnique.mockResolvedValue(makeCompletedAutoFetchOrder())
-            scrapeSharedAccountsMock.mockResolvedValue([SCRAPED_ACCOUNT_NEW]) // 只有新账号
+            scrapeMultipleUrlsMock.mockResolvedValue([SCRAPED_ACCOUNT_NEW]) // 只有新账号
             prismaMock.card.update.mockResolvedValue({} as any)
 
             const res = await POST(makeRequest(BODY), makeContext())
@@ -315,7 +315,7 @@ describe("POST /api/orders/[orderId]/refresh", () => {
 
         it("更新卡密时，写入新内容和 lastRefreshedAt", async () => {
             prismaMock.order.findUnique.mockResolvedValue(makeCompletedAutoFetchOrder())
-            scrapeSharedAccountsMock.mockResolvedValue([SCRAPED_ACCOUNT])
+            scrapeMultipleUrlsMock.mockResolvedValue([SCRAPED_ACCOUNT])
 
             let capturedUpdateData: Record<string, unknown> | undefined
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -335,7 +335,7 @@ describe("POST /api/orders/[orderId]/refresh", () => {
 
         it("card.update 失败 → 500", async () => {
             prismaMock.order.findUnique.mockResolvedValue(makeCompletedAutoFetchOrder())
-            scrapeSharedAccountsMock.mockResolvedValue([SCRAPED_ACCOUNT])
+            scrapeMultipleUrlsMock.mockResolvedValue([SCRAPED_ACCOUNT])
             prismaMock.card.update.mockRejectedValue(new Error("DB error"))
 
             const res = await POST(makeRequest(BODY), makeContext())

@@ -1,4 +1,5 @@
 import { type NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { GET, PUT, DELETE } from "@/app/api/products/[productId]/route";
 import { prismaMock } from "../../__mocks__/prisma";
 
@@ -52,16 +53,23 @@ describe("GET /api/products/[productId]", () => {
       id: "prod_1",
       name: "Test",
       slug: "test",
+      summary: null,
       description: null,
       image: null,
-      price: 50,
+      price: new Prisma.Decimal("50"),
       maxQuantity: 5,
       status: "ACTIVE",
+      productType: "NORMAL",
+      sourceUrl: null,
+      validityHours: null,
+      allowAccountSwitch: true,
+      accountSwitchLimit: 1,
+      pinnedAt: null,
       createdAt: new Date(),
       updatedAt: new Date(),
       tags: [{ id: "t1", name: "Tag", slug: "tag" }],
     };
-    prismaMock.product.findUnique.mockResolvedValueOnce(product);
+    prismaMock.product.findUnique.mockResolvedValueOnce(product as any);
     prismaMock.card.count.mockResolvedValueOnce(7);
 
     const res = await GET(
@@ -91,10 +99,23 @@ describe("GET /api/products/[productId]", () => {
       id: "prod_public",
       name: "Public",
       slug: "public",
-      price: 50,
+      summary: null,
+      description: null,
+      image: null,
+      price: new Prisma.Decimal("50"),
+      maxQuantity: 5,
+      status: "ACTIVE",
+      productType: "NORMAL",
+      sourceUrl: null,
+      validityHours: null,
+      allowAccountSwitch: true,
+      accountSwitchLimit: 1,
+      pinnedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
       tags: [],
     };
-    prismaMock.product.findUnique.mockResolvedValueOnce(product);
+    prismaMock.product.findUnique.mockResolvedValueOnce(product as any);
     prismaMock.card.count.mockResolvedValueOnce(3);
 
     const res = await GET(
@@ -151,7 +172,7 @@ describe("PUT /api/products/[productId]", () => {
     prismaMock.product.findUnique.mockResolvedValueOnce({
       id: "prod_1",
       slug: "test",
-    });
+    } as any);
 
     const res = await PUT(
       createJsonRequest({ price: -1 }),
@@ -183,11 +204,11 @@ describe("PUT /api/products/[productId]", () => {
       .mockResolvedValueOnce({
         id: "prod_1",
         slug: "old-slug",
-      })
+      } as any)
       .mockResolvedValueOnce({
         id: "other",
         slug: "taken-slug",
-      });
+      } as any);
 
     const res = await PUT(
       createJsonRequest({ slug: "taken-slug" }),
@@ -206,18 +227,18 @@ describe("PUT /api/products/[productId]", () => {
     prismaMock.product.findUnique.mockResolvedValueOnce({
       id: "prod_1",
       slug: "test",
-    });
+    } as any);
     const updated = {
       id: "prod_1",
       name: "Prod",
       slug: "test",
-      price: 50,
+      price: new Prisma.Decimal("50"),
       tags: [
         { id: "tag_1", name: "T1", slug: "t1" },
         { id: "tag_2", name: "T2", slug: "t2" },
       ],
     };
-    prismaMock.product.update.mockResolvedValueOnce(updated);
+    prismaMock.product.update.mockResolvedValueOnce(updated as any);
 
     const res = await PUT(
       createJsonRequest({ tagIds: ["tag_1", "tag_2"] }),
@@ -243,15 +264,15 @@ describe("PUT /api/products/[productId]", () => {
     prismaMock.product.findUnique.mockResolvedValueOnce({
       id: "prod_1",
       slug: "test",
-    });
+    } as any);
     const updated = {
       id: "prod_1",
       name: "Updated Name",
       slug: "test",
-      price: 99,
+      price: new Prisma.Decimal("99"),
       tags: [],
     };
-    prismaMock.product.update.mockResolvedValueOnce(updated);
+    prismaMock.product.update.mockResolvedValueOnce(updated as any);
 
     const res = await PUT(
       createJsonRequest({ name: "Updated Name", price: 99 }),
@@ -315,8 +336,8 @@ describe("DELETE /api/products/[productId]", () => {
     prismaMock.product.findUnique.mockResolvedValueOnce({
       id: "prod_1",
       name: "Test",
-    });
-    prismaMock.product.update.mockResolvedValueOnce({});
+    } as any);
+    prismaMock.product.update.mockResolvedValueOnce({} as any);
 
     const res = await DELETE(
       createUrlRequest("http://localhost/api/products/prod_1"),
@@ -339,7 +360,7 @@ describe("DELETE /api/products/[productId]", () => {
       prismaMock.product.findUnique.mockResolvedValueOnce({
         id: "prod_1",
         status: "ACTIVE",
-      });
+      } as any);
 
       const res = await DELETE(
         createUrlRequest("http://localhost/api/products/prod_1?permanent=true"),
@@ -358,7 +379,7 @@ describe("DELETE /api/products/[productId]", () => {
       prismaMock.product.findUnique.mockResolvedValueOnce({
         id: "prod_1",
         status: "INACTIVE",
-      });
+      } as any);
       prismaMock.order.count.mockResolvedValueOnce(2);
 
       const res = await DELETE(
@@ -380,7 +401,7 @@ describe("DELETE /api/products/[productId]", () => {
       prismaMock.product.findUnique.mockResolvedValueOnce({
         id: "prod_1",
         status: "INACTIVE",
-      });
+      } as any);
       prismaMock.order.count.mockResolvedValueOnce(0);
       (prismaMock.$transaction as jest.Mock).mockImplementation(
         async (fn: (tx: typeof prismaMock) => Promise<unknown>) =>

@@ -7,6 +7,7 @@
 import { type NextRequest } from "next/server";
 import { POST } from "@/app/api/orders/route";
 import { prismaMock } from "../../__mocks__/prisma";
+import { Prisma } from "@prisma/client";
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
@@ -62,11 +63,11 @@ jest.mock("@/lib/order-success-token", () => ({
 }));
 
 jest.mock("@/lib/scrape-shared-accounts", () => ({
-  scrapeSharedAccounts: jest.fn(),
+  scrapeMultipleUrls: jest.fn(),
 }));
 
-import { scrapeSharedAccounts } from "@/lib/scrape-shared-accounts";
-const scrapeSharedAccountsMock = scrapeSharedAccounts as jest.Mock;
+import { scrapeMultipleUrls } from "@/lib/scrape-shared-accounts";
+const scrapeMultipleUrlsMock = scrapeMultipleUrls as jest.Mock;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -86,28 +87,46 @@ function makeFreeAutoFetchProduct(overrides?: Record<string, unknown>) {
   return {
     id: "prod_free",
     name: "Free AutoFetch Account",
-    price: 0,
+    slug: "free-autofetch-account",
+    summary: null,
+    description: null,
+    image: null,
+    price: new Prisma.Decimal("0"),
     maxQuantity: 1,
     status: "ACTIVE",
     productType: "AUTO_FETCH",
     sourceUrl: "https://source.example.com",
     validityHours: 24,
+    allowAccountSwitch: true,
+    accountSwitchLimit: 1,
+    pinnedAt: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
     ...overrides,
-  };
+  } as any;
 }
 
 function makePaidAutoFetchProduct(overrides?: Record<string, unknown>) {
   return {
     id: "prod_paid",
     name: "Paid AutoFetch Account",
-    price: 19.9,
+    slug: "paid-autofetch-account",
+    summary: null,
+    description: null,
+    image: null,
+    price: new Prisma.Decimal("19.9"),
     maxQuantity: 1,
     status: "ACTIVE",
     productType: "AUTO_FETCH",
     sourceUrl: "https://source.example.com",
     validityHours: 24,
+    allowAccountSwitch: true,
+    accountSwitchLimit: 1,
+    pinnedAt: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
     ...overrides,
-  };
+  } as any;
 }
 
 function makeRequest(body: unknown): NextRequest {
@@ -119,7 +138,7 @@ function makeRequest(body: unknown): NextRequest {
 
 /** 成功创建订单所需的 transaction mock */
 function mockSuccessfulFreeTransaction() {
-  prismaMock.$transaction.mockImplementation(async (fn: Function) => {
+  (prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: Function) => {
     const tx = {
       order: {
         create: jest.fn().mockResolvedValue({ id: "ord_1", orderNo: "uuid-1" }),
@@ -148,7 +167,7 @@ describe("POST /api/orders — AUTO_FETCH 多因素限领", () => {
     getConfig().nodeEnv = "test";
     prismaMock.order.count.mockResolvedValue(0);
     prismaMock.user.findFirst.mockResolvedValue(null);
-    scrapeSharedAccountsMock.mockResolvedValue([SCRAPED_ACCOUNT]);
+    scrapeMultipleUrlsMock.mockResolvedValue([SCRAPED_ACCOUNT]);
     prismaMock.accountBlacklist.findMany.mockResolvedValue([]);
   });
 
@@ -162,7 +181,7 @@ describe("POST /api/orders — AUTO_FETCH 多因素限领", () => {
       prismaMock.order.findFirst.mockResolvedValue({
         id: "existing",
         expiresAt: null,
-      });
+      } as any);
 
       const res = await POST(makeRequest(BASE_BODY));
 
@@ -176,7 +195,7 @@ describe("POST /api/orders — AUTO_FETCH 多因素限领", () => {
       prismaMock.order.findFirst.mockResolvedValue({
         id: "existing",
         expiresAt: null,
-      });
+      } as any);
 
       const res = await POST(
         makeRequest({
@@ -196,7 +215,7 @@ describe("POST /api/orders — AUTO_FETCH 多因素限领", () => {
       prismaMock.order.findFirst.mockResolvedValue({
         id: "existing",
         expiresAt: null,
-      });
+      } as any);
 
       const res = await POST(makeRequest(BASE_BODY));
 
@@ -230,8 +249,8 @@ describe("POST /api/orders — AUTO_FETCH 多因素限领", () => {
 
       await POST(makeRequest({ ...BASE_BODY, fingerprintHash: undefined }));
 
-      const call = prismaMock.order.findFirst.mock.calls[0][0];
-      const ownerOR: object[] = call.where.AND[1].OR;
+      const call = prismaMock.order.findFirst.mock.calls[0]![0]!;
+      const ownerOR: object[] = (call.where!.AND as any)[1].OR;
       // 只有邮箱 + IP辅助（无指纹），确认没有 fingerprintHash 独立信号
       const hasStandaloneFingerprint = ownerOR.some(
         (c) => "fingerprintHash" in c && !("clientIp" in c),
@@ -248,8 +267,8 @@ describe("POST /api/orders — AUTO_FETCH 多因素限领", () => {
 
       await POST(makeRequest({ ...BASE_BODY, fingerprintHash: "fp-xyz" }));
 
-      const call = prismaMock.order.findFirst.mock.calls[0][0];
-      const ownerOR: object[] = call.where.AND[1].OR;
+      const call = prismaMock.order.findFirst.mock.calls[0]![0]!;
+      const ownerOR: object[] = (call.where!.AND as any)[1].OR;
       const hasStandaloneFingerprint = ownerOR.some(
         (c) =>
           (c as Record<string, unknown>).fingerprintHash === "fp-xyz" &&
@@ -267,8 +286,8 @@ describe("POST /api/orders — AUTO_FETCH 多因素限领", () => {
 
       await POST(makeRequest({ ...BASE_BODY, fingerprintHash: "fp-abc" }));
 
-      const call = prismaMock.order.findFirst.mock.calls[0][0];
-      const ownerOR: object[] = call.where.AND[1].OR;
+      const call = prismaMock.order.findFirst.mock.calls[0]![0]!;
+      const ownerOR: object[] = (call.where!.AND as any)[1].OR;
       const ipEntry = ownerOR.find((c) => "clientIp" in c) as
         | Record<string, unknown>
         | undefined;
@@ -293,8 +312,8 @@ describe("POST /api/orders — AUTO_FETCH 多因素限领", () => {
 
       await POST(makeRequest(BASE_BODY));
 
-      const call = prismaMock.order.findFirst.mock.calls[0][0];
-      expect(call.where.amount).toEqual({ equals: 0 });
+      const call = prismaMock.order.findFirst.mock.calls[0]![0]!;
+      expect((call.where as any).amount).toEqual({ equals: 0 });
     });
 
     it("收费商品 → WHERE 不含 amount 过滤", async () => {
@@ -303,7 +322,7 @@ describe("POST /api/orders — AUTO_FETCH 多因素限领", () => {
       );
       prismaMock.order.findFirst.mockResolvedValue(null);
       // paid 流程需要 transaction mock
-      prismaMock.$transaction.mockImplementation(async (fn: Function) => {
+      (prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: Function) => {
         const tx = {
           order: {
             create: jest
@@ -318,8 +337,8 @@ describe("POST /api/orders — AUTO_FETCH 多因素限领", () => {
 
       await POST(makeRequest({ ...BASE_BODY, productId: "prod_paid" }));
 
-      const call = prismaMock.order.findFirst.mock.calls[0][0];
-      expect(call.where.amount).toBeUndefined();
+      const call = prismaMock.order.findFirst.mock.calls[0]![0]!;
+      expect((call.where as any).amount).toBeUndefined();
     });
   });
 
@@ -333,7 +352,7 @@ describe("POST /api/orders — AUTO_FETCH 多因素限领", () => {
       prismaMock.order.findFirst.mockResolvedValue(null);
 
       let capturedOrderData: Record<string, unknown> | undefined;
-      prismaMock.$transaction.mockImplementation(async (fn: Function) => {
+      (prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: Function) => {
         const tx = {
           order: {
             create: jest
@@ -363,7 +382,7 @@ describe("POST /api/orders — AUTO_FETCH 多因素限领", () => {
       prismaMock.order.findFirst.mockResolvedValue(null);
 
       let capturedOrderData: Record<string, unknown> | undefined;
-      prismaMock.$transaction.mockImplementation(async (fn: Function) => {
+      (prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: Function) => {
         const tx = {
           order: {
             create: jest
@@ -393,7 +412,7 @@ describe("POST /api/orders — AUTO_FETCH 多因素限领", () => {
       prismaMock.order.findFirst.mockResolvedValue(null);
 
       let capturedOrderData: Record<string, unknown> | undefined;
-      prismaMock.$transaction.mockImplementation(async (fn: Function) => {
+      (prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: Function) => {
         const tx = {
           order: {
             create: jest
@@ -427,7 +446,7 @@ describe("POST /api/orders — AUTO_FETCH 多因素限领", () => {
       prismaMock.order.findFirst.mockResolvedValue({
         id: "existing",
         expiresAt: null,
-      });
+      } as any);
 
       const res = await POST(makeRequest(BASE_BODY));
       const data = await res.json();
@@ -444,7 +463,7 @@ describe("POST /api/orders — AUTO_FETCH 多因素限领", () => {
       prismaMock.order.findFirst.mockResolvedValue({
         id: "existing",
         expiresAt,
-      });
+      } as any);
 
       const res = await POST(makeRequest(BASE_BODY));
       const data = await res.json();
@@ -461,7 +480,7 @@ describe("POST /api/orders — AUTO_FETCH 多因素限领", () => {
       prismaMock.order.findFirst.mockResolvedValue({
         id: "existing",
         expiresAt: null,
-      });
+      } as any);
 
       const res = await POST(
         makeRequest({ ...BASE_BODY, productId: "prod_paid" }),
@@ -505,8 +524,8 @@ describe("POST /api/orders — AUTO_FETCH 多因素限领", () => {
       await POST(makeRequest(BASE_BODY));
       const after = Date.now();
 
-      const call = prismaMock.order.findFirst.mock.calls[0][0];
-      const timeOR = call.where.AND[0].OR as object[];
+      const call = prismaMock.order.findFirst.mock.calls[0]![0]!;
+      const timeOR = (call.where!.AND as any)[0].OR as object[];
 
       // 第一个条件：expiresAt null + createdAt >= cooldownStart
       const nullExpiryBranch = timeOR.find(
@@ -531,8 +550,8 @@ describe("POST /api/orders — AUTO_FETCH 多因素限领", () => {
       const before = Date.now();
       await POST(makeRequest(BASE_BODY));
 
-      const call = prismaMock.order.findFirst.mock.calls[0][0];
-      const timeOR = call.where.AND[0].OR as object[];
+      const call = prismaMock.order.findFirst.mock.calls[0]![0]!;
+      const timeOR = (call.where!.AND as any)[0].OR as object[];
 
       const activeExpiryBranch = timeOR.find(
         (c) =>
@@ -569,8 +588,8 @@ describe("POST /api/orders — AUTO_FETCH 多因素限领", () => {
       const now = Date.now()
       await POST(makeRequest(BASE_BODY))
 
-      const call = prismaMock.order.findFirst.mock.calls[0][0]
-      const timeOR = call.where.AND[0].OR as object[]
+      const call = prismaMock.order.findFirst.mock.calls[0]![0]!
+      const timeOR = (call.where!.AND as any)[0].OR as object[]
       const activeExpiryBranch = timeOR.find(
           (c) => (c as Record<string, unknown>).expiresAt !== null &&
               (c as Record<string, unknown>).expiresAt !== undefined

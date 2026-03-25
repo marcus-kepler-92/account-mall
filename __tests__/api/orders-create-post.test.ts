@@ -1,1343 +1,1708 @@
-import { type NextRequest } from "next/server"
-import { POST } from "@/app/api/orders/route"
-import { prismaMock } from "../../__mocks__/prisma"
+import { type NextRequest } from "next/server";
+import { POST } from "@/app/api/orders/route";
+import { prismaMock } from "../../__mocks__/prisma";
+import { Prisma } from "@prisma/client";
 
 jest.mock("@/lib/prisma", () => {
-    const { prismaMock } = require("../../__mocks__/prisma")
-    return {
-        __esModule: true,
-        prisma: prismaMock,
-    }
-})
+  const { prismaMock } = require("../../__mocks__/prisma");
+  return {
+    __esModule: true,
+    prisma: prismaMock,
+  };
+});
 
 jest.mock("@/lib/auth-guard", () => ({
-    __esModule: true,
-    getAdminSession: jest.fn(),
-}))
+  __esModule: true,
+  getAdminSession: jest.fn(),
+}));
 
 jest.mock("better-auth/crypto", () => ({
-    __esModule: true,
-    hashPassword: jest.fn().mockResolvedValue("hashed-password"),
-}))
+  __esModule: true,
+  hashPassword: jest.fn().mockResolvedValue("hashed-password"),
+}));
 
 jest.mock("@/lib/rate-limit", () => ({
-    __esModule: true,
-    checkOrderCreateRateLimit: jest.fn().mockResolvedValue(null),
-    checkTurnstileFallbackRateLimit: jest.fn().mockResolvedValue(true),
-    getClientIp: jest.fn().mockReturnValue("127.0.0.1"),
-    MAX_PENDING_ORDERS_PER_IP: 3,
-}))
+  __esModule: true,
+  checkOrderCreateRateLimit: jest.fn().mockResolvedValue(null),
+  checkTurnstileFallbackRateLimit: jest.fn().mockResolvedValue(true),
+  getClientIp: jest.fn().mockReturnValue("127.0.0.1"),
+  MAX_PENDING_ORDERS_PER_IP: 3,
+}));
 
 jest.mock("@/lib/get-payment-url", () => ({
-    getPaymentUrlForOrder: jest.fn().mockReturnValue(null),
-}))
+  getPaymentUrlForOrder: jest.fn().mockReturnValue(null),
+}));
 
 jest.mock("@/lib/config", () => {
-    const mock = {
-        turnstileSecretKey: undefined as string | undefined,
-        nodeEnv: "test" as string,
-        siteUrl: "http://localhost:3000",
-    }
-    ;(global as { __configMock?: typeof mock }).__configMock = mock
-    return { config: mock, getConfig: () => mock }
-})
+  const mock = {
+    turnstileSecretKey: undefined as string | undefined,
+    nodeEnv: "test" as string,
+    siteUrl: "http://localhost:3000",
+  };
+  (global as { __configMock?: typeof mock }).__configMock = mock;
+  return { config: mock, getConfig: () => mock };
+});
 
 jest.mock("@/lib/turnstile", () => ({
-    verifyTurnstileToken: jest.fn(),
-}))
+  verifyTurnstileToken: jest.fn(),
+}));
 
 jest.mock("@/lib/complete-pending-order", () => ({
-    completePendingOrder: jest.fn(),
-}))
+  completePendingOrder: jest.fn(),
+}));
 
 jest.mock("@/lib/order-success-token", () => ({
-    createOrderSuccessToken: jest.fn().mockReturnValue("mock-success-token"),
-}))
+  createOrderSuccessToken: jest.fn().mockReturnValue("mock-success-token"),
+}));
 
-function createJsonRequest(body: unknown, cookies?: { get: (name: string) => { value: string } | undefined }): NextRequest {
-    return {
-        json: async () => body,
-        cookies: cookies ?? { get: () => undefined },
-    } as unknown as NextRequest
+function createJsonRequest(
+  body: unknown,
+  cookies?: { get: (name: string) => { value: string } | undefined },
+): NextRequest {
+  return {
+    json: async () => body,
+    cookies: cookies ?? { get: () => undefined },
+  } as unknown as NextRequest;
 }
 
 function createInvalidJsonRequest(): NextRequest {
-    return {
-        json: async () => {
-            throw new Error("Invalid JSON")
-        },
-    } as unknown as NextRequest
+  return {
+    json: async () => {
+      throw new Error("Invalid JSON");
+    },
+  } as unknown as NextRequest;
 }
 
 describe("POST /api/orders (create order)", () => {
-    function getConfigMock() {
-        return (global as {
-            __configMock?: { turnstileSecretKey?: string; nodeEnv?: string; siteUrl?: string }
-        }).__configMock!
+  function getConfigMock() {
+    return (
+      global as {
+        __configMock?: {
+          turnstileSecretKey?: string;
+          nodeEnv?: string;
+          siteUrl?: string;
+        };
+      }
+    ).__configMock!;
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    getConfigMock().turnstileSecretKey = undefined;
+    (prismaMock.$transaction as jest.Mock).mockReset();
+  });
+
+  it("returns 400 when body is not valid JSON", async () => {
+    const res = await POST(createInvalidJsonRequest());
+    const data = await res.json();
+    expect(res.status).toBe(400);
+    expect(data).toEqual({ error: "Invalid JSON body" });
+  });
+
+  it("returns 400 when validation fails (missing productId)", async () => {
+    const res = await POST(
+      createJsonRequest({
+        email: "user@example.com",
+        orderPassword: "password123",
+        quantity: 1,
+      }),
+    );
+    const data = await res.json();
+    expect(res.status).toBe(400);
+    expect(data.error).toBe("Validation failed");
+    expect(data.details).toBeDefined();
+  });
+
+  it("returns 400 when validation fails (invalid email)", async () => {
+    const res = await POST(
+      createJsonRequest({
+        productId: "prod_1",
+        email: "not-an-email",
+        orderPassword: "password123",
+        quantity: 1,
+      }),
+    );
+    const data = await res.json();
+    expect(res.status).toBe(400);
+    expect(data.error).toBe("Validation failed");
+  });
+
+  it("returns 400 when validation fails (password too short)", async () => {
+    const res = await POST(
+      createJsonRequest({
+        productId: "prod_1",
+        email: "user@example.com",
+        orderPassword: "short",
+        quantity: 1,
+      }),
+    );
+    const data = await res.json();
+    expect(res.status).toBe(400);
+    expect(data.error).toBe("Validation failed");
+  });
+
+  it("returns 404 when product does not exist", async () => {
+    prismaMock.product.findUnique.mockResolvedValueOnce(null);
+
+    const res = await POST(
+      createJsonRequest({
+        productId: "nonexistent",
+        email: "user@example.com",
+        orderPassword: "password123",
+        quantity: 1,
+      }),
+    );
+    const data = await res.json();
+    expect(res.status).toBe(404);
+    expect(data).toEqual({ error: "Product not found or unavailable" });
+  });
+
+  it("returns 404 when product is INACTIVE", async () => {
+    prismaMock.product.findUnique.mockResolvedValueOnce({
+      id: "prod_1",
+      name: "Test",
+      slug: "test",
+      summary: null,
+      description: null,
+      image: null,
+      price: new Prisma.Decimal("100"),
+      maxQuantity: 5,
+      status: "INACTIVE",
+      productType: "NORMAL",
+      sourceUrl: null,
+      validityHours: null,
+      allowAccountSwitch: true,
+      accountSwitchLimit: 1,
+      pinnedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const res = await POST(
+      createJsonRequest({
+        productId: "prod_1",
+        email: "user@example.com",
+        orderPassword: "password123",
+        quantity: 1,
+      }),
+    );
+    const data = await res.json();
+    expect(res.status).toBe(404);
+    expect(data).toEqual({ error: "Product not found or unavailable" });
+  });
+
+  it("returns 400 when quantity exceeds maxQuantity", async () => {
+    prismaMock.product.findUnique.mockResolvedValueOnce({
+      id: "prod_1",
+      name: "Test",
+      slug: "test",
+      summary: null,
+      description: null,
+      image: null,
+      price: new Prisma.Decimal("100"),
+      maxQuantity: 2,
+      status: "ACTIVE",
+      productType: "NORMAL",
+      sourceUrl: null,
+      validityHours: null,
+      allowAccountSwitch: true,
+      accountSwitchLimit: 1,
+      pinnedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    prismaMock.card.count.mockResolvedValueOnce(10);
+
+    const res = await POST(
+      createJsonRequest({
+        productId: "prod_1",
+        email: "user@example.com",
+        orderPassword: "password123",
+        quantity: 5,
+      }),
+    );
+    const data = await res.json();
+    expect(res.status).toBe(400);
+    expect(data.error).toContain("Quantity must be between 1 and 2");
+  });
+
+  it("returns 400 when quantity is less than 1", async () => {
+    prismaMock.product.findUnique.mockResolvedValueOnce({
+      id: "prod_1",
+      name: "Test",
+      slug: "test",
+      summary: null,
+      description: null,
+      image: null,
+      price: new Prisma.Decimal("100"),
+      maxQuantity: 5,
+      status: "ACTIVE",
+      productType: "NORMAL",
+      sourceUrl: null,
+      validityHours: null,
+      allowAccountSwitch: true,
+      accountSwitchLimit: 1,
+      pinnedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const res = await POST(
+      createJsonRequest({
+        productId: "prod_1",
+        email: "user@example.com",
+        orderPassword: "password123",
+        quantity: 0,
+      }),
+    );
+    const data = await res.json();
+    expect(res.status).toBe(400);
+    expect(data.error).toBe("Validation failed");
+  });
+
+  it("returns 400 when order amount is invalid (zero)", async () => {
+    prismaMock.product.findUnique.mockResolvedValueOnce({
+      id: "prod_1",
+      name: "Test",
+      slug: "test",
+      summary: null,
+      description: null,
+      image: null,
+      price: new Prisma.Decimal("0"),
+      maxQuantity: 10,
+      status: "ACTIVE",
+      productType: "NORMAL",
+      sourceUrl: null,
+      validityHours: null,
+      allowAccountSwitch: true,
+      accountSwitchLimit: 1,
+      pinnedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    prismaMock.card.count.mockResolvedValueOnce(10);
+
+    const res = await POST(
+      createJsonRequest({
+        productId: "prod_1",
+        email: "user@example.com",
+        orderPassword: "password123",
+        quantity: 1,
+      }),
+    );
+    const data = await res.json();
+    expect(res.status).toBe(400);
+    expect(data.error).toBe("Invalid order amount");
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when order amount exceeds max (999999.99)", async () => {
+    prismaMock.product.findUnique.mockResolvedValueOnce({
+      id: "prod_1",
+      name: "Test",
+      slug: "test",
+      summary: null,
+      description: null,
+      image: null,
+      price: new Prisma.Decimal("500000"),
+      maxQuantity: 10,
+      status: "ACTIVE",
+      productType: "NORMAL",
+      sourceUrl: null,
+      validityHours: null,
+      allowAccountSwitch: true,
+      accountSwitchLimit: 1,
+      pinnedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    prismaMock.card.count.mockResolvedValueOnce(10);
+
+    const res = await POST(
+      createJsonRequest({
+        productId: "prod_1",
+        email: "user@example.com",
+        orderPassword: "password123",
+        quantity: 2,
+      }),
+    );
+    const data = await res.json();
+    expect(res.status).toBe(400);
+    expect(data.error).toBe("Invalid order amount");
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when insufficient stock", async () => {
+    prismaMock.product.findUnique.mockResolvedValueOnce({
+      id: "prod_1",
+      name: "Test",
+      slug: "test",
+      summary: null,
+      description: null,
+      image: null,
+      price: new Prisma.Decimal("100"),
+      maxQuantity: 10,
+      status: "ACTIVE",
+      productType: "NORMAL",
+      sourceUrl: null,
+      validityHours: null,
+      allowAccountSwitch: true,
+      accountSwitchLimit: 1,
+      pinnedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    prismaMock.card.count.mockResolvedValueOnce(1);
+
+    const res = await POST(
+      createJsonRequest({
+        productId: "prod_1",
+        email: "user@example.com",
+        orderPassword: "password123",
+        quantity: 3,
+      }),
+    );
+    const data = await res.json();
+    expect(res.status).toBe(400);
+    expect(data.error).toContain("Insufficient stock");
+    expect(data.error).toContain("Available: 1");
+  });
+
+  it("creates order and reserves cards, returns orderNo and amount", async () => {
+    const product = {
+      id: "prod_1",
+      name: "Test Product",
+      slug: "test-product",
+      summary: null,
+      description: null,
+      image: null,
+      price: new Prisma.Decimal("50"),
+      maxQuantity: 5,
+      status: "ACTIVE",
+      productType: "NORMAL",
+      sourceUrl: null,
+      validityHours: null,
+      allowAccountSwitch: true,
+      accountSwitchLimit: 1,
+      pinnedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    prismaMock.product.findUnique.mockResolvedValueOnce(product as any);
+    prismaMock.card.count.mockResolvedValueOnce(3);
+
+    const createdOrder = {
+      id: "order_new",
+      orderNo: "550e8400-e29b-41d4-a716-446655440000",
+      productId: "prod_1",
+      distributorId: null,
+      email: "user@example.com",
+      passwordHash: "hashed-password",
+      quantity: 2,
+      amount: new Prisma.Decimal("100"),
+      discountPercentApplied: null,
+      productNameSnapshot: null,
+      status: "PENDING",
+      paidAt: null,
+      expiresAt: null,
+      promoCode: null,
+      paymentMethod: "alipay",
+      clientIp: null,
+      fingerprintHash: null,
+      exitDiscountMeta: null,
+      switchAccountCount: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const mockTx = {
+      order: {
+        create: jest.fn().mockResolvedValue(createdOrder),
+      },
+      card: {
+        findMany: jest
+          .fn()
+          .mockResolvedValue([{ id: "card_1" }, { id: "card_2" }]),
+        updateMany: jest.fn().mockResolvedValue({ count: 2 }),
+      },
+    };
+    (prismaMock.$transaction as jest.Mock).mockImplementation(
+      (cb: (tx: unknown) => Promise<unknown>) => cb(mockTx),
+    );
+
+    const res = await POST(
+      createJsonRequest({
+        productId: "prod_1",
+        email: "User@Example.com",
+        orderPassword: "password123",
+        quantity: 2,
+      }),
+    );
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data).toMatchObject({
+      orderNo: createdOrder.orderNo,
+      amount: 100,
+      paymentUrl: null,
+    });
+    expect(data.successToken).toBeUndefined();
+    expect(mockTx.order.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        orderNo: expect.any(String),
+        productId: "prod_1",
+        productNameSnapshot: "Test Product",
+        email: "user@example.com",
+        passwordHash: "hashed-password",
+        quantity: 2,
+        amount: 100,
+        status: "PENDING",
+        clientIp: "127.0.0.1",
+      }),
+    });
+    expect(mockTx.card.findMany).toHaveBeenCalledWith({
+      where: { productId: "prod_1", status: "UNSOLD" },
+      take: 2,
+      orderBy: { createdAt: "asc" },
+      select: { id: true },
+    });
+    expect(mockTx.card.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ["card_1", "card_2"] } },
+      data: { status: "RESERVED", orderId: "order_new" },
+    });
+  });
+
+  it("stores paymentMethod in order and passes it to getPaymentUrlForOrder", async () => {
+    const { getPaymentUrlForOrder } = require("@/lib/get-payment-url");
+    (getPaymentUrlForOrder as jest.Mock).mockReturnValue(
+      "https://yipay.example/wxpay",
+    );
+    const product = {
+      id: "prod_1",
+      name: "Test Product",
+      slug: "test-product",
+      summary: null,
+      description: null,
+      image: null,
+      price: new Prisma.Decimal("50"),
+      maxQuantity: 5,
+      status: "ACTIVE",
+      productType: "NORMAL",
+      sourceUrl: null,
+      validityHours: null,
+      allowAccountSwitch: true,
+      accountSwitchLimit: 1,
+      pinnedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    prismaMock.product.findUnique.mockResolvedValueOnce(product as any);
+    prismaMock.card.count.mockResolvedValueOnce(3);
+
+    const createdOrder = {
+      id: "order_new",
+      orderNo: "uuid-wxpay",
+      productId: "prod_1",
+      distributorId: null,
+      email: "user@example.com",
+      passwordHash: "hashed-password",
+      quantity: 1,
+      amount: new Prisma.Decimal("50"),
+      discountPercentApplied: null,
+      productNameSnapshot: null,
+      status: "PENDING",
+      paidAt: null,
+      expiresAt: null,
+      promoCode: null,
+      paymentMethod: "alipay",
+      clientIp: null,
+      fingerprintHash: null,
+      exitDiscountMeta: null,
+      switchAccountCount: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    const mockTx = {
+      order: { create: jest.fn().mockResolvedValue(createdOrder) },
+      card: {
+        findMany: jest.fn().mockResolvedValue([{ id: "card_1" }]),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+    };
+    (prismaMock.$transaction as jest.Mock).mockImplementation(
+      (cb: (tx: unknown) => Promise<unknown>) => cb(mockTx),
+    );
+
+    const res = await POST(
+      createJsonRequest({
+        productId: "prod_1",
+        email: "user@example.com",
+        orderPassword: "password123",
+        quantity: 1,
+        paymentMethod: "wxpay",
+      }),
+    );
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.paymentUrl).toBe("https://yipay.example/wxpay");
+    expect(mockTx.order.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        paymentMethod: "wxpay",
+      }),
+    });
+    expect(getPaymentUrlForOrder).toHaveBeenCalledWith(
+      expect.objectContaining({ paymentMethod: "wxpay" }),
+    );
+  });
+
+  it("defaults paymentMethod to alipay when not provided", async () => {
+    const { getPaymentUrlForOrder } = require("@/lib/get-payment-url");
+    const product = {
+      id: "prod_1",
+      name: "Test Product",
+      slug: "test-product",
+      summary: null,
+      description: null,
+      image: null,
+      price: new Prisma.Decimal("50"),
+      maxQuantity: 5,
+      status: "ACTIVE",
+      productType: "NORMAL",
+      sourceUrl: null,
+      validityHours: null,
+      allowAccountSwitch: true,
+      accountSwitchLimit: 1,
+      pinnedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    prismaMock.product.findUnique.mockResolvedValueOnce(product as any);
+    prismaMock.card.count.mockResolvedValueOnce(3);
+
+    const createdOrder = {
+      id: "order_new",
+      orderNo: "uuid-default",
+      productId: "prod_1",
+      distributorId: null,
+      email: "user@example.com",
+      passwordHash: "hashed-password",
+      quantity: 1,
+      amount: new Prisma.Decimal("50"),
+      discountPercentApplied: null,
+      productNameSnapshot: null,
+      status: "PENDING",
+      paidAt: null,
+      expiresAt: null,
+      promoCode: null,
+      paymentMethod: "alipay",
+      clientIp: null,
+      fingerprintHash: null,
+      exitDiscountMeta: null,
+      switchAccountCount: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    const mockTx = {
+      order: { create: jest.fn().mockResolvedValue(createdOrder) },
+      card: {
+        findMany: jest.fn().mockResolvedValue([{ id: "card_1" }]),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+    };
+    (prismaMock.$transaction as jest.Mock).mockImplementation(
+      (cb: (tx: unknown) => Promise<unknown>) => cb(mockTx),
+    );
+
+    await POST(
+      createJsonRequest({
+        productId: "prod_1",
+        email: "user@example.com",
+        orderPassword: "password123",
+        quantity: 1,
+      }),
+    );
+
+    expect(mockTx.order.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        paymentMethod: "alipay",
+      }),
+    });
+    expect(getPaymentUrlForOrder).toHaveBeenCalledWith(
+      expect.objectContaining({ paymentMethod: "alipay" }),
+    );
+  });
+
+  it("rejects invalid paymentMethod value", async () => {
+    const res = await POST(
+      createJsonRequest({
+        productId: "prod_1",
+        email: "user@example.com",
+        orderPassword: "password123",
+        quantity: 1,
+        paymentMethod: "bitcoin",
+      }),
+    );
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toBe("Validation failed");
+  });
+
+  it("ignores client-submitted price and amount; order amount is computed from product.price only", async () => {
+    const product = {
+      id: "prod_1",
+      name: "Test Product",
+      slug: "test-product",
+      summary: null,
+      description: null,
+      image: null,
+      price: new Prisma.Decimal("50"),
+      maxQuantity: 5,
+      status: "ACTIVE",
+      productType: "NORMAL",
+      sourceUrl: null,
+      validityHours: null,
+      allowAccountSwitch: true,
+      accountSwitchLimit: 1,
+      pinnedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    prismaMock.product.findUnique.mockResolvedValueOnce(product as any);
+    prismaMock.card.count.mockResolvedValueOnce(3);
+    const createdOrder = {
+      id: "order_new",
+      orderNo: "550e8400-e29b-41d4-a716-446655440000",
+      productId: "prod_1",
+      distributorId: null,
+      email: "user@example.com",
+      passwordHash: "hashed-password",
+      quantity: 2,
+      amount: new Prisma.Decimal("100"),
+      discountPercentApplied: null,
+      productNameSnapshot: null,
+      status: "PENDING",
+      paidAt: null,
+      expiresAt: null,
+      promoCode: null,
+      paymentMethod: "alipay",
+      clientIp: null,
+      fingerprintHash: null,
+      exitDiscountMeta: null,
+      switchAccountCount: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    const mockTx = {
+      order: { create: jest.fn().mockResolvedValue(createdOrder) },
+      card: {
+        findMany: jest
+          .fn()
+          .mockResolvedValue([{ id: "card_1" }, { id: "card_2" }]),
+        updateMany: jest.fn().mockResolvedValue({ count: 2 }),
+      },
+    };
+    (prismaMock.$transaction as jest.Mock).mockImplementation(
+      (cb: (tx: unknown) => Promise<unknown>) => cb(mockTx),
+    );
+
+    const res = await POST(
+      createJsonRequest({
+        productId: "prod_1",
+        email: "user@example.com",
+        orderPassword: "password123",
+        quantity: 2,
+        price: 0.01,
+        amount: 0.01,
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    const createCall = (mockTx.order.create as jest.Mock).mock.calls[0][0];
+    expect(createCall.data.amount).toBe(100);
+    expect(createCall.data).not.toMatchObject({ price: 0.01, amount: 0.01 });
+  });
+
+  it("in development completes order immediately and returns successToken and paymentUrl null", async () => {
+    const { completePendingOrder } = require("@/lib/complete-pending-order");
+    (completePendingOrder as jest.Mock).mockResolvedValueOnce({
+      done: true,
+      orderNo: "uuid-dev-mock",
+    });
+    getConfigMock().nodeEnv = "development";
+    getConfigMock().siteUrl = "https://example.com";
+    const product = {
+      id: "prod_1",
+      name: "Test Product",
+      slug: "test-product",
+      summary: null,
+      description: null,
+      image: null,
+      price: new Prisma.Decimal("50"),
+      maxQuantity: 5,
+      status: "ACTIVE",
+      productType: "NORMAL",
+      sourceUrl: null,
+      validityHours: null,
+      allowAccountSwitch: true,
+      accountSwitchLimit: 1,
+      pinnedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    prismaMock.product.findUnique.mockResolvedValueOnce(product as any);
+    prismaMock.card.count.mockResolvedValueOnce(3);
+    const createdOrder = {
+      id: "order_new",
+      orderNo: "uuid-dev-mock",
+      productId: "prod_1",
+      distributorId: null,
+      email: "user@example.com",
+      passwordHash: "hashed-password",
+      quantity: 1,
+      amount: new Prisma.Decimal("50"),
+      discountPercentApplied: null,
+      productNameSnapshot: null,
+      status: "PENDING",
+      paidAt: null,
+      expiresAt: null,
+      promoCode: null,
+      paymentMethod: "alipay",
+      clientIp: null,
+      fingerprintHash: null,
+      exitDiscountMeta: null,
+      switchAccountCount: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    const mockTx = {
+      order: {
+        create: jest.fn().mockResolvedValue(createdOrder),
+      },
+      card: {
+        findMany: jest.fn().mockResolvedValue([{ id: "card_1" }]),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+    };
+    (prismaMock.$transaction as jest.Mock).mockImplementation(
+      (cb: (tx: unknown) => Promise<unknown>) => cb(mockTx),
+    );
+    const res = await POST(
+      createJsonRequest({
+        productId: "prod_1",
+        email: "user@example.com",
+        orderPassword: "password123",
+        quantity: 1,
+      }),
+    );
+    const data = await res.json();
+    expect(res.status).toBe(200);
+    expect(data.paymentUrl).toBeNull();
+    expect(data.successToken).toBeDefined();
+    expect(typeof data.successToken).toBe("string");
+    expect(data.orderNo).toBe("uuid-dev-mock");
+    expect(data.amount).toBe(50);
+    expect(completePendingOrder).toHaveBeenCalledWith("uuid-dev-mock");
+    getConfigMock().nodeEnv = "test";
+  });
+
+  it("in development returns 500 when completePendingOrder returns done false", async () => {
+    const { completePendingOrder } = require("@/lib/complete-pending-order");
+    (completePendingOrder as jest.Mock).mockResolvedValueOnce({
+      done: false,
+      error: "Order not found",
+    });
+    getConfigMock().nodeEnv = "development";
+    const product = {
+      id: "prod_1",
+      name: "Test Product",
+      slug: "test-product",
+      summary: null,
+      description: null,
+      image: null,
+      price: new Prisma.Decimal("50"),
+      maxQuantity: 5,
+      status: "ACTIVE",
+      productType: "NORMAL",
+      sourceUrl: null,
+      validityHours: null,
+      allowAccountSwitch: true,
+      accountSwitchLimit: 1,
+      pinnedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    prismaMock.product.findUnique.mockResolvedValueOnce(product as any);
+    prismaMock.card.count.mockResolvedValueOnce(3);
+    const createdOrder = {
+      id: "order_new",
+      orderNo: "uuid-dev-mock",
+      productId: "prod_1",
+      distributorId: null,
+      email: "user@example.com",
+      passwordHash: "hashed-password",
+      quantity: 1,
+      amount: new Prisma.Decimal("50"),
+      discountPercentApplied: null,
+      productNameSnapshot: null,
+      status: "PENDING",
+      paidAt: null,
+      expiresAt: null,
+      promoCode: null,
+      paymentMethod: "alipay",
+      clientIp: null,
+      fingerprintHash: null,
+      exitDiscountMeta: null,
+      switchAccountCount: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    const mockTx = {
+      order: { create: jest.fn().mockResolvedValue(createdOrder) },
+      card: {
+        findMany: jest.fn().mockResolvedValue([{ id: "card_1" }]),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+    };
+    (prismaMock.$transaction as jest.Mock).mockImplementation(
+      (cb: (tx: unknown) => Promise<unknown>) => cb(mockTx),
+    );
+    const res = await POST(
+      createJsonRequest({
+        productId: "prod_1",
+        email: "user@example.com",
+        orderPassword: "password123",
+        quantity: 1,
+      }),
+    );
+    const data = await res.json();
+    expect(res.status).toBe(500);
+    expect(data.error).toBeDefined();
+    getConfigMock().nodeEnv = "test";
+  });
+
+  it("throws when reservation finds insufficient cards during transaction", async () => {
+    prismaMock.product.findUnique.mockResolvedValueOnce({
+      id: "prod_1",
+      name: "Test",
+      slug: "test",
+      summary: null,
+      description: null,
+      image: null,
+      price: new Prisma.Decimal("100"),
+      maxQuantity: 5,
+      status: "ACTIVE",
+      productType: "NORMAL",
+      sourceUrl: null,
+      validityHours: null,
+      allowAccountSwitch: true,
+      accountSwitchLimit: 1,
+      pinnedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    prismaMock.card.count.mockResolvedValueOnce(2);
+    const mockTx = {
+      order: {
+        create: jest.fn().mockResolvedValue({
+          id: "order_new",
+          orderNo: "uuid-1",
+          productId: "prod_1",
+          distributorId: null,
+          email: "user@example.com",
+          passwordHash: "hash",
+          quantity: 2,
+          amount: new Prisma.Decimal("200"),
+          discountPercentApplied: null,
+          productNameSnapshot: null,
+          status: "PENDING",
+          paidAt: null,
+          expiresAt: null,
+          promoCode: null,
+          paymentMethod: "alipay",
+          clientIp: null,
+          fingerprintHash: null,
+          exitDiscountMeta: null,
+          switchAccountCount: 0,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }),
+      },
+      card: {
+        findMany: jest.fn().mockResolvedValue([{ id: "card_1" }]),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+    };
+    (prismaMock.$transaction as jest.Mock).mockImplementation(
+      (cb: (tx: unknown) => Promise<unknown>) => cb(mockTx),
+    );
+    await expect(
+      POST(
+        createJsonRequest({
+          productId: "prod_1",
+          email: "user@example.com",
+          orderPassword: "password123",
+          quantity: 2,
+        }),
+      ),
+    ).rejects.toThrow("Insufficient stock during reservation");
+  });
+
+  it("returns 500 when order creation hits P2002 unique constraint exhausts retries", async () => {
+    prismaMock.product.findUnique.mockResolvedValueOnce({
+      id: "prod_1",
+      name: "Test",
+      slug: "test",
+      summary: null,
+      description: null,
+      image: null,
+      price: new Prisma.Decimal("100"),
+      maxQuantity: 5,
+      status: "ACTIVE",
+      productType: "NORMAL",
+      sourceUrl: null,
+      validityHours: null,
+      allowAccountSwitch: true,
+      accountSwitchLimit: 1,
+      pinnedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    prismaMock.card.count.mockResolvedValueOnce(10);
+    const p2002 = new Error("Unique constraint") as Error & {
+      code?: string;
+      meta?: { target?: string[] };
+    };
+    p2002.code = "P2002";
+    p2002.meta = { target: ["orderNo"] };
+    (prismaMock.$transaction as jest.Mock).mockImplementation(() =>
+      Promise.reject(p2002),
+    );
+    const res = await POST(
+      createJsonRequest({
+        productId: "prod_1",
+        email: "user@example.com",
+        orderPassword: "password123",
+        quantity: 1,
+      }),
+    );
+    const data = await res.json();
+    expect(res.status).toBe(500);
+    expect(data.error).toMatch(/retries|try again/);
+  });
+
+  it("returns 429 when rate limited", async () => {
+    const { checkOrderCreateRateLimit } = require("@/lib/rate-limit");
+    (checkOrderCreateRateLimit as jest.Mock).mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ error: "Too many orders. Please try again later." }),
+        { status: 429, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    const res = await POST(
+      createJsonRequest({
+        productId: "prod_1",
+        email: "user@example.com",
+        orderPassword: "password123",
+        quantity: 1,
+      }),
+    );
+    expect(res.status).toBe(429);
+    const data = await res.json();
+    expect(data.error).toContain("Too many");
+    expect(prismaMock.product.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when IP has too many PENDING orders", async () => {
+    prismaMock.order.count.mockResolvedValueOnce(3);
+    prismaMock.product.findUnique.mockResolvedValueOnce({
+      id: "prod_1",
+      name: "Test",
+      slug: "test",
+      summary: null,
+      description: null,
+      image: null,
+      price: new Prisma.Decimal("100"),
+      maxQuantity: 5,
+      status: "ACTIVE",
+      productType: "NORMAL",
+      sourceUrl: null,
+      validityHours: null,
+      allowAccountSwitch: true,
+      accountSwitchLimit: 1,
+      pinnedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    const res = await POST(
+      createJsonRequest({
+        productId: "prod_1",
+        email: "user@example.com",
+        orderPassword: "password123",
+        quantity: 1,
+      }),
+    );
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toMatch(/unpaid order|expire/);
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  describe("Turnstile verification", () => {
+    it("returns 400 when Turnstile is configured but token is missing", async () => {
+      getConfigMock().turnstileSecretKey = "test-secret";
+      const res = await POST(
+        createJsonRequest({
+          productId: "prod_1",
+          email: "user@example.com",
+          orderPassword: "password123",
+          quantity: 1,
+        }),
+      );
+      const data = await res.json();
+      expect(res.status).toBe(400);
+      expect(data.error).toContain("安全验证");
+      const { verifyTurnstileToken } = require("@/lib/turnstile");
+      expect(verifyTurnstileToken).not.toHaveBeenCalled();
+    });
+
+    it("returns 400 when Turnstile is configured but token is empty string", async () => {
+      getConfigMock().turnstileSecretKey = "test-secret";
+      const res = await POST(
+        createJsonRequest({
+          productId: "prod_1",
+          email: "user@example.com",
+          orderPassword: "password123",
+          quantity: 1,
+          turnstileToken: "   ",
+        }),
+      );
+      const data = await res.json();
+      expect(res.status).toBe(400);
+      expect(data.error).toContain("安全验证");
+    });
+
+    it("returns 400 when Turnstile verification fails", async () => {
+      getConfigMock().turnstileSecretKey = "test-secret";
+      const { verifyTurnstileToken } = require("@/lib/turnstile");
+      (verifyTurnstileToken as jest.Mock).mockResolvedValueOnce({
+        success: false,
+        "error-codes": ["invalid-input-response"],
+      });
+      const res = await POST(
+        createJsonRequest({
+          productId: "prod_1",
+          email: "user@example.com",
+          orderPassword: "password123",
+          quantity: 1,
+          turnstileToken: "bad-token",
+        }),
+      );
+      const data = await res.json();
+      expect(res.status).toBe(400);
+      expect(data.error).toMatch(/安全验证|重试/);
+      expect(verifyTurnstileToken).toHaveBeenCalledWith(
+        "bad-token",
+        "test-secret",
+        "127.0.0.1",
+      );
+      expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    });
+
+    it("returns 400 when Turnstile verification returns timeout-or-duplicate", async () => {
+      getConfigMock().turnstileSecretKey = "test-secret";
+      const { verifyTurnstileToken } = require("@/lib/turnstile");
+      (verifyTurnstileToken as jest.Mock).mockResolvedValueOnce({
+        success: false,
+        "error-codes": ["timeout-or-duplicate"],
+      });
+      const res = await POST(
+        createJsonRequest({
+          productId: "prod_1",
+          email: "user@example.com",
+          orderPassword: "password123",
+          quantity: 1,
+          turnstileToken: "expired-token",
+        }),
+      );
+      const data = await res.json();
+      expect(res.status).toBe(400);
+      expect(data.error).toMatch(/过期|重新提交/);
+    });
+
+    it("allows order when Turnstile token is missing but fingerprintHash is present (graceful degradation)", async () => {
+      getConfigMock().turnstileSecretKey = "test-secret";
+      prismaMock.product.findUnique.mockResolvedValueOnce({
+        id: "prod_1",
+        name: "Test",
+        slug: "test",
+        summary: null,
+        description: null,
+        image: null,
+        price: new Prisma.Decimal("50"),
+        maxQuantity: 5,
+        status: "ACTIVE",
+        productType: "NORMAL",
+        sourceUrl: null,
+        validityHours: null,
+        allowAccountSwitch: true,
+        accountSwitchLimit: 1,
+        pinnedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      prismaMock.card.count.mockResolvedValueOnce(3);
+      prismaMock.order.count.mockResolvedValueOnce(0);
+      const createdOrder = {
+        id: "order_new",
+        orderNo: "550e8400-e29b-41d4-a716-446655440000",
+        productId: "prod_1",
+        distributorId: null,
+        email: "user@example.com",
+        passwordHash: "hashed-password",
+        quantity: 1,
+        amount: new Prisma.Decimal("50"),
+        discountPercentApplied: null,
+        productNameSnapshot: null,
+        status: "PENDING",
+        paidAt: null,
+        expiresAt: null,
+        promoCode: null,
+        paymentMethod: "alipay",
+        clientIp: null,
+        fingerprintHash: null,
+        exitDiscountMeta: null,
+        switchAccountCount: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const mockTx = {
+        order: {
+          create: jest.fn().mockResolvedValue(createdOrder),
+        },
+        card: {
+          findMany: jest.fn().mockResolvedValue([{ id: "card_1" }]),
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
+      };
+      (prismaMock.$transaction as jest.Mock).mockImplementation(
+        (cb: (tx: unknown) => Promise<unknown>) => cb(mockTx),
+      );
+
+      const res = await POST(
+        createJsonRequest({
+          productId: "prod_1",
+          email: "user@example.com",
+          orderPassword: "password123",
+          quantity: 1,
+          fingerprintHash: "abc123fingerprint",
+        }),
+      );
+
+      expect(res.status).toBe(200);
+      const { verifyTurnstileToken } = require("@/lib/turnstile");
+      expect(verifyTurnstileToken).not.toHaveBeenCalled();
+    });
+
+    it("rejects order when both Turnstile token and fingerprintHash are missing", async () => {
+      getConfigMock().turnstileSecretKey = "test-secret";
+      const res = await POST(
+        createJsonRequest({
+          productId: "prod_1",
+          email: "user@example.com",
+          orderPassword: "password123",
+          quantity: 1,
+        }),
+      );
+      const data = await res.json();
+      expect(res.status).toBe(400);
+      expect(data.error).toContain("安全验证");
+    });
+
+    it("creates order when Turnstile is configured and token verification succeeds", async () => {
+      getConfigMock().turnstileSecretKey = "test-secret";
+      const { verifyTurnstileToken } = require("@/lib/turnstile");
+      (verifyTurnstileToken as jest.Mock).mockResolvedValueOnce({
+        success: true,
+      });
+      prismaMock.product.findUnique.mockResolvedValueOnce({
+        id: "prod_1",
+        name: "Test",
+        slug: "test",
+        summary: null,
+        description: null,
+        image: null,
+        price: new Prisma.Decimal("50"),
+        maxQuantity: 5,
+        status: "ACTIVE",
+        productType: "NORMAL",
+        sourceUrl: null,
+        validityHours: null,
+        allowAccountSwitch: true,
+        accountSwitchLimit: 1,
+        pinnedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      prismaMock.card.count.mockResolvedValueOnce(3);
+      prismaMock.order.count.mockResolvedValueOnce(0);
+      const createdOrder = {
+        id: "order_new",
+        orderNo: "550e8400-e29b-41d4-a716-446655440000",
+        productId: "prod_1",
+        distributorId: null,
+        email: "user@example.com",
+        passwordHash: "hashed-password",
+        quantity: 1,
+        amount: new Prisma.Decimal("50"),
+        discountPercentApplied: null,
+        productNameSnapshot: null,
+        status: "PENDING",
+        paidAt: null,
+        expiresAt: null,
+        promoCode: null,
+        paymentMethod: "alipay",
+        clientIp: null,
+        fingerprintHash: null,
+        exitDiscountMeta: null,
+        switchAccountCount: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const mockTx = {
+        order: {
+          create: jest.fn().mockResolvedValue(createdOrder),
+        },
+        card: {
+          findMany: jest.fn().mockResolvedValue([{ id: "card_1" }]),
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
+      };
+      (prismaMock.$transaction as jest.Mock).mockImplementation(
+        (cb: (tx: unknown) => Promise<unknown>) => cb(mockTx),
+      );
+
+      const res = await POST(
+        createJsonRequest({
+          productId: "prod_1",
+          email: "user@example.com",
+          orderPassword: "password123",
+          quantity: 1,
+          turnstileToken: "valid-token",
+        }),
+      );
+      const data = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(data.orderNo).toBe(createdOrder.orderNo);
+      expect(verifyTurnstileToken).toHaveBeenCalledWith(
+        "valid-token",
+        "test-secret",
+        "127.0.0.1",
+      );
+      expect(mockTx.order.create).toHaveBeenCalled();
+    });
+  });
+
+  describe("promoCode attribution (distributor)", () => {
+    const product = {
+      id: "prod_1",
+      name: "Test Product",
+      slug: "test-product",
+      summary: null,
+      description: null,
+      image: null,
+      price: new Prisma.Decimal("50"),
+      maxQuantity: 5,
+      status: "ACTIVE",
+      productType: "NORMAL",
+      sourceUrl: null,
+      validityHours: null,
+      allowAccountSwitch: true,
+      accountSwitchLimit: 1,
+      pinnedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    const createdOrder = {
+      id: "order_new",
+      orderNo: "550e8400-e29b-41d4-a716-446655440000",
+      productId: "prod_1",
+      distributorId: null,
+      email: "user@example.com",
+      passwordHash: "hashed-password",
+      quantity: 2,
+      amount: new Prisma.Decimal("100"),
+      discountPercentApplied: null,
+      productNameSnapshot: null,
+      status: "PENDING",
+      paidAt: null,
+      expiresAt: null,
+      promoCode: null,
+      paymentMethod: "alipay",
+      clientIp: null,
+      fingerprintHash: null,
+      exitDiscountMeta: null,
+      switchAccountCount: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    function mockTxWithCreate() {
+      const tx = {
+        order: { create: jest.fn().mockResolvedValue(createdOrder) },
+        card: {
+          findMany: jest
+            .fn()
+            .mockResolvedValue([{ id: "card_1" }, { id: "card_2" }]),
+          updateMany: jest.fn().mockResolvedValue({ count: 2 }),
+        },
+      };
+      (prismaMock.$transaction as jest.Mock).mockImplementation(
+        (cb: (t: unknown) => Promise<unknown>) => cb(tx),
+      );
+      return tx;
     }
 
-    beforeEach(() => {
-        jest.clearAllMocks()
-        getConfigMock().turnstileSecretKey = undefined
-        ;(prismaMock.$transaction as jest.Mock).mockReset()
-    })
+    it("includes distributorId when body has valid promoCode", async () => {
+      prismaMock.user.findFirst.mockResolvedValueOnce({ id: "dist_1" } as any);
+      prismaMock.product.findUnique.mockResolvedValueOnce(product as any);
+      prismaMock.card.count.mockResolvedValueOnce(3);
+      const tx = mockTxWithCreate();
 
-    it("returns 400 when body is not valid JSON", async () => {
-        const res = await POST(createInvalidJsonRequest())
-        const data = await res.json()
-        expect(res.status).toBe(400)
-        expect(data).toEqual({ error: "Invalid JSON body" })
-    })
+      const res = await POST(
+        createJsonRequest({
+          productId: "prod_1",
+          email: "user@example.com",
+          orderPassword: "password123",
+          quantity: 2,
+          promoCode: "PROMO1",
+        }),
+      );
+      const data = await res.json();
 
-    it("returns 400 when validation fails (missing productId)", async () => {
-        const res = await POST(
-            createJsonRequest({
-                email: "user@example.com",
-                orderPassword: "password123",
-                quantity: 1,
-            })
-        )
-        const data = await res.json()
-        expect(res.status).toBe(400)
-        expect(data.error).toBe("Validation failed")
-        expect(data.details).toBeDefined()
-    })
+      expect(res.status).toBe(200);
+      expect(tx.order.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          distributorId: "dist_1",
+          productId: "prod_1",
+          quantity: 2,
+          amount: 100,
+        }),
+      });
+    });
 
-    it("returns 400 when validation fails (invalid email)", async () => {
-        const res = await POST(
-            createJsonRequest({
-                productId: "prod_1",
-                email: "not-an-email",
-                orderPassword: "password123",
-                quantity: 1,
-            })
-        )
-        const data = await res.json()
-        expect(res.status).toBe(400)
-        expect(data.error).toBe("Validation failed")
-    })
+    it("includes distributorId when cookie has valid promoCode and body has none", async () => {
+      prismaMock.user.findFirst.mockResolvedValueOnce({ id: "dist_1" } as any);
+      prismaMock.product.findUnique.mockResolvedValueOnce(product as any);
+      prismaMock.card.count.mockResolvedValueOnce(3);
+      const tx = mockTxWithCreate();
+      const cookies = {
+        get: (name: string) =>
+          name === "distributor_promo_code" ? { value: "PROMO1" } : undefined,
+      };
 
-    it("returns 400 when validation fails (password too short)", async () => {
-        const res = await POST(
-            createJsonRequest({
-                productId: "prod_1",
-                email: "user@example.com",
-                orderPassword: "short",
-                quantity: 1,
-            })
-        )
-        const data = await res.json()
-        expect(res.status).toBe(400)
-        expect(data.error).toBe("Validation failed")
-    })
-
-    it("returns 404 when product does not exist", async () => {
-        prismaMock.product.findUnique.mockResolvedValueOnce(null)
-
-        const res = await POST(
-            createJsonRequest({
-                productId: "nonexistent",
-                email: "user@example.com",
-                orderPassword: "password123",
-                quantity: 1,
-            })
-        )
-        const data = await res.json()
-        expect(res.status).toBe(404)
-        expect(data).toEqual({ error: "Product not found or unavailable" })
-    })
-
-    it("returns 404 when product is INACTIVE", async () => {
-        prismaMock.product.findUnique.mockResolvedValueOnce({
-            id: "prod_1",
-            name: "Test",
-            price: 100,
-            maxQuantity: 5,
-            status: "INACTIVE",
-        })
-
-        const res = await POST(
-            createJsonRequest({
-                productId: "prod_1",
-                email: "user@example.com",
-                orderPassword: "password123",
-                quantity: 1,
-            })
-        )
-        const data = await res.json()
-        expect(res.status).toBe(404)
-        expect(data).toEqual({ error: "Product not found or unavailable" })
-    })
-
-    it("returns 400 when quantity exceeds maxQuantity", async () => {
-        prismaMock.product.findUnique.mockResolvedValueOnce({
-            id: "prod_1",
-            name: "Test",
-            price: 100,
-            maxQuantity: 2,
-            status: "ACTIVE",
-        })
-        prismaMock.card.count.mockResolvedValueOnce(10)
-
-        const res = await POST(
-            createJsonRequest({
-                productId: "prod_1",
-                email: "user@example.com",
-                orderPassword: "password123",
-                quantity: 5,
-            })
-        )
-        const data = await res.json()
-        expect(res.status).toBe(400)
-        expect(data.error).toContain("Quantity must be between 1 and 2")
-    })
-
-    it("returns 400 when quantity is less than 1", async () => {
-        prismaMock.product.findUnique.mockResolvedValueOnce({
-            id: "prod_1",
-            name: "Test",
-            price: 100,
-            maxQuantity: 5,
-            status: "ACTIVE",
-        })
-
-        const res = await POST(
-            createJsonRequest({
-                productId: "prod_1",
-                email: "user@example.com",
-                orderPassword: "password123",
-                quantity: 0,
-            })
-        )
-        const data = await res.json()
-        expect(res.status).toBe(400)
-        expect(data.error).toBe("Validation failed")
-    })
-
-    it("returns 400 when order amount is invalid (zero)", async () => {
-        prismaMock.product.findUnique.mockResolvedValueOnce({
-            id: "prod_1",
-            name: "Test",
-            price: 0,
-            maxQuantity: 10,
-            status: "ACTIVE",
-        })
-        prismaMock.card.count.mockResolvedValueOnce(10)
-
-        const res = await POST(
-            createJsonRequest({
-                productId: "prod_1",
-                email: "user@example.com",
-                orderPassword: "password123",
-                quantity: 1,
-            })
-        )
-        const data = await res.json()
-        expect(res.status).toBe(400)
-        expect(data.error).toBe("Invalid order amount")
-        expect(prismaMock.$transaction).not.toHaveBeenCalled()
-    })
-
-    it("returns 400 when order amount exceeds max (999999.99)", async () => {
-        prismaMock.product.findUnique.mockResolvedValueOnce({
-            id: "prod_1",
-            name: "Test",
-            price: 500000,
-            maxQuantity: 10,
-            status: "ACTIVE",
-        })
-        prismaMock.card.count.mockResolvedValueOnce(10)
-
-        const res = await POST(
-            createJsonRequest({
-                productId: "prod_1",
-                email: "user@example.com",
-                orderPassword: "password123",
-                quantity: 2,
-            })
-        )
-        const data = await res.json()
-        expect(res.status).toBe(400)
-        expect(data.error).toBe("Invalid order amount")
-        expect(prismaMock.$transaction).not.toHaveBeenCalled()
-    })
-
-    it("returns 400 when insufficient stock", async () => {
-        prismaMock.product.findUnique.mockResolvedValueOnce({
-            id: "prod_1",
-            name: "Test",
-            price: 100,
-            maxQuantity: 10,
-            status: "ACTIVE",
-        })
-        prismaMock.card.count.mockResolvedValueOnce(1)
-
-        const res = await POST(
-            createJsonRequest({
-                productId: "prod_1",
-                email: "user@example.com",
-                orderPassword: "password123",
-                quantity: 3,
-            })
-        )
-        const data = await res.json()
-        expect(res.status).toBe(400)
-        expect(data.error).toContain("Insufficient stock")
-        expect(data.error).toContain("Available: 1")
-    })
-
-    it("creates order and reserves cards, returns orderNo and amount", async () => {
-        const product = {
-            id: "prod_1",
-            name: "Test Product",
-            price: 50,
-            maxQuantity: 5,
-            status: "ACTIVE",
-        }
-        prismaMock.product.findUnique.mockResolvedValueOnce(product)
-        prismaMock.card.count.mockResolvedValueOnce(3)
-
-        const createdOrder = {
-            id: "order_new",
-            orderNo: "550e8400-e29b-41d4-a716-446655440000",
+      const res = await POST(
+        createJsonRequest(
+          {
             productId: "prod_1",
             email: "user@example.com",
-            passwordHash: "hashed-password",
+            orderPassword: "password123",
             quantity: 2,
-            amount: 100,
-            status: "PENDING",
-            paidAt: null,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-        }
+          },
+          cookies,
+        ),
+      );
 
-        const mockTx = {
-            order: {
-                create: jest.fn().mockResolvedValue(createdOrder),
-            },
-            card: {
-                findMany: jest.fn().mockResolvedValue([
-                    { id: "card_1" },
-                    { id: "card_2" },
-                ]),
-                updateMany: jest.fn().mockResolvedValue({ count: 2 }),
-            },
-        }
-        ;(prismaMock.$transaction as jest.Mock).mockImplementation((cb: (tx: unknown) => Promise<unknown>) =>
-            cb(mockTx)
-        )
+      expect(res.status).toBe(200);
+      expect(tx.order.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          distributorId: "dist_1",
+        }),
+      });
+    });
 
-        const res = await POST(
-            createJsonRequest({
-                productId: "prod_1",
-                email: "User@Example.com",
-                orderPassword: "password123",
-                quantity: 2,
-            })
-        )
-        const data = await res.json()
+    it("does not set distributorId when promoCode is invalid or distributor disabled", async () => {
+      prismaMock.user.findFirst.mockResolvedValueOnce(null);
+      prismaMock.product.findUnique.mockResolvedValueOnce(product as any);
+      prismaMock.card.count.mockResolvedValueOnce(3);
+      const tx = mockTxWithCreate();
 
-        expect(res.status).toBe(200)
-        expect(data).toMatchObject({
-            orderNo: createdOrder.orderNo,
-            amount: 100,
-            paymentUrl: null,
-        })
-        expect(data.successToken).toBeUndefined()
-        expect(mockTx.order.create).toHaveBeenCalledWith({
-            data: expect.objectContaining({
-                orderNo: expect.any(String),
-                productId: "prod_1",
-                productNameSnapshot: "Test Product",
-                email: "user@example.com",
-                passwordHash: "hashed-password",
-                quantity: 2,
-                amount: 100,
-                status: "PENDING",
-                clientIp: "127.0.0.1",
-            }),
-        })
-        expect(mockTx.card.findMany).toHaveBeenCalledWith({
-            where: { productId: "prod_1", status: "UNSOLD" },
-            take: 2,
-            orderBy: { createdAt: "asc" },
-            select: { id: true },
-        })
-        expect(mockTx.card.updateMany).toHaveBeenCalledWith({
-            where: { id: { in: ["card_1", "card_2"] } },
-            data: { status: "RESERVED", orderId: "order_new" },
-        })
-    })
+      const res = await POST(
+        createJsonRequest({
+          productId: "prod_1",
+          email: "user@example.com",
+          orderPassword: "password123",
+          quantity: 2,
+          promoCode: "INVALID",
+        }),
+      );
 
-    it("stores paymentMethod in order and passes it to getPaymentUrlForOrder", async () => {
-        const { getPaymentUrlForOrder } = require("@/lib/get-payment-url")
-        ;(getPaymentUrlForOrder as jest.Mock).mockReturnValue("https://yipay.example/wxpay")
-        const product = {
-            id: "prod_1",
-            name: "Test Product",
-            price: 50,
-            maxQuantity: 5,
-            status: "ACTIVE",
-        }
-        prismaMock.product.findUnique.mockResolvedValueOnce(product)
-        prismaMock.card.count.mockResolvedValueOnce(3)
+      expect(res.status).toBe(200);
+      const call = (tx.order.create as jest.Mock).mock.calls[0][0];
+      expect(call.data).not.toHaveProperty("distributorId");
+    });
 
-        const createdOrder = {
-            id: "order_new",
-            orderNo: "uuid-wxpay",
+    it("prefers body promoCode over cookie when both present", async () => {
+      prismaMock.user.findFirst
+        .mockResolvedValueOnce({ id: "dist_body" } as any)
+        .mockResolvedValueOnce({ id: "dist_cookie" } as any);
+      prismaMock.product.findUnique.mockResolvedValueOnce(product as any);
+      prismaMock.card.count.mockResolvedValueOnce(3);
+      const tx = mockTxWithCreate();
+      const cookies = {
+        get: (name: string) =>
+          name === "distributor_promo_code"
+            ? { value: "COOKIE_PROMO" }
+            : undefined,
+      };
+
+      await POST(
+        createJsonRequest(
+          {
             productId: "prod_1",
             email: "user@example.com",
-            passwordHash: "hashed-password",
-            quantity: 1,
-            amount: 50,
-            status: "PENDING",
-            paidAt: null,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-        }
-        const mockTx = {
-            order: { create: jest.fn().mockResolvedValue(createdOrder) },
-            card: {
-                findMany: jest.fn().mockResolvedValue([{ id: "card_1" }]),
-                updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-            },
-        }
-        ;(prismaMock.$transaction as jest.Mock).mockImplementation((cb: (tx: unknown) => Promise<unknown>) =>
-            cb(mockTx)
-        )
-
-        const res = await POST(
-            createJsonRequest({
-                productId: "prod_1",
-                email: "user@example.com",
-                orderPassword: "password123",
-                quantity: 1,
-                paymentMethod: "wxpay",
-            })
-        )
-        const data = await res.json()
-
-        expect(res.status).toBe(200)
-        expect(data.paymentUrl).toBe("https://yipay.example/wxpay")
-        expect(mockTx.order.create).toHaveBeenCalledWith({
-            data: expect.objectContaining({
-                paymentMethod: "wxpay",
-            }),
-        })
-        expect(getPaymentUrlForOrder).toHaveBeenCalledWith(
-            expect.objectContaining({ paymentMethod: "wxpay" }),
-        )
-    })
-
-    it("defaults paymentMethod to alipay when not provided", async () => {
-        const { getPaymentUrlForOrder } = require("@/lib/get-payment-url")
-        const product = {
-            id: "prod_1",
-            name: "Test Product",
-            price: 50,
-            maxQuantity: 5,
-            status: "ACTIVE",
-        }
-        prismaMock.product.findUnique.mockResolvedValueOnce(product)
-        prismaMock.card.count.mockResolvedValueOnce(3)
-
-        const createdOrder = {
-            id: "order_new",
-            orderNo: "uuid-default",
-            productId: "prod_1",
-            email: "user@example.com",
-            passwordHash: "hashed-password",
-            quantity: 1,
-            amount: 50,
-            status: "PENDING",
-            paidAt: null,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-        }
-        const mockTx = {
-            order: { create: jest.fn().mockResolvedValue(createdOrder) },
-            card: {
-                findMany: jest.fn().mockResolvedValue([{ id: "card_1" }]),
-                updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-            },
-        }
-        ;(prismaMock.$transaction as jest.Mock).mockImplementation((cb: (tx: unknown) => Promise<unknown>) =>
-            cb(mockTx)
-        )
-
-        await POST(
-            createJsonRequest({
-                productId: "prod_1",
-                email: "user@example.com",
-                orderPassword: "password123",
-                quantity: 1,
-            })
-        )
-
-        expect(mockTx.order.create).toHaveBeenCalledWith({
-            data: expect.objectContaining({
-                paymentMethod: "alipay",
-            }),
-        })
-        expect(getPaymentUrlForOrder).toHaveBeenCalledWith(
-            expect.objectContaining({ paymentMethod: "alipay" }),
-        )
-    })
-
-    it("rejects invalid paymentMethod value", async () => {
-        const res = await POST(
-            createJsonRequest({
-                productId: "prod_1",
-                email: "user@example.com",
-                orderPassword: "password123",
-                quantity: 1,
-                paymentMethod: "bitcoin",
-            })
-        )
-        expect(res.status).toBe(400)
-        const data = await res.json()
-        expect(data.error).toBe("Validation failed")
-    })
-
-    it("ignores client-submitted price and amount; order amount is computed from product.price only", async () => {
-        const product = {
-            id: "prod_1",
-            name: "Test Product",
-            price: 50,
-            maxQuantity: 5,
-            status: "ACTIVE",
-        }
-        prismaMock.product.findUnique.mockResolvedValueOnce(product)
-        prismaMock.card.count.mockResolvedValueOnce(3)
-        const createdOrder = {
-            id: "order_new",
-            orderNo: "550e8400-e29b-41d4-a716-446655440000",
-            productId: "prod_1",
-            email: "user@example.com",
-            passwordHash: "hashed-password",
+            orderPassword: "password123",
             quantity: 2,
-            amount: 100,
-            status: "PENDING",
-            paidAt: null,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-        }
-        const mockTx = {
-            order: { create: jest.fn().mockResolvedValue(createdOrder) },
-            card: {
-                findMany: jest.fn().mockResolvedValue([{ id: "card_1" }, { id: "card_2" }]),
-                updateMany: jest.fn().mockResolvedValue({ count: 2 }),
-            },
-        }
-        ;(prismaMock.$transaction as jest.Mock).mockImplementation((cb: (tx: unknown) => Promise<unknown>) =>
-            cb(mockTx)
-        )
+            promoCode: "BODY_PROMO",
+          },
+          cookies,
+        ),
+      );
 
-        const res = await POST(
-            createJsonRequest({
-                productId: "prod_1",
-                email: "user@example.com",
-                orderPassword: "password123",
-                quantity: 2,
-                price: 0.01,
-                amount: 0.01,
-            })
-        )
+      expect(prismaMock.user.findFirst).toHaveBeenCalledWith({
+        where: {
+          distributorCode: "BODY_PROMO",
+          role: "DISTRIBUTOR",
+          disabledAt: null,
+        },
+        select: { id: true, discountCodeEnabled: true, discountPercent: true },
+      });
+      expect(tx.order.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          distributorId: "dist_body",
+        }),
+      });
+    });
 
-        expect(res.status).toBe(200)
-        const createCall = (mockTx.order.create as jest.Mock).mock.calls[0][0]
-        expect(createCall.data.amount).toBe(100)
-        expect(createCall.data).not.toMatchObject({ price: 0.01, amount: 0.01 })
-    })
+    it("applies discount and sets discountPercentApplied when distributor has discountCodeEnabled and discountPercent", async () => {
+      prismaMock.user.findFirst.mockResolvedValueOnce({
+        id: "dist_1",
+        discountCodeEnabled: true,
+        discountPercent: new Prisma.Decimal("5"),
+      } as any);
+      prismaMock.product.findUnique.mockResolvedValueOnce(product as any);
+      prismaMock.card.count.mockResolvedValueOnce(3);
+      const tx = mockTxWithCreate();
 
-    it("in development completes order immediately and returns successToken and paymentUrl null", async () => {
-        const { completePendingOrder } = require("@/lib/complete-pending-order")
-        ;(completePendingOrder as jest.Mock).mockResolvedValueOnce({
-            done: true,
-            orderNo: "uuid-dev-mock",
-        })
-        getConfigMock().nodeEnv = "development"
-        getConfigMock().siteUrl = "https://example.com"
-        const product = {
-            id: "prod_1",
-            name: "Test Product",
-            price: 50,
-            maxQuantity: 5,
-            status: "ACTIVE",
-        }
-        prismaMock.product.findUnique.mockResolvedValueOnce(product)
-        prismaMock.card.count.mockResolvedValueOnce(3)
-        const createdOrder = {
-            id: "order_new",
-            orderNo: "uuid-dev-mock",
-            productId: "prod_1",
-            email: "user@example.com",
-            passwordHash: "hashed-password",
-            quantity: 1,
-            amount: 50,
-            status: "PENDING",
-            paidAt: null,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-        }
-        const mockTx = {
+      const res = await POST(
+        createJsonRequest({
+          productId: "prod_1",
+          email: "user@example.com",
+          orderPassword: "password123",
+          quantity: 2,
+          promoCode: "PROMO1",
+        }),
+      );
+
+      expect(res.status).toBe(200);
+      expect(tx.order.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          distributorId: "dist_1",
+          amount: 95,
+          discountPercentApplied: 5,
+        }),
+      });
+    });
+
+    it("no discount when distributor has discountCodeEnabled false", async () => {
+      prismaMock.user.findFirst.mockResolvedValueOnce({
+        id: "dist_1",
+        discountCodeEnabled: false,
+        discountPercent: new Prisma.Decimal("5"),
+      } as any);
+      prismaMock.product.findUnique.mockResolvedValueOnce(product as any);
+      prismaMock.card.count.mockResolvedValueOnce(3);
+      const tx = mockTxWithCreate();
+
+      await POST(
+        createJsonRequest({
+          productId: "prod_1",
+          email: "user@example.com",
+          orderPassword: "password123",
+          quantity: 2,
+          promoCode: "PROMO1",
+        }),
+      );
+
+      const call = (tx.order.create as jest.Mock).mock.calls[0][0];
+      expect(call.data.amount).toBe(100);
+      expect(call.data).not.toHaveProperty("discountPercentApplied");
+    });
+
+    it("no discount when distributor has discountCodeEnabled true but discountPercent null", async () => {
+      prismaMock.user.findFirst.mockResolvedValueOnce({
+        id: "dist_1",
+        discountCodeEnabled: true,
+        discountPercent: null,
+      } as any);
+      prismaMock.product.findUnique.mockResolvedValueOnce(product as any);
+      prismaMock.card.count.mockResolvedValueOnce(3);
+      const tx = mockTxWithCreate();
+
+      await POST(
+        createJsonRequest({
+          productId: "prod_1",
+          email: "user@example.com",
+          orderPassword: "password123",
+          quantity: 2,
+          promoCode: "PROMO1",
+        }),
+      );
+
+      const call = (tx.order.create as jest.Mock).mock.calls[0][0];
+      expect(call.data.amount).toBe(100);
+      expect(call.data).not.toHaveProperty("discountPercentApplied");
+    });
+
+    it("no discount when distributor has discountPercent 0", async () => {
+      prismaMock.user.findFirst.mockResolvedValueOnce({
+        id: "dist_1",
+        discountCodeEnabled: true,
+        discountPercent: new Prisma.Decimal("0"),
+      } as any);
+      prismaMock.product.findUnique.mockResolvedValueOnce(product as any);
+      prismaMock.card.count.mockResolvedValueOnce(3);
+      const tx = mockTxWithCreate();
+
+      await POST(
+        createJsonRequest({
+          productId: "prod_1",
+          email: "user@example.com",
+          orderPassword: "password123",
+          quantity: 2,
+          promoCode: "PROMO1",
+        }),
+      );
+
+      const call = (tx.order.create as jest.Mock).mock.calls[0][0];
+      expect(call.data.amount).toBe(100);
+      expect(call.data).not.toHaveProperty("discountPercentApplied");
+    });
+
+    it("no discount when distributor has discountPercent greater than 100", async () => {
+      prismaMock.user.findFirst.mockResolvedValueOnce({
+        id: "dist_1",
+        discountCodeEnabled: true,
+        discountPercent: new Prisma.Decimal("101"),
+      } as any);
+      prismaMock.product.findUnique.mockResolvedValueOnce(product as any);
+      prismaMock.card.count.mockResolvedValueOnce(3);
+      const tx = mockTxWithCreate();
+
+      await POST(
+        createJsonRequest({
+          productId: "prod_1",
+          email: "user@example.com",
+          orderPassword: "password123",
+          quantity: 2,
+          promoCode: "PROMO1",
+        }),
+      );
+
+      const call = (tx.order.create as jest.Mock).mock.calls[0][0];
+      expect(call.data.amount).toBe(100);
+      expect(call.data).not.toHaveProperty("discountPercentApplied");
+    });
+  });
+
+  describe("fingerprintHash 写入普通商品订单", () => {
+    function makeNormalProduct(price: Prisma.Decimal = new Prisma.Decimal("100")) {
+      return {
+        id: "prod_normal",
+        name: "Normal Product",
+        slug: "normal-product",
+        summary: null,
+        description: null,
+        image: null,
+        price,
+        maxQuantity: 10,
+        status: "ACTIVE",
+        productType: "NORMAL",
+        sourceUrl: null,
+        validityHours: null,
+        allowAccountSwitch: true,
+        accountSwitchLimit: 1,
+        pinnedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+    }
+
+    function makeNormalOrderBody(overrides?: Record<string, unknown>) {
+      return {
+        productId: "prod_normal",
+        email: "buyer@example.com",
+        orderPassword: "password123",
+        quantity: 1,
+        ...overrides,
+      };
+    }
+
+    function setupNormalTransaction(captureRef: {
+      data?: Record<string, unknown>;
+    }) {
+      return (prismaMock.$transaction as jest.Mock).mockImplementation(
+        async (fn: Function) => {
+          const tx = {
             order: {
-                create: jest.fn().mockResolvedValue(createdOrder),
+              create: jest
+                .fn()
+                .mockImplementation(
+                  async (args: { data: Record<string, unknown> }) => {
+                    captureRef.data = args.data;
+                    return { id: "ord_1", orderNo: "uuid-normal" };
+                  },
+                ),
             },
             card: {
-                findMany: jest.fn().mockResolvedValue([{ id: "card_1" }]),
-                updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+              findMany: jest.fn().mockResolvedValue([{ id: "card_1" }]),
+              updateMany: jest.fn().mockResolvedValue({ count: 1 }),
             },
-        }
-        ;(prismaMock.$transaction as jest.Mock).mockImplementation((cb: (tx: unknown) => Promise<unknown>) =>
-            cb(mockTx)
-        )
-        const res = await POST(
-            createJsonRequest({
-                productId: "prod_1",
-                email: "user@example.com",
-                orderPassword: "password123",
-                quantity: 1,
-            })
-        )
-        const data = await res.json()
-        expect(res.status).toBe(200)
-        expect(data.paymentUrl).toBeNull()
-        expect(data.successToken).toBeDefined()
-        expect(typeof data.successToken).toBe("string")
-        expect(data.orderNo).toBe("uuid-dev-mock")
-        expect(data.amount).toBe(50)
-        expect(completePendingOrder).toHaveBeenCalledWith("uuid-dev-mock")
-        getConfigMock().nodeEnv = "test"
-    })
+          };
+          await fn(tx);
+          return { id: "ord_1", orderNo: "uuid-normal" };
+        },
+      );
+    }
 
-    it("in development returns 500 when completePendingOrder returns done false", async () => {
-        const { completePendingOrder } = require("@/lib/complete-pending-order")
-        ;(completePendingOrder as jest.Mock).mockResolvedValueOnce({
-            done: false,
-            error: "Order not found",
-        })
-        getConfigMock().nodeEnv = "development"
-        const product = {
-            id: "prod_1",
-            name: "Test Product",
-            price: 50,
-            maxQuantity: 5,
-            status: "ACTIVE",
-        }
-        prismaMock.product.findUnique.mockResolvedValueOnce(product)
-        prismaMock.card.count.mockResolvedValueOnce(3)
-        const createdOrder = {
-            id: "order_new",
-            orderNo: "uuid-dev-mock",
-            productId: "prod_1",
-            email: "user@example.com",
-            passwordHash: "hashed-password",
-            quantity: 1,
-            amount: 50,
-            status: "PENDING",
-            paidAt: null,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-        }
-        const mockTx = {
-            order: { create: jest.fn().mockResolvedValue(createdOrder) },
-            card: {
-                findMany: jest.fn().mockResolvedValue([{ id: "card_1" }]),
-                updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-            },
-        }
-        ;(prismaMock.$transaction as jest.Mock).mockImplementation((cb: (tx: unknown) => Promise<unknown>) =>
-            cb(mockTx)
-        )
-        const res = await POST(
-            createJsonRequest({
-                productId: "prod_1",
-                email: "user@example.com",
-                orderPassword: "password123",
-                quantity: 1,
-            })
-        )
-        const data = await res.json()
-        expect(res.status).toBe(500)
-        expect(data.error).toBeDefined()
-        getConfigMock().nodeEnv = "test"
-    })
+    it("有指纹 → fingerprintHash 存入普通订单 data", async () => {
+      prismaMock.product.findUnique.mockResolvedValue(makeNormalProduct() as any);
+      prismaMock.user.findFirst.mockResolvedValue(null);
+      prismaMock.order.count.mockResolvedValue(0);
+      prismaMock.card.count.mockResolvedValue(5);
+      const captureRef: { data?: Record<string, unknown> } = {};
+      setupNormalTransaction(captureRef);
 
-    it("throws when reservation finds insufficient cards during transaction", async () => {
-        prismaMock.product.findUnique.mockResolvedValueOnce({
-            id: "prod_1",
-            name: "Test",
-            price: 100,
-            maxQuantity: 5,
-            status: "ACTIVE",
-        })
-        prismaMock.card.count.mockResolvedValueOnce(2)
-        const mockTx = {
-            order: {
-                create: jest.fn().mockResolvedValue({
-                    id: "order_new",
-                    orderNo: "uuid-1",
-                    productId: "prod_1",
-                    email: "user@example.com",
-                    passwordHash: "hash",
-                    quantity: 2,
-                    amount: 200,
-                    status: "PENDING",
-                    paidAt: null,
-                    createdAt: new Date(),
-                    updatedAt: new Date(),
-                }),
-            },
-            card: {
-                findMany: jest.fn().mockResolvedValue([{ id: "card_1" }]),
-                updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-            },
-        }
-        ;(prismaMock.$transaction as jest.Mock).mockImplementation((cb: (tx: unknown) => Promise<unknown>) =>
-            cb(mockTx)
-        )
-        await expect(
-            POST(
-                createJsonRequest({
-                    productId: "prod_1",
-                    email: "user@example.com",
-                    orderPassword: "password123",
-                    quantity: 2,
-                })
-            )
-        ).rejects.toThrow("Insufficient stock during reservation")
-    })
+      await POST(
+        createJsonRequest(
+          makeNormalOrderBody({ fingerprintHash: "fp-normal-abc" }),
+        ),
+      );
 
-    it("returns 500 when order creation hits P2002 unique constraint exhausts retries", async () => {
-        prismaMock.product.findUnique.mockResolvedValueOnce({
-            id: "prod_1",
-            name: "Test",
-            price: 100,
-            maxQuantity: 5,
-            status: "ACTIVE",
-        })
-        prismaMock.card.count.mockResolvedValueOnce(10)
-        const p2002 = new Error("Unique constraint") as Error & { code?: string; meta?: { target?: string[] } }
-        p2002.code = "P2002"
-        p2002.meta = { target: ["orderNo"] }
-        ;(prismaMock.$transaction as jest.Mock).mockImplementation(() => Promise.reject(p2002))
-        const res = await POST(
-            createJsonRequest({
-                productId: "prod_1",
-                email: "user@example.com",
-                orderPassword: "password123",
-                quantity: 1,
-            })
-        )
-        const data = await res.json()
-        expect(res.status).toBe(500)
-        expect(data.error).toMatch(/retries|try again/)
-    })
+      expect(captureRef.data?.fingerprintHash).toBe("fp-normal-abc");
+    });
 
-    it("returns 429 when rate limited", async () => {
-        const { checkOrderCreateRateLimit } = require("@/lib/rate-limit")
-        ;(checkOrderCreateRateLimit as jest.Mock).mockResolvedValueOnce(
-            new Response(
-                JSON.stringify({ error: "Too many orders. Please try again later." }),
-                { status: 429, headers: { "Content-Type": "application/json" } },
-            ),
-        )
-        const res = await POST(
-            createJsonRequest({
-                productId: "prod_1",
-                email: "user@example.com",
-                orderPassword: "password123",
-                quantity: 1,
-            }),
-        )
-        expect(res.status).toBe(429)
-        const data = await res.json()
-        expect(data.error).toContain("Too many")
-        expect(prismaMock.product.findUnique).not.toHaveBeenCalled()
-    })
+    it("无指纹 → fingerprintHash 不出现在普通订单 data", async () => {
+      prismaMock.product.findUnique.mockResolvedValue(makeNormalProduct() as any);
+      prismaMock.user.findFirst.mockResolvedValue(null);
+      prismaMock.order.count.mockResolvedValue(0);
+      prismaMock.card.count.mockResolvedValue(5);
+      const captureRef: { data?: Record<string, unknown> } = {};
+      setupNormalTransaction(captureRef);
 
-    it("returns 400 when IP has too many PENDING orders", async () => {
-        prismaMock.order.count.mockResolvedValueOnce(3)
-        prismaMock.product.findUnique.mockResolvedValueOnce({
-            id: "prod_1",
-            name: "Test",
-            price: 100,
-            maxQuantity: 5,
-            status: "ACTIVE",
-        })
-        const res = await POST(
-            createJsonRequest({
-                productId: "prod_1",
-                email: "user@example.com",
-                orderPassword: "password123",
-                quantity: 1,
-            }),
-        )
-        expect(res.status).toBe(400)
-        const data = await res.json()
-        expect(data.error).toMatch(/unpaid order|expire/)
-        expect(prismaMock.$transaction).not.toHaveBeenCalled()
-    })
+      await POST(createJsonRequest(makeNormalOrderBody()));
 
-    describe("Turnstile verification", () => {
-        it("returns 400 when Turnstile is configured but token is missing", async () => {
-            getConfigMock().turnstileSecretKey = "test-secret"
-            const res = await POST(
-                createJsonRequest({
-                    productId: "prod_1",
-                    email: "user@example.com",
-                    orderPassword: "password123",
-                    quantity: 1,
-                })
-            )
-            const data = await res.json()
-            expect(res.status).toBe(400)
-            expect(data.error).toContain("安全验证")
-            const { verifyTurnstileToken } = require("@/lib/turnstile")
-            expect(verifyTurnstileToken).not.toHaveBeenCalled()
-        })
-
-        it("returns 400 when Turnstile is configured but token is empty string", async () => {
-            getConfigMock().turnstileSecretKey = "test-secret"
-            const res = await POST(
-                createJsonRequest({
-                    productId: "prod_1",
-                    email: "user@example.com",
-                    orderPassword: "password123",
-                    quantity: 1,
-                    turnstileToken: "   ",
-                })
-            )
-            const data = await res.json()
-            expect(res.status).toBe(400)
-            expect(data.error).toContain("安全验证")
-        })
-
-        it("returns 400 when Turnstile verification fails", async () => {
-            getConfigMock().turnstileSecretKey = "test-secret"
-            const { verifyTurnstileToken } = require("@/lib/turnstile")
-            ;(verifyTurnstileToken as jest.Mock).mockResolvedValueOnce({
-                success: false,
-                "error-codes": ["invalid-input-response"],
-            })
-            const res = await POST(
-                createJsonRequest({
-                    productId: "prod_1",
-                    email: "user@example.com",
-                    orderPassword: "password123",
-                    quantity: 1,
-                    turnstileToken: "bad-token",
-                })
-            )
-            const data = await res.json()
-            expect(res.status).toBe(400)
-            expect(data.error).toMatch(/安全验证|重试/)
-            expect(verifyTurnstileToken).toHaveBeenCalledWith(
-                "bad-token",
-                "test-secret",
-                "127.0.0.1"
-            )
-            expect(prismaMock.$transaction).not.toHaveBeenCalled()
-        })
-
-        it("returns 400 when Turnstile verification returns timeout-or-duplicate", async () => {
-            getConfigMock().turnstileSecretKey = "test-secret"
-            const { verifyTurnstileToken } = require("@/lib/turnstile")
-            ;(verifyTurnstileToken as jest.Mock).mockResolvedValueOnce({
-                success: false,
-                "error-codes": ["timeout-or-duplicate"],
-            })
-            const res = await POST(
-                createJsonRequest({
-                    productId: "prod_1",
-                    email: "user@example.com",
-                    orderPassword: "password123",
-                    quantity: 1,
-                    turnstileToken: "expired-token",
-                })
-            )
-            const data = await res.json()
-            expect(res.status).toBe(400)
-            expect(data.error).toMatch(/过期|重新提交/)
-        })
-
-        it("allows order when Turnstile token is missing but fingerprintHash is present (graceful degradation)", async () => {
-            getConfigMock().turnstileSecretKey = "test-secret"
-            prismaMock.product.findUnique.mockResolvedValueOnce({
-                id: "prod_1",
-                name: "Test",
-                price: 50,
-                maxQuantity: 5,
-                status: "ACTIVE",
-            })
-            prismaMock.card.count.mockResolvedValueOnce(3)
-            prismaMock.order.count.mockResolvedValueOnce(0)
-            const createdOrder = {
-                id: "order_new",
-                orderNo: "550e8400-e29b-41d4-a716-446655440000",
-                productId: "prod_1",
-                email: "user@example.com",
-                passwordHash: "hashed-password",
-                quantity: 1,
-                amount: 50,
-                status: "PENDING",
-                paidAt: null,
-                createdAt: new Date(),
-                updatedAt: new Date(),
-            }
-            const mockTx = {
-                order: {
-                    create: jest.fn().mockResolvedValue(createdOrder),
-                },
-                card: {
-                    findMany: jest.fn().mockResolvedValue([{ id: "card_1" }]),
-                    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-                },
-            }
-            ;(prismaMock.$transaction as jest.Mock).mockImplementation((cb: (tx: unknown) => Promise<unknown>) =>
-                cb(mockTx)
-            )
-
-            const res = await POST(
-                createJsonRequest({
-                    productId: "prod_1",
-                    email: "user@example.com",
-                    orderPassword: "password123",
-                    quantity: 1,
-                    fingerprintHash: "abc123fingerprint",
-                })
-            )
-
-            expect(res.status).toBe(200)
-            const { verifyTurnstileToken } = require("@/lib/turnstile")
-            expect(verifyTurnstileToken).not.toHaveBeenCalled()
-        })
-
-        it("rejects order when both Turnstile token and fingerprintHash are missing", async () => {
-            getConfigMock().turnstileSecretKey = "test-secret"
-            const res = await POST(
-                createJsonRequest({
-                    productId: "prod_1",
-                    email: "user@example.com",
-                    orderPassword: "password123",
-                    quantity: 1,
-                })
-            )
-            const data = await res.json()
-            expect(res.status).toBe(400)
-            expect(data.error).toContain("安全验证")
-        })
-
-        it("creates order when Turnstile is configured and token verification succeeds", async () => {
-            getConfigMock().turnstileSecretKey = "test-secret"
-            const { verifyTurnstileToken } = require("@/lib/turnstile")
-            ;(verifyTurnstileToken as jest.Mock).mockResolvedValueOnce({
-                success: true,
-            })
-            prismaMock.product.findUnique.mockResolvedValueOnce({
-                id: "prod_1",
-                name: "Test",
-                price: 50,
-                maxQuantity: 5,
-                status: "ACTIVE",
-            })
-            prismaMock.card.count.mockResolvedValueOnce(3)
-            prismaMock.order.count.mockResolvedValueOnce(0)
-            const createdOrder = {
-                id: "order_new",
-                orderNo: "550e8400-e29b-41d4-a716-446655440000",
-                productId: "prod_1",
-                email: "user@example.com",
-                passwordHash: "hashed-password",
-                quantity: 1,
-                amount: 50,
-                status: "PENDING",
-                paidAt: null,
-                createdAt: new Date(),
-                updatedAt: new Date(),
-            }
-            const mockTx = {
-                order: {
-                    create: jest.fn().mockResolvedValue(createdOrder),
-                },
-                card: {
-                    findMany: jest.fn().mockResolvedValue([{ id: "card_1" }]),
-                    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-                },
-            }
-            ;(prismaMock.$transaction as jest.Mock).mockImplementation((cb: (tx: unknown) => Promise<unknown>) =>
-                cb(mockTx)
-            )
-
-            const res = await POST(
-                createJsonRequest({
-                    productId: "prod_1",
-                    email: "user@example.com",
-                    orderPassword: "password123",
-                    quantity: 1,
-                    turnstileToken: "valid-token",
-                })
-            )
-            const data = await res.json()
-
-            expect(res.status).toBe(200)
-            expect(data.orderNo).toBe(createdOrder.orderNo)
-            expect(verifyTurnstileToken).toHaveBeenCalledWith(
-                "valid-token",
-                "test-secret",
-                "127.0.0.1"
-            )
-            expect(mockTx.order.create).toHaveBeenCalled()
-        })
-    })
-
-    describe("promoCode attribution (distributor)", () => {
-        const product = {
-            id: "prod_1",
-            name: "Test Product",
-            price: 50,
-            maxQuantity: 5,
-            status: "ACTIVE",
-        }
-        const createdOrder = {
-            id: "order_new",
-            orderNo: "550e8400-e29b-41d4-a716-446655440000",
-            productId: "prod_1",
-            email: "user@example.com",
-            passwordHash: "hashed-password",
-            quantity: 2,
-            amount: 100,
-            status: "PENDING",
-            paidAt: null,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-        }
-        function mockTxWithCreate() {
-            const tx = {
-                order: { create: jest.fn().mockResolvedValue(createdOrder) },
-                card: {
-                    findMany: jest.fn().mockResolvedValue([{ id: "card_1" }, { id: "card_2" }]),
-                    updateMany: jest.fn().mockResolvedValue({ count: 2 }),
-                },
-            }
-            ;(prismaMock.$transaction as jest.Mock).mockImplementation((cb: (t: unknown) => Promise<unknown>) =>
-                cb(tx)
-            )
-            return tx
-        }
-
-        it("includes distributorId when body has valid promoCode", async () => {
-            prismaMock.user.findFirst.mockResolvedValueOnce({ id: "dist_1" })
-            prismaMock.product.findUnique.mockResolvedValueOnce(product)
-            prismaMock.card.count.mockResolvedValueOnce(3)
-            const tx = mockTxWithCreate()
-
-            const res = await POST(
-                createJsonRequest({
-                    productId: "prod_1",
-                    email: "user@example.com",
-                    orderPassword: "password123",
-                    quantity: 2,
-                    promoCode: "PROMO1",
-                })
-            )
-            const data = await res.json()
-
-            expect(res.status).toBe(200)
-            expect(tx.order.create).toHaveBeenCalledWith({
-                data: expect.objectContaining({
-                    distributorId: "dist_1",
-                    productId: "prod_1",
-                    quantity: 2,
-                    amount: 100,
-                }),
-            })
-        })
-
-        it("includes distributorId when cookie has valid promoCode and body has none", async () => {
-            prismaMock.user.findFirst.mockResolvedValueOnce({ id: "dist_1" })
-            prismaMock.product.findUnique.mockResolvedValueOnce(product)
-            prismaMock.card.count.mockResolvedValueOnce(3)
-            const tx = mockTxWithCreate()
-            const cookies = {
-                get: (name: string) =>
-                    name === "distributor_promo_code" ? { value: "PROMO1" } : undefined,
-            }
-
-            const res = await POST(
-                createJsonRequest(
-                    {
-                        productId: "prod_1",
-                        email: "user@example.com",
-                        orderPassword: "password123",
-                        quantity: 2,
-                    },
-                    cookies
-                )
-            )
-
-            expect(res.status).toBe(200)
-            expect(tx.order.create).toHaveBeenCalledWith({
-                data: expect.objectContaining({
-                    distributorId: "dist_1",
-                }),
-            })
-        })
-
-        it("does not set distributorId when promoCode is invalid or distributor disabled", async () => {
-            prismaMock.user.findFirst.mockResolvedValueOnce(null)
-            prismaMock.product.findUnique.mockResolvedValueOnce(product)
-            prismaMock.card.count.mockResolvedValueOnce(3)
-            const tx = mockTxWithCreate()
-
-            const res = await POST(
-                createJsonRequest({
-                    productId: "prod_1",
-                    email: "user@example.com",
-                    orderPassword: "password123",
-                    quantity: 2,
-                    promoCode: "INVALID",
-                })
-            )
-
-            expect(res.status).toBe(200)
-            const call = (tx.order.create as jest.Mock).mock.calls[0][0]
-            expect(call.data).not.toHaveProperty("distributorId")
-        })
-
-        it("prefers body promoCode over cookie when both present", async () => {
-            prismaMock.user.findFirst
-                .mockResolvedValueOnce({ id: "dist_body" })
-                .mockResolvedValueOnce({ id: "dist_cookie" })
-            prismaMock.product.findUnique.mockResolvedValueOnce(product)
-            prismaMock.card.count.mockResolvedValueOnce(3)
-            const tx = mockTxWithCreate()
-            const cookies = {
-                get: (name: string) =>
-                    name === "distributor_promo_code" ? { value: "COOKIE_PROMO" } : undefined,
-            }
-
-            await POST(
-                createJsonRequest(
-                    {
-                        productId: "prod_1",
-                        email: "user@example.com",
-                        orderPassword: "password123",
-                        quantity: 2,
-                        promoCode: "BODY_PROMO",
-                    },
-                    cookies
-                )
-            )
-
-            expect(prismaMock.user.findFirst).toHaveBeenCalledWith({
-                where: { distributorCode: "BODY_PROMO", role: "DISTRIBUTOR", disabledAt: null },
-                select: { id: true, discountCodeEnabled: true, discountPercent: true },
-            })
-            expect(tx.order.create).toHaveBeenCalledWith({
-                data: expect.objectContaining({
-                    distributorId: "dist_body",
-                }),
-            })
-        })
-
-        it("applies discount and sets discountPercentApplied when distributor has discountCodeEnabled and discountPercent", async () => {
-            prismaMock.user.findFirst.mockResolvedValueOnce({
-                id: "dist_1",
-                discountCodeEnabled: true,
-                discountPercent: 5,
-            })
-            prismaMock.product.findUnique.mockResolvedValueOnce(product)
-            prismaMock.card.count.mockResolvedValueOnce(3)
-            const tx = mockTxWithCreate()
-
-            const res = await POST(
-                createJsonRequest({
-                    productId: "prod_1",
-                    email: "user@example.com",
-                    orderPassword: "password123",
-                    quantity: 2,
-                    promoCode: "PROMO1",
-                })
-            )
-
-            expect(res.status).toBe(200)
-            expect(tx.order.create).toHaveBeenCalledWith({
-                data: expect.objectContaining({
-                    distributorId: "dist_1",
-                    amount: 95,
-                    discountPercentApplied: 5,
-                }),
-            })
-        })
-
-        it("no discount when distributor has discountCodeEnabled false", async () => {
-            prismaMock.user.findFirst.mockResolvedValueOnce({
-                id: "dist_1",
-                discountCodeEnabled: false,
-                discountPercent: 5,
-            })
-            prismaMock.product.findUnique.mockResolvedValueOnce(product)
-            prismaMock.card.count.mockResolvedValueOnce(3)
-            const tx = mockTxWithCreate()
-
-            await POST(
-                createJsonRequest({
-                    productId: "prod_1",
-                    email: "user@example.com",
-                    orderPassword: "password123",
-                    quantity: 2,
-                    promoCode: "PROMO1",
-                })
-            )
-
-            const call = (tx.order.create as jest.Mock).mock.calls[0][0]
-            expect(call.data.amount).toBe(100)
-            expect(call.data).not.toHaveProperty("discountPercentApplied")
-        })
-
-        it("no discount when distributor has discountCodeEnabled true but discountPercent null", async () => {
-            prismaMock.user.findFirst.mockResolvedValueOnce({
-                id: "dist_1",
-                discountCodeEnabled: true,
-                discountPercent: null,
-            })
-            prismaMock.product.findUnique.mockResolvedValueOnce(product)
-            prismaMock.card.count.mockResolvedValueOnce(3)
-            const tx = mockTxWithCreate()
-
-            await POST(
-                createJsonRequest({
-                    productId: "prod_1",
-                    email: "user@example.com",
-                    orderPassword: "password123",
-                    quantity: 2,
-                    promoCode: "PROMO1",
-                })
-            )
-
-            const call = (tx.order.create as jest.Mock).mock.calls[0][0]
-            expect(call.data.amount).toBe(100)
-            expect(call.data).not.toHaveProperty("discountPercentApplied")
-        })
-
-        it("no discount when distributor has discountPercent 0", async () => {
-            prismaMock.user.findFirst.mockResolvedValueOnce({
-                id: "dist_1",
-                discountCodeEnabled: true,
-                discountPercent: 0,
-            })
-            prismaMock.product.findUnique.mockResolvedValueOnce(product)
-            prismaMock.card.count.mockResolvedValueOnce(3)
-            const tx = mockTxWithCreate()
-
-            await POST(
-                createJsonRequest({
-                    productId: "prod_1",
-                    email: "user@example.com",
-                    orderPassword: "password123",
-                    quantity: 2,
-                    promoCode: "PROMO1",
-                })
-            )
-
-            const call = (tx.order.create as jest.Mock).mock.calls[0][0]
-            expect(call.data.amount).toBe(100)
-            expect(call.data).not.toHaveProperty("discountPercentApplied")
-        })
-
-        it("no discount when distributor has discountPercent greater than 100", async () => {
-            prismaMock.user.findFirst.mockResolvedValueOnce({
-                id: "dist_1",
-                discountCodeEnabled: true,
-                discountPercent: 101,
-            })
-            prismaMock.product.findUnique.mockResolvedValueOnce(product)
-            prismaMock.card.count.mockResolvedValueOnce(3)
-            const tx = mockTxWithCreate()
-
-            await POST(
-                createJsonRequest({
-                    productId: "prod_1",
-                    email: "user@example.com",
-                    orderPassword: "password123",
-                    quantity: 2,
-                    promoCode: "PROMO1",
-                })
-            )
-
-            const call = (tx.order.create as jest.Mock).mock.calls[0][0]
-            expect(call.data.amount).toBe(100)
-            expect(call.data).not.toHaveProperty("discountPercentApplied")
-        })
-    })
-
-    describe("fingerprintHash 写入普通商品订单", () => {
-        function makeNormalProduct(price = 100) {
-            return {
-                id: "prod_normal",
-                name: "Normal Product",
-                price,
-                maxQuantity: 10,
-                status: "ACTIVE",
-                productType: "NORMAL",
-            }
-        }
-
-        function makeNormalOrderBody(overrides?: Record<string, unknown>) {
-            return {
-                productId: "prod_normal",
-                email: "buyer@example.com",
-                orderPassword: "password123",
-                quantity: 1,
-                ...overrides,
-            }
-        }
-
-        function setupNormalTransaction(captureRef: { data?: Record<string, unknown> }) {
-            return prismaMock.$transaction.mockImplementation(async (fn: Function) => {
-                const tx = {
-                    order: {
-                        create: jest.fn().mockImplementation(async (args: { data: Record<string, unknown> }) => {
-                            captureRef.data = args.data
-                            return { id: "ord_1", orderNo: "uuid-normal" }
-                        }),
-                    },
-                    card: {
-                        findMany: jest.fn().mockResolvedValue([{ id: "card_1" }]),
-                        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-                    },
-                }
-                await fn(tx)
-                return { id: "ord_1", orderNo: "uuid-normal" }
-            })
-        }
-
-        it("有指纹 → fingerprintHash 存入普通订单 data", async () => {
-            prismaMock.product.findUnique.mockResolvedValue(makeNormalProduct())
-            prismaMock.user.findFirst.mockResolvedValue(null)
-            prismaMock.order.count.mockResolvedValue(0)
-            prismaMock.card.count.mockResolvedValue(5)
-            const captureRef: { data?: Record<string, unknown> } = {}
-            setupNormalTransaction(captureRef)
-
-            await POST(createJsonRequest(makeNormalOrderBody({ fingerprintHash: "fp-normal-abc" })))
-
-            expect(captureRef.data?.fingerprintHash).toBe("fp-normal-abc")
-        })
-
-        it("无指纹 → fingerprintHash 不出现在普通订单 data", async () => {
-            prismaMock.product.findUnique.mockResolvedValue(makeNormalProduct())
-            prismaMock.user.findFirst.mockResolvedValue(null)
-            prismaMock.order.count.mockResolvedValue(0)
-            prismaMock.card.count.mockResolvedValue(5)
-            const captureRef: { data?: Record<string, unknown> } = {}
-            setupNormalTransaction(captureRef)
-
-            await POST(createJsonRequest(makeNormalOrderBody()))
-
-            expect(captureRef.data?.fingerprintHash).toBeUndefined()
-        })
-    })
-})
+      expect(captureRef.data?.fingerprintHash).toBeUndefined();
+    });
+  });
+});

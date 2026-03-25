@@ -15,6 +15,7 @@ jest.mock("@/lib/config", () => {
         betterAuthSecret: "x".repeat(32),
         siteUrl: "http://localhost:3000",
         nodeEnv: "test" as const,
+        pendingOrderTimeoutMs: 900_000,
     }
     return { config: mock, getConfig: () => mock }
 })

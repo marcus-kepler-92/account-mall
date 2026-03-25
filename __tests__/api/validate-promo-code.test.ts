@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server"
+import { Prisma } from "@prisma/client"
 import { GET } from "@/app/api/validate-promo-code/route"
 import { prismaMock } from "../../__mocks__/prisma"
 
@@ -50,8 +51,8 @@ describe("GET /api/validate-promo-code", () => {
         prismaMock.user.findFirst.mockResolvedValueOnce({
             id: "u1",
             discountCodeEnabled: true,
-            discountPercent: 5,
-        })
+            discountPercent: new Prisma.Decimal("5"),
+        } as any)
         const req = new NextRequest("http://localhost:3000/api/validate-promo-code?promoCode=PROMO1")
         const res = await GET(req)
         const data = await res.json()
@@ -63,8 +64,8 @@ describe("GET /api/validate-promo-code", () => {
         prismaMock.user.findFirst.mockResolvedValueOnce({
             id: "u1",
             discountCodeEnabled: false,
-            discountPercent: 5,
-        })
+            discountPercent: new Prisma.Decimal("5"),
+        } as any)
         const req = new NextRequest("http://localhost:3000/api/validate-promo-code?promoCode=PROMO1")
         const res = await GET(req)
         const data = await res.json()
@@ -77,7 +78,7 @@ describe("GET /api/validate-promo-code", () => {
             id: "u1",
             discountCodeEnabled: true,
             discountPercent: null,
-        })
+        } as any)
         const req = new NextRequest("http://localhost:3000/api/validate-promo-code?promoCode=PROMO1")
         const res = await GET(req)
         const data = await res.json()

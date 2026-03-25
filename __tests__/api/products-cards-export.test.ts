@@ -60,11 +60,11 @@ describe("GET /api/products/[productId]/cards/export", () => {
   })
 
   it("returns text/plain with all card contents joined by newline", async () => {
-    prismaMock.product.findUnique.mockResolvedValueOnce({ id: productId, name: "Netflix Premium" })
+    prismaMock.product.findUnique.mockResolvedValueOnce({ id: productId, name: "Netflix Premium" } as any)
     prismaMock.card.findMany.mockResolvedValueOnce([
       { content: "user1|pass1" },
       { content: "user2|pass2" },
-    ])
+    ] as any)
 
     const res = await GET(createRequest("http://localhost"), createContext() as any)
     const text = await res.text()
@@ -75,8 +75,8 @@ describe("GET /api/products/[productId]/cards/export", () => {
   })
 
   it("filters by status when valid status param is provided", async () => {
-    prismaMock.product.findUnique.mockResolvedValueOnce({ id: productId, name: "Test" })
-    prismaMock.card.findMany.mockResolvedValueOnce([{ content: "card1" }])
+    prismaMock.product.findUnique.mockResolvedValueOnce({ id: productId, name: "Test" } as any)
+    prismaMock.card.findMany.mockResolvedValueOnce([{ content: "card1" }] as any)
 
     await GET(createRequest("http://localhost?status=UNSOLD"), createContext() as any)
 
@@ -88,7 +88,7 @@ describe("GET /api/products/[productId]/cards/export", () => {
   })
 
   it("ignores invalid status param and queries all cards", async () => {
-    prismaMock.product.findUnique.mockResolvedValueOnce({ id: productId, name: "Test" })
+    prismaMock.product.findUnique.mockResolvedValueOnce({ id: productId, name: "Test" } as any)
     prismaMock.card.findMany.mockResolvedValueOnce([])
 
     await GET(createRequest("http://localhost?status=BOGUS"), createContext() as any)
@@ -101,7 +101,7 @@ describe("GET /api/products/[productId]/cards/export", () => {
   })
 
   it("sets Content-Disposition attachment header with filename containing product name and status label", async () => {
-    prismaMock.product.findUnique.mockResolvedValueOnce({ id: productId, name: "Netflix Premium" })
+    prismaMock.product.findUnique.mockResolvedValueOnce({ id: productId, name: "Netflix Premium" } as any)
     prismaMock.card.findMany.mockResolvedValueOnce([])
 
     const res = await GET(createRequest("http://localhost?status=UNSOLD"), createContext() as any)
@@ -114,7 +114,7 @@ describe("GET /api/products/[productId]/cards/export", () => {
   })
 
   it("returns empty body when product has no cards", async () => {
-    prismaMock.product.findUnique.mockResolvedValueOnce({ id: productId, name: "Empty Product" })
+    prismaMock.product.findUnique.mockResolvedValueOnce({ id: productId, name: "Empty Product" } as any)
     prismaMock.card.findMany.mockResolvedValueOnce([])
 
     const res = await GET(createRequest("http://localhost"), createContext() as any)

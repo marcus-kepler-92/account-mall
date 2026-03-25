@@ -73,12 +73,11 @@ describe("POST /api/admin/guides", () => {
             content: "## Hello",
             tagId: null,
             sortOrder: 0,
-            status: "DRAFT",
+            status: "DRAFT" as const,
             publishedAt: null,
             createdAt: new Date(),
             updatedAt: new Date(),
-            tag: null,
-        })
+        } as any)
         const res = await POST(
             createRequest("http://localhost/api/admin/guides", {
                 title: "Guide 1",
@@ -112,12 +111,11 @@ describe("POST /api/admin/guides", () => {
             content: null,
             tagId: null,
             sortOrder: 0,
-            status: "PUBLISHED",
+            status: "PUBLISHED" as const,
             publishedAt: now,
             createdAt: now,
             updatedAt: now,
-            tag: null,
-        })
+        } as any)
         const res = await POST(
             createRequest("http://localhost/api/admin/guides", {
                 title: "Guide 1",
@@ -165,7 +163,7 @@ describe("GET /api/admin/guides", () => {
                 tag: { id: "tag_1", name: "Tag1", slug: "tag1" },
             },
         ]
-        prismaMock.distributorGuide.findMany.mockResolvedValue(guides)
+        prismaMock.distributorGuide.findMany.mockResolvedValue(guides as any)
         const res = await GET()
         const data = await res.json()
         expect(res.status).toBe(200)
@@ -219,7 +217,7 @@ describe("GET /api/admin/guides/[id]", () => {
             updatedAt: new Date(),
             tag: null,
         }
-        prismaMock.distributorGuide.findUnique.mockResolvedValue(guide)
+        prismaMock.distributorGuide.findUnique.mockResolvedValue(guide as any)
         const res = await GetOne(createRequest("http://localhost/api/admin/guides/g1"), {
             params: createIdParams("g1"),
         })
@@ -268,12 +266,11 @@ describe("PATCH /api/admin/guides/[id]", () => {
             createdAt: new Date(),
             updatedAt: new Date(),
         }
-        prismaMock.distributorGuide.findUnique.mockResolvedValue(existing)
+        prismaMock.distributorGuide.findUnique.mockResolvedValue(existing as any)
         prismaMock.distributorGuide.update.mockResolvedValue({
             ...existing,
             title: "Updated",
-            tag: null,
-        })
+        } as any)
         const res = await PATCH(
             createRequest("http://localhost/api/admin/guides/g1", { title: "Updated" }),
             { params: createIdParams("g1") }
@@ -301,13 +298,12 @@ describe("PATCH /api/admin/guides/[id]", () => {
             createdAt: new Date(),
             updatedAt: new Date(),
         }
-        prismaMock.distributorGuide.findUnique.mockResolvedValue(existing)
+        prismaMock.distributorGuide.findUnique.mockResolvedValue(existing as any)
         prismaMock.distributorGuide.update.mockResolvedValue({
             ...existing,
             status: "PUBLISHED",
             publishedAt: new Date(),
-            tag: null,
-        })
+        } as any)
         await PATCH(
             createRequest("http://localhost/api/admin/guides/g1", { status: "PUBLISHED" }),
             { params: createIdParams("g1") }
@@ -354,7 +350,7 @@ describe("DELETE /api/admin/guides/[id]", () => {
             content: null,
             tagId: null,
             sortOrder: 0,
-            status: "DRAFT",
+            status: "DRAFT" as const,
             publishedAt: null,
             createdAt: new Date(),
             updatedAt: new Date(),

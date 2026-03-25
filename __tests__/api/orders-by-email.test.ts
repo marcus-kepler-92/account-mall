@@ -1,6 +1,7 @@
 import { type NextRequest } from "next/server"
 import { GET, POST } from "@/app/api/orders/by-email/route"
 import { prismaMock } from "../../__mocks__/prisma"
+import { Prisma } from "@prisma/client"
 
 jest.mock("@/lib/prisma", () => {
   const { prismaMock } = require("../../__mocks__/prisma")
@@ -97,7 +98,7 @@ describe("POST /api/orders/by-email", () => {
         createdAt: new Date(),
         status: "PENDING",
         quantity: 1,
-        amount: 99,
+        amount: new Prisma.Decimal("99"),
         passwordHash: null,
         product: { name: "P1" },
       },
@@ -106,7 +107,7 @@ describe("POST /api/orders/by-email", () => {
         createdAt: new Date(),
         status: "COMPLETED",
         quantity: 1,
-        amount: 99,
+        amount: new Prisma.Decimal("99"),
         passwordHash: "hash2",
         product: { name: "P2" },
       },
@@ -130,11 +131,11 @@ describe("POST /api/orders/by-email", () => {
         createdAt: new Date(),
         status: "PENDING",
         quantity: 1,
-        amount: 99,
+        amount: new Prisma.Decimal("99"),
         passwordHash: "hash",
         product: { name: "P" },
       },
-    ])
+    ] as any)
     verifyPasswordMock.mockResolvedValue(false)
 
     const req = createJsonRequest({
@@ -155,11 +156,11 @@ describe("POST /api/orders/by-email", () => {
         createdAt,
         status: "COMPLETED",
         quantity: 2,
-        amount: 100,
+        amount: new Prisma.Decimal("100"),
         passwordHash: "hash",
         product: { name: "Test Product" },
       },
-    ])
+    ] as any)
     verifyPasswordMock.mockResolvedValue(true)
 
     const req = createJsonRequest({

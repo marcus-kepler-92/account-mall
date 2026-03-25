@@ -58,7 +58,7 @@ describe("POST /api/payment/yipay/notify", () => {
             cards: [{ id: "c1", status: "RESERVED" }],
         } as any)
         prismaMock.order.updateMany.mockResolvedValue({ count: 1 })
-        prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<number>) => {
+        ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<number>) => {
             return await fn(prismaMock)
         })
         const body = new URLSearchParams({
@@ -146,7 +146,7 @@ describe("POST /api/payment/yipay/notify", () => {
             cards: [{ id: "c1", status: "RESERVED" }],
         } as any)
         prismaMock.order.updateMany.mockResolvedValue({ count: 1 })
-        prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<number>) => {
+        ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<number>) => {
             return await fn(prismaMock)
         })
         const req = createNotifyRequest({
@@ -182,7 +182,7 @@ describe("POST /api/payment/yipay/notify", () => {
             cards: [{ id: "c1", status: "RESERVED" }],
         } as any)
         prismaMock.order.updateMany.mockResolvedValue({ count: 1 })
-        prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<number>) => {
+        ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<number>) => {
             return await fn(prismaMock)
         })
         const req = createNotifyRequest({
@@ -207,7 +207,7 @@ describe("POST /api/payment/yipay/notify", () => {
             cards: [{ id: "c1", status: "RESERVED" }],
         } as any)
         prismaMock.order.updateMany.mockResolvedValue({ count: 1 })
-        prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<number>) => {
+        ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<number>) => {
             return await fn(prismaMock)
         })
         const req = createNotifyRequest({
@@ -271,7 +271,7 @@ describe("POST /api/payment/yipay/notify", () => {
             cards: [{ id: "c1", status: "RESERVED" }],
         } as any)
         prismaMock.order.updateMany.mockResolvedValue({ count: 1 })
-        prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<number>) => {
+        ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<number>) => {
             return await fn(prismaMock)
         })
         const req = createNotifyRequest({

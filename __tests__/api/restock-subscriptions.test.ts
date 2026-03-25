@@ -69,8 +69,7 @@ describe("/api/restock-subscriptions POST", () => {
       notifiedAt: null,
       createdAt: new Date(),
       updatedAt: new Date(),
-      product: undefined as any,
-    })
+    } as any)
     const req = createJsonRequest(baseBody, "10.0.0.99", true)
     const res = await POST(req)
     expect(res.status).toBe(200)
@@ -98,8 +97,7 @@ describe("/api/restock-subscriptions POST", () => {
       notifiedAt: null,
       createdAt: new Date(),
       updatedAt: new Date(),
-      product: undefined as any,
-    })
+    } as any)
 
     const req = createJsonRequest(baseBody)
     const res = await POST(req)
@@ -265,7 +263,6 @@ describe("/api/restock-subscriptions GET", () => {
       notifiedAt: null,
       createdAt: new Date(),
       updatedAt: new Date(),
-      product: undefined as any,
     } as any)
 
     const req = createUrlRequest(

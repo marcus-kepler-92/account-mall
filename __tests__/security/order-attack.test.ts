@@ -4,6 +4,7 @@
  */
 
 import { type NextRequest } from "next/server"
+import { Prisma } from "@prisma/client"
 import { GET, POST } from "@/app/api/orders/route"
 import { GET as GETOrder, PATCH, DELETE } from "@/app/api/orders/[orderId]/route"
 import { POST as POSTLookup } from "@/app/api/orders/lookup/route"
@@ -116,8 +117,8 @@ describe("Security: AuthZ / IDOR (admin and order access)", () => {
             product: { name: "P" },
             cards: [],
             createdAt: new Date(),
-            amount: 99,
-        })
+            amount: new Prisma.Decimal("99"),
+        } as any)
         verifyPassword.mockResolvedValue(false)
 
         const res = await POSTLookup(
@@ -154,8 +155,8 @@ describe("Security: AuthZ / IDOR (admin and order access)", () => {
         expect(dataEmpty.error).toMatch(/not found|password incorrect|Order not found/)
 
         prismaMock.order.findMany.mockResolvedValue([
-            { id: "o1", orderNo: "O1", passwordHash: "h", status: "PENDING", product: { name: "P" }, cards: [], createdAt: new Date(), quantity: 1, amount: 99 },
-        ])
+            { id: "o1", orderNo: "O1", passwordHash: "h", status: "PENDING", product: { name: "P" }, cards: [], createdAt: new Date(), quantity: 1, amount: new Prisma.Decimal("99") },
+        ] as any)
         verifyPassword.mockResolvedValue(false)
         const resWrong = await POSTLookupByEmail(
             createJsonRequest({ email: "real@test.com", password: "wrong666" }),
@@ -268,9 +269,21 @@ describe("Security: Injection and malicious input", () => {
         prismaMock.product.findUnique.mockResolvedValue({
             id: "p1",
             name: "P",
-            price: 10,
+            slug: "p",
+            summary: null,
+            description: null,
+            image: null,
+            price: new Prisma.Decimal("10"),
             maxQuantity: 5,
             status: "ACTIVE",
+            productType: "NORMAL",
+            sourceUrl: null,
+            validityHours: null,
+            allowAccountSwitch: true,
+            accountSwitchLimit: 1,
+            pinnedAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
         })
         prismaMock.card.count.mockResolvedValue(10)
 
@@ -336,7 +349,7 @@ describe("Security: Mass assignment and privilege", () => {
             orderNo: "ORD-1",
             status: "PENDING",
             cards: [{ id: "c1", status: "RESERVED" }],
-        }).mockResolvedValueOnce(fullOrder)
+        } as any).mockResolvedValueOnce(fullOrder as any)
 
         const res = await PATCH(
             createJsonRequest({ status: "COMPLETED", paidAt: "2020-01-01", note: "<script>" }),
@@ -359,21 +372,43 @@ describe("Security: Mass assignment and privilege", () => {
         prismaMock.product.findUnique.mockResolvedValue({
             id: "p1",
             name: "P",
-            price: 50,
+            slug: "p",
+            summary: null,
+            description: null,
+            image: null,
+            price: new Prisma.Decimal("50"),
             maxQuantity: 5,
             status: "ACTIVE",
+            productType: "NORMAL",
+            sourceUrl: null,
+            validityHours: null,
+            allowAccountSwitch: true,
+            accountSwitchLimit: 1,
+            pinnedAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
         })
         prismaMock.card.count.mockResolvedValue(3)
         const created = {
             id: "ord-new",
             orderNo: "uuid-1",
             productId: "p1",
+            distributorId: null,
             email: "user@example.com",
             passwordHash: "hash",
             quantity: 1,
-            amount: 50,
+            amount: new Prisma.Decimal("50"),
+            discountPercentApplied: null,
+            productNameSnapshot: null,
             status: "PENDING",
             paidAt: null,
+            expiresAt: null,
+            promoCode: null,
+            paymentMethod: "alipay",
+            clientIp: null,
+            fingerprintHash: null,
+            exitDiscountMeta: null,
+            switchAccountCount: 0,
             createdAt: new Date(),
             updatedAt: new Date(),
         }

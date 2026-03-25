@@ -55,7 +55,7 @@ describe("GET /api/distributor/guides", () => {
                 tag: { id: "tag_1", name: "Tag1", slug: "tag1" },
             },
         ]
-        prismaMock.distributorGuide.findMany.mockResolvedValue(guides)
+        prismaMock.distributorGuide.findMany.mockResolvedValue(guides as any)
         const res = await GET(createRequest("http://localhost/api/distributor/guides"))
         const data = await res.json()
         expect(res.status).toBe(200)

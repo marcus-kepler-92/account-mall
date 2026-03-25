@@ -72,7 +72,7 @@ describe("GET /api/products/[productId]/cards", () => {
   })
 
   it("returns cards and stats for product", async () => {
-    prismaMock.product.findUnique.mockResolvedValueOnce({ id: productId })
+    prismaMock.product.findUnique.mockResolvedValueOnce({ id: productId } as any)
     prismaMock.card.findMany.mockResolvedValueOnce([
       {
         id: "c1",
@@ -81,12 +81,12 @@ describe("GET /api/products/[productId]/cards", () => {
         createdAt: new Date("2024-01-01"),
         order: null,
       },
-    ])
+    ] as any)
     prismaMock.card.groupBy.mockResolvedValueOnce([
       { status: "UNSOLD", _count: { id: 5 } },
       { status: "RESERVED", _count: { id: 2 } },
       { status: "SOLD", _count: { id: 3 } },
-    ])
+    ] as any)
 
     const res = await GET(createUrlRequest("http://localhost"), createContext() as any)
     const data = await res.json()
@@ -103,7 +103,7 @@ describe("GET /api/products/[productId]/cards", () => {
   })
 
   it("applies status filter when status param is provided", async () => {
-    prismaMock.product.findUnique.mockResolvedValueOnce({ id: productId })
+    prismaMock.product.findUnique.mockResolvedValueOnce({ id: productId } as any)
     prismaMock.card.findMany.mockResolvedValueOnce([])
     prismaMock.card.groupBy.mockResolvedValueOnce([])
 
@@ -157,7 +157,7 @@ describe("POST /api/products/[productId]/cards", () => {
   })
 
   it("returns 400 when body is invalid JSON", async () => {
-    prismaMock.product.findUnique.mockResolvedValueOnce({ id: productId })
+    prismaMock.product.findUnique.mockResolvedValueOnce({ id: productId } as any)
 
     const req = {
       json: async () => {
@@ -173,7 +173,7 @@ describe("POST /api/products/[productId]/cards", () => {
   })
 
   it("returns 400 when validation fails (missing contents)", async () => {
-    prismaMock.product.findUnique.mockResolvedValueOnce({ id: productId })
+    prismaMock.product.findUnique.mockResolvedValueOnce({ id: productId } as any)
 
     const res = await POST(createJsonRequest({}), context as any)
     const data = await res.json()
@@ -183,7 +183,7 @@ describe("POST /api/products/[productId]/cards", () => {
   })
 
   it("returns 201 and imported count when import succeeds", async () => {
-    prismaMock.product.findUnique.mockResolvedValueOnce({ id: productId })
+    prismaMock.product.findUnique.mockResolvedValueOnce({ id: productId } as any)
     prismaMock.card.count.mockResolvedValueOnce(1)
     prismaMock.card.createMany.mockResolvedValueOnce({ count: 2 } as any)
 

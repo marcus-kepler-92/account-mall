@@ -135,6 +135,7 @@ expect(data.code).toBe("VALIDATION_FAILED")
         email: "user@example.com",
         passwordHash: "hash",
         status: "COMPLETED",
+        amount: 50,
         product: {
           name: "Test Product",
         },
@@ -171,10 +172,12 @@ expect(data.code).toBe("VALIDATION_FAILED")
       productName: "Test Product",
       createdAt: createdAt.toISOString(),
       status: "COMPLETED",
+      amount: 50,
       cards: [
         { content: "code-1" },
         { content: "code-2" },
       ],
+      successToken: expect.any(String),
     })
   })
 
@@ -192,6 +195,7 @@ expect(data.code).toBe("VALIDATION_FAILED")
         email: "user@example.com",
         passwordHash: "hash",
         status: "PENDING",
+        amount: 100,
         product: {
           name: "Test Product",
         },
@@ -219,8 +223,11 @@ expect(data.code).toBe("VALIDATION_FAILED")
       productName: "Test Product",
       createdAt: createdAt.toISOString(),
       status: "PENDING",
+      amount: 100,
       cards: [],
       isPending: true,
+      canPay: expect.any(Boolean),
+      expiresAt: expect.any(String),
     })
   })
 
@@ -238,6 +245,7 @@ expect(data.code).toBe("VALIDATION_FAILED")
         email: "user@example.com",
         passwordHash: "hash",
         status: "COMPLETED",
+        amount: 50,
         product: {
           name: "Test Product",
         },
@@ -263,7 +271,9 @@ expect(data.code).toBe("VALIDATION_FAILED")
       productName: "Test Product",
       createdAt: createdAt.toISOString(),
       status: "COMPLETED",
+      amount: 50,
       cards: [{ content: "code-1" }],
+      successToken: expect.any(String),
     })
   })
 

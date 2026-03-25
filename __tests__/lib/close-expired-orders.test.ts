@@ -30,7 +30,7 @@ describe("closeExpiredOrders", () => {
     })
 
     it("returns { closed: 0, total: 0 } when no expired orders", async () => {
-        prismaMock.order.findMany.mockResolvedValue([])
+        prismaMock.order.findMany.mockResolvedValue([] as any)
         const result = await closeExpiredOrders()
         expect(result).toEqual({ closed: 0, total: 0 })
         expect(prismaMock.$transaction).not.toHaveBeenCalled()
@@ -39,19 +39,19 @@ describe("closeExpiredOrders", () => {
     it("NORMAL 订单过期 → 卡密状态 RESERVED→UNSOLD, orderId 清空", async () => {
         prismaMock.order.findMany.mockResolvedValue([
             makeExpiredOrder({ id: "ord_normal", product: { productType: "NORMAL" } }),
-        ])
+        ] as any)
 
         const txOrderUpdate = jest.fn().mockResolvedValue({})
         const txCardUpdateMany = jest.fn().mockResolvedValue({ count: 1 })
         const txCardDeleteMany = jest.fn().mockResolvedValue({ count: 0 })
 
-        prismaMock.$transaction.mockImplementation(async (fn: Function) => {
+        prismaMock.$transaction.mockImplementation((async (fn: Function) => {
             const tx = {
                 order: { update: txOrderUpdate },
                 card: { updateMany: txCardUpdateMany, deleteMany: txCardDeleteMany },
             }
             return fn(tx)
-        })
+        }) as any)
 
         const result = await closeExpiredOrders()
         expect(result.closed).toBe(1)
@@ -71,19 +71,19 @@ describe("closeExpiredOrders", () => {
     it("AUTO_FETCH 订单过期 → 卡密被删除而非回库", async () => {
         prismaMock.order.findMany.mockResolvedValue([
             makeExpiredOrder({ id: "ord_auto", product: { productType: "AUTO_FETCH" } }),
-        ])
+        ] as any)
 
         const txOrderUpdate = jest.fn().mockResolvedValue({})
         const txCardUpdateMany = jest.fn().mockResolvedValue({ count: 0 })
         const txCardDeleteMany = jest.fn().mockResolvedValue({ count: 1 })
 
-        prismaMock.$transaction.mockImplementation(async (fn: Function) => {
+        prismaMock.$transaction.mockImplementation((async (fn: Function) => {
             const tx = {
                 order: { update: txOrderUpdate },
                 card: { updateMany: txCardUpdateMany, deleteMany: txCardDeleteMany },
             }
             return fn(tx)
-        })
+        }) as any)
 
         const result = await closeExpiredOrders()
         expect(result.closed).toBe(1)
@@ -98,11 +98,11 @@ describe("closeExpiredOrders", () => {
         prismaMock.order.findMany.mockResolvedValue([
             makeExpiredOrder({ id: "ord_normal", product: { productType: "NORMAL" } }),
             makeExpiredOrder({ id: "ord_auto", product: { productType: "AUTO_FETCH" } }),
-        ])
+        ] as any)
 
         const calls: { updateMany: jest.Mock; deleteMany: jest.Mock }[] = []
 
-        prismaMock.$transaction.mockImplementation(async (fn: Function) => {
+        prismaMock.$transaction.mockImplementation((async (fn: Function) => {
             const updateMany = jest.fn().mockResolvedValue({ count: 1 })
             const deleteMany = jest.fn().mockResolvedValue({ count: 1 })
             calls.push({ updateMany, deleteMany })
@@ -111,7 +111,7 @@ describe("closeExpiredOrders", () => {
                 card: { updateMany, deleteMany },
             }
             return fn(tx)
-        })
+        }) as any)
 
         const result = await closeExpiredOrders()
         expect(result.closed).toBe(2)
@@ -130,10 +130,10 @@ describe("closeExpiredOrders", () => {
         prismaMock.order.findMany.mockResolvedValue([
             makeExpiredOrder({ id: "ord_fail", product: { productType: "NORMAL" } }),
             makeExpiredOrder({ id: "ord_ok", product: { productType: "NORMAL" } }),
-        ])
+        ] as any)
 
         let callCount = 0
-        prismaMock.$transaction.mockImplementation(async (fn: Function) => {
+        prismaMock.$transaction.mockImplementation((async (fn: Function) => {
             callCount++
             if (callCount === 1) throw new Error("DB error")
             const tx = {
@@ -141,7 +141,7 @@ describe("closeExpiredOrders", () => {
                 card: { updateMany: jest.fn().mockResolvedValue({ count: 1 }), deleteMany: jest.fn() },
             }
             return fn(tx)
-        })
+        }) as any)
 
         const result = await closeExpiredOrders()
         expect(result.closed).toBe(1)

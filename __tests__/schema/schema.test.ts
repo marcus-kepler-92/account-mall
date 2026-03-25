@@ -1,5 +1,14 @@
 import { prismaMock } from "../../__mocks__/prisma";
-import type { Product, Tag, Card, Order, Commission, CommissionTier, Withdrawal, DistributorInvitation } from "@prisma/client";
+import type {
+  Product,
+  Tag,
+  Card,
+  Order,
+  Commission,
+  CommissionTier,
+  Withdrawal,
+  DistributorInvitation,
+} from "@prisma/client";
 import { Prisma } from "@prisma/client";
 
 // ─── Product CRUD ────────────────────────────────────────────────
@@ -9,10 +18,18 @@ describe("Product model", () => {
     id: "clx1234567890",
     name: "ChatGPT Plus Account",
     slug: "chatgpt-plus-account",
+    summary: null,
     description: "Premium ChatGPT account with GPT-4 access",
+    image: null,
     price: new Prisma.Decimal("29.99"),
     maxQuantity: 10,
     status: "ACTIVE",
+    productType: "NORMAL",
+    sourceUrl: null,
+    validityHours: null,
+    allowAccountSwitch: true,
+    accountSwitchLimit: 1,
+    pinnedAt: null,
     createdAt: new Date("2026-01-01"),
     updatedAt: new Date("2026-01-01"),
   };
@@ -87,8 +104,8 @@ describe("Product model", () => {
     prismaMock.product.create.mockRejectedValue(
       new Prisma.PrismaClientKnownRequestError(
         "Unique constraint failed on the fields: (`slug`)",
-        { code: "P2002", clientVersion: "7.3.0", meta: { target: ["slug"] } }
-      )
+        { code: "P2002", clientVersion: "7.3.0", meta: { target: ["slug"] } },
+      ),
     );
 
     await expect(
@@ -98,7 +115,7 @@ describe("Product model", () => {
           slug: "chatgpt-plus-account",
           price: new Prisma.Decimal("19.99"),
         },
-      })
+      }),
     ).rejects.toThrow(Prisma.PrismaClientKnownRequestError);
   });
 });
@@ -130,10 +147,18 @@ describe("Tag model (many-to-many with Product)", () => {
       id: "clx_prod_001",
       name: "ChatGPT Plus",
       slug: "chatgpt-plus",
+      summary: null,
       description: null,
+      image: null,
       price: new Prisma.Decimal("29.99"),
       maxQuantity: 10,
       status: "ACTIVE" as const,
+      productType: "NORMAL" as const,
+      sourceUrl: null,
+      validityHours: null,
+      allowAccountSwitch: true,
+      accountSwitchLimit: 1,
+      pinnedAt: null,
       createdAt: new Date(),
       updatedAt: new Date(),
       tags: [mockTag],
@@ -179,12 +204,12 @@ describe("Tag model (many-to-many with Product)", () => {
     prismaMock.tag.create.mockRejectedValue(
       new Prisma.PrismaClientKnownRequestError(
         "Unique constraint failed on the fields: (`name`)",
-        { code: "P2002", clientVersion: "7.3.0", meta: { target: ["name"] } }
-      )
+        { code: "P2002", clientVersion: "7.3.0", meta: { target: ["name"] } },
+      ),
     );
 
     await expect(
-      prismaMock.tag.create({ data: { name: "AI Tools", slug: "ai-tools-2" } })
+      prismaMock.tag.create({ data: { name: "AI Tools", slug: "ai-tools-2" } }),
     ).rejects.toThrow(Prisma.PrismaClientKnownRequestError);
   });
 });
@@ -198,6 +223,7 @@ describe("Card model", () => {
     content: "username:password123",
     status: "UNSOLD",
     orderId: null,
+    lastRefreshedAt: null,
     createdAt: new Date("2026-01-01"),
     updatedAt: new Date("2026-01-01"),
   };
@@ -234,7 +260,11 @@ describe("Card model", () => {
   });
 
   it("should mark a card as SOLD", async () => {
-    const sold: Card = { ...mockCard, status: "SOLD", orderId: "clx_order_001" };
+    const sold: Card = {
+      ...mockCard,
+      status: "SOLD",
+      orderId: "clx_order_001",
+    };
     prismaMock.card.update.mockResolvedValue(sold);
 
     const result = await prismaMock.card.update({
@@ -280,12 +310,22 @@ describe("Order model", () => {
     id: "clx_order_001",
     orderNo: "FAK202601010001",
     productId: "clx_prod_001",
+    distributorId: null,
     email: "buyer@example.com",
     passwordHash: "$argon2id$v=19$m=65536,t=3,p=4$hash",
     quantity: 2,
     amount: new Prisma.Decimal("59.98"),
+    discountPercentApplied: null,
+    productNameSnapshot: null,
     status: "PENDING",
     paidAt: null,
+    expiresAt: null,
+    promoCode: null,
+    paymentMethod: "alipay",
+    clientIp: null,
+    fingerprintHash: null,
+    exitDiscountMeta: null,
+    switchAccountCount: 0,
     createdAt: new Date("2026-01-01"),
     updatedAt: new Date("2026-01-01"),
   };
@@ -378,8 +418,12 @@ describe("Order model", () => {
     prismaMock.order.create.mockRejectedValue(
       new Prisma.PrismaClientKnownRequestError(
         "Unique constraint failed on the fields: (`orderNo`)",
-        { code: "P2002", clientVersion: "7.3.0", meta: { target: ["orderNo"] } }
-      )
+        {
+          code: "P2002",
+          clientVersion: "7.3.0",
+          meta: { target: ["orderNo"] },
+        },
+      ),
     );
 
     await expect(
@@ -392,7 +436,7 @@ describe("Order model", () => {
           quantity: 1,
           amount: new Prisma.Decimal("29.99"),
         },
-      })
+      }),
     ).rejects.toThrow(Prisma.PrismaClientKnownRequestError);
   });
 });
@@ -405,10 +449,18 @@ describe("Enum default values", () => {
       id: "test",
       name: "Test",
       slug: "test",
+      summary: null,
       description: null,
+      image: null,
       price: new Prisma.Decimal("10.00"),
       maxQuantity: 10,
       status: "ACTIVE" as const,
+      productType: "NORMAL" as const,
+      sourceUrl: null,
+      validityHours: null,
+      allowAccountSwitch: true,
+      accountSwitchLimit: 1,
+      pinnedAt: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -427,6 +479,7 @@ describe("Enum default values", () => {
       content: "test",
       status: "UNSOLD",
       orderId: null,
+      lastRefreshedAt: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -443,12 +496,22 @@ describe("Enum default values", () => {
       id: "test",
       orderNo: "FAK202601010002",
       productId: "prod",
+      distributorId: null,
       email: "test@test.com",
       passwordHash: "hash",
       quantity: 1,
       amount: new Prisma.Decimal("10.00"),
+      discountPercentApplied: null,
+      productNameSnapshot: null,
       status: "PENDING",
       paidAt: null,
+      expiresAt: null,
+      promoCode: null,
+      paymentMethod: "alipay",
+      clientIp: null,
+      fingerprintHash: null,
+      exitDiscountMeta: null,
+      switchAccountCount: 0,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -573,8 +636,11 @@ describe("Withdrawal model", () => {
     distributorId: "dist_1",
     amount: new Prisma.Decimal("50.00"),
     status: "PENDING",
+    receiptImageUrl: null,
     note: null,
     processedAt: null,
+    feePercent: null,
+    feeAmount: null,
     createdAt: new Date("2026-01-01"),
     updatedAt: new Date("2026-01-01"),
   };
@@ -632,7 +698,13 @@ describe("Commission.level field", () => {
     prismaMock.commission.create.mockResolvedValue(commission);
 
     const result = await prismaMock.commission.create({
-      data: { orderId: "ord_1", distributorId: "dist_B", amount: 44, status: "SETTLED", level: 1 },
+      data: {
+        orderId: "ord_1",
+        distributorId: "dist_B",
+        amount: 44,
+        status: "SETTLED",
+        level: 1,
+      },
     });
 
     expect(result.level).toBe(1);
@@ -717,7 +789,9 @@ describe("DistributorInvitation model", () => {
   });
 
   it("should find invitation by token", async () => {
-    prismaMock.distributorInvitation.findUnique.mockResolvedValue(mockInvitation);
+    prismaMock.distributorInvitation.findUnique.mockResolvedValue(
+      mockInvitation,
+    );
 
     const result = await prismaMock.distributorInvitation.findUnique({
       where: { token: "uuid-token-here" },
@@ -743,8 +817,8 @@ describe("DistributorInvitation model", () => {
     prismaMock.distributorInvitation.create.mockRejectedValue(
       new Prisma.PrismaClientKnownRequestError(
         "Unique constraint failed on the fields: (`token`)",
-        { code: "P2002", clientVersion: "7.3.0", meta: { target: ["token"] } }
-      )
+        { code: "P2002", clientVersion: "7.3.0", meta: { target: ["token"] } },
+      ),
     );
 
     await expect(
@@ -755,7 +829,7 @@ describe("DistributorInvitation model", () => {
           inviterId: "dist_A",
           expiresAt: new Date(),
         },
-      })
+      }),
     ).rejects.toThrow(Prisma.PrismaClientKnownRequestError);
   });
 });

@@ -19,7 +19,7 @@ jest.mock("@/lib/order-success-token", () => ({
 }))
 
 jest.mock("@/lib/scrape-shared-accounts", () => ({
-    scrapeSharedAccounts: jest.fn(),
+    scrapeMultipleUrls: jest.fn(),
 }))
 
 jest.mock("@/lib/config", () => ({
@@ -30,10 +30,10 @@ jest.mock("@/lib/config", () => ({
 }))
 
 import { verifyOrderSuccessToken } from "@/lib/order-success-token"
-import { scrapeSharedAccounts } from "@/lib/scrape-shared-accounts"
+import { scrapeMultipleUrls } from "@/lib/scrape-shared-accounts"
 
 const verifyOrderSuccessTokenMock = verifyOrderSuccessToken as jest.Mock
-const scrapeSharedAccountsMock = scrapeSharedAccounts as jest.Mock
+const scrapeMultipleUrlsMock = scrapeMultipleUrls as jest.Mock
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -83,7 +83,7 @@ describe("POST /api/orders/[orderId]/switch-account", () => {
     beforeEach(() => {
         jest.clearAllMocks()
         verifyOrderSuccessTokenMock.mockReturnValue(true)
-        scrapeSharedAccountsMock.mockResolvedValue([NEW_ACCOUNT])
+        scrapeMultipleUrlsMock.mockResolvedValue([NEW_ACCOUNT])
         prismaMock.accountBlacklist.findMany.mockResolvedValue([])
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ;(prismaMock.$transaction as any).mockImplementation(async (ops: any[]) => Promise.all(ops))
@@ -230,7 +230,7 @@ describe("POST /api/orders/[orderId]/switch-account", () => {
     describe("爬取结果处理", () => {
         it("爬取返回空列表 → 503", async () => {
             prismaMock.order.findUnique.mockResolvedValue(makeOrder())
-            scrapeSharedAccountsMock.mockResolvedValue([])
+            scrapeMultipleUrlsMock.mockResolvedValue([])
 
             const res = await POST(makeRequest(BODY), makeContext())
             expect(res.status).toBe(503)
@@ -239,7 +239,7 @@ describe("POST /api/orders/[orderId]/switch-account", () => {
         it("所有账号被黑名单过滤（含当前账号）→ 503", async () => {
             prismaMock.order.findUnique.mockResolvedValue(makeOrder())
             // 爬取到的唯一账号就是当前账号 old@apple.com，会被 currentAccount 过滤
-            scrapeSharedAccountsMock.mockResolvedValue([
+            scrapeMultipleUrlsMock.mockResolvedValue([
                 { account: "old@apple.com", password: "p", region: "US", status: "valid" },
             ])
 

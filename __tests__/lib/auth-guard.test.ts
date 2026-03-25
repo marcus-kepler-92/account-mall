@@ -44,7 +44,7 @@ describe("getDistributorSession", () => {
         })
         prismaMock.user.findUnique.mockResolvedValue({
             disabledAt: new Date("2025-01-01"),
-        })
+        } as any)
         expect(await getDistributorSession()).toBeNull()
         expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
             where: { id: "dist_1" },
@@ -56,7 +56,7 @@ describe("getDistributorSession", () => {
             user: { id: "dist_1", email: "d@b.com", name: "D", role: "DISTRIBUTOR" },
         }
         mockGetSession.mockResolvedValue(session)
-        prismaMock.user.findUnique.mockResolvedValue({ disabledAt: null })
+        prismaMock.user.findUnique.mockResolvedValue({ disabledAt: null } as any)
         expect(await getDistributorSession()).toEqual(session)
     })
 })
@@ -76,7 +76,7 @@ describe("getAdminSession", () => {
         mockGetSession.mockResolvedValue({
             user: { id: "u1", email: "a@b.com", name: "A", role: "DISTRIBUTOR" },
         })
-        prismaMock.user.findUnique.mockResolvedValue({ role: "DISTRIBUTOR" })
+        prismaMock.user.findUnique.mockResolvedValue({ role: "DISTRIBUTOR" } as any)
         expect(await getAdminSession()).toBeNull()
     })
 
@@ -85,7 +85,7 @@ describe("getAdminSession", () => {
             user: { id: "admin_1", email: "a@b.com", name: "Admin", role: "ADMIN" },
         }
         mockGetSession.mockResolvedValue(session)
-        prismaMock.user.findUnique.mockResolvedValue({ role: "ADMIN" })
+        prismaMock.user.findUnique.mockResolvedValue({ role: "ADMIN" } as any)
         expect(await getAdminSession()).toEqual(session)
     })
 })

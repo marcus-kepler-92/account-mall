@@ -1,4 +1,5 @@
 import { type NextRequest } from "next/server"
+import { Prisma } from "@prisma/client"
 import { GET as MeGet } from "@/app/api/distributor/me/route"
 import { GET as OrdersGet } from "@/app/api/distributor/orders/route"
 import { GET as CommissionsGet } from "@/app/api/distributor/commissions/route"
@@ -82,10 +83,10 @@ describe("GET /api/distributor/me", () => {
 
     it("returns 200 with promoUrl and withdrawableBalance when session has distributorCode", async () => {
         getDistributorSession.mockResolvedValue(distributorSession)
-        prismaMock.commission.aggregate.mockResolvedValue({ _sum: { amount: 100 } })
+        prismaMock.commission.aggregate.mockResolvedValue({ _sum: { amount: new Prisma.Decimal("100") }, _count: { id: 0 }, _avg: null, _min: null, _max: null } as any)
         prismaMock.withdrawal.aggregate
-            .mockResolvedValueOnce({ _sum: { amount: 20 } })
-            .mockResolvedValueOnce({ _sum: { amount: 0 } })
+            .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal("20"), feeAmount: null }, _count: { id: 0 }, _avg: null, _min: null, _max: null } as any)
+            .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal("0"), feeAmount: null }, _count: { id: 0 }, _avg: null, _min: null, _max: null } as any)
         prismaMock.order.findMany.mockResolvedValue([])
         prismaMock.commissionTier.findMany.mockResolvedValue([])
 
@@ -112,11 +113,11 @@ describe("GET /api/distributor/me", () => {
         prismaMock.user.update.mockResolvedValue({
             id: "dist_1",
             distributorCode: "D00000001",
-        })
-        prismaMock.commission.aggregate.mockResolvedValue({ _sum: { amount: null } })
+        } as any)
+        prismaMock.commission.aggregate.mockResolvedValue({ _sum: { amount: null }, _count: { id: 0 }, _avg: null, _min: null, _max: null } as any)
         prismaMock.withdrawal.aggregate
-            .mockResolvedValueOnce({ _sum: { amount: null } })
-            .mockResolvedValueOnce({ _sum: { amount: null } })
+            .mockResolvedValueOnce({ _sum: { amount: null, feeAmount: null }, _count: { id: 0 }, _avg: null, _min: null, _max: null } as any)
+            .mockResolvedValueOnce({ _sum: { amount: null, feeAmount: null }, _count: { id: 0 }, _avg: null, _min: null, _max: null } as any)
         prismaMock.order.findMany.mockResolvedValue([])
         prismaMock.commissionTier.findMany.mockResolvedValue([])
 
@@ -151,14 +152,14 @@ describe("GET /api/distributor/orders", () => {
             {
                 id: "ord_1",
                 orderNo: "no-1",
-                product: { id: "p1", name: "P", slug: "p", price: 50 },
+                product: { id: "p1", name: "P", slug: "p", price: new Prisma.Decimal("50") },
                 quantity: 1,
-                amount: 50,
+                amount: new Prisma.Decimal("50"),
                 status: "COMPLETED",
                 paidAt: new Date(),
                 createdAt: new Date(),
             },
-        ])
+        ] as any)
         prismaMock.order.count.mockResolvedValue(1)
 
         const req = createRequest("http://localhost/api/distributor/orders?page=1&pageSize=20")
@@ -196,17 +197,17 @@ describe("GET /api/distributor/commissions", () => {
             {
                 id: "c1",
                 orderId: "ord_1",
-                amount: 10,
+                amount: new Prisma.Decimal("10"),
                 status: "SETTLED",
                 createdAt: new Date(),
-                order: { orderNo: "no-1", amount: 100, paidAt: new Date() },
+                order: { orderNo: "no-1", amount: new Prisma.Decimal("100"), paidAt: new Date() },
             },
-        ])
+        ] as any)
         prismaMock.commission.count.mockResolvedValue(1)
-        prismaMock.commission.aggregate.mockResolvedValue({ _sum: { amount: 50 } })
+        prismaMock.commission.aggregate.mockResolvedValue({ _sum: { amount: new Prisma.Decimal("50") }, _count: { id: 0 }, _avg: null, _min: null, _max: null } as any)
         prismaMock.withdrawal.aggregate
-            .mockResolvedValueOnce({ _sum: { amount: 10 } })
-            .mockResolvedValueOnce({ _sum: { amount: 0 } })
+            .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal("10"), feeAmount: null }, _count: { id: 0 }, _avg: null, _min: null, _max: null } as any)
+            .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal("0"), feeAmount: null }, _count: { id: 0 }, _avg: null, _min: null, _max: null } as any)
 
         const req = createRequest("http://localhost/api/distributor/commissions")
         const res = await CommissionsGet(req)
@@ -223,10 +224,10 @@ describe("GET /api/distributor/commissions", () => {
         getDistributorSession.mockResolvedValue(distributorSession)
         prismaMock.commission.findMany.mockResolvedValue([])
         prismaMock.commission.count.mockResolvedValue(0)
-        prismaMock.commission.aggregate.mockResolvedValue({ _sum: { amount: null } })
+        prismaMock.commission.aggregate.mockResolvedValue({ _sum: { amount: null }, _count: { id: 0 }, _avg: null, _min: null, _max: null } as any)
         prismaMock.withdrawal.aggregate
-            .mockResolvedValueOnce({ _sum: { amount: null } })
-            .mockResolvedValueOnce({ _sum: { amount: null } })
+            .mockResolvedValueOnce({ _sum: { amount: null, feeAmount: null }, _count: { id: 0 }, _avg: null, _min: null, _max: null } as any)
+            .mockResolvedValueOnce({ _sum: { amount: null, feeAmount: null }, _count: { id: 0 }, _avg: null, _min: null, _max: null } as any)
 
         const req = createRequest("http://localhost/api/distributor/commissions")
         await CommissionsGet(req)
@@ -256,13 +257,13 @@ describe("GET /api/distributor/withdrawals", () => {
         prismaMock.withdrawal.findMany.mockResolvedValue([
             {
                 id: "w1",
-                amount: 50,
+                amount: new Prisma.Decimal("50"),
                 status: "PAID",
                 note: null,
                 processedAt: new Date(),
                 createdAt: new Date(),
             },
-        ])
+        ] as any)
         prismaMock.withdrawal.count.mockResolvedValue(1)
 
         const req = createRequest("http://localhost/api/distributor/withdrawals")
@@ -377,18 +378,18 @@ describe("POST /api/distributor/withdrawals", () => {
 
     it("rounds amount to 2 decimals and creates withdrawal (e.g. 50.999 -> 51)", async () => {
         getDistributorSession.mockResolvedValue(distributorSession)
-        prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock))
-        prismaMock.commission.aggregate.mockResolvedValue({ _sum: { amount: 200 } })
+        ;(prismaMock.$transaction as any).mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock))
+        prismaMock.commission.aggregate.mockResolvedValue({ _sum: { amount: new Prisma.Decimal("200") }, _count: { id: 0 }, _avg: null, _min: null, _max: null } as any)
         prismaMock.withdrawal.aggregate
-            .mockResolvedValueOnce({ _sum: { amount: 0 } })
-            .mockResolvedValueOnce({ _sum: { amount: 0 } })
+            .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal("0"), feeAmount: null }, _count: { id: 0 }, _avg: null, _min: null, _max: null } as any)
+            .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal("0"), feeAmount: null }, _count: { id: 0 }, _avg: null, _min: null, _max: null } as any)
         prismaMock.withdrawal.create.mockResolvedValue({
             id: "with_1",
-            amount: 51,
+            amount: new Prisma.Decimal("51"),
             status: "PENDING",
             receiptImageUrl: "/uploads/receipts/test.jpg",
             createdAt: new Date(),
-        })
+        } as any)
 
         const req = createWithdrawalFormRequest("50.999")
         const res = await WithdrawalsPost(req)
@@ -410,11 +411,11 @@ describe("POST /api/distributor/withdrawals", () => {
 
     it("returns 400 when amount exceeds withdrawable balance", async () => {
         getDistributorSession.mockResolvedValue(distributorSession)
-        prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock))
-        prismaMock.commission.aggregate.mockResolvedValue({ _sum: { amount: 100 } })
+        ;(prismaMock.$transaction as any).mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock))
+        prismaMock.commission.aggregate.mockResolvedValue({ _sum: { amount: new Prisma.Decimal("100") }, _count: { id: 0 }, _avg: null, _min: null, _max: null } as any)
         prismaMock.withdrawal.aggregate
-            .mockResolvedValueOnce({ _sum: { amount: 80 } })
-            .mockResolvedValueOnce({ _sum: { amount: 0 } })
+            .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal("80"), feeAmount: null }, _count: { id: 0 }, _avg: null, _min: null, _max: null } as any)
+            .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal("0"), feeAmount: null }, _count: { id: 0 }, _avg: null, _min: null, _max: null } as any)
 
         const req = createWithdrawalFormRequest("50")
         const res = await WithdrawalsPost(req)
@@ -427,18 +428,18 @@ describe("POST /api/distributor/withdrawals", () => {
 
     it("returns 201 and creates withdrawal when amount is valid (at minimum amount boundary)", async () => {
         getDistributorSession.mockResolvedValue(distributorSession)
-        prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock))
-        prismaMock.commission.aggregate.mockResolvedValue({ _sum: { amount: 100 } })
+        ;(prismaMock.$transaction as any).mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock))
+        prismaMock.commission.aggregate.mockResolvedValue({ _sum: { amount: new Prisma.Decimal("100") }, _count: { id: 0 }, _avg: null, _min: null, _max: null } as any)
         prismaMock.withdrawal.aggregate
-            .mockResolvedValueOnce({ _sum: { amount: 0 } })
-            .mockResolvedValueOnce({ _sum: { amount: 0 } })
+            .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal("0"), feeAmount: null }, _count: { id: 0 }, _avg: null, _min: null, _max: null } as any)
+            .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal("0"), feeAmount: null }, _count: { id: 0 }, _avg: null, _min: null, _max: null } as any)
         prismaMock.withdrawal.create.mockResolvedValue({
             id: "with_1",
-            amount: 50,
+            amount: new Prisma.Decimal("50"),
             status: "PENDING",
             receiptImageUrl: "/uploads/receipts/test.jpg",
             createdAt: new Date(),
-        })
+        } as any)
 
         const req = createWithdrawalFormRequest("50")
         const res = await WithdrawalsPost(req)
@@ -464,18 +465,18 @@ describe("POST /api/distributor/withdrawals", () => {
 
     it("returns 201 when amount equals withdrawable balance (boundary allowed)", async () => {
         getDistributorSession.mockResolvedValue(distributorSession)
-        prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock))
-        prismaMock.commission.aggregate.mockResolvedValue({ _sum: { amount: 100 } })
+        ;(prismaMock.$transaction as any).mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock))
+        prismaMock.commission.aggregate.mockResolvedValue({ _sum: { amount: new Prisma.Decimal("100") }, _count: { id: 0 }, _avg: null, _min: null, _max: null } as any)
         prismaMock.withdrawal.aggregate
-            .mockResolvedValueOnce({ _sum: { amount: 20 } })
-            .mockResolvedValueOnce({ _sum: { amount: 0 } })
+            .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal("20"), feeAmount: null }, _count: { id: 0 }, _avg: null, _min: null, _max: null } as any)
+            .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal("0"), feeAmount: null }, _count: { id: 0 }, _avg: null, _min: null, _max: null } as any)
         prismaMock.withdrawal.create.mockResolvedValue({
             id: "with_1",
-            amount: 80,
+            amount: new Prisma.Decimal("80"),
             status: "PENDING",
             receiptImageUrl: "/uploads/receipts/test.jpg",
             createdAt: new Date(),
-        })
+        } as any)
 
         const req = createWithdrawalFormRequest("80")
         const res = await WithdrawalsPost(req)
@@ -515,20 +516,20 @@ describe("POST /api/distributor/withdrawals", () => {
 
     it("creates withdrawal with feePercent=2 and correct feeAmount", async () => {
         getDistributorSession.mockResolvedValue(distributorSession)
-        prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock))
-        prismaMock.commission.aggregate.mockResolvedValue({ _sum: { amount: 200 } })
+        ;(prismaMock.$transaction as any).mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock))
+        prismaMock.commission.aggregate.mockResolvedValue({ _sum: { amount: new Prisma.Decimal("200") }, _count: { id: 0 }, _avg: null, _min: null, _max: null } as any)
         prismaMock.withdrawal.aggregate
-            .mockResolvedValueOnce({ _sum: { amount: 0 } })
-            .mockResolvedValueOnce({ _sum: { amount: 0 } })
+            .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal("0"), feeAmount: null }, _count: { id: 0 }, _avg: null, _min: null, _max: null } as any)
+            .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal("0"), feeAmount: null }, _count: { id: 0 }, _avg: null, _min: null, _max: null } as any)
         prismaMock.withdrawal.create.mockResolvedValue({
             id: "with_fee",
-            amount: 100,
+            amount: new Prisma.Decimal("100"),
             feePercent: 2,
-            feeAmount: 2,
+            feeAmount: new Prisma.Decimal("2"),
             status: "PENDING",
             receiptImageUrl: "/uploads/receipts/test.jpg",
             createdAt: new Date(),
-        })
+        } as any)
 
         const req = createWithdrawalFormRequest("100")
         const res = await WithdrawalsPost(req)
@@ -544,20 +545,20 @@ describe("POST /api/distributor/withdrawals", () => {
 
     it("calculates feeAmount rounded to 2 decimal places (83.33 * 2% = 1.67)", async () => {
         getDistributorSession.mockResolvedValue(distributorSession)
-        prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock))
-        prismaMock.commission.aggregate.mockResolvedValue({ _sum: { amount: 200 } })
+        ;(prismaMock.$transaction as any).mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock))
+        prismaMock.commission.aggregate.mockResolvedValue({ _sum: { amount: new Prisma.Decimal("200") }, _count: { id: 0 }, _avg: null, _min: null, _max: null } as any)
         prismaMock.withdrawal.aggregate
-            .mockResolvedValueOnce({ _sum: { amount: 0 } })
-            .mockResolvedValueOnce({ _sum: { amount: 0 } })
+            .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal("0"), feeAmount: null }, _count: { id: 0 }, _avg: null, _min: null, _max: null } as any)
+            .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal("0"), feeAmount: null }, _count: { id: 0 }, _avg: null, _min: null, _max: null } as any)
         prismaMock.withdrawal.create.mockResolvedValue({
             id: "with_fee2",
-            amount: 83.33,
+            amount: new Prisma.Decimal("83.33"),
             feePercent: 2,
-            feeAmount: 1.67,
+            feeAmount: new Prisma.Decimal("1.67"),
             status: "PENDING",
             receiptImageUrl: "/uploads/receipts/test.jpg",
             createdAt: new Date(),
-        })
+        } as any)
 
         // 83.33 * 2% = Math.round(166.66) / 100 = 167 / 100 = 1.67
         const req = createWithdrawalFormRequest("83.33")
@@ -574,20 +575,20 @@ describe("POST /api/distributor/withdrawals", () => {
         config.withdrawalFeePercent = 0
 
         getDistributorSession.mockResolvedValue(distributorSession)
-        prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock))
-        prismaMock.commission.aggregate.mockResolvedValue({ _sum: { amount: 200 } })
+        ;(prismaMock.$transaction as any).mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock))
+        prismaMock.commission.aggregate.mockResolvedValue({ _sum: { amount: new Prisma.Decimal("200") }, _count: { id: 0 }, _avg: null, _min: null, _max: null } as any)
         prismaMock.withdrawal.aggregate
-            .mockResolvedValueOnce({ _sum: { amount: 0 } })
-            .mockResolvedValueOnce({ _sum: { amount: 0 } })
+            .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal("0"), feeAmount: null }, _count: { id: 0 }, _avg: null, _min: null, _max: null } as any)
+            .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal("0"), feeAmount: null }, _count: { id: 0 }, _avg: null, _min: null, _max: null } as any)
         prismaMock.withdrawal.create.mockResolvedValue({
             id: "with_nofee",
-            amount: 100,
+            amount: new Prisma.Decimal("100"),
             feePercent: 0,
-            feeAmount: 0,
+            feeAmount: new Prisma.Decimal("0"),
             status: "PENDING",
             receiptImageUrl: "/uploads/receipts/test.jpg",
             createdAt: new Date(),
-        })
+        } as any)
 
         const req = createWithdrawalFormRequest("100")
         await WithdrawalsPost(req)
@@ -604,16 +605,16 @@ describe("POST /api/distributor/withdrawals", () => {
         prismaMock.withdrawal.findMany.mockResolvedValue([
             {
                 id: "w1",
-                amount: 100,
+                amount: new Prisma.Decimal("100"),
                 feePercent: 2,
-                feeAmount: 2,
+                feeAmount: new Prisma.Decimal("2"),
                 status: "PENDING",
                 receiptImageUrl: null,
                 note: null,
                 processedAt: null,
                 createdAt: new Date(),
             },
-        ])
+        ] as any)
         prismaMock.withdrawal.count.mockResolvedValue(1)
 
         const url = "http://localhost/api/distributor/withdrawals"

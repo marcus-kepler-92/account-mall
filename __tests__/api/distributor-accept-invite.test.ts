@@ -91,7 +91,7 @@ describe("POST /api/distributor/accept-invite", () => {
     it("creates user with inviterId when invited by distributor", async () => {
         prismaMock.distributorInvitation.findUnique.mockResolvedValue(makeInvitation())
         prismaMock.user.findUnique.mockResolvedValue(null)
-        prismaMock.$transaction.mockImplementation(async (fn: (tx: any) => Promise<void>) => {
+        ;(prismaMock.$transaction as any).mockImplementation(async (fn: (tx: any) => Promise<void>) => {
             await fn({
                 ...prismaMock,
                 distributorInvitation: {
@@ -114,7 +114,7 @@ describe("POST /api/distributor/accept-invite", () => {
         prismaMock.user.findUnique.mockResolvedValue(null)
 
         let userCreateArgs: any
-        prismaMock.$transaction.mockImplementation(async (fn: (tx: any) => Promise<void>) => {
+        ;(prismaMock.$transaction as any).mockImplementation(async (fn: (tx: any) => Promise<void>) => {
             const userCreateMock = jest.fn().mockResolvedValue({ id: "new_user" })
             await fn({
                 ...prismaMock,
@@ -136,7 +136,7 @@ describe("POST /api/distributor/accept-invite", () => {
     it("returns 409 when concurrent accept detected (acceptedAt set inside transaction)", async () => {
         prismaMock.distributorInvitation.findUnique.mockResolvedValue(makeInvitation())
         prismaMock.user.findUnique.mockResolvedValue(null)
-        prismaMock.$transaction.mockImplementation(async (fn: (tx: any) => Promise<void>) => {
+        ;(prismaMock.$transaction as any).mockImplementation(async (fn: (tx: any) => Promise<void>) => {
             await fn({
                 ...prismaMock,
                 distributorInvitation: {
@@ -178,7 +178,7 @@ describe("POST /api/distributor/accept-invite", () => {
     it("accepts password at exact min length (6 chars)", async () => {
         prismaMock.distributorInvitation.findUnique.mockResolvedValue(makeInvitation())
         prismaMock.user.findUnique.mockResolvedValue(null)
-        prismaMock.$transaction.mockImplementation(async (fn: (tx: any) => Promise<void>) => {
+        ;(prismaMock.$transaction as any).mockImplementation(async (fn: (tx: any) => Promise<void>) => {
             await fn({
                 ...prismaMock,
                 distributorInvitation: {
@@ -203,7 +203,7 @@ describe("POST /api/distributor/accept-invite", () => {
     it("accepts password at exact max length (128 chars)", async () => {
         prismaMock.distributorInvitation.findUnique.mockResolvedValue(makeInvitation())
         prismaMock.user.findUnique.mockResolvedValue(null)
-        prismaMock.$transaction.mockImplementation(async (fn: (tx: any) => Promise<void>) => {
+        ;(prismaMock.$transaction as any).mockImplementation(async (fn: (tx: any) => Promise<void>) => {
             await fn({
                 ...prismaMock,
                 distributorInvitation: {

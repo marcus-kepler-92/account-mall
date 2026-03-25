@@ -65,7 +65,7 @@ describe("POST /api/distributor/bind-inviter", () => {
 
     it("returns 400 when binding self as inviter", async () => {
         getDistributorSession.mockResolvedValue({ user: { id: "user_1" } })
-        prismaMock.user.findFirst.mockResolvedValue({ id: "user_1" })
+        prismaMock.user.findFirst.mockResolvedValue({ id: "user_1" } as any)
         const res = await BindInviterPost(createRequest({ inviteCode: "MYCODE" }))
         expect(res.status).toBe(400)
         const data = await res.json()
@@ -75,8 +75,8 @@ describe("POST /api/distributor/bind-inviter", () => {
 
     it("returns 200 and updates user inviterId when inviteCode is valid", async () => {
         getDistributorSession.mockResolvedValue({ user: { id: "invitee_1" } })
-        prismaMock.user.findFirst.mockResolvedValue({ id: "inviter_1" })
-        prismaMock.user.update.mockResolvedValue({})
+        prismaMock.user.findFirst.mockResolvedValue({ id: "inviter_1" } as any)
+        prismaMock.user.update.mockResolvedValue({} as any)
         const res = await BindInviterPost(createRequest({ inviteCode: "PROMO1" }))
         expect(res.status).toBe(200)
         const data = await res.json()
@@ -97,8 +97,8 @@ describe("POST /api/distributor/bind-inviter", () => {
 
     it("trims inviteCode before lookup", async () => {
         getDistributorSession.mockResolvedValue({ user: { id: "invitee_1" } })
-        prismaMock.user.findFirst.mockResolvedValue({ id: "inviter_1" })
-        prismaMock.user.update.mockResolvedValue({})
+        prismaMock.user.findFirst.mockResolvedValue({ id: "inviter_1" } as any)
+        prismaMock.user.update.mockResolvedValue({} as any)
         await BindInviterPost(createRequest({ inviteCode: "  PROMO1  " }))
         expect(prismaMock.user.findFirst).toHaveBeenCalledWith(
             expect.objectContaining({

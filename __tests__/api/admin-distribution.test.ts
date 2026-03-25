@@ -1,4 +1,5 @@
 import { type NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import {
   GET as TiersGet,
   POST as TiersPost,
@@ -47,9 +48,9 @@ describe("GET /api/admin/commission-tiers", () => {
     prismaMock.commissionTier.findMany.mockResolvedValue([
       {
         id: "t1",
-        minAmount: 0,
-        maxAmount: 1000,
-        ratePercent: 5,
+        minAmount: new Prisma.Decimal("0"),
+        maxAmount: new Prisma.Decimal("1000"),
+        ratePercent: new Prisma.Decimal("5"),
         sortOrder: 0,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -123,12 +124,16 @@ describe("POST /api/admin/commission-tiers", () => {
     withSession();
     prismaMock.commissionTier.aggregate.mockResolvedValue({
       _max: { sortOrder: 0 },
-    });
+      _count: { id: 0 },
+      _avg: null,
+      _sum: null,
+      _min: null,
+    } as any);
     prismaMock.commissionTier.create.mockResolvedValue({
       id: "t_new",
-      minAmount: 0,
-      maxAmount: 2000,
-      ratePercent: 10,
+      minAmount: new Prisma.Decimal("0"),
+      maxAmount: new Prisma.Decimal("2000"),
+      ratePercent: new Prisma.Decimal("10"),
       sortOrder: 1,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -178,11 +183,11 @@ describe("PATCH /api/admin/commission-tiers/[id]", () => {
     withSession();
     prismaMock.commissionTier.findUnique.mockResolvedValue({
       id: "t1",
-      minAmount: 0,
-      maxAmount: 1000,
-      ratePercent: 3,
+      minAmount: new Prisma.Decimal("0"),
+      maxAmount: new Prisma.Decimal("1000"),
+      ratePercent: new Prisma.Decimal("3"),
       sortOrder: 0,
-    });
+    } as any);
     const req = {
       json: async () => ({ minAmount: 500, maxAmount: 400 }),
     } as unknown as NextRequest;
@@ -196,11 +201,11 @@ describe("PATCH /api/admin/commission-tiers/[id]", () => {
     withSession();
     prismaMock.commissionTier.findUnique.mockResolvedValue({
       id: "t1",
-      minAmount: 0,
-      maxAmount: 1000,
-      ratePercent: 3,
+      minAmount: new Prisma.Decimal("0"),
+      maxAmount: new Prisma.Decimal("1000"),
+      ratePercent: new Prisma.Decimal("3"),
       sortOrder: 0,
-    });
+    } as any);
     const req = {
       json: async () => ({ ratePercent: 101 }),
     } as unknown as NextRequest;
@@ -213,16 +218,16 @@ describe("PATCH /api/admin/commission-tiers/[id]", () => {
     withSession();
     prismaMock.commissionTier.findUnique.mockResolvedValue({
       id: "t1",
-      minAmount: 0,
-      maxAmount: 1000,
-      ratePercent: 3,
+      minAmount: new Prisma.Decimal("0"),
+      maxAmount: new Prisma.Decimal("1000"),
+      ratePercent: new Prisma.Decimal("3"),
       sortOrder: 0,
-    });
+    } as any);
     prismaMock.commissionTier.update.mockResolvedValue({
       id: "t1",
-      minAmount: 0,
-      maxAmount: 1000,
-      ratePercent: 5,
+      minAmount: new Prisma.Decimal("0"),
+      maxAmount: new Prisma.Decimal("1000"),
+      ratePercent: new Prisma.Decimal("5"),
       sortOrder: 0,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -259,7 +264,15 @@ describe("DELETE /api/admin/commission-tiers/[id]", () => {
 
   it("returns 204 and deletes tier", async () => {
     withSession();
-    prismaMock.commissionTier.findUnique.mockResolvedValue({ id: "t1" });
+    prismaMock.commissionTier.findUnique.mockResolvedValue({
+      id: "t1",
+      minAmount: new Prisma.Decimal("0"),
+      maxAmount: new Prisma.Decimal("1000"),
+      ratePercent: new Prisma.Decimal("5"),
+      sortOrder: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
     prismaMock.commissionTier.delete.mockResolvedValue({} as never);
     const res = await TierDelete({} as NextRequest, context);
     expect(res.status).toBe(204);
@@ -295,11 +308,11 @@ describe("GET /api/admin/distributors", () => {
     ] as never);
     prismaMock.order.count.mockResolvedValue(3);
     prismaMock.commission.aggregate
-      .mockResolvedValueOnce({ _sum: { amount: 100 } })
-      .mockResolvedValueOnce({ _sum: { amount: 80 } });
+      .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal("100") }, _avg: null, _min: null, _max: null, _count: { id: 0 } } as any)
+      .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal("80") }, _avg: null, _min: null, _max: null, _count: { id: 0 } } as any);
     prismaMock.withdrawal.aggregate
-      .mockResolvedValueOnce({ _sum: { amount: 20 } })
-      .mockResolvedValueOnce({ _sum: { amount: 0 } });
+      .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal("20") }, _avg: null, _min: null, _max: null, _count: { id: 0 } } as any)
+      .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal("0") }, _avg: null, _min: null, _max: null, _count: { id: 0 } } as any);
 
     const res = await DistributorsGet();
     const data = await res.json();
@@ -619,15 +632,18 @@ describe("GET /api/admin/withdrawals", () => {
       {
         id: "w1",
         distributorId: "dist_1",
-        amount: 50,
+        amount: new Prisma.Decimal("50"),
         status: "PENDING",
+        receiptImageUrl: null,
         note: null,
         processedAt: null,
+        feePercent: null,
+        feeAmount: null,
         createdAt: new Date(),
         updatedAt: new Date(),
         distributor: { id: "dist_1", email: "d@x.com", name: "D" },
       },
-    ]);
+    ] as any);
     const req = createRequest(
       "http://localhost/api/admin/withdrawals?status=PENDING",
     );
@@ -679,9 +695,12 @@ describe("PATCH /api/admin/withdrawals/[id]", () => {
       id: "w1",
       status: "PAID",
       distributorId: "dist_1",
-      amount: 50,
+      amount: new Prisma.Decimal("50"),
+      receiptImageUrl: null,
       note: null,
       processedAt: new Date(),
+      feePercent: null,
+      feeAmount: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -700,9 +719,12 @@ describe("PATCH /api/admin/withdrawals/[id]", () => {
       id: "w1",
       status: "PENDING",
       distributorId: "dist_1",
-      amount: 50,
+      amount: new Prisma.Decimal("50"),
+      receiptImageUrl: null,
       note: null,
       processedAt: null,
+      feePercent: null,
+      feeAmount: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -722,23 +744,29 @@ describe("PATCH /api/admin/withdrawals/[id]", () => {
       id: "w1",
       status: "PENDING",
       distributorId: "dist_1",
-      amount: 50,
+      amount: new Prisma.Decimal("50"),
+      receiptImageUrl: null,
       note: null,
       processedAt: null,
+      feePercent: null,
+      feeAmount: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
     prismaMock.withdrawal.update.mockResolvedValue({
       id: "w1",
       distributorId: "dist_1",
-      amount: 50,
+      amount: new Prisma.Decimal("50"),
       status: "PAID",
+      receiptImageUrl: null,
       note: "Done",
       processedAt: new Date(),
+      feePercent: null,
+      feeAmount: null,
       createdAt: new Date(),
       updatedAt: new Date(),
       distributor: { id: "dist_1", email: "d@x.com", name: "D" },
-    });
+    } as any);
     const req = {
       json: async () => ({ status: "PAID", note: "Done" }),
     } as unknown as NextRequest;

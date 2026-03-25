@@ -63,7 +63,7 @@ describe("DELETE /api/tags/[tagId]", () => {
             id: "tag_1",
             name: "Game",
             slug: "game",
-        })
+        } as any)
         prismaMock.tag.delete.mockResolvedValueOnce({} as any)
 
         const res = await DELETE(

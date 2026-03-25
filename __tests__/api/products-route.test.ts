@@ -1,4 +1,5 @@
 import { type NextRequest } from "next/server"
+import { Prisma } from "@prisma/client"
 import { GET, POST } from "@/app/api/products/route"
 import { prismaMock } from "../../__mocks__/prisma"
 
@@ -41,12 +42,12 @@ describe("GET /api/products", () => {
                 name: "Product 1",
                 slug: "product-1",
                 status: "ACTIVE",
-                price: 100,
+                price: new Prisma.Decimal("100"),
                 tags: [],
                 _count: { cards: 5 },
             },
         ]
-        prismaMock.product.findMany.mockResolvedValueOnce(products)
+        prismaMock.product.findMany.mockResolvedValueOnce(products as any)
         prismaMock.product.count.mockResolvedValueOnce(1)
         prismaMock.card.count.mockResolvedValueOnce(3)
 
@@ -307,7 +308,7 @@ describe("POST /api/products", () => {
             slug: "new-product",
             description: "Desc",
             image: null,
-            price: 199,
+            price: new Prisma.Decimal("199"),
             maxQuantity: 10,
             status: "ACTIVE",
             createdAt: new Date(),
@@ -316,7 +317,7 @@ describe("POST /api/products", () => {
                 { id: "tag_1", name: "Game", slug: "game" },
             ],
         }
-        prismaMock.product.create.mockResolvedValueOnce(created)
+        prismaMock.product.create.mockResolvedValueOnce(created as any)
 
         const res = await POST(
             createJsonRequest({

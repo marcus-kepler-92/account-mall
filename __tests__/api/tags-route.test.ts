@@ -112,7 +112,7 @@ describe("POST /api/tags", () => {
             id: "existing",
             name: "Game",
             slug: "game",
-        })
+        } as any)
 
         const res = await POST(createJsonRequest({ name: "Game" }))
         const data = await res.json()
@@ -131,7 +131,7 @@ describe("POST /api/tags", () => {
             name: "New Tag",
             slug: "new-tag",
         }
-        prismaMock.tag.create.mockResolvedValueOnce(created)
+        prismaMock.tag.create.mockResolvedValueOnce(created as any)
 
         const res = await POST(createJsonRequest({ name: "New Tag" }))
         const data = await res.json()
