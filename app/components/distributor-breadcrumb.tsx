@@ -46,10 +46,10 @@ export function DistributorBreadcrumb() {
             <BreadcrumbList>
                 <BreadcrumbItem>
                     {isHome ? (
-                        <BreadcrumbPage>仪表盘</BreadcrumbPage>
+                        <BreadcrumbPage>分销中心</BreadcrumbPage>
                     ) : (
                         <BreadcrumbLink asChild>
-                            <Link href="/distributor">仪表盘</Link>
+                            <Link href="/distributor">分销中心</Link>
                         </BreadcrumbLink>
                     )}
                 </BreadcrumbItem>

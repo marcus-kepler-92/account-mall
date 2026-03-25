@@ -110,7 +110,7 @@ export default async function DistributorDashboardPage() {
   return (
     <div className="space-y-4 md:space-y-6">
       <div>
-        <h1 className="text-xl font-bold tracking-tight sm:text-2xl">仪表盘</h1>
+        <h1 className="text-xl font-bold tracking-tight sm:text-2xl">总览</h1>
         <p className="text-muted-foreground">推广链接与数据概览</p>
       </div>
 

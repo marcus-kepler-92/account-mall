@@ -10,7 +10,6 @@ import { cn } from "@/lib/utils"
 const MOBILE_HIDDEN_TABS = new Set(["/distributor/guide"])
 
 const shortLabels: Record<string, string> = {
-    "仪表盘": "总览",
     "我的团队": "团队",
     "我的订单": "订单",
     "我的奖金": "奖金",

@@ -32,7 +32,7 @@ import {
 import { useSiteName } from "@/app/components/site-name-provider"
 
 export const navItems = [
-    { title: "仪表盘", href: "/distributor", icon: LayoutDashboard },
+    { title: "总览", href: "/distributor", icon: LayoutDashboard },
     { title: "入门手册", href: "/distributor/guide", icon: BookOpen },
     { title: "我的团队", href: "/distributor/invitees", icon: Users },
     { title: "我的订单", href: "/distributor/orders", icon: ShoppingCart },
