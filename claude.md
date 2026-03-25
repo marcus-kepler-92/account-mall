@@ -35,7 +35,7 @@ npm run test:e2e         # 运行 Playwright E2E 测试
 |---|------|
 | 框架 | Next.js 16 (App Router, `proxy.ts` 替代 middleware) |
 | 前端 | React 19 (RSC + Client Components) |
-| UI | shadcn/ui (New York) + Tailwind CSS 4 |
+| UI | shadcn/ui (New York) + Tailwind CSS 4 + `@tailwindcss/typography`（prose 类依赖） |
 | 数据库 | PostgreSQL 17 + Prisma 6 |
 | 认证 | better-auth（邮箱+密码, 角色: ADMIN / DISTRIBUTOR） |
 | 校验 | Zod (表单 + API) |
@@ -246,6 +246,8 @@ app/admin/(main)/{resource}/
 - 实现参考：`app/components/product-catalog.tsx`。
 - 复杂 query 可考虑 [nuqs](https://github.com/47ng/nuqs)。
 
+**若必须双向同步（不推荐）**：URL → state 时，仅当 URL 中**确有该参数**才覆盖 state，URL 为空时不清空 state（防止 `router.replace` 未生效前的短暂空 URL 导致振荡）；state → URL 时，仅当新旧参数字符串**不相等**才 `router.replace`。
+
 ## 认证与授权
 
 - **proxy.ts**：网络边界，检查 cookie 做粗粒度路由守卫（公开 vs 需登录）。
@@ -274,3 +276,4 @@ app/admin/(main)/{resource}/
 6. **不引入新依赖**前先检查现有工具是否能解决问题。
 7. **shadcn 组件优先**：所有表单元素用 shadcn Form + FormField；单选用 RadioGroup；勿用原生 `<input type="radio">`。
 8. **useSearchParams 必须包 Suspense**：凡是调用 `useSearchParams()` 的客户端组件，其父级 `page.tsx` 必须用 `<Suspense>` 包裹。
+9. **外部 mutable store 用 `useSyncExternalStore`**：读取 `localStorage`、`sessionStorage` 等外部可变存储时，使用 `useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)`，不要用 `useState` + `useEffect` 同步（会触发 SSR hydration mismatch 且违反 lint 规则）。`getServerSnapshot` 返回固定值以保证 SSR 一致性。参考实现：`app/components/theme-toggle.tsx`。
