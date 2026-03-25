@@ -70,7 +70,7 @@ export function ProductOrderSection({
                 exitDiscountPercent={exitDiscountPercent}
                 onExitDiscountConsumed={handleConsumed}
             />
-            {productType !== "AUTO_FETCH" && (
+            {price > 0 && (
                 <ExitIntentDialog
                     productId={productId}
                     productName={productName}

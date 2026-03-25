@@ -18,12 +18,23 @@ import {
     FormMessage,
 } from "@/components/ui/form"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Skeleton } from "@/components/ui/skeleton"
 import { SiteHeader } from "@/app/components/site-header"
 import { useSiteName } from "@/app/components/site-name-provider"
 import {
     Copy, Check, Eye, EyeOff, Loader2, Mail, Hash, Package, Search,
-    Zap, CreditCard, KeyRound, Globe, Clock, Info, RefreshCw, ArrowLeftRight, AlertTriangle,
+    Zap, CreditCard, KeyRound, Globe, Clock, Info, RefreshCw, ArrowLeftRight,
 } from "lucide-react"
 import { toast } from "sonner"
 import { addOrUpdateOrder } from "@/lib/order-history-storage"
@@ -53,6 +64,10 @@ interface OrderResult {
     isAutoFetch?: boolean
     /** AUTO_FETCH：是否可使用一次性换号 */
     canSwitch?: boolean
+    /** AUTO_FETCH：剩余换号次数 */
+    remainingSwitches?: number
+    /** 成功查询后服务端颁发的临时 token，用于 refresh/switch API 鉴权 */
+    successToken?: string
 }
 
 interface OrderListItem {
@@ -227,18 +242,15 @@ function OrderDetailContent({
 }) {
     const [result, setResult] = useState<OrderResult>(initialResult)
     const [copiedId, setCopiedId] = useState<string | null>(null)
-    const [refreshPassword, setRefreshPassword] = useState("")
     const [refreshLoading, setRefreshLoading] = useState(false)
-    const [switchPassword, setSwitchPassword] = useState("")
     const [switchLoading, setSwitchLoading] = useState(false)
-    const [switchUsed, setSwitchUsed] = useState(false)
     const [continuePaymentLoading, setContinuePaymentLoading] = useState(false)
+    const anyLoading = refreshLoading || switchLoading
     const copiedTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
 
     // 当外部 result 变化时（切换订单）同步
     useEffect(() => {
         setResult(initialResult)
-        setRefreshPassword("")
         setCopiedId(null)
     }, [initialResult.orderNo, initialResult])
 
@@ -270,13 +282,13 @@ function OrderDetailContent({
     }, [result.cards])
 
     const handleRefresh = useCallback(async () => {
-        if (!refreshPassword) return
+        if (!result.successToken) return
         setRefreshLoading(true)
         try {
             const res = await fetch(`/api/orders/${encodeURIComponent(result.orderNo)}/refresh`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ password: refreshPassword }),
+                body: JSON.stringify({ token: result.successToken }),
             })
             const data = await res.json() as {
                 refreshed?: boolean
@@ -290,23 +302,22 @@ function OrderDetailContent({
                     ...prev,
                     cards: [{ content: toCardContentJson(data.payload!), ...data.payload! }],
                 }))
-                setRefreshPassword("")
                 toast.success(data.accountChanged ? "已换新账号" : "已获取最新账号信息")
             } else {
                 toast.error(data.error || "暂时无法获取，请稍后重试")
             }
         } catch { toast.error("网络异常，请稍后重试") }
         finally { setRefreshLoading(false) }
-    }, [result.orderNo, refreshPassword])
+    }, [result.orderNo, result.successToken])
 
     const handleSwitch = useCallback(async () => {
-        if (!switchPassword) return
+        if (!result.successToken) return
         setSwitchLoading(true)
         try {
             const res = await fetch(`/api/orders/${encodeURIComponent(result.orderNo)}/switch-account`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ password: switchPassword }),
+                body: JSON.stringify({ token: result.successToken }),
             })
             const data = await res.json() as { switched?: boolean; payload?: AutoFetchCardPayload; error?: string }
             if (!res.ok) { toast.error(data.error || "切换失败"); return }
@@ -314,15 +325,14 @@ function OrderDetailContent({
                 setResult((prev) => ({
                     ...prev,
                     cards: [{ content: toCardContentJson(data.payload!), ...data.payload! }],
-                    canSwitch: false,
+                    canSwitch: (prev.remainingSwitches ?? 1) - 1 > 0,
+                    remainingSwitches: Math.max(0, (prev.remainingSwitches ?? 1) - 1),
                 }))
-                setSwitchUsed(true)
-                setSwitchPassword("")
                 toast.success("已切换到新账号")
             }
         } catch { toast.error("网络异常，请稍后重试") }
         finally { setSwitchLoading(false) }
-    }, [result.orderNo, switchPassword])
+    }, [result.orderNo, result.successToken])
 
     const handleContinuePayment = useCallback(async () => {
         const password = getPassword()
@@ -439,50 +449,47 @@ function OrderDetailContent({
                 </div>
             )}
 
-            {/* AUTO_FETCH：获取最新密码（仅未过期时显示） */}
-            {!result.isPending && result.isAutoFetch && result.status === "COMPLETED" && !isContentExpired && (
-                <div className="border-t pt-3 space-y-1.5">
-                    <p className="text-xs text-muted-foreground">密码登录失败？获取最新密码：</p>
-                    <div className="flex gap-2">
-                        <input
-                            type="password"
-                            placeholder="输入下单时设置的查询密码"
-                            value={refreshPassword}
-                            onChange={(e) => setRefreshPassword(e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && handleRefresh()}
-                            className="flex-1 min-w-0 rounded-md border border-input bg-background px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-ring"
-                        />
+            {/* AUTO_FETCH：刷新密码 + 换号（token 校验，无需再输密码） */}
+            {!result.isPending && result.isAutoFetch && result.status === "COMPLETED" && !isContentExpired && result.successToken && (
+                <div className="border-t pt-3 space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs text-muted-foreground flex-1">
+                            {result.canSwitch && "① "}密码登录失败？获取最新密码
+                        </p>
                         <Button type="button" variant="outline" size="sm" className="shrink-0 gap-1.5"
-                            disabled={refreshLoading || !refreshPassword} onClick={handleRefresh}>
+                            disabled={anyLoading} onClick={handleRefresh}>
                             <RefreshCw className={`size-3.5 ${refreshLoading ? "animate-spin" : ""}`} />
-                            {refreshLoading ? "获取中…" : "获取最新密码"}
+                            {refreshLoading ? "获取中…" : "刷新密码"}
                         </Button>
                     </div>
-                </div>
-            )}
-
-            {/* AUTO_FETCH：一次性换号（仅未使用时显示） */}
-            {!result.isPending && result.isAutoFetch && result.status === "COMPLETED" && !isContentExpired && result.canSwitch && !switchUsed && (
-                <div className="border-t pt-3 space-y-2">
-                    <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <AlertTriangle className="size-3.5 shrink-0 text-amber-500" />
-                        账号无法正常使用？可更换一次。
-                    </p>
-                    <div className="flex gap-2">
-                        <input
-                            type="password"
-                            placeholder="输入下单时设置的查询密码"
-                            value={switchPassword}
-                            onChange={(e) => setSwitchPassword(e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && handleSwitch()}
-                            className="flex-1 min-w-0 rounded-md border border-input bg-background px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-ring"
-                        />
-                        <Button type="button" variant="outline" size="sm" className="shrink-0 gap-1.5"
-                            disabled={switchLoading || !switchPassword} onClick={handleSwitch}>
-                            <ArrowLeftRight className={`size-3.5 ${switchLoading ? "animate-pulse" : ""}`} />
-                            {switchLoading ? "切换中…" : "更换账号"}
-                        </Button>
-                    </div>
+                    {result.canSwitch && (
+                        <div className="flex items-center justify-between gap-2">
+                            <p className="text-xs text-muted-foreground flex-1">
+                                ② 账号无法使用？更换账号（剩余 {result.remainingSwitches} 次）
+                            </p>
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button type="button" variant="outline" size="sm" className="shrink-0 gap-1.5"
+                                        disabled={anyLoading}>
+                                        <ArrowLeftRight className={`size-3.5 ${switchLoading ? "animate-pulse" : ""}`} />
+                                        {switchLoading ? "切换中…" : "更换账号"}
+                                    </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>确认更换账号？</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            更换后将分配新账号，当前账号将失效。剩余 {result.remainingSwitches} 次更换机会。
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>取消</AlertDialogCancel>
+                                        <AlertDialogAction onClick={handleSwitch}>确认更换</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                        </div>
+                    )}
                 </div>
             )}
 

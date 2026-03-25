@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
         return validationError(parsed.error.flatten());
     }
 
-    const { name, slug, description, summary, image, price, maxQuantity, status, tagIds, productType, sourceUrl, validityHours } =
+    const { name, slug, description, summary, image, price, maxQuantity, status, tagIds, productType, sourceUrl, validityHours, allowAccountSwitch, accountSwitchLimit } =
         parsed.data;
 
     // Check slug uniqueness
@@ -173,6 +173,8 @@ export async function POST(request: NextRequest) {
             productType: productType ?? "NORMAL",
             sourceUrl: finalSourceUrl,
             ...(validityHours != null && { validityHours }),
+            ...(allowAccountSwitch != null && { allowAccountSwitch }),
+            ...(accountSwitchLimit != null && { accountSwitchLimit }),
             tags:
                 tagIds && tagIds.length > 0
                     ? { connect: tagIds.map((id) => ({ id })) }

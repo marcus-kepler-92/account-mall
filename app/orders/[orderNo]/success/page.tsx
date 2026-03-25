@@ -54,7 +54,14 @@ export default async function OrderSuccessPage({ params, searchParams }: PagePro
     const order = await prisma.order.findFirst({
         where: { orderNo },
         include: {
-            product: { select: { name: true, productType: true } },
+            product: {
+                select: {
+                    name: true,
+                    productType: true,
+                    allowAccountSwitch: true,
+                    accountSwitchLimit: true,
+                },
+            },
             cards: {
                 where: { status: { in: ["SOLD", "RESERVED"] } },
                 select: { content: true },
@@ -92,10 +99,14 @@ export default async function OrderSuccessPage({ params, searchParams }: PagePro
     const productName = order.productNameSnapshot ?? order.product?.name ?? "商品"
     const isAutoFetch = order.product?.productType === "AUTO_FETCH"
     const expiresAt = order.expiresAt ? order.expiresAt.toISOString() : null
+    const notExpired = !order.expiresAt || order.expiresAt > new Date()
+    const switchLimit = order.product?.accountSwitchLimit ?? 1
+    const remainingSwitches = Math.max(0, switchLimit - order.switchAccountCount)
     const canSwitch =
         isAutoFetch &&
-        !order.hasSwitchedAccount &&
-        (!order.expiresAt || order.expiresAt > new Date())
+        (order.product?.allowAccountSwitch ?? true) &&
+        remainingSwitches > 0 &&
+        notExpired
 
     return (
         <div className="flex min-h-screen flex-col">
@@ -128,7 +139,8 @@ export default async function OrderSuccessPage({ params, searchParams }: PagePro
                                     orderNo={orderNo}
                                     expiresAt={expiresAt}
                                     initialCards={cards}
-                                    canSwitch={canSwitch}
+                                    token={token!}
+                                    remainingSwitches={canSwitch ? remainingSwitches : 0}
                                 />
                             ) : (
                                 <OrderSuccessCopySection cards={cards} />

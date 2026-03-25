@@ -82,7 +82,7 @@ export async function PUT(
         return notFound("Product not found");
     }
 
-    const { tagIds, productType, sourceUrl, price, pinned, validityHours, ...rest } = parsed.data;
+    const { tagIds, productType, sourceUrl, price, pinned, validityHours, allowAccountSwitch, accountSwitchLimit, ...rest } = parsed.data;
 
     // Check slug uniqueness if updating slug
     if (rest.slug && rest.slug !== existing.slug) {
@@ -113,6 +113,12 @@ export async function PUT(
     }
     if (validityHours !== undefined) {
         updateData.validityHours = validityHours
+    }
+    if (allowAccountSwitch !== undefined) {
+        updateData.allowAccountSwitch = allowAccountSwitch
+    }
+    if (accountSwitchLimit !== undefined) {
+        updateData.accountSwitchLimit = accountSwitchLimit
     }
 
     const product = await prisma.product.update({

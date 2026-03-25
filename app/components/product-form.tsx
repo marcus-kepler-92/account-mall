@@ -32,6 +32,8 @@ type ProductData = {
     productType?: "NORMAL" | "AUTO_FETCH"
     sourceUrl?: string | null
     validityHours?: number | null
+    allowAccountSwitch?: boolean
+    accountSwitchLimit?: number
     tags: Tag[]
 }
 
@@ -63,6 +65,8 @@ export function ProductForm({
             productType: product?.productType ?? "NORMAL",
             sourceUrl: product?.sourceUrl ?? "",
             validityHours: product?.validityHours ? String(product.validityHours) : "",
+            allowAccountSwitch: product?.allowAccountSwitch ?? true,
+            accountSwitchLimit: product?.accountSwitchLimit != null ? String(product.accountSwitchLimit) : "1",
             tagIds: product?.tags.map((t) => t.id) ?? [],
         },
     })
@@ -91,6 +95,10 @@ export function ProductForm({
             productType: data.productType ?? "NORMAL",
             sourceUrl: data.sourceUrl?.trim() || null,
             validityHours: data.validityHours && data.validityHours !== "" ? parseInt(data.validityHours, 10) : null,
+            ...(isAutoFetch && {
+                allowAccountSwitch: data.allowAccountSwitch ?? true,
+                accountSwitchLimit: data.accountSwitchLimit && data.accountSwitchLimit !== "" ? parseInt(data.accountSwitchLimit, 10) : 1,
+            }),
             tagIds: data.tagIds ?? [],
         }
 

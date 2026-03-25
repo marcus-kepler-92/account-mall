@@ -2,6 +2,7 @@
 
 import { useFormContext } from "react-hook-form"
 import { Input } from "@/components/ui/input"
+import { Switch } from "@/components/ui/switch"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
     FormControl,
@@ -29,7 +30,8 @@ export function ProductFormPricingFields({
     isAutoFetch: boolean
     sourceUrlOptions: string[]
 }) {
-    const { control } = useFormContext<ProductFormSchema>()
+    const { control, watch } = useFormContext<ProductFormSchema>()
+    const allowAccountSwitch = watch("allowAccountSwitch") ?? true
 
     return (
         <>
@@ -163,6 +165,51 @@ export function ProductFormPricingFields({
                                     </FormItem>
                                 )}
                             />
+                            <FormField
+                                control={control}
+                                name="allowAccountSwitch"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <FormLabel>允许更换账号</FormLabel>
+                                                <FormDescription>
+                                                    开启后用户可在订单详情页申请更换不可用账号
+                                                </FormDescription>
+                                            </div>
+                                            <FormControl>
+                                                <Switch
+                                                    checked={field.value ?? true}
+                                                    onCheckedChange={field.onChange}
+                                                />
+                                            </FormControl>
+                                        </div>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            {allowAccountSwitch && (
+                                <FormField
+                                    control={control}
+                                    name="accountSwitchLimit"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>最大更换次数</FormLabel>
+                                            <FormControl>
+                                                <Input
+                                                    type="number"
+                                                    min={1}
+                                                    max={100}
+                                                    placeholder="1"
+                                                    {...field}
+                                                />
+                                            </FormControl>
+                                            <FormDescription>每个订单允许更换账号的次数上限</FormDescription>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            )}
                         </>
                     )}
                 </CardContent>

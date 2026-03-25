@@ -21,6 +21,8 @@ export const createProductSchema = z.object({
     productType: productTypeEnum.optional(),
     sourceUrl: z.string().url().optional().nullable().or(z.literal("")),
     validityHours: z.number().int().min(1).max(8760).optional().nullable(),
+    allowAccountSwitch: z.boolean().optional(),
+    accountSwitchLimit: z.number().int().min(1).max(100).optional(),
     tagIds: z.array(z.string()).optional(),
 }).refine(
     (data) => data.productType !== "AUTO_FETCH" || (data.sourceUrl && data.sourceUrl !== ""),
@@ -44,6 +46,8 @@ export const updateProductSchema = z.object({
     productType: productTypeEnum.optional(),
     sourceUrl: z.string().url().optional().nullable().or(z.literal("")),
     validityHours: z.number().int().min(1).max(8760).optional().nullable(),
+    allowAccountSwitch: z.boolean().optional(),
+    accountSwitchLimit: z.number().int().min(1).max(100).optional(),
     tagIds: z.array(z.string()).optional(),
     pinned: z.boolean().optional(),
 });
@@ -77,6 +81,8 @@ export const productFormSchema = z
         productType: z.enum(["NORMAL", "AUTO_FETCH"]).optional(),
         sourceUrl: z.string().optional(),
         validityHours: z.string().optional(),
+        allowAccountSwitch: z.boolean().optional(),
+        accountSwitchLimit: z.string().optional(),
         tagIds: z.array(z.string()).optional(),
     })
     .superRefine((data, ctx) => {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { verifyPassword } from "better-auth/crypto"
+import { verifyOrderSuccessToken } from "@/lib/order-success-token"
 import { scrapeSharedAccounts } from "@/lib/scrape-shared-accounts"
 import { sharedAccountToCardPayload, toCardContentJson } from "@/lib/auto-fetch-card"
 import { config } from "@/lib/config"
@@ -28,9 +28,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
         return invalidJsonBody()
     }
 
-    const { password } = (body as { password?: string }) ?? {}
-    if (!password || typeof password !== "string") {
-        return badRequest("缺少订单密码")
+    const { token } = (body as { token?: string }) ?? {}
+    if (!token || typeof token !== "string") {
+        return badRequest("缺少访问令牌")
+    }
+    if (!verifyOrderSuccessToken(orderNo, token)) {
+        return badRequest("令牌无效或已过期，请重新查询订单")
     }
 
     // 查询订单（含产品类型 + 卡密）
@@ -47,10 +50,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
     })
 
     if (!order) return notFound("订单不存在")
-
-    // 验证密码
-    const passwordOk = await verifyPassword({ hash: order.passwordHash, password: password.trim() })
-    if (!passwordOk) return badRequest("订单密码错误")
 
     // 类型检查
     if (order.product?.productType !== "AUTO_FETCH") {
@@ -88,7 +87,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
         return badRequest("未配置爬取来源，无法刷新")
     }
 
-    const scrapedList = await scrapeSharedAccounts(sourceUrl)
+    const [scrapedList, blacklisted] = await Promise.all([
+        scrapeSharedAccounts(sourceUrl),
+        prisma.accountBlacklist.findMany({
+            where: { productId: order.product.id },
+            select: { account: true },
+        }),
+    ])
     if (scrapedList.length === 0) {
         return NextResponse.json(
             {
@@ -98,12 +103,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
             { status: 503 }
         )
     }
-
-    // 过滤黑名单
-    const blacklisted = await prisma.accountBlacklist.findMany({
-        where: { productId: order.product.id },
-        select: { account: true },
-    })
     const blackSet = new Set(blacklisted.map((b) => b.account))
     const available = scrapedList.filter((a) => !blackSet.has(a.account))
     if (available.length === 0) {

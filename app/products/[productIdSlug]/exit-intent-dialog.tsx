@@ -109,6 +109,19 @@ export function ExitIntentDialog({
         disabled: !inStock || loading,
     })
 
+    // Dev only: Option+E bypasses all checks and opens dialog with mock data
+    useEffect(() => {
+        if (process.env.NODE_ENV !== "development") return
+        const handler = (e: KeyboardEvent) => {
+            if (!e.altKey || e.code !== "KeyE") return
+            fetchedRef.current = false
+            setDiscountResult({ eligible: true, token: "dev-token", expiresAt: Date.now() + 15 * 60 * 1000, discountPercent: 5 })
+            setOpen(true)
+        }
+        window.addEventListener("keydown", handler)
+        return () => window.removeEventListener("keydown", handler)
+    }, [])
+
     const handleClaim = () => {
         if (!discountResult?.eligible) return
         onDiscount(discountResult.token, discountResult.discountPercent)

@@ -1,40 +1,41 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { useTheme } from "next-themes"
 import { Monitor, Moon, Sun } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+
+const THEMES = ["light", "dark", "system"] as const
+type Theme = (typeof THEMES)[number]
 
 export function ThemeToggle() {
-  const { theme, setTheme } = useTheme()
+    const { theme, setTheme } = useTheme()
+    const [mounted, setMounted] = useState(false)
 
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="size-9" aria-label="切换主题">
-          <Sun className="size-4 dark:hidden" />
-          <Moon className="hidden size-4 dark:block" />
+    useEffect(() => setMounted(true), [])
+
+    function cycle() {
+        const idx = THEMES.indexOf((theme ?? "system") as Theme)
+        setTheme(THEMES[(idx + 1) % THEMES.length])
+    }
+
+    const Icon = !mounted
+        ? null
+        : theme === "dark"
+          ? Moon
+          : theme === "light"
+            ? Sun
+            : Monitor
+
+    return (
+        <Button
+            variant="ghost"
+            size="icon"
+            className="size-9"
+            aria-label="切换主题"
+            onClick={cycle}
+        >
+            {Icon ? <Icon className="size-4" /> : <Sun className="size-4 opacity-0" aria-hidden />}
         </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuCheckboxItem checked={theme === "light"} onCheckedChange={() => setTheme("light")}>
-          <Sun className="size-4" />
-          亮色
-        </DropdownMenuCheckboxItem>
-        <DropdownMenuCheckboxItem checked={theme === "dark"} onCheckedChange={() => setTheme("dark")}>
-          <Moon className="size-4" />
-          暗色
-        </DropdownMenuCheckboxItem>
-        <DropdownMenuCheckboxItem checked={theme === "system"} onCheckedChange={() => setTheme("system")}>
-          <Monitor className="size-4" />
-          跟随系统
-        </DropdownMenuCheckboxItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
+    )
 }

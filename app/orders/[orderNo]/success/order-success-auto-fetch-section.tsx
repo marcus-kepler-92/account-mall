@@ -1,9 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { OrderRefreshSection } from "./order-refresh-section"
 import { OrderSuccessCopySection } from "./order-success-copy-section"
-import { OrderSwitchAccountSection } from "./order-switch-account-section"
+import { OrderTroubleshootSection } from "./order-troubleshoot-section"
 import type { AutoFetchCardPayload } from "@/lib/auto-fetch-card"
 import { toCardContentJson } from "@/lib/auto-fetch-card"
 
@@ -11,12 +10,13 @@ type Props = {
     orderNo: string
     expiresAt: string | null
     initialCards: string[]
-    canSwitch: boolean
+    token: string
+    remainingSwitches: number
 }
 
-export function OrderSuccessAutoFetchSection({ orderNo, expiresAt, initialCards, canSwitch }: Props) {
+export function OrderSuccessAutoFetchSection({ orderNo, expiresAt, initialCards, token, remainingSwitches }: Props) {
     const [cards, setCards] = useState<string[]>(initialCards)
-    const [switchUsed, setSwitchUsed] = useState(!canSwitch)
+    const [remaining, setRemaining] = useState(remainingSwitches)
 
     function handleRefreshed(payload: AutoFetchCardPayload) {
         setCards([toCardContentJson(payload)])
@@ -24,20 +24,20 @@ export function OrderSuccessAutoFetchSection({ orderNo, expiresAt, initialCards,
 
     function handleSwitched(payload: AutoFetchCardPayload) {
         setCards([toCardContentJson(payload)])
-        setSwitchUsed(true)
+        setRemaining((c) => Math.max(0, c - 1))
     }
 
     return (
         <>
             <OrderSuccessCopySection cards={cards} isAutoFetch />
-            <OrderRefreshSection
+            <OrderTroubleshootSection
                 orderNo={orderNo}
                 expiresAt={expiresAt}
+                token={token}
+                remainingSwitches={remaining}
                 onRefreshed={handleRefreshed}
+                onSwitched={handleSwitched}
             />
-            {!switchUsed && (
-                <OrderSwitchAccountSection orderNo={orderNo} onSwitched={handleSwitched} />
-            )}
         </>
     )
 }

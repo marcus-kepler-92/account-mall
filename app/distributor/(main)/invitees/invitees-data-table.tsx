@@ -21,8 +21,8 @@ interface InviteesDataTableProps {
 export function InviteesDataTable({ data, level2RatePercent }: InviteesDataTableProps) {
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
-        if (typeof window === "undefined") return {}
-        return window.innerWidth < 768 ? { email: false } : {}
+        if (typeof window === "undefined") return {} as VisibilityState
+        return window.innerWidth < 768 ? { email: false } : {} as VisibilityState
     })
 
     const table = useReactTable({

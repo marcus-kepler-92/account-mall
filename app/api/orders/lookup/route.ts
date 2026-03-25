@@ -1,38 +1,46 @@
-import { NextRequest, NextResponse } from "next/server"
-import { PrismaClient } from "@prisma/client"
-import { prisma } from "@/lib/prisma"
-import { publicOrderLookupSchema, orderStatusSchema } from "@/lib/validations/order"
-import type { z } from "zod"
-import { verifyPassword } from "better-auth/crypto"
-import { createOrderSuccessToken } from "@/lib/order-success-token"
-import { checkOrderQueryRateLimit } from "@/lib/rate-limit"
-import { invalidJsonBody, validationError, badRequest, internalServerError } from "@/lib/api-response"
-import { config } from "@/lib/config"
-import { parseAutoFetchCardContent } from "@/lib/auto-fetch-card"
+import { NextRequest, NextResponse } from "next/server";
+import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import {
+    publicOrderLookupSchema,
+    orderStatusSchema,
+} from "@/lib/validations/order";
+import type { z } from "zod";
+import { verifyPassword } from "better-auth/crypto";
+import { createOrderSuccessToken } from "@/lib/order-success-token";
+import { checkOrderQueryRateLimit } from "@/lib/rate-limit";
+import {
+    invalidJsonBody,
+    validationError,
+    badRequest,
+    internalServerError,
+} from "@/lib/api-response";
+import { config } from "@/lib/config";
+import { parseAutoFetchCardContent } from "@/lib/auto-fetch-card";
 
-type LookupBody = z.infer<typeof publicOrderLookupSchema>
-type OrderStatus = z.infer<typeof orderStatusSchema>
+type LookupBody = z.infer<typeof publicOrderLookupSchema>;
+type OrderStatus = z.infer<typeof orderStatusSchema>;
 
 type TransactionClient = Omit<
     PrismaClient,
     "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
->
+>;
 
 interface LookupResponseBase {
-    orderNo: string
-    productName: string
-    createdAt: Date
-    status: OrderStatus
-    amount: number
+    orderNo: string;
+    productName: string;
+    createdAt: Date;
+    status: OrderStatus;
+    amount: number;
 }
 
 interface LookupResponsePending extends LookupResponseBase {
-    cards: []
-    isPending: true
+    cards: [];
+    isPending: true;
     /** 未超时且可继续支付时为 true */
-    canPay: boolean
+    canPay: boolean;
     /** 支付截止时间（ISO），便于前端展示「请在 xx 前完成支付」 */
-    expiresAt?: string
+    expiresAt?: string;
 }
 
 /** 卡密：普通为 content；AUTO_FETCH 为 content(JSON) + account/password/region/lastCheckedAt/installStatus */
@@ -40,20 +48,22 @@ interface LookupResponseCompleted extends LookupResponseBase {
     cards: Array<
         | { content: string }
         | {
-              content: string
-              account: string
-              password: string
-              region: string
-              lastCheckedAt?: string
-              installStatus?: string
+              content: string;
+              account: string;
+              password: string;
+              region: string;
+              lastCheckedAt?: string;
+              installStatus?: string;
           }
-    >
-    successToken?: string
+    >;
+    successToken?: string;
     /** AUTO_FETCH 订单的账号有效期 */
-    contentExpiresAt?: string
-    isAutoFetch?: boolean
+    contentExpiresAt?: string;
+    isAutoFetch?: boolean;
     /** AUTO_FETCH：用户是否可以使用一次性换号机会 */
-    canSwitch?: boolean
+    canSwitch?: boolean;
+    /** AUTO_FETCH：剩余换号次数 */
+    remainingSwitches?: number;
 }
 
 /**
@@ -61,23 +71,23 @@ interface LookupResponseCompleted extends LookupResponseBase {
  * Public: users can query order details and cards by orderNo + password.
  */
 export async function POST(request: NextRequest) {
-    const rateLimitRes = await checkOrderQueryRateLimit(request)
-    if (rateLimitRes) return rateLimitRes
+    const rateLimitRes = await checkOrderQueryRateLimit(request);
+    if (rateLimitRes) return rateLimitRes;
 
-    let body: unknown
+    let body: unknown;
     try {
-        body = await request.json()
+        body = await request.json();
     } catch {
-        return invalidJsonBody()
+        return invalidJsonBody();
     }
 
-    const parsed = publicOrderLookupSchema.safeParse(body)
+    const parsed = publicOrderLookupSchema.safeParse(body);
     if (!parsed.success) {
         // Public endpoint: avoid exposing detailed validation errors.
-        return validationError()
+        return validationError();
     }
 
-    const { orderNo, password }: LookupBody = parsed.data
+    const { orderNo, password }: LookupBody = parsed.data;
 
     try {
         const order = await prisma.$transaction(async (tx: TransactionClient) => {
@@ -88,6 +98,8 @@ export async function POST(request: NextRequest) {
                         select: {
                             name: true,
                             productType: true,
+                            allowAccountSwitch: true,
+                            accountSwitchLimit: true,
                         },
                     },
                     cards: {
@@ -98,26 +110,31 @@ export async function POST(request: NextRequest) {
                         },
                     },
                 },
-            })
+            });
 
             if (!existing) {
-                throw new Error("LOOKUP_FAILED")
+                throw new Error("LOOKUP_FAILED");
             }
 
             // verifyPassword signature: verifyPassword({ hash, password })
-            const passwordOk = await verifyPassword({ hash: existing.passwordHash, password: password.trim() })
+            const passwordOk = await verifyPassword({
+                hash: existing.passwordHash,
+                password: password.trim(),
+            });
             if (!passwordOk) {
-                throw new Error("LOOKUP_FAILED")
+                throw new Error("LOOKUP_FAILED");
             }
 
-            return existing
-        })
+            return existing;
+        });
 
         // For PENDING orders, return order info without cards + canPay/expiresAt
         if (order.status === "PENDING") {
-            const elapsed = Date.now() - order.createdAt.getTime()
-            const canPay = elapsed < config.pendingOrderTimeoutMs
-            const expiresAt = new Date(order.createdAt.getTime() + config.pendingOrderTimeoutMs).toISOString()
+            const elapsed = Date.now() - order.createdAt.getTime();
+            const canPay = elapsed < config.pendingOrderTimeoutMs;
+            const expiresAt = new Date(
+                order.createdAt.getTime() + config.pendingOrderTimeoutMs,
+            ).toISOString();
             const payload: LookupResponsePending = {
                 orderNo: order.orderNo,
                 productName: order.productNameSnapshot ?? order.product.name,
@@ -128,29 +145,37 @@ export async function POST(request: NextRequest) {
                 isPending: true,
                 canPay,
                 expiresAt,
-            }
-            return NextResponse.json(payload)
+            };
+            return NextResponse.json(payload);
         }
 
         // For COMPLETED/CLOSED orders, return cards and optional successToken for redirect to success page.
-        type CardRow = { content: string; status: string }
+        type CardRow = { content: string; status: string };
         const cards = (order.cards as CardRow[])
-            .filter((card: CardRow) => card.status === "SOLD" || card.status === "RESERVED")
+            .filter(
+                (card: CardRow) => card.status === "SOLD" || card.status === "RESERVED",
+            )
             .map((card: CardRow) => {
-                const payload = parseAutoFetchCardContent(card.content)
+                const payload = parseAutoFetchCardContent(card.content);
                 if (payload) {
-                    return { content: card.content, ...payload }
+                    return { content: card.content, ...payload };
                 }
-                return { content: card.content }
-            })
+                return { content: card.content };
+            });
 
-        const successToken = createOrderSuccessToken(order.orderNo)
-        const isAutoFetch = order.product.productType === "AUTO_FETCH"
+        const successToken = createOrderSuccessToken(order.orderNo);
+        const isAutoFetch = order.product.productType === "AUTO_FETCH";
+        const switchLimit = order.product.accountSwitchLimit ?? 1;
+        const remainingSwitches = Math.max(
+            0,
+            switchLimit - order.switchAccountCount,
+        );
         const canSwitch =
             isAutoFetch &&
             order.status === "COMPLETED" &&
-            !order.hasSwitchedAccount &&
-            (!order.expiresAt || order.expiresAt > new Date())
+            (order.product.allowAccountSwitch ?? true) &&
+            remainingSwitches > 0 &&
+            (!order.expiresAt || order.expiresAt > new Date());
         const payload: LookupResponseCompleted = {
             orderNo: order.orderNo,
             productName: order.productNameSnapshot ?? order.product.name,
@@ -160,18 +185,19 @@ export async function POST(request: NextRequest) {
             cards,
             ...(successToken && { successToken }),
             ...(isAutoFetch && { isAutoFetch: true }),
-            ...(isAutoFetch && order.expiresAt && { contentExpiresAt: order.expiresAt.toISOString() }),
+            ...(isAutoFetch &&
+                order.expiresAt && { contentExpiresAt: order.expiresAt.toISOString() }),
             ...(isAutoFetch && { canSwitch }),
-        }
-        return NextResponse.json(payload)
+            ...(isAutoFetch && { remainingSwitches }),
+        };
+        return NextResponse.json(payload);
     } catch (error) {
         if (error instanceof Error && error.message === "LOOKUP_FAILED") {
-            return badRequest("Order not found or password incorrect")
+            return badRequest("Order not found or password incorrect");
         }
 
-        return internalServerError()
+        return internalServerError();
     }
 }
 
-export const runtime = "nodejs"
-
+export const runtime = "nodejs";

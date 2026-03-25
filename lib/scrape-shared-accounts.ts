@@ -199,14 +199,12 @@ export async function scrapeSharedAccounts(sourceUrl: string): Promise<SharedAcc
             return []
         }
         const html = await res.text()
-        if (process.env.NODE_ENV === "development") {
-            console.log(`[scrape] 页面长度 ${html.length} 字节，包含"状态":`, html.includes("状态"))
-        }
         const data = parseAccountsFromHtml(html)
-        if (process.env.NODE_ENV === "development") {
-            console.log(`[scrape] 解析出 ${data.length} 条账号`)
+        console.log(`[scrape] 解析出 ${data.length} 条账号，来源: ${url}`)
+        // Only cache non-empty results; empty results should be retried immediately
+        if (data.length > 0) {
+            scrapeCache.set(url, { data, expiresAt: now + config.autoFetchScrapeCacheTtlMs })
         }
-        scrapeCache.set(url, { data, expiresAt: now + config.autoFetchScrapeCacheTtlMs })
         return data
     } catch (err) {
         clearTimeout(timeoutId)

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { verifyPassword } from "better-auth/crypto"
+import { verifyOrderSuccessToken } from "@/lib/order-success-token"
 import { scrapeSharedAccounts } from "@/lib/scrape-shared-accounts"
 import {
     parseAutoFetchCardContent,
@@ -16,26 +16,37 @@ type RouteContext = {
 
 /**
  * POST /api/orders/[orderNo]/switch-account
- * 公开 API：AUTO_FETCH 订单一次性换号。用户标记当前账号不可用，旧账号加入该商品黑名单，重新分配新账号。
+ * 公开 API：AUTO_FETCH 订单换号。用户标记当前账号不可用，旧账号加入该商品黑名单，重新分配新账号。
+ * 鉴权：验证 successToken（由订单查询时密码验证后生成，无需二次输入密码）。
  * 路由参数 orderId 实际传入的是 orderNo（人类可读订单号）。
  */
 export async function POST(request: NextRequest, context: RouteContext) {
     const { orderId: orderNo } = await context.params
 
-    let body: { password?: string }
+    let body: { token?: string }
     try {
         body = await request.json()
     } catch {
         return invalidJsonBody()
     }
 
-    const { password } = body
-    if (!password) return badRequest("缺少订单密码")
+    const { token } = body
+    if (!token) return badRequest("缺少访问令牌")
+    if (!verifyOrderSuccessToken(orderNo, token)) return badRequest("令牌无效或已过期，请重新查询订单")
 
     const order = await prisma.order.findUnique({
         where: { orderNo },
         include: {
-            product: { select: { id: true, productType: true, sourceUrl: true, validityHours: true } },
+            product: {
+                select: {
+                    id: true,
+                    productType: true,
+                    sourceUrl: true,
+                    validityHours: true,
+                    allowAccountSwitch: true,
+                    accountSwitchLimit: true,
+                },
+            },
             cards: {
                 where: { status: "SOLD" },
                 select: { id: true, content: true },
@@ -46,12 +57,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     if (!order) return notFound("订单不存在")
 
-    if (!(await verifyPassword({ hash: order.passwordHash, password }))) {
-        return badRequest("订单密码错误")
-    }
-
     if (order.product?.productType !== "AUTO_FETCH") {
         return badRequest("仅 AUTO_FETCH 商品支持账号切换")
+    }
+
+    if (!order.product.allowAccountSwitch) {
+        return badRequest("该商品未启用账号更换功能")
     }
 
     if (order.status !== "COMPLETED") {
@@ -62,8 +73,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
         return badRequest("订单已过期，请重新下单")
     }
 
-    if (order.hasSwitchedAccount) {
-        return badRequest("每个订单只能切换账号一次")
+    if (order.switchAccountCount >= order.product.accountSwitchLimit) {
+        return badRequest(
+            order.product.accountSwitchLimit === 1
+                ? "每个订单只能切换账号一次"
+                : `已达到最大更换次数（${order.product.accountSwitchLimit} 次）`
+        )
     }
 
     const card = order.cards[0]
@@ -72,25 +87,27 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const sourceUrl = (order.product.sourceUrl?.trim() || config.autoFetchSourceUrls[0]?.trim()) ?? ""
     if (!sourceUrl) return badRequest("未配置爬取来源，无法切换账号")
 
-    const scrapedList = await scrapeSharedAccounts(sourceUrl)
-    if (scrapedList.length === 0) {
-        return NextResponse.json({ error: "当前无可用账号，请稍后再试" }, { status: 503 })
-    }
-
     const currentPayload = parseAutoFetchCardContent(card.content)
     const currentAccount = currentPayload?.account ?? null
 
-    // 过滤：黑名单 + 当前账号
-    const blacklisted = await prisma.accountBlacklist.findMany({
-        where: { productId: order.product.id },
-        select: { account: true },
-    })
+    const [scrapedList, blacklisted] = await Promise.all([
+        scrapeSharedAccounts(sourceUrl),
+        prisma.accountBlacklist.findMany({
+            where: { productId: order.product.id },
+            select: { account: true },
+        }),
+    ])
+    if (scrapedList.length === 0) {
+        console.warn(`[switch-account] 爬取返回空列表，订单: ${orderNo}，来源: ${sourceUrl}`)
+        return NextResponse.json({ error: "当前无可用账号，请稍后再试" }, { status: 503 })
+    }
     const blackSet = new Set(blacklisted.map((b) => b.account))
     const available = scrapedList.filter(
         (a) => !blackSet.has(a.account) && a.account !== currentAccount
     )
 
     if (available.length === 0) {
+        console.warn(`[switch-account] 无可用备用账号，订单: ${orderNo}，共 ${scrapedList.length} 条，黑名单 ${blacklisted.length} 条，当前账号: ${currentAccount}`)
         return NextResponse.json({ error: "当前无其他可用账号，请稍后再试" }, { status: 503 })
     }
 
@@ -120,10 +137,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
             where: { id: card.id },
             data: { content: newContent, lastRefreshedAt: now },
         }),
-        // 标记订单已切换
+        // 递增换号计数
         prisma.order.update({
-            where: { id: order.id, hasSwitchedAccount: false },
-            data: { hasSwitchedAccount: true },
+            where: { id: order.id },
+            data: { switchAccountCount: { increment: 1 } },
         }),
     ])
 

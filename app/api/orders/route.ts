@@ -14,7 +14,7 @@ import {
 } from "@/lib/rate-limit"
 import { config } from "@/lib/config"
 import { verifyTurnstileToken } from "@/lib/turnstile"
-import { verifyExitDiscountToken } from "@/lib/exit-discount"
+import { verifyExitDiscountToken, type ExitDiscountPayload } from "@/lib/exit-discount"
 import { scrapeSharedAccounts } from "@/lib/scrape-shared-accounts"
 import { sharedAccountToCardPayload, toCardContentJson } from "@/lib/auto-fetch-card"
 import { createOrderSuccessToken } from "@/lib/order-success-token"
@@ -549,9 +549,11 @@ export async function POST(request: NextRequest) {
     // Exit intent 折扣：仅当无 promoCode 且配置了 secret 时生效
     let exitDiscountPercent: number | null = null
     let exitDiscountMeta: string | null = null
+    let exitDiscountPayload: ExitDiscountPayload | null = null
     if (!promoCode && exitDiscountToken && config.exitDiscountSecret) {
         const verifyResult = verifyExitDiscountToken(exitDiscountToken, config.exitDiscountSecret)
         if (verifyResult.valid && verifyResult.payload.productId === productId) {
+            exitDiscountPayload = verifyResult.payload
             exitDiscountPercent = verifyResult.payload.discountPercent
             exitDiscountMeta = JSON.stringify({
                 productId: verifyResult.payload.productId,
@@ -623,6 +625,18 @@ export async function POST(request: NextRequest) {
                     where: { id: { in: cardsToReserve.map((c) => c.id) } },
                     data: { status: "RESERVED", orderId: newOrder.id },
                 })
+
+                if (exitDiscountPayload) {
+                    await tx.exitDiscountUsage.create({
+                        data: {
+                            productId: exitDiscountPayload.productId,
+                            orderId: newOrder.id,
+                            visitorId: exitDiscountPayload.visitorId,
+                            fingerprintHash: exitDiscountPayload.fingerprintHash,
+                            ip: exitDiscountPayload.ip,
+                        },
+                    })
+                }
 
                 return newOrder
             })

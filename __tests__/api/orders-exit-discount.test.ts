@@ -83,6 +83,7 @@ function mockTransaction(createdOrder: Record<string, unknown>) {
             findMany: jest.fn().mockResolvedValue([{ id: "card_1" }]),
             updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         },
+        exitDiscountUsage: { create: jest.fn().mockResolvedValue({}) },
     }
     ;(prismaMock.$transaction as jest.Mock).mockImplementation((cb: (tx: unknown) => Promise<unknown>) => cb(mockTx))
     return mockTx
@@ -273,6 +274,93 @@ describe("POST /api/orders -- exit discount token handling", () => {
         const createCall = (tx.order.create as jest.Mock).mock.calls[0][0]
         expect(createCall.data.amount).toBe(100)
         expect(createCall.data).not.toHaveProperty("exitDiscountMeta")
+    })
+
+    it("writes ExitDiscountUsage in transaction when valid token applied", async () => {
+        const { verifyExitDiscountToken } = require("@/lib/exit-discount")
+        ;(verifyExitDiscountToken as jest.Mock).mockReturnValueOnce({
+            valid: true,
+            payload: {
+                productId: "prod_1",
+                visitorId: "visitor-1",
+                fingerprintHash: "fp-hash-1",
+                ip: "127.0.0.1",
+                discountPercent: 5,
+                exp: Date.now() + 900_000,
+            },
+        })
+
+        prismaMock.product.findUnique.mockResolvedValueOnce(product)
+        prismaMock.card.count.mockResolvedValueOnce(5)
+        const tx = mockTransaction(baseCreatedOrder)
+
+        await POST(
+            createJsonRequest({
+                productId: "prod_1",
+                email: "user@example.com",
+                orderPassword: "password123",
+                quantity: 1,
+                exitDiscountToken: "valid.token.here",
+            })
+        )
+
+        expect(tx.exitDiscountUsage.create).toHaveBeenCalledWith({
+            data: {
+                productId: "prod_1",
+                orderId: baseCreatedOrder.id,
+                visitorId: "visitor-1",
+                fingerprintHash: "fp-hash-1",
+                ip: "127.0.0.1",
+            },
+        })
+    })
+
+    it("does not write ExitDiscountUsage when token verification fails", async () => {
+        const { verifyExitDiscountToken } = require("@/lib/exit-discount")
+        ;(verifyExitDiscountToken as jest.Mock).mockReturnValueOnce({ valid: false, reason: "invalid" })
+
+        prismaMock.product.findUnique.mockResolvedValueOnce(product)
+        prismaMock.card.count.mockResolvedValueOnce(5)
+        const tx = mockTransaction({ ...baseCreatedOrder, amount: 100 })
+
+        await POST(
+            createJsonRequest({
+                productId: "prod_1",
+                email: "user@example.com",
+                orderPassword: "password123",
+                quantity: 1,
+                exitDiscountToken: "tampered.token",
+            })
+        )
+
+        expect(tx.exitDiscountUsage.create).not.toHaveBeenCalled()
+    })
+
+    it("does not write ExitDiscountUsage when promoCode takes precedence", async () => {
+        const { verifyExitDiscountToken } = require("@/lib/exit-discount")
+
+        prismaMock.user.findFirst.mockResolvedValueOnce({
+            id: "dist_1",
+            discountCodeEnabled: true,
+            discountPercent: 10,
+        })
+        prismaMock.product.findUnique.mockResolvedValueOnce(product)
+        prismaMock.card.count.mockResolvedValueOnce(5)
+        const tx = mockTransaction({ ...baseCreatedOrder, amount: 90 })
+
+        await POST(
+            createJsonRequest({
+                productId: "prod_1",
+                email: "user@example.com",
+                orderPassword: "password123",
+                quantity: 1,
+                promoCode: "DIST10",
+                exitDiscountToken: "valid.token.here",
+            })
+        )
+
+        expect(verifyExitDiscountToken).not.toHaveBeenCalled()
+        expect(tx.exitDiscountUsage.create).not.toHaveBeenCalled()
     })
 
     it("applies full price when token productId does not match request productId", async () => {

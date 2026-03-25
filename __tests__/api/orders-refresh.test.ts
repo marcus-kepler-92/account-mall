@@ -1,6 +1,6 @@
 /**
  * POST /api/orders/[orderId]/refresh
- * 覆盖：订单校验、密码验证、类型检查、过期检查、限流、爬取、账号更新
+ * 覆盖：订单校验、token 验证、类型检查、过期检查、限流、爬取、账号更新
  */
 import { NextRequest } from "next/server"
 import { POST } from "@/app/api/orders/[orderId]/refresh/route"
@@ -13,9 +13,9 @@ jest.mock("@/lib/prisma", () => {
     return { __esModule: true, prisma: prismaMock }
 })
 
-jest.mock("better-auth/crypto", () => ({
+jest.mock("@/lib/order-success-token", () => ({
     __esModule: true,
-    verifyPassword: jest.fn().mockResolvedValue(true),
+    verifyOrderSuccessToken: jest.fn().mockReturnValue(true),
 }))
 
 jest.mock("@/lib/scrape-shared-accounts", () => ({
@@ -29,10 +29,10 @@ jest.mock("@/lib/config", () => ({
     },
 }))
 
-import { verifyPassword } from "better-auth/crypto"
+import { verifyOrderSuccessToken } from "@/lib/order-success-token"
 import { scrapeSharedAccounts } from "@/lib/scrape-shared-accounts"
 
-const verifyPasswordMock = verifyPassword as jest.Mock
+const verifyOrderSuccessTokenMock = verifyOrderSuccessToken as jest.Mock
 const scrapeSharedAccountsMock = scrapeSharedAccounts as jest.Mock
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -48,13 +48,15 @@ function makeContext(orderNo = "order-1") {
     return { params: Promise.resolve({ orderId: orderNo }) }
 }
 
-function makeCompletedAutoFetchOrder(overrides?: Record<string, unknown>) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function makeCompletedAutoFetchOrder(overrides?: Record<string, unknown>): any {
     return {
         id: "ord_1",
         orderNo: "order-1",
         status: "COMPLETED",
         passwordHash: "hashed-pw",
         expiresAt: null,
+        switchAccountCount: 0,
         product: {
             id: "prod_1",
             productType: "AUTO_FETCH",
@@ -86,14 +88,14 @@ const SCRAPED_ACCOUNT_NEW = {
     status: "valid",
 }
 
-const BODY = { password: "order-password" }
+const BODY = { token: "valid-token" }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe("POST /api/orders/[orderId]/refresh", () => {
     beforeEach(() => {
         jest.clearAllMocks()
-        verifyPasswordMock.mockResolvedValue(true)
+        verifyOrderSuccessTokenMock.mockReturnValue(true)
         scrapeSharedAccountsMock.mockResolvedValue([SCRAPED_ACCOUNT])
         prismaMock.accountBlacklist.findMany.mockResolvedValue([])
     })
@@ -101,11 +103,11 @@ describe("POST /api/orders/[orderId]/refresh", () => {
     // ─── 请求校验 ─────────────────────────────────────────────────────────────
 
     describe("请求校验", () => {
-        it("缺少 password → 400", async () => {
+        it("缺少 token → 400", async () => {
             const res = await POST(makeRequest({}), makeContext())
             expect(res.status).toBe(400)
             const data = await res.json()
-            expect(data.error).toContain("订单密码")
+            expect(data.error).toContain("访问令牌")
         })
 
         it("JSON 解析失败 → 400", async () => {
@@ -115,22 +117,21 @@ describe("POST /api/orders/[orderId]/refresh", () => {
         })
     })
 
-    // ─── 订单查找 & 密码 ──────────────────────────────────────────────────────
+    // ─── 订单查找 & token 验证 ────────────────────────────────────────────────
 
-    describe("订单查找 & 密码验证", () => {
+    describe("订单查找 & token 验证", () => {
         it("订单不存在 → 404", async () => {
             prismaMock.order.findUnique.mockResolvedValue(null)
             const res = await POST(makeRequest(BODY), makeContext())
             expect(res.status).toBe(404)
         })
 
-        it("密码错误 → 400", async () => {
-            prismaMock.order.findUnique.mockResolvedValue(makeCompletedAutoFetchOrder())
-            verifyPasswordMock.mockResolvedValue(false)
+        it("令牌无效 → 400", async () => {
+            verifyOrderSuccessTokenMock.mockReturnValue(false)
             const res = await POST(makeRequest(BODY), makeContext())
             expect(res.status).toBe(400)
             const data = await res.json()
-            expect(data.error).toContain("密码错误")
+            expect(data.error).toContain("令牌")
         })
     })
 
@@ -178,7 +179,7 @@ describe("POST /api/orders/[orderId]/refresh", () => {
             prismaMock.order.findUnique.mockResolvedValue(
                 makeCompletedAutoFetchOrder({ expiresAt: futureAt })
             )
-            prismaMock.card.update.mockResolvedValue({})
+            prismaMock.card.update.mockResolvedValue({} as any)
 
             const res = await POST(makeRequest(BODY), makeContext())
             expect(res.status).toBe(200)
@@ -188,7 +189,7 @@ describe("POST /api/orders/[orderId]/refresh", () => {
             prismaMock.order.findUnique.mockResolvedValue(
                 makeCompletedAutoFetchOrder({ expiresAt: null })
             )
-            prismaMock.card.update.mockResolvedValue({})
+            prismaMock.card.update.mockResolvedValue({} as any)
 
             const res = await POST(makeRequest(BODY), makeContext())
             expect(res.status).toBe(200)
@@ -239,7 +240,7 @@ describe("POST /api/orders/[orderId]/refresh", () => {
                     cards: [{ id: "c1", content: JSON.stringify({ account: "user@apple.com" }), lastRefreshedAt: oldRefresh }],
                 })
             )
-            prismaMock.card.update.mockResolvedValue({})
+            prismaMock.card.update.mockResolvedValue({} as any)
 
             const res = await POST(makeRequest(BODY), makeContext())
             expect(res.status).toBe(200)
@@ -285,7 +286,7 @@ describe("POST /api/orders/[orderId]/refresh", () => {
         it("爬取成功，原账号在列表中 → 更新密码，accountChanged: false", async () => {
             prismaMock.order.findUnique.mockResolvedValue(makeCompletedAutoFetchOrder())
             scrapeSharedAccountsMock.mockResolvedValue([SCRAPED_ACCOUNT]) // 同账号，密码已变
-            prismaMock.card.update.mockResolvedValue({})
+            prismaMock.card.update.mockResolvedValue({} as any)
 
             const res = await POST(makeRequest(BODY), makeContext())
             const data = await res.json()
@@ -301,7 +302,7 @@ describe("POST /api/orders/[orderId]/refresh", () => {
         it("爬取成功，原账号不在列表中 → 换新账号，accountChanged: true", async () => {
             prismaMock.order.findUnique.mockResolvedValue(makeCompletedAutoFetchOrder())
             scrapeSharedAccountsMock.mockResolvedValue([SCRAPED_ACCOUNT_NEW]) // 只有新账号
-            prismaMock.card.update.mockResolvedValue({})
+            prismaMock.card.update.mockResolvedValue({} as any)
 
             const res = await POST(makeRequest(BODY), makeContext())
             const data = await res.json()
@@ -317,7 +318,8 @@ describe("POST /api/orders/[orderId]/refresh", () => {
             scrapeSharedAccountsMock.mockResolvedValue([SCRAPED_ACCOUNT])
 
             let capturedUpdateData: Record<string, unknown> | undefined
-            prismaMock.card.update.mockImplementation(async (args: { data: Record<string, unknown> }) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            ;(prismaMock.card.update as any).mockImplementation(async (args: any) => {
                 capturedUpdateData = args.data
                 return {}
             })
