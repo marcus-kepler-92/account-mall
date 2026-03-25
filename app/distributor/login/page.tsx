@@ -5,7 +5,6 @@ import { toast } from "sonner"
 import { Eye, EyeOff } from "lucide-react"
 import { authClient } from "@/lib/auth-client"
 import { useRouter } from "next/navigation"
-import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -120,10 +119,7 @@ export default function DistributorLoginPage() {
                         </Button>
 
                         <p className="text-center text-sm text-muted-foreground">
-                            还没有账号？{" "}
-                            <Link href="/distributor/register" className="underline hover:text-foreground">
-                                立即注册
-                            </Link>
+                            还没有账号？请联系已有分销员获取邀请链接
                         </p>
                     </form>
                 </CardContent>

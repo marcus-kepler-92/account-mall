@@ -39,7 +39,10 @@ export function DistributorWithdrawalsDataTable({
 }: DistributorWithdrawalsDataTableProps) {
     const router = useRouter()
     const searchParams = useSearchParams()
-    const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
+    const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
+        if (typeof window === "undefined") return {}
+        return window.innerWidth < 768 ? { processedAt: false, note: false } : {}
+    })
 
     const table = useReactTable({
         data,

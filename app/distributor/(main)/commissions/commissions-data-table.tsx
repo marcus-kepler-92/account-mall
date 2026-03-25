@@ -39,7 +39,10 @@ export function DistributorCommissionsDataTable({
 }: DistributorCommissionsDataTableProps) {
     const router = useRouter()
     const searchParams = useSearchParams()
-    const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
+    const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
+        if (typeof window === "undefined") return {}
+        return window.innerWidth < 768 ? { orderNo: false, createdAt: false } : {}
+    })
 
     const table = useReactTable({
         data,

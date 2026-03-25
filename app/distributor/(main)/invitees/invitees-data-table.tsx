@@ -6,6 +6,7 @@ import {
     getCoreRowModel,
     getFilteredRowModel,
     type ColumnFiltersState,
+    type VisibilityState,
 } from "@tanstack/react-table"
 import { DataTable } from "@/app/admin/components"
 import { Input } from "@/components/ui/input"
@@ -19,12 +20,17 @@ interface InviteesDataTableProps {
 
 export function InviteesDataTable({ data, level2RatePercent }: InviteesDataTableProps) {
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+    const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
+        if (typeof window === "undefined") return {}
+        return window.innerWidth < 768 ? { email: false } : {}
+    })
 
     const table = useReactTable({
         data,
         columns: inviteesColumns,
-        state: { columnFilters },
+        state: { columnFilters, columnVisibility },
         onColumnFiltersChange: setColumnFilters,
+        onColumnVisibilityChange: setColumnVisibility,
         getCoreRowModel: getCoreRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
         getRowId: (row) => row.id,

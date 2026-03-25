@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, Suspense } from "react"
+import { useState, useRef, useEffect, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import {
@@ -41,6 +41,7 @@ function MyOrdersPageContent() {
     const [orders, setOrders] = useState<OrderHistoryItem[]>(() => getOrderHistory())
     const [userSelectedOrderNo, setUserSelectedOrderNo] = useState<string | null>(null)
     const [confirmRemoveOrderNo, setConfirmRemoveOrderNo] = useState<string | null>(null)
+    const detailRef = useRef<HTMLDivElement>(null)
 
     const refreshOrders = () => setOrders(getOrderHistory())
 
@@ -48,6 +49,13 @@ function MyOrdersPageContent() {
     const orderNoInList = orderNoFromUrl && orders.some((o) => o.orderNo === orderNoFromUrl) ? orderNoFromUrl : null
     const selectedOrderNo = orderNoInList ?? userSelectedOrderNo ?? orders[0]?.orderNo ?? null
     const selected = orders.find((o) => o.orderNo === selectedOrderNo)
+
+    // Scroll to detail card on mobile when selection changes
+    useEffect(() => {
+        if (selectedOrderNo && detailRef.current) {
+            detailRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" })
+        }
+    }, [selectedOrderNo])
 
     const syncUrlToOrderNo = (orderNo: string | null) => {
         if (orderNo) {
@@ -123,7 +131,7 @@ function MyOrdersPageContent() {
                                     <h2 className="text-base font-semibold leading-none">订单列表</h2>
                                 </div>
                                 <CardContent className="p-0">
-                                    <ul className="max-h-[360px] overflow-y-auto">
+                                    <ul className="max-h-[240px] overflow-y-auto md:max-h-[360px]">
                                         {orders.map((o) => (
                                             <li key={o.orderNo} className="border-b last:border-b-0">
                                                 <div
@@ -179,7 +187,7 @@ function MyOrdersPageContent() {
                             </Card>
 
                             {/* 订单详情 */}
-                            <Card className="min-w-0">
+                            <Card className="min-w-0" ref={detailRef}>
                                 <CardHeader className="min-w-0 overflow-hidden px-4 sm:px-6">
                                     <CardTitle className="flex min-w-0 items-center gap-2 text-base font-semibold">
                                         <Package className="size-5 shrink-0" />
@@ -195,7 +203,7 @@ function MyOrdersPageContent() {
                                     <CardDescription className="mt-1">
                                         {selected
                                             ? "本地历史记录，点击下方按钮跳转订单查询（输入密码查看卡密）"
-                                            : "在左侧选择订单"}
+                                            : "请选择一个订单"}
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-5 px-4 sm:px-6">
@@ -228,7 +236,7 @@ function MyOrdersPageContent() {
                                         </>
                                     ) : (
                                         <p className="text-sm text-muted-foreground">
-                                            请从左侧选择订单
+                                            请选择一个订单
                                         </p>
                                     )}
                                 </CardContent>

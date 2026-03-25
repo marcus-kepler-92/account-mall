@@ -20,7 +20,7 @@ export default async function DistributorMainLayout({
         <SidebarProvider>
             <DistributorMobileNav />
             <DistributorSidebar />
-            <SidebarInset className="pl-14 md:pl-0">
+            <SidebarInset className="pb-16 md:pb-0">
                 <header className="sticky top-0 z-50 flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4">
                     <SidebarTrigger className="-ml-1 hidden md:flex" />
                     <DistributorBreadcrumb />

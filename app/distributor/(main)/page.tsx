@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { getDistributorSession } from "@/lib/auth-guard";
 import {
   Card,
@@ -7,7 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Link2, TrendingUp } from "lucide-react";
+import { Link2, TrendingUp, BookOpen, ChevronRight } from "lucide-react";
 import { CommissionRateDetail } from "./commission-rate-detail";
 import { config } from "@/lib/config";
 import { prisma } from "@/lib/prisma";
@@ -113,14 +114,27 @@ export default async function DistributorDashboardPage() {
         <p className="text-muted-foreground">推广链接与数据概览</p>
       </div>
 
+      {/* Guide entry — mobile only (desktop uses sidebar) */}
+      <Link
+        href="/distributor/guide"
+        className="flex items-center gap-3 rounded-lg border bg-card px-4 py-3 text-sm transition-colors hover:bg-accent md:hidden"
+      >
+        <BookOpen className="size-4 shrink-0 text-muted-foreground" />
+        <span className="flex-1 font-medium">入门手册</span>
+        <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+      </Link>
+
       {/* 整站推广链接 — primary CTA */}
       <Card>
-        <CardContent className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:gap-4">
-          <div className="flex items-center gap-2 shrink-0">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
             <Link2 className="size-4 text-primary" />
-            <span className="text-sm font-semibold">推广链接</span>
-          </div>
-          <code className="flex-1 min-w-0 rounded bg-muted px-3 py-2 text-xs break-all sm:text-sm">
+            推广链接
+          </CardTitle>
+          <CardDescription>复制链接分享给客户，每笔成交获奖金</CardDescription>
+        </CardHeader>
+        <CardContent className="flex items-center gap-3">
+          <code className="flex-1 min-w-0 truncate rounded bg-muted px-3 py-2 text-xs sm:text-sm">
             {promoUrl}
           </code>
           <CopyButtonClient text={promoUrl} successMessage="推广链接已复制到剪贴板" />

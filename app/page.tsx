@@ -57,13 +57,13 @@ export default async function HomePage() {
 
             {/* Main content */}
             <main className="flex-1">
-                <div className="mx-auto max-w-6xl px-4 py-8 xl:max-w-7xl 2xl:max-w-[90rem]">
+                <div className="mx-auto max-w-6xl px-4 py-5 sm:py-8 xl:max-w-7xl 2xl:max-w-[90rem]">
                     {/* Hero */}
-                    <section className="mb-12 text-center">
-                        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
+                    <section className="mb-6 sm:mb-12 text-center">
+                        <h1 className="text-2xl font-bold tracking-tight sm:text-4xl">
                             {config.siteTagline}
                         </h1>
-                        <p className="mx-auto mt-3 max-w-2xl text-lg text-muted-foreground">
+                        <p className="mx-auto mt-3 max-w-2xl text-base sm:text-lg text-muted-foreground">
                             {config.siteSubtitle}
                         </p>
                     </section>

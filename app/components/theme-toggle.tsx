@@ -1,95 +1,40 @@
-"use client";
+"use client"
 
-import { useTheme } from "next-themes";
-import { useEffect, useEffectEvent, useState, useSyncExternalStore } from "react";
-import { Monitor, Moon, Sun, Sunrise } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useTheme } from "next-themes"
+import { Monitor, Moon, Sun } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { getSunriseSunsetTheme } from "@/lib/sunrise-sunset";
-
-type ThemeMode = "system" | "sunrise-sunset";
-
-const STORAGE_KEY = "theme-mode";
-
-function subscribeToStorage(cb: () => void) {
-  window.addEventListener("storage", cb);
-  return () => window.removeEventListener("storage", cb);
-}
-
-function getStoredMode(): ThemeMode {
-  return (localStorage.getItem(STORAGE_KEY) as ThemeMode) || "system";
-}
+} from "@/components/ui/dropdown-menu"
 
 export function ThemeToggle() {
-  const { setTheme, resolvedTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  const mode = useSyncExternalStore(
-    subscribeToStorage,
-    getStoredMode,
-    () => "system" as ThemeMode
-  );
-
-  const applyTheme = useEffectEvent((currentMode: ThemeMode) => {
-    if (currentMode === "sunrise-sunset") {
-      setTheme(getSunriseSunsetTheme());
-    } else {
-      setTheme("system");
-    }
-  });
-
-  useEffect(() => {
-    applyTheme(mode);
-  }, [mode]);
-
-  useEffect(() => {
-    queueMicrotask(() => setMounted(true));
-  }, []);
-
-  const handleSelect = (value: string) => {
-    localStorage.setItem(STORAGE_KEY, value);
-    window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }));
-  };
-
-  const isDark = resolvedTheme === "dark";
+  const { theme, setTheme } = useTheme()
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-9"
-          aria-label="切换主题"
-        >
-          {mounted && isDark ? (
-            <Moon className="size-4" />
-          ) : (
-            <Sun className="size-4" />
-          )}
+        <Button variant="ghost" size="icon" className="size-9" aria-label="切换主题">
+          <Sun className="size-4 dark:hidden" />
+          <Moon className="hidden size-4 dark:block" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuCheckboxItem
-          checked={mode === "system"}
-          onCheckedChange={() => handleSelect("system")}
-        >
+        <DropdownMenuCheckboxItem checked={theme === "light"} onCheckedChange={() => setTheme("light")}>
+          <Sun className="size-4" />
+          亮色
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuCheckboxItem checked={theme === "dark"} onCheckedChange={() => setTheme("dark")}>
+          <Moon className="size-4" />
+          暗色
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuCheckboxItem checked={theme === "system"} onCheckedChange={() => setTheme("system")}>
           <Monitor className="size-4" />
           跟随系统
         </DropdownMenuCheckboxItem>
-        <DropdownMenuCheckboxItem
-          checked={mode === "sunrise-sunset"}
-          onCheckedChange={() => handleSelect("sunrise-sunset")}
-        >
-          <Sunrise className="size-4" />
-          日出日落
-        </DropdownMenuCheckboxItem>
       </DropdownMenuContent>
     </DropdownMenu>
-  );
+  )
 }

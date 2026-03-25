@@ -5,7 +5,7 @@ import Image from "next/image"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Package, Bell, ShoppingCart } from "lucide-react"
+import { Package, Bell } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { descriptionToPlainText } from "@/lib/description"
 import { SoldOutOverlay } from "@/app/components/sold-out-overlay"
@@ -102,7 +102,7 @@ export function ProductCard({ product, gradientIndex = 0, className, code }: Pro
                 </div>
 
                 <CardContent className="flex min-h-0 flex-1 flex-col gap-1 px-3 py-2 sm:gap-3 sm:p-4">
-                    <div className="hidden flex-wrap gap-1 sm:flex">
+                    <div className="flex flex-wrap gap-1 overflow-hidden max-h-5 sm:max-h-none">
                         {product.tags.map((tag) => (
                             <Badge
                                 key={tag.id}
@@ -168,18 +168,12 @@ export function ProductCard({ product, gradientIndex = 0, className, code }: Pro
                             {isSoldOut ? (
                                 <>
                                     <Bell className="size-3.5" />
-                                    <span className="hidden sm:inline">补货提醒</span>
+                                    <span className="text-xs sm:text-sm">补货提醒</span>
                                 </>
                             ) : isFree ? (
-                                <>
-                                    <ShoppingCart className="size-3.5 sm:hidden" />
-                                    <span className="hidden sm:inline">领取</span>
-                                </>
+                                <span className="text-xs sm:text-sm">领取</span>
                             ) : (
-                                <>
-                                    <ShoppingCart className="size-3.5 sm:hidden" />
-                                    <span className="hidden sm:inline">购买</span>
-                                </>
+                                <span className="text-xs sm:text-sm">购买</span>
                             )}
                         </Button>
                     </div>
