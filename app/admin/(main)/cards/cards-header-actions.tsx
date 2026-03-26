@@ -13,14 +13,17 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select"
-import { Loader2, Upload } from "lucide-react"
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from "@/components/ui/command"
+import { cn } from "@/lib/utils"
+import { Check, ChevronsUpDown, Loader2, Upload } from "lucide-react"
 
 const MAX_LINES = 500
 
@@ -35,6 +38,7 @@ type ProductOption = {
 export function CardsHeaderActions() {
     const router = useRouter()
     const [open, setOpen] = useState(false)
+    const [productSelectOpen, setProductSelectOpen] = useState(false)
     const [products, setProducts] = useState<ProductOption[]>([])
     const [selectedProductId, setSelectedProductId] = useState<string | undefined>()
     const [loading, setLoading] = useState(false)
@@ -155,22 +159,60 @@ export function CardsHeaderActions() {
                             <p className="text-sm text-muted-foreground">
                                 选择商品（仅展示可用商品）
                             </p>
-                            <Select
-                                value={selectedProductId}
-                                onValueChange={(value) => setSelectedProductId(value)}
-                                disabled={loading || products.length === 0}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder={loading ? "加载中..." : "选择商品"} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {products.map((product) => (
-                                        <SelectItem key={product.id} value={product.id}>
-                                            {product.name}（/{product.slug}）
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <Popover open={productSelectOpen} onOpenChange={setProductSelectOpen}>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        role="combobox"
+                                        disabled={loading || products.length === 0}
+                                        className={cn(
+                                            "w-full justify-between font-normal",
+                                            !selectedProductId && "text-muted-foreground"
+                                        )}
+                                    >
+                                        <span className="truncate">
+                                            {loading
+                                                ? "加载中..."
+                                                : selectedProductId
+                                                  ? products.find((p) => p.id === selectedProductId)?.name
+                                                  : "选择商品"}
+                                        </span>
+                                        <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
+                                    <Command>
+                                        <CommandInput placeholder="搜索商品..." />
+                                        <CommandList>
+                                            <CommandEmpty>未找到匹配商品</CommandEmpty>
+                                            <CommandGroup>
+                                                {products.map((product) => (
+                                                    <CommandItem
+                                                        key={product.id}
+                                                        value={product.name}
+                                                        onSelect={() => {
+                                                            setSelectedProductId(product.id)
+                                                            setProductSelectOpen(false)
+                                                        }}
+                                                    >
+                                                        <Check
+                                                            className={cn(
+                                                                "mr-2 size-4",
+                                                                selectedProductId === product.id ? "opacity-100" : "opacity-0"
+                                                            )}
+                                                        />
+                                                        <span className="truncate">{product.name}</span>
+                                                        <span className="ml-auto pl-2 text-xs text-muted-foreground shrink-0">
+                                                            /{product.slug}
+                                                        </span>
+                                                    </CommandItem>
+                                                ))}
+                                            </CommandGroup>
+                                        </CommandList>
+                                    </Command>
+                                </PopoverContent>
+                            </Popover>
                             {products.length === 0 && !loading && (
                                 <p className="text-xs text-muted-foreground">
                                     暂无可用商品，请先到商品管理中创建商品。

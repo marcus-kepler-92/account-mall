@@ -194,7 +194,7 @@ export function GuideForm({ guide, tags }: GuideFormProps) {
                                                 value={field.value ?? ""}
                                                 onChange={field.onChange}
                                                 placeholder="输入指南内容，支持 Markdown。将需要分销员复制的话术、描述等放在代码块（```）中，分销员端会自动显示复制按钮。"
-                                                height={460}
+                                                height={320}
                                                 imageUpload={{ pathPrefix: "guides" }}
                                             />
                                         </FormControl>
@@ -255,7 +255,7 @@ export function GuideForm({ guide, tags }: GuideFormProps) {
                         </CardContent>
                     </Card>
 
-                    <div className="flex gap-4">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
                         <Button type="submit" disabled={form.formState.isSubmitting}>
                             {form.formState.isSubmitting && (
                                 <Loader2 className="size-4 animate-spin" />

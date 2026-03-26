@@ -3,7 +3,7 @@
 import "@uiw/react-md-editor/markdown-editor.css"
 import dynamic from "next/dynamic"
 import { useTheme } from "next-themes"
-import { useRef, useMemo } from "react"
+import { useRef, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { getCommands, type ICommand } from "@uiw/react-md-editor/commands"
@@ -60,6 +60,10 @@ export function MarkdownEditor({
 }: MarkdownEditorProps) {
     const { resolvedTheme } = useTheme()
     const colorMode = resolvedTheme === "dark" ? "dark" : "light"
+    // MDEditor is SSR-disabled, so window is always available at this point
+    const [defaultPreview] = useState<"edit" | "live">(() =>
+        typeof window !== "undefined" && window.innerWidth >= 640 ? "live" : "edit"
+    )
     const fileInputRef = useRef<HTMLInputElement | null>(null)
     const apiRef = useRef<{ replaceSelection: (text: string) => void } | null>(null)
 
@@ -124,7 +128,7 @@ export function MarkdownEditor({
                 onChange={(v) => onChange(v ?? "")}
                 height={height}
                 visibleDragbar={false}
-                preview="live"
+                preview={defaultPreview}
                 commands={commands}
                 textareaProps={{
                     placeholder,

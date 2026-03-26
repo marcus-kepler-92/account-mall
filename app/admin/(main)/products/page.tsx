@@ -41,7 +41,7 @@ export default async function AdminProductsPage() {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h2 className="text-2xl font-bold tracking-tight">商品管理</h2>
                     <p className="text-muted-foreground">管理数字商品和价格</p>

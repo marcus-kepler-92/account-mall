@@ -163,14 +163,16 @@ export default async function AdminWithdrawalsPage() {
 
     return (
         <div className="space-y-6">
-            <div>
-                <h2 className="text-2xl font-bold tracking-tight">提现管理</h2>
-                <p className="text-muted-foreground">
-                    处理分销员提现申请，线下打款后标记已打款或拒绝
-                </p>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h2 className="text-2xl font-bold tracking-tight">提现管理</h2>
+                    <p className="text-muted-foreground">
+                        处理分销员提现申请，线下打款后标记已打款或拒绝
+                    </p>
+                </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
                 {statCards.map((stat) => (
                     <Card
                         key={stat.label}

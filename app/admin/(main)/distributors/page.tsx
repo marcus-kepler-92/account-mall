@@ -197,11 +197,13 @@ export default async function AdminDistributorsPage({
 
     return (
         <div className="space-y-6">
-            <div>
-                <h2 className="text-2xl font-bold tracking-tight">分销员管理</h2>
-                <p className="text-muted-foreground">
-                    查看分销员列表、启用/停用、订单与佣金汇总
-                </p>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h2 className="text-2xl font-bold tracking-tight">分销员管理</h2>
+                    <p className="text-muted-foreground">
+                        查看分销员列表、启用/停用、订单与佣金汇总
+                    </p>
+                </div>
             </div>
             <DistributorsDataTable data={data} total={total} statusCounts={statusCounts} />
         </div>

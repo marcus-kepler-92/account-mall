@@ -25,12 +25,14 @@ export default async function AdminMainLayout({
                 {/* Top bar with sidebar trigger */}
                 <header className="sticky top-0 z-50 flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4">
                     <SidebarTrigger className="-ml-1" />
-                    <AdminBreadcrumb />
+                    <div className="flex-1 min-w-0">
+                        <AdminBreadcrumb />
+                    </div>
                     <AdminTopbarActions />
                 </header>
 
                 {/* Page content: min-w-0 防止 flex 子项撑破宽度 */}
-                <div className="flex-1 min-w-0 p-6">
+                <div className="flex-1 min-w-0 p-3 sm:p-6">
                     {children}
                 </div>
             </SidebarInset>

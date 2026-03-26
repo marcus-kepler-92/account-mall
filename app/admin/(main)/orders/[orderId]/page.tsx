@@ -180,7 +180,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
                                     <TableRow className="bg-muted/50">
                                         <TableHead className="pl-4">卡密</TableHead>
                                         <TableHead className="text-center">状态</TableHead>
-                                        <TableHead className="text-right">创建时间</TableHead>
+                                        <TableHead className="hidden text-right sm:table-cell">创建时间</TableHead>
                                         <TableHead className="text-right pr-4 w-[120px]">操作</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -214,7 +214,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
                                                             : "已售"}
                                                 </Badge>
                                             </TableCell>
-                                            <TableCell className="text-right text-muted-foreground text-xs">
+                                            <TableCell className="hidden text-right text-muted-foreground text-xs sm:table-cell">
                                                 {formatDateTime(card.createdAt)}
                                             </TableCell>
                                             <TableCell className="text-right pr-4">

@@ -11,7 +11,7 @@ export default function OrdersLoading() {
             </div>
 
             {/* Stats cards */}
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
                 {[1, 2, 3, 4].map((i) => (
                     <Card key={i} className="border-l-4 border-l-muted">
                         <CardContent className="pt-4 pb-4">

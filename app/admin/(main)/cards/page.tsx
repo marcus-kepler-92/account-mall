@@ -192,7 +192,7 @@ export default async function AdminCardsPage({
     return (
         <div className="space-y-6">
             {/* Page header */}
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h2 className="text-2xl font-bold tracking-tight">卡密管理</h2>
                     <p className="text-muted-foreground">

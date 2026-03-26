@@ -118,7 +118,7 @@ export function ProductFormBasicFields({
                                         <img
                                             src={field.value}
                                             alt="商品图片预览"
-                                            className="h-50 w-50 rounded-md border object-cover"
+                                            className="size-32 sm:size-50 rounded-md border object-cover"
                                         />
                                         <Button
                                             type="button"

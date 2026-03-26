@@ -145,7 +145,7 @@ export function ProductForm({
             <Form {...form}>
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                     <div className="grid gap-6 lg:grid-cols-3">
-                        <div className="lg:col-span-2 space-y-6">
+                        <div className="min-w-0 lg:col-span-2 space-y-6">
                             <ProductFormBasicFields
                                 isEditing={isEditing}
                                 onSlugManualEdit={() => setSlugManuallyEdited(true)}
@@ -153,13 +153,13 @@ export function ProductForm({
                             <ProductFormPricingFields isAutoFetch={isAutoFetch} sourceUrlOptions={sourceUrlOptions} />
                         </div>
 
-                        <div className="space-y-6 lg:sticky lg:top-20 lg:self-start">
+                        <div className="min-w-0 space-y-6 order-first lg:order-0 lg:sticky lg:top-20 lg:self-start">
                             <ProductFormSettings />
                             <ProductFormTagSelect initialTags={allTags} />
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-4">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
                         <Button type="submit" disabled={form.formState.isSubmitting}>
                             {form.formState.isSubmitting && (
                                 <Loader2 className="size-4 animate-spin" />

@@ -21,7 +21,7 @@ export function DataTableSelectionBar<TData>({
     }
 
     return (
-        <div className="flex items-center justify-between rounded-lg border bg-muted/50 px-4 py-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/50 px-4 py-2">
             <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">
                     已选择 <span className="font-medium text-foreground">{selectedCount}</span> 项

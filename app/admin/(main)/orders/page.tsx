@@ -219,7 +219,7 @@ export default async function AdminOrdersPage({
     return (
         <div className="space-y-6">
             {/* Page header */}
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h2 className="text-2xl font-bold tracking-tight">订单管理</h2>
                     <p className="text-muted-foreground">
@@ -229,7 +229,7 @@ export default async function AdminOrdersPage({
             </div>
 
             {/* Stats cards */}
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
                 {statCards.map((stat) => {
                     const cardEl = (
                         <Card className={`border-l-4 ${stat.borderColor} transition-colors ${!("noLink" in stat && stat.noLink) ? "hover:bg-accent/50 cursor-pointer" : ""} ${stat.active ? "ring-2 ring-primary/20 bg-accent/30" : ""}`}>

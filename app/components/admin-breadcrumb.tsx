@@ -91,27 +91,33 @@ export function AdminBreadcrumb() {
     if (items.length === 0) return null
 
     return (
-        <Breadcrumb>
-            <BreadcrumbList>
-                <BreadcrumbItem>
+        <Breadcrumb className="min-w-0">
+            <BreadcrumbList className="flex-nowrap">
+                <BreadcrumbItem className="hidden sm:list-item">
                     <BreadcrumbLink asChild>
                         <Link href="/admin/dashboard">{adminPanelLabel}</Link>
                     </BreadcrumbLink>
                 </BreadcrumbItem>
-                {items.map((item, idx) => (
-                    <span key={`${item.href ?? "current"}-${idx}`} className="flex items-center gap-1.5">
-                        <BreadcrumbSeparator />
-                        <BreadcrumbItem>
-                            {item.href ? (
-                                <BreadcrumbLink asChild>
-                                    <Link href={item.href}>{item.label}</Link>
-                                </BreadcrumbLink>
-                            ) : (
-                                <BreadcrumbPage>{item.label}</BreadcrumbPage>
-                            )}
-                        </BreadcrumbItem>
-                    </span>
-                ))}
+                {items.map((item, idx) => {
+                    const isLast = idx === items.length - 1
+                    return (
+                        <span
+                            key={`${item.href ?? "current"}-${idx}`}
+                            className={`flex items-center gap-1.5${isLast ? "" : " hidden sm:flex"}`}
+                        >
+                            <BreadcrumbSeparator className={isLast ? "hidden sm:block" : undefined} />
+                            <BreadcrumbItem>
+                                {item.href ? (
+                                    <BreadcrumbLink asChild>
+                                        <Link href={item.href}>{item.label}</Link>
+                                    </BreadcrumbLink>
+                                ) : (
+                                    <BreadcrumbPage>{item.label}</BreadcrumbPage>
+                                )}
+                            </BreadcrumbItem>
+                        </span>
+                    )
+                })}
             </BreadcrumbList>
         </Breadcrumb>
     )

@@ -295,7 +295,7 @@ export function ProductFormPricingFields({
                                         value={field.value ?? ""}
                                         onChange={field.onChange}
                                         placeholder="描述你的商品，支持 Markdown…"
-                                        height={480}
+                                        height={320}
                                     />
                                 </FormControl>
                                 <FormMessage />

@@ -101,20 +101,20 @@ export default async function AdminDashboardPage() {
               : "text-red-600"
 
     return (
-        <div className={sectionGap}>
-            <header>
-                <h2 className="text-xl font-bold tracking-tight sm:text-2xl">概览</h2>
-                <p className="mt-1 text-sm text-muted-foreground sm:text-base">
+        <div className="space-y-6">
+            <div>
+                <h2 className="text-2xl font-bold tracking-tight">概览</h2>
+                <p className="text-muted-foreground">
                     欢迎使用 {config.siteName} {config.adminPanelLabel}
                 </p>
-            </header>
+            </div>
 
             {/* 第一层：财务核心 */}
             <section className="min-w-0" aria-label="财务核心指标">
                 <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     财务核心
                 </h3>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
                     <KpiCard
                         title="累计收款"
                         value={`¥${kpis.totalRevenue.toFixed(2)}`}
@@ -172,7 +172,7 @@ export default async function AdminDashboardPage() {
                 <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     运营效率
                 </h3>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
                     <KpiCard
                         title="订单数"
                         value={String(kpis.orderCount)}
@@ -210,7 +210,7 @@ export default async function AdminDashboardPage() {
                 <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     待办事项
                 </h3>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
                     <KpiCard
                         title="待处理提现"
                         value={

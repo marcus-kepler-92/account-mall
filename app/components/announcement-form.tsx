@@ -153,7 +153,7 @@ export function AnnouncementForm({ announcement }: AnnouncementFormProps) {
                                                 value={field.value ?? ""}
                                                 onChange={field.onChange}
                                                 placeholder="输入公告内容，支持 Markdown…"
-                                                height={460}
+                                                height={320}
                                             />
                                         </FormControl>
                                         <FormDescription>支持 Markdown 语法：**加粗**、*斜体*、列表、链接等</FormDescription>
@@ -213,7 +213,7 @@ export function AnnouncementForm({ announcement }: AnnouncementFormProps) {
                         </CardContent>
                     </Card>
 
-                    <div className="flex gap-4">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
                         <Button type="submit" disabled={form.formState.isSubmitting}>
                             {form.formState.isSubmitting && (
                                 <Loader2 className="size-4 animate-spin" />
