@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { AlertTriangle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -10,7 +9,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { ProductDescriptionViewClient } from "@/app/components/product-description-view-client";
+import { MarkdownViewClient } from "@/app/components/markdown-view-client";
 
 type RiskWarningDialogProps = {
   productId: string;
@@ -82,7 +81,7 @@ export function RiskWarningDialog({
         </DialogHeader>
 
         <div className="overflow-y-auto flex-1">
-          <ProductDescriptionViewClient description={content} />
+          <MarkdownViewClient content={content} />
         </div>
 
         <Button

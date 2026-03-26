@@ -208,20 +208,19 @@
   color: var(--card-foreground) !important;
 }
 
-/* 商品详情 Markdown 深色下与卡片背景一致，消除色差 */
-.product-description-markdown[data-color-mode="dark"],
-.product-description-markdown[data-color-mode="dark"] .wmde-markdown-var,
-.product-description-markdown[data-color-mode="dark"] .wmde-markdown {
-  --color-canvas-default: var(--card);
+/* 商品详情 Markdown：桥接库 CSS 变量到项目语义变量，light/dark 统一生效 */
+.wmde-theme-bridge,
+.wmde-theme-bridge .wmde-markdown-var {
+  --color-canvas-default: transparent;
   --color-canvas-subtle: var(--muted);
-  --color-fg-default: var(--card-foreground);
+  --color-fg-default: var(--foreground);
   --color-fg-muted: var(--muted-foreground);
   --color-border-default: var(--border);
   --color-border-muted: var(--border);
 }
-.product-description-markdown[data-color-mode="dark"] .wmde-markdown {
-  background-color: var(--card);
-  color: var(--card-foreground);
+.wmde-theme-bridge .wmde-markdown {
+  background-color: transparent !important;
+  color: var(--foreground);
 }
 
 /* 富文本编辑器内列表：恢复数字与圆点，避免被 preflight 重置后看不见 */
