@@ -156,6 +156,23 @@ describe("POST /api/products/[productId]/cards", () => {
     expect(data).toEqual({ error: "Product not found" })
   })
 
+  it("returns 400 when product is AUTO_FETCH type", async () => {
+    prismaMock.product.findUnique.mockResolvedValueOnce({
+      id: productId,
+      productType: "AUTO_FETCH",
+    } as any)
+
+    const res = await POST(
+      createJsonRequest({ contents: ["a"] }),
+      context as any
+    )
+    const data = await res.json()
+
+    expect(res.status).toBe(400)
+    expect(data.error).toBe("自动获取类型的商品不支持手动导入卡密")
+    expect(prismaMock.card.createMany).not.toHaveBeenCalled()
+  })
+
   it("returns 400 when body is invalid JSON", async () => {
     prismaMock.product.findUnique.mockResolvedValueOnce({ id: productId } as any)
 

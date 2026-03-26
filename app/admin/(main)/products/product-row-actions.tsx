@@ -155,7 +155,7 @@ export function ProductRowActions({
                         编辑
                     </Link>
                 </DropdownMenuItem>
-                {!isFree && (
+                {!isAutoFetch && (
                     <DropdownMenuItem asChild>
                         <Link href={`/admin/products/${productId}/cards`}>
                             <CreditCard className="size-4" />

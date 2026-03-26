@@ -85,10 +85,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     const product = await prisma.product.findUnique({
         where: { id: productId },
-        select: { id: true },
+        select: { id: true, productType: true },
     });
     if (!product) {
         return notFound("Product not found");
+    }
+    if (product.productType === "AUTO_FETCH") {
+        return badRequest("自动获取类型的商品不支持手动导入卡密");
     }
 
     let body: unknown;

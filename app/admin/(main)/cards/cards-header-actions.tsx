@@ -68,7 +68,7 @@ export function CardsHeaderActions() {
                 if (cancelled) return
 
                 const items: ProductOption[] = (data.data ?? [])
-                    .filter((p: ProductOption) => !(p.productType === "AUTO_FETCH" && Number(p.price) === 0))
+                    .filter((p: ProductOption) => p.productType !== "AUTO_FETCH")
                     .map((p: ProductOption) => ({
                         id: p.id,
                         name: p.name,
