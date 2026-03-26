@@ -30,6 +30,9 @@ const yipayDisabledPaymentTypes = rawDisabledTypes
     .map((s) => s.trim())
     .filter((s): s is typeof VALID_PAYMENT_TYPES[number] => (VALID_PAYMENT_TYPES as readonly string[]).includes(s))
 
+const supportTelegram = (process.env.NEXT_PUBLIC_SUPPORT_TELEGRAM ?? "@Marcus_Kepler").trim()
+const supportWechat = (process.env.NEXT_PUBLIC_SUPPORT_WECHAT ?? "Mashangbang0").trim()
+
 export const configClient = {
     promoCodeMaxLength: Number.isInteger(promoCodeMaxLength) && promoCodeMaxLength >= 1 && promoCodeMaxLength <= 256
         ? promoCodeMaxLength
@@ -48,4 +51,8 @@ export const configClient = {
     yipayPaymentTypes: yipayPaymentTypes.length > 0 ? yipayPaymentTypes : (["alipay"] as const),
     /** 禁用的支付渠道（界面上显示但置灰不可选） */
     yipayDisabledPaymentTypes: yipayDisabledPaymentTypes,
+    /** 客服 Telegram 联系方式（@username 或完整 URL）；空字符串时隐藏 */
+    supportTelegram,
+    /** 客服微信号；空字符串时隐藏 */
+    supportWechat,
 }

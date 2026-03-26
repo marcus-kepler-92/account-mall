@@ -7,6 +7,7 @@ import { PromoCodeSync } from "@/app/components/promo-code-sync";
 import { QueryProvider } from "@/app/components/query-provider";
 import { NetworkStatusBar } from "@/app/components/network-status-bar";
 import { AnalyticsClient } from "@/app/components/analytics-client";
+import { CustomerServiceFab } from "@/app/components/customer-service-fab";
 import { config } from "@/lib/config";
 
 import { KEYWORDS_META } from "@/lib/seo-keywords";
@@ -95,6 +96,7 @@ export default function RootLayout({
               <Toaster />
               <AnalyticsClient />
               <NetworkStatusBar />
+              <CustomerServiceFab />
             </SiteNameProvider>
           </QueryProvider>
         </ThemeProvider>

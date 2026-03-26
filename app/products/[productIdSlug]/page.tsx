@@ -16,6 +16,7 @@ import { ProductBottomBar } from "../../components/product-bottom-bar"
 import { descriptionToPlainText } from "@/lib/description"
 import { buildProductDetailRedirectPath } from "@/lib/product-canonical-url"
 import { ProductDescriptionViewClient } from "@/app/components/product-description-view-client"
+import { RiskWarningDialog } from "./risk-warning-dialog"
 export const dynamic = "force-dynamic"
 
 type PageProps = {
@@ -236,6 +237,16 @@ export default async function ProductDetailPage({ params, searchParams }: PagePr
                         />
 
                         <ProductMetaNoticeSection />
+
+                        {product.riskWarningEnabled && product.riskWarningContent && (
+                            <RiskWarningDialog
+                                productId={product.id}
+                                title={product.riskWarningTitle}
+                                content={product.riskWarningContent}
+                                countdown={product.riskWarningCountdown}
+                                confirmText={product.riskWarningConfirmText}
+                            />
+                        )}
 
                         <section id="order-section">
                             <ProductOrderSection

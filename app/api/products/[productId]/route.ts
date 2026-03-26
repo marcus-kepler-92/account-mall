@@ -82,7 +82,7 @@ export async function PUT(
         return notFound("Product not found");
     }
 
-    const { tagIds, productType, sourceUrl, price, pinned, validityHours, allowAccountSwitch, accountSwitchLimit, ...rest } = parsed.data;
+    const { tagIds, productType, sourceUrl, price, pinned, validityHours, allowAccountSwitch, accountSwitchLimit, riskWarningEnabled, riskWarningTitle, riskWarningContent, riskWarningCountdown, riskWarningConfirmText, ...rest } = parsed.data;
 
     // Check slug uniqueness if updating slug
     if (rest.slug && rest.slug !== existing.slug) {
@@ -119,6 +119,21 @@ export async function PUT(
     }
     if (accountSwitchLimit !== undefined) {
         updateData.accountSwitchLimit = accountSwitchLimit
+    }
+    if (riskWarningEnabled !== undefined) {
+        updateData.riskWarningEnabled = riskWarningEnabled
+    }
+    if (riskWarningTitle !== undefined) {
+        updateData.riskWarningTitle = riskWarningTitle ?? null
+    }
+    if (riskWarningContent !== undefined) {
+        updateData.riskWarningContent = riskWarningContent ?? null
+    }
+    if (riskWarningCountdown !== undefined) {
+        updateData.riskWarningCountdown = riskWarningCountdown ?? null
+    }
+    if (riskWarningConfirmText !== undefined) {
+        updateData.riskWarningConfirmText = riskWarningConfirmText ?? null
     }
 
     const product = await prisma.product.update({

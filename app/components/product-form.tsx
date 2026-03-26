@@ -16,6 +16,7 @@ import { ProductFormBasicFields } from "./product-form-basic-fields"
 import { ProductFormPricingFields } from "./product-form-pricing-fields"
 import { ProductFormTagSelect } from "./product-form-tag-select"
 import { ProductFormSettings } from "./product-form-settings"
+import { ProductFormRiskWarningFields } from "./product-form-risk-warning-fields"
 
 type Tag = { id: string; name: string; slug: string }
 
@@ -34,6 +35,11 @@ type ProductData = {
     validityHours?: number | null
     allowAccountSwitch?: boolean
     accountSwitchLimit?: number
+    riskWarningEnabled?: boolean
+    riskWarningTitle?: string | null
+    riskWarningContent?: string | null
+    riskWarningCountdown?: number | null
+    riskWarningConfirmText?: string | null
     tags: Tag[]
 }
 
@@ -68,6 +74,11 @@ export function ProductForm({
             allowAccountSwitch: product?.allowAccountSwitch ?? true,
             accountSwitchLimit: product?.accountSwitchLimit != null ? String(product.accountSwitchLimit) : "1",
             tagIds: product?.tags.map((t) => t.id) ?? [],
+            riskWarningEnabled: product?.riskWarningEnabled ?? false,
+            riskWarningTitle: product?.riskWarningTitle ?? "",
+            riskWarningContent: product?.riskWarningContent ?? "",
+            riskWarningCountdown: product?.riskWarningCountdown != null ? String(product.riskWarningCountdown) : "15",
+            riskWarningConfirmText: product?.riskWarningConfirmText ?? "",
         },
     })
 
@@ -100,6 +111,11 @@ export function ProductForm({
                 accountSwitchLimit: data.accountSwitchLimit && data.accountSwitchLimit !== "" ? parseInt(data.accountSwitchLimit, 10) : 1,
             }),
             tagIds: data.tagIds ?? [],
+            riskWarningEnabled: data.riskWarningEnabled ?? false,
+            riskWarningTitle: data.riskWarningTitle?.trim() || null,
+            riskWarningContent: data.riskWarningContent?.trim() || null,
+            riskWarningCountdown: data.riskWarningCountdown && data.riskWarningCountdown !== "" ? parseInt(data.riskWarningCountdown, 10) : null,
+            riskWarningConfirmText: data.riskWarningConfirmText?.trim() || null,
         }
 
         try {
@@ -151,6 +167,7 @@ export function ProductForm({
                                 onSlugManualEdit={() => setSlugManuallyEdited(true)}
                             />
                             <ProductFormPricingFields isAutoFetch={isAutoFetch} sourceUrlOptions={sourceUrlOptions} />
+                            <ProductFormRiskWarningFields />
                         </div>
 
                         <div className="min-w-0 space-y-6 order-first lg:order-0 lg:sticky lg:top-20 lg:self-start">

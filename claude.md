@@ -25,6 +25,7 @@ npm run db:seed          # 运行 seed 脚本
 # 测试
 npm test                 # 运行所有 Jest 单元测试
 npm run test:watch       # Jest watch 模式
+npm run test:coverage    # Jest 覆盖率报告
 npx jest path/to/test    # 运行单个测试文件
 npm run test:e2e         # 运行 Playwright E2E 测试
 ```

@@ -126,6 +126,12 @@ model Product {
   allowAccountSwitch Boolean     @default(true)
   /// AUTO_FETCH：每个订单允许换号的最大次数
   accountSwitchLimit Int         @default(1)
+  /// Risk warning dialog shown to users before they can proceed (configurable per product)
+  riskWarningEnabled     Boolean   @default(false)
+  riskWarningTitle       String?   @db.VarChar(100)
+  riskWarningContent     String?   @db.Text
+  riskWarningCountdown   Int?
+  riskWarningConfirmText String?   @db.VarChar(50)
   pinnedAt         DateTime?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
