@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
+import { usePathname } from "next/navigation"
 import { Headset, Send, Copy, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -28,6 +29,7 @@ function normalizeTgUrl(value: string): string {
 }
 
 export function CustomerServiceFab() {
+    const pathname = usePathname()
     const telegram = configClient.supportTelegram
     const wechat = configClient.supportWechat
 
@@ -115,6 +117,7 @@ export function CustomerServiceFab() {
         }
     }
 
+    if (pathname.startsWith("/admin") || pathname.startsWith("/distributor")) return null
     if (!telegram && !wechat) return null
     // Hide until position is initialized (avoids SSR position flash)
     if (!pos) return null

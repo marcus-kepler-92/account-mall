@@ -69,6 +69,7 @@ export const ordersColumns: ColumnDef<OrderRow>[] = [
         header: ({ column }) => (
             <DataTableColumnHeader column={column} title="订单号" />
         ),
+        enableSorting: false,
         cell: ({ row }) => (
             <Link
                 href={`/admin/orders/${row.original.id}`}
@@ -125,6 +126,7 @@ export const ordersColumns: ColumnDef<OrderRow>[] = [
         header: ({ column }) => (
             <DataTableColumnHeader column={column} title="数量" />
         ),
+        enableSorting: false,
         cell: ({ row }) => (
             <span className="text-right">{row.getValue("quantity") as number}</span>
         ),
@@ -134,6 +136,7 @@ export const ordersColumns: ColumnDef<OrderRow>[] = [
         header: ({ column }) => (
             <DataTableColumnHeader column={column} title="金额" />
         ),
+        enableSorting: false,
         cell: ({ row }) => (
             <span className="text-right font-medium">
                 {formatCurrency(row.getValue("amount") as number)}
@@ -171,6 +174,7 @@ export const ordersColumns: ColumnDef<OrderRow>[] = [
         header: ({ column }) => (
             <DataTableColumnHeader column={column} title="创建时间" />
         ),
+        enableSorting: false,
         cell: ({ row }) => {
             const createdAt = row.getValue("createdAt") as string
             const paidAt = row.original.paidAt

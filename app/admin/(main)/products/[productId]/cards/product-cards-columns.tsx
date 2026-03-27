@@ -247,6 +247,7 @@ export const productCardsColumns: ColumnDef<ProductCardRow>[] = [
         header: ({ column }) => (
             <DataTableColumnHeader column={column} title="卡密" />
         ),
+        enableSorting: false,
         cell: ({ row }) => (
             <span className="font-mono text-xs">{row.getValue("maskedContent")}</span>
         ),
@@ -284,6 +285,7 @@ export const productCardsColumns: ColumnDef<ProductCardRow>[] = [
         header: ({ column }) => (
             <DataTableColumnHeader column={column} title="创建时间" />
         ),
+        enableSorting: false,
         cell: ({ row }) => {
             const date = row.getValue("createdAt") as string;
             return (

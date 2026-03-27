@@ -99,6 +99,7 @@ export const withdrawalsColumns: ColumnDef<WithdrawalRow>[] = [
     {
         accessorKey: "createdAt",
         header: ({ column }) => <DataTableColumnHeader column={column} title="申请时间" />,
+        enableSorting: false,
         cell: ({ row }) => (
             <span className="text-muted-foreground text-sm">
                 {formatDateTime(row.original.createdAt)}

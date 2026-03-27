@@ -41,7 +41,7 @@ function CodeBlockWithCopy({
                 <Copy className="size-4 mr-1" />
                 复制
             </Button>
-            <pre ref={preRef} {...props} className="pr-24 pt-10 pb-3 pl-4 overflow-x-auto rounded-md border bg-muted/50 text-sm">
+            <pre ref={preRef} {...props} className="pr-24 pt-10 pb-3 pl-4 overflow-x-auto rounded-md border bg-muted/50 text-sm text-foreground">
                 {children}
             </pre>
         </div>

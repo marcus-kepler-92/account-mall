@@ -33,6 +33,7 @@ export const distributorsColumns: ColumnDef<DistributorRow>[] = [
         header: ({ column }) => (
             <DataTableColumnHeader column={column} title="昵称" />
         ),
+        enableSorting: false,
         cell: ({ row }) => (
             <span className="font-medium">{row.original.name}</span>
         ),
@@ -79,6 +80,7 @@ export const distributorsColumns: ColumnDef<DistributorRow>[] = [
         header: ({ column }) => (
             <DataTableColumnHeader column={column} title="下线数" className="justify-end" />
         ),
+        enableSorting: false,
         cell: ({ row }) => (
             <div className="text-right text-muted-foreground">
                 {row.original.inviteeCount}
@@ -122,6 +124,7 @@ export const distributorsColumns: ColumnDef<DistributorRow>[] = [
         header: ({ column }) => (
             <DataTableColumnHeader column={column} title="成交订单" className="justify-end" />
         ),
+        enableSorting: false,
         cell: ({ row }) => (
             <div className="text-right">{row.original.completedOrderCount}</div>
         ),
@@ -131,6 +134,7 @@ export const distributorsColumns: ColumnDef<DistributorRow>[] = [
         header: ({ column }) => (
             <DataTableColumnHeader column={column} title="累计佣金" className="justify-end" />
         ),
+        enableSorting: false,
         cell: ({ row }) => (
             <div className="text-right font-medium">
                 <CommissionTooltip row={row.original} />
@@ -142,6 +146,7 @@ export const distributorsColumns: ColumnDef<DistributorRow>[] = [
         header: ({ column }) => (
             <DataTableColumnHeader column={column} title="可提现余额" className="justify-end" />
         ),
+        enableSorting: false,
         cell: ({ row }) => (
             <div className="text-right font-medium">
                 <BalanceTooltip row={row.original} />
