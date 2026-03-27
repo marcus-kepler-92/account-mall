@@ -1,10 +1,12 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import {
     Dialog,
@@ -14,7 +16,34 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog"
+import {
+    Form,
+    FormControl,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
+} from "@/components/ui/form"
 import { Loader2 } from "lucide-react"
+
+const discountSchema = z
+    .object({
+        enabled: z.boolean(),
+        percent: z.string(),
+    })
+    .superRefine((data, ctx) => {
+        if (!data.enabled) return
+        const pct = data.percent.trim() === "" ? NaN : parseFloat(data.percent)
+        if (Number.isNaN(pct) || pct < 0 || pct > 100) {
+            ctx.addIssue({
+                code: "custom",
+                message: "请填写 0–100 的折扣比例",
+                path: ["percent"],
+            })
+        }
+    })
+
+type DiscountFormValues = z.infer<typeof discountSchema>
 
 type EditDiscountDialogProps = {
     open: boolean
@@ -35,32 +64,31 @@ export function EditDiscountDialog({
     discountPercent,
     onSuccess,
 }: EditDiscountDialogProps) {
-    const [loading, setLoading] = useState(false)
-    const [enabled, setEnabled] = useState(discountCodeEnabled)
-    const [percent, setPercent] = useState(discountPercent != null ? String(discountPercent) : "")
+    const form = useForm<DiscountFormValues>({
+        resolver: zodResolver(discountSchema),
+        defaultValues: { enabled: false, percent: "" },
+    })
 
     useEffect(() => {
         if (open) {
-            setEnabled(discountCodeEnabled)
-            setPercent(discountPercent != null ? String(discountPercent) : "")
+            form.reset({
+                enabled: discountCodeEnabled,
+                percent: discountPercent != null ? String(discountPercent) : "",
+            })
         }
-    }, [open, discountCodeEnabled, discountPercent])
+    }, [open, discountCodeEnabled, discountPercent, form])
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault()
-        const pctNum = percent.trim() === "" ? null : parseFloat(percent)
-        if (enabled && (pctNum == null || Number.isNaN(pctNum) || pctNum < 0 || pctNum > 100)) {
-            toast.error("启用优惠码时请填写 0–100 的折扣比例")
-            return
-        }
-        setLoading(true)
+    const enabled = form.watch("enabled")
+
+    const onSubmit = async (values: DiscountFormValues) => {
+        const pctNum = values.percent.trim() === "" ? null : parseFloat(values.percent)
         try {
             const res = await fetch(`/api/admin/distributors/${distributorId}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    discountCodeEnabled: enabled,
-                    discountPercent: enabled && pctNum != null ? pctNum : null,
+                    discountCodeEnabled: values.enabled,
+                    discountPercent: values.enabled && pctNum != null ? pctNum : null,
                 }),
             })
             if (!res.ok) {
@@ -73,8 +101,6 @@ export function EditDiscountDialog({
             onSuccess()
         } catch {
             toast.error("保存失败")
-        } finally {
-            setLoading(false)
         }
     }
 
@@ -91,45 +117,61 @@ export function EditDiscountDialog({
                         )}
                     </DialogDescription>
                 </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="flex items-center justify-between space-x-2">
-                        <Label htmlFor="discount-enabled">启用优惠码</Label>
-                        <Switch
-                            id="discount-enabled"
-                            checked={enabled}
-                            onCheckedChange={setEnabled}
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                        <FormField
+                            control={form.control}
+                            name="enabled"
+                            render={({ field }) => (
+                                <FormItem className="flex items-center justify-between space-x-2">
+                                    <FormLabel>启用优惠码</FormLabel>
+                                    <FormControl>
+                                        <Switch
+                                            checked={field.value}
+                                            onCheckedChange={field.onChange}
+                                        />
+                                    </FormControl>
+                                </FormItem>
+                            )}
                         />
-                    </div>
-                    {enabled && (
-                        <div className="space-y-2">
-                            <Label htmlFor="discount-percent">折扣比例（%）</Label>
-                            <Input
-                                id="discount-percent"
-                                type="number"
-                                min={0}
-                                max={100}
-                                step={0.01}
-                                placeholder="如 5 表示 5%"
-                                value={percent}
-                                onChange={(e) => setPercent(e.target.value)}
+                        {enabled && (
+                            <FormField
+                                control={form.control}
+                                name="percent"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>折扣比例（%）</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                type="number"
+                                                min={0}
+                                                max={100}
+                                                step={0.01}
+                                                placeholder="如 5 表示 5%"
+                                                {...field}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
                             />
-                        </div>
-                    )}
-                    <DialogFooter>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => onOpenChange(false)}
-                            disabled={loading}
-                        >
-                            取消
-                        </Button>
-                        <Button type="submit" disabled={loading}>
-                            {loading && <Loader2 className="mr-2 size-4 animate-spin" />}
-                            保存
-                        </Button>
-                    </DialogFooter>
-                </form>
+                        )}
+                        <DialogFooter>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => onOpenChange(false)}
+                                disabled={form.formState.isSubmitting}
+                            >
+                                取消
+                            </Button>
+                            <Button type="submit" disabled={form.formState.isSubmitting}>
+                                {form.formState.isSubmitting && <Loader2 className="mr-2 size-4 animate-spin" />}
+                                保存
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </Form>
             </DialogContent>
         </Dialog>
     )

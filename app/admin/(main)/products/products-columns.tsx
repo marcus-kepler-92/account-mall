@@ -11,12 +11,17 @@ export type ProductRow = {
     id: string
     name: string
     slug: string
-    status: string
+    status: "ACTIVE" | "INACTIVE"
     productType: string
     price: number
     pinnedAt: string | null
     tags: { id: string; name: string; slug: string }[]
     stock: number
+}
+
+const statusMap: Record<ProductRow["status"], { label: string; variant: "default" | "secondary" }> = {
+    ACTIVE: { label: "上架", variant: "default" },
+    INACTIVE: { label: "下架", variant: "secondary" },
 }
 
 export const productsColumns: ColumnDef<ProductRow>[] = [
@@ -54,11 +59,10 @@ export const productsColumns: ColumnDef<ProductRow>[] = [
     {
         accessorKey: "status",
         header: "状态",
-        cell: ({ row }) => (
-            <Badge variant={row.original.status === "ACTIVE" ? "default" : "secondary"}>
-                {row.original.status === "ACTIVE" ? "上架" : "下架"}
-            </Badge>
-        ),
+        cell: ({ row }) => {
+            const { label, variant } = statusMap[row.original.status]
+            return <Badge variant={variant}>{label}</Badge>
+        },
         filterFn: (row, id, value: string) => !value || row.getValue(id) === value,
     },
     {

@@ -16,7 +16,7 @@ export type WithdrawalRow = {
     feePercent: number
     feeAmount: number
     actualAmount: number
-    status: string
+    status: "PENDING" | "PAID" | "REJECTED"
     receiptImageUrl: string | null
     note: string | null
     processedAt: string | null
@@ -29,7 +29,7 @@ export type WithdrawalRow = {
     currentBalance: number
 }
 
-const statusMap: Record<string, { label: string; variant: "warning" | "success" | "destructive" }> =
+const statusMap: Record<WithdrawalRow["status"], { label: string; variant: "warning" | "success" | "destructive" }> =
     {
         PENDING: { label: "待处理", variant: "warning" },
         PAID: { label: "已打款", variant: "success" },
@@ -92,10 +92,7 @@ export const withdrawalsColumns: ColumnDef<WithdrawalRow>[] = [
         accessorKey: "status",
         header: "状态",
         cell: ({ row }) => {
-            const { label, variant } = statusMap[row.original.status] ?? {
-                label: row.original.status,
-                variant: "outline" as const,
-            }
+            const { label, variant } = statusMap[row.original.status]
             return <Badge variant={variant}>{label}</Badge>
         },
     },

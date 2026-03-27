@@ -90,6 +90,9 @@ export function ProductRowActions({
                 setStatusDialogOpen(false)
                 toast.success(isActive ? "商品已下架" : "商品已上架")
                 router.refresh()
+            } else {
+                const data = await res.json().catch(() => ({}))
+                toast.error(data?.error ?? "操作失败")
             }
         } catch {
             toast.error("操作失败")
@@ -109,6 +112,9 @@ export function ProductRowActions({
             if (res.ok) {
                 toast.success(isPinned ? "已取消置顶" : "已置顶")
                 router.refresh()
+            } else {
+                const data = await res.json().catch(() => ({}))
+                toast.error(data?.error ?? "操作失败")
             }
         } catch {
             toast.error("操作失败")
@@ -180,7 +186,7 @@ export function ProductRowActions({
                         <Copy className="size-4" />
                         复制链接
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleTogglePin} disabled={pinLoading}>
+                    <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleTogglePin() }} disabled={pinLoading}>
                         {isPinned ? (
                             <>
                                 <PinOff className="size-4" />
@@ -235,13 +241,13 @@ export function ProductRowActions({
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>取消</AlertDialogCancel>
+                        <AlertDialogCancel disabled={loading}>取消</AlertDialogCancel>
                         <AlertDialogAction
-                            onClick={handleToggleStatus}
+                            onClick={(e) => { e.preventDefault(); handleToggleStatus() }}
                             disabled={loading}
                             className={isActive ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
                         >
-                            {loading && <Loader2 className="mr-2 size-4 animate-spin" />}
+                            {loading && <Loader2 className="size-4 animate-spin" />}
                             {isActive ? "下架" : "上架"}
                         </AlertDialogAction>
                     </AlertDialogFooter>
@@ -257,13 +263,13 @@ export function ProductRowActions({
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>取消</AlertDialogCancel>
+                        <AlertDialogCancel disabled={deleteLoading}>取消</AlertDialogCancel>
                         <AlertDialogAction
-                            onClick={handleDelete}
+                            onClick={(e) => { e.preventDefault(); handleDelete() }}
                             disabled={deleteLoading}
                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
-                            {deleteLoading && <Loader2 className="mr-2 size-4 animate-spin" />}
+                            {deleteLoading && <Loader2 className="size-4 animate-spin" />}
                             删除
                         </AlertDialogAction>
                     </AlertDialogFooter>

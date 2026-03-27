@@ -22,11 +22,21 @@ import { useState } from "react"
 
 const schema = z
     .object({
-        minAmount: z.coerce.number().min(0, "不能为负数"),
-        maxAmount: z.coerce.number().min(0, "不能为负数"),
-        ratePercent: z.coerce.number().min(0, "不能为负数").max(100, "最大 100"),
+        minAmount: z
+            .string()
+            .refine((v) => !Number.isNaN(parseFloat(v)), "请输入有效数字")
+            .refine((v) => parseFloat(v) >= 0, "不能为负数"),
+        maxAmount: z
+            .string()
+            .refine((v) => !Number.isNaN(parseFloat(v)), "请输入有效数字")
+            .refine((v) => parseFloat(v) >= 0, "不能为负数"),
+        ratePercent: z
+            .string()
+            .refine((v) => !Number.isNaN(parseFloat(v)), "请输入有效数字")
+            .refine((v) => parseFloat(v) >= 0, "不能为负数")
+            .refine((v) => parseFloat(v) <= 100, "最大 100"),
     })
-    .refine((d) => d.minAmount < d.maxAmount, {
+    .refine((d) => parseFloat(d.minAmount) < parseFloat(d.maxAmount), {
         message: "销售额下限必须小于上限",
         path: ["minAmount"],
     })
@@ -39,7 +49,7 @@ export function AddTierDialog() {
 
     const form = useForm<FormValues>({
         resolver: zodResolver(schema),
-        defaultValues: { minAmount: 0, maxAmount: 0, ratePercent: 0 },
+        defaultValues: { minAmount: "0", maxAmount: "0", ratePercent: "0" },
     })
 
     const onSubmit = async (values: FormValues) => {
@@ -47,7 +57,11 @@ export function AddTierDialog() {
             const res = await fetch("/api/admin/commission-tiers", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(values),
+                body: JSON.stringify({
+                    minAmount: parseFloat(values.minAmount),
+                    maxAmount: parseFloat(values.maxAmount),
+                    ratePercent: parseFloat(values.ratePercent),
+                }),
             })
             if (!res.ok) {
                 const err = await res.json()

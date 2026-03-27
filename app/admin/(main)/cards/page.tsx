@@ -3,11 +3,12 @@ import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/c
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { CreditCard, CircleDot, Clock, CheckCircle2, Ban } from "lucide-react";
-import { PageHeader } from "@/app/admin/components";
+import { PageHeader, StatCard } from "@/app/admin/components";
 import {
     DEFAULT_CARD_FILTERS,
     parseCardFilters,
     type CardFiltersInput,
+    type CardStatusFilter,
 } from "./cards-filters";
 import { CardsHeaderActions } from "./cards-header-actions";
 import { CardsDataTable } from "./cards-data-table";
@@ -44,8 +45,8 @@ export default async function AdminCardsPage({
 
     const where: Record<string, unknown> = {};
 
-    if (filters.status !== "ALL") {
-        where.status = filters.status;
+    if (filters.statusList.length > 0) {
+        where.status = { in: filters.statusList }
     }
 
     if (filters.codeLike) {
@@ -119,7 +120,6 @@ export default async function AdminCardsPage({
         SOLD: statusCounts.find((c) => c.status === "SOLD")?._count.id ?? 0,
         DISABLED: statusCounts.find((c) => c.status === "DISABLED")?._count.id ?? 0,
     };
-    const statsTotal = stats.UNSOLD + stats.RESERVED + stats.SOLD + stats.DISABLED;
 
     const serializedCards: CardRow[] = cards.map((card) => ({
         id: card.id,
@@ -136,101 +136,74 @@ export default async function AdminCardsPage({
         createdAt: card.createdAt.toISOString(),
     }));
 
-    const buildStatusLink = (status: string) => {
-        const paramsEntries = new URLSearchParams();
-        if (status !== "ALL") {
-            paramsEntries.set("status", status);
+    const buildStatusLink = (statusKey: CardStatusFilter) => {
+        const params = new URLSearchParams();
+        const nextList = filters.statusList.includes(statusKey)
+            ? filters.statusList.filter((s) => s !== statusKey)
+            : [...filters.statusList, statusKey];
+        if (nextList.length > 0) {
+            params.set("status", nextList.join(","));
         }
-        const query = paramsEntries.toString();
+        const query = params.toString();
         return `/admin/cards${query ? `?${query}` : ""}`;
     };
 
     const hasFilters =
-        filters.status !== "ALL" ||
+        filters.statusList.length > 0 ||
         filters.codeLike ||
         filters.orderNo ||
         filters.productKeyword;
 
-    const statCards = [
-        {
-            key: "UNSOLD",
-            label: "未售",
-            value: stats.UNSOLD,
-            icon: CircleDot,
-            color: "text-success",
-            borderColor: "border-l-success",
-            active: filters.status === "UNSOLD",
-        },
-        {
-            key: "RESERVED",
-            label: "预占中",
-            value: stats.RESERVED,
-            icon: Clock,
-            color: "text-warning",
-            borderColor: "border-l-warning",
-            active: filters.status === "RESERVED",
-        },
-        {
-            key: "SOLD",
-            label: "已售",
-            value: stats.SOLD,
-            icon: CheckCircle2,
-            color: "text-muted-foreground",
-            borderColor: "border-l-muted-foreground",
-            active: filters.status === "SOLD",
-        },
-        {
-            key: "DISABLED",
-            label: "停用",
-            value: stats.DISABLED,
-            icon: Ban,
-            color: "text-muted-foreground",
-            borderColor: "border-l-muted-foreground",
-            active: filters.status === "DISABLED",
-        },
-    ];
-
     return (
         <div className="space-y-6">
-            <PageHeader title="卡密管理" description="跨商品查看和管理所有卡密库存">
-                <CardsHeaderActions />
-            </PageHeader>
+            <PageHeader title="卡密管理" description="跨商品查看和管理所有卡密库存" />
 
-            {/* Stats cards - clickable to filter by status */}
             <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">
-                {statCards.map((stat) => (
-                    <Link key={stat.key} href={buildStatusLink(stat.active ? "ALL" : stat.key)}>
-                        <Card className={`border-l-4 ${stat.borderColor} transition-colors hover:bg-accent/50 cursor-pointer ${stat.active ? "ring-2 ring-primary/20 bg-accent/30" : ""}`}>
-                            <CardContent className="pt-4 pb-4">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm font-medium text-muted-foreground">{stat.label}</p>
-                                        <p className="text-2xl font-bold mt-1">{stat.value}</p>
-                                    </div>
-                                    <stat.icon className={`size-8 ${stat.color} opacity-80`} />
-                                </div>
-                                {statsTotal > 0 && (
-                                    <div className="mt-2 flex items-center gap-2">
-                                        <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
-                                            <div
-                                                className={`h-full rounded-full bg-current ${stat.color}`}
-                                                style={{ width: `${(stat.value / statsTotal) * 100}%` }}
-                                            />
-                                        </div>
-                                        <span className="text-xs text-muted-foreground">
-                                            {statsTotal > 0 ? ((stat.value / statsTotal) * 100).toFixed(0) : 0}%
-                                        </span>
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </Link>
-                ))}
+                <StatCard
+                    label="未售"
+                    value={stats.UNSOLD}
+                    icon={CircleDot}
+                    borderColor="border-l-success"
+                    iconColor="text-success"
+                    active={filters.statusList.includes("UNSOLD")}
+                    href={buildStatusLink("UNSOLD")}
+                />
+                <StatCard
+                    label="预占中"
+                    value={stats.RESERVED}
+                    icon={Clock}
+                    borderColor="border-l-warning"
+                    iconColor="text-warning"
+                    active={filters.statusList.includes("RESERVED")}
+                    href={buildStatusLink("RESERVED")}
+                />
+                <StatCard
+                    label="已售"
+                    value={stats.SOLD}
+                    icon={CheckCircle2}
+                    borderColor="border-l-muted-foreground"
+                    iconColor="text-muted-foreground"
+                    active={filters.statusList.includes("SOLD")}
+                    href={buildStatusLink("SOLD")}
+                />
+                <StatCard
+                    label="停用"
+                    value={stats.DISABLED}
+                    icon={Ban}
+                    borderColor="border-l-muted-foreground"
+                    iconColor="text-muted-foreground"
+                    active={filters.statusList.includes("DISABLED")}
+                    href={buildStatusLink("DISABLED")}
+                />
             </div>
 
-            {/* DataTable */}
             {serializedCards.length > 0 || hasFilters ? (
-                <CardsDataTable data={serializedCards} total={total} statusCounts={stats} />
+                <CardsDataTable
+                    data={serializedCards}
+                    total={total}
+                    statusCounts={stats}
+                    actions={<CardsHeaderActions />}
+                />
             ) : (
                 <Card>
                     <CardContent className="flex flex-col items-center justify-center py-16">

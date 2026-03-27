@@ -11,11 +11,16 @@ export type AnnouncementRow = {
     id: string
     title: string
     content: string | null
-    status: string
+    status: "PUBLISHED" | "DRAFT"
     sortOrder: number
     publishedAt: string | null
     createdAt: string
     updatedAt: string
+}
+
+const statusMap: Record<AnnouncementRow["status"], { label: string; variant: "default" | "secondary" }> = {
+    PUBLISHED: { label: "已发布", variant: "default" },
+    DRAFT: { label: "草稿", variant: "secondary" },
 }
 
 export const announcementsColumns: ColumnDef<AnnouncementRow>[] = [
@@ -41,11 +46,10 @@ export const announcementsColumns: ColumnDef<AnnouncementRow>[] = [
     {
         accessorKey: "status",
         header: "状态",
-        cell: ({ row }) => (
-            <Badge variant={row.original.status === "PUBLISHED" ? "default" : "secondary"}>
-                {row.original.status === "PUBLISHED" ? "已发布" : "草稿"}
-            </Badge>
-        ),
+        cell: ({ row }) => {
+            const { label, variant } = statusMap[row.original.status]
+            return <Badge variant={variant}>{label}</Badge>
+        },
         filterFn: (row, id, value: string) => !value || row.getValue(id) === value,
     },
     {

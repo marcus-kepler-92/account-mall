@@ -6,11 +6,12 @@ import {
     getCoreRowModel,
     type VisibilityState,
 } from "@tanstack/react-table"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Separator } from "@/components/ui/separator"
 import {
     DataTable,
     DataTableToolbar,
     DataTablePagination,
-    DataTableFacetedFilter,
 } from "@/app/admin/components"
 import { withdrawalsColumns, type WithdrawalRow } from "./withdrawals-columns"
 import type { WithdrawalFiltersState } from "./withdrawals-filters"
@@ -50,33 +51,27 @@ export function WithdrawalsDataTable({
         manualFiltering: true,
     })
 
-    const statusOptionsWithCounts = statusOptions.map((opt) => ({
-        ...opt,
-        count: statusCounts[opt.value as keyof typeof statusCounts],
-    }))
-
     return (
-        <div className="space-y-4">
-            <DataTableToolbar
-                table={table}
-                searchPlaceholder="搜索分销员姓名或邮箱..."
-                searchParamKey="search"
-            >
-                <DataTableFacetedFilter
-                    column={table.getColumn("status")}
-                    title="状态"
-                    options={statusOptionsWithCounts}
-                    paramKey="status"
+        <Card>
+            <CardHeader className="pb-4">
+                <CardTitle className="text-base">提现记录</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-0">
+                <DataTableToolbar
+                    table={table}
+                    searchPlaceholder="搜索分销员姓名或邮箱..."
+                    searchParamKey="search"
+                    statusOptions={statusOptions}
+                    statusParamKey="status"
                 />
-            </DataTableToolbar>
-
-            <DataTable
-                table={table}
-                columns={withdrawalsColumns}
-                emptyMessage="暂无提现记录"
-            />
-
-            <DataTablePagination table={table} total={total} />
-        </div>
+                <Separator />
+                <DataTable
+                    table={table}
+                    columns={withdrawalsColumns}
+                    emptyMessage="暂无提现记录"
+                />
+                <DataTablePagination table={table} total={total} />
+            </CardContent>
+        </Card>
     )
 }

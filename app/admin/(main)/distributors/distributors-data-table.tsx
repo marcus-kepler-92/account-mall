@@ -6,11 +6,12 @@ import {
     getCoreRowModel,
     VisibilityState,
 } from "@tanstack/react-table"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Separator } from "@/components/ui/separator"
 import {
     DataTable,
     DataTableToolbar,
     DataTablePagination,
-    DataTableFacetedFilter,
 } from "@/app/admin/components"
 import { distributorsColumns, type DistributorRow } from "./distributors-columns"
 import { InviteDistributorButtonClient } from "./invite-distributor-button-client"
@@ -44,36 +45,30 @@ export function DistributorsDataTable({
         manualFiltering: true,
     })
 
-    const statusOptionsWithCounts = statusOptions.map((opt) => ({
-        ...opt,
-        count: statusCounts[opt.value as keyof typeof statusCounts],
-    }))
-
     return (
-        <div className="space-y-4">
-            <div className="flex items-center justify-between gap-2">
+        <Card>
+            <CardHeader className="pb-4">
+                <div className="flex items-center justify-between">
+                    <CardTitle className="text-base">分销员列表</CardTitle>
+                    <InviteDistributorButtonClient />
+                </div>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-0">
                 <DataTableToolbar
                     table={table}
                     searchPlaceholder="搜索昵称、邮箱、优惠码..."
                     searchParamKey="search"
-                >
-                    <DataTableFacetedFilter
-                        column={table.getColumn("disabledAt")}
-                        title="状态"
-                        options={statusOptionsWithCounts}
-                        paramKey="status"
-                    />
-                </DataTableToolbar>
-                <InviteDistributorButtonClient />
-            </div>
-
-            <DataTable
-                table={table}
-                columns={distributorsColumns}
-                emptyMessage="暂无分销员，分销员可通过前台注册成为分销员。"
-            />
-
-            <DataTablePagination table={table} total={total} />
-        </div>
+                    statusOptions={statusOptions}
+                    statusParamKey="status"
+                />
+                <Separator />
+                <DataTable
+                    table={table}
+                    columns={distributorsColumns}
+                    emptyMessage="暂无分销员，分销员可通过前台注册成为分销员。"
+                />
+                <DataTablePagination table={table} total={total} />
+            </CardContent>
+        </Card>
     )
 }

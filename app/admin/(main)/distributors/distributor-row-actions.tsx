@@ -112,8 +112,8 @@ export function DistributorRowActions({ row }: { row: DistributorRow }) {
                 body: JSON.stringify({ disabled: !disabled }),
             })
             if (!res.ok) {
-                const err = await res.json()
-                toast.error(err.error || "操作失败")
+                const err = await res.json().catch(() => ({}))
+                toast.error(err?.error ?? "操作失败")
                 return
             }
             toast.success(disabled ? "已启用" : "已停用")
@@ -158,37 +158,36 @@ export function DistributorRowActions({ row }: { row: DistributorRow }) {
         <>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="size-8" disabled={loading}>
-                        <span className="sr-only">打开菜单</span>
-                        {loading ? (
-                            <Loader2 className="size-4 animate-spin" />
-                        ) : (
-                            <MoreHorizontal className="size-4" />
-                        )}
+                    <Button variant="ghost" size="icon" className="size-8">
+                        <MoreHorizontal className="size-4" />
+                        <span className="sr-only">操作菜单</span>
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={handleToggle}>
+                    <DropdownMenuItem
+                        onSelect={(e) => { e.preventDefault(); handleToggle() }}
+                        disabled={loading}
+                    >
                         {disabled ? (
                             <>
-                                <UserCheck className="mr-2 size-4" />
+                                <UserCheck className="size-4" />
                                 启用
                             </>
                         ) : (
                             <>
-                                <UserX className="mr-2 size-4" />
+                                <UserX className="size-4" />
                                 停用
                             </>
                         )}
                     </DropdownMenuItem>
                     {row.distributorCode && (
                         <DropdownMenuItem onClick={handleCopyCode}>
-                            <Copy className="mr-2 size-4" />
+                            <Copy className="size-4" />
                             复制推荐码
                         </DropdownMenuItem>
                     )}
-                    <DropdownMenuItem onClick={() => setDiscountOpen(true)}>
-                        <Percent className="mr-2 size-4" />
+                    <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setDiscountOpen(true) }}>
+                        <Percent className="size-4" />
                         优惠码设置
                     </DropdownMenuItem>
                     {disabled && (
@@ -201,7 +200,7 @@ export function DistributorRowActions({ row }: { row: DistributorRow }) {
                                     setDeleteOpen(true)
                                 }}
                             >
-                                <Trash2 className="mr-2 size-4" />
+                                <Trash2 className="size-4" />
                                 删除
                             </DropdownMenuItem>
                         </>
@@ -235,7 +234,7 @@ export function DistributorRowActions({ row }: { row: DistributorRow }) {
                             disabled={deleteLoading}
                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
-                            {deleteLoading && <Loader2 className="mr-2 size-4 animate-spin" />}
+                            {deleteLoading && <Loader2 className="size-4 animate-spin" />}
                             删除
                         </AlertDialogAction>
                     </AlertDialogFooter>

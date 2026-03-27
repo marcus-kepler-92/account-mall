@@ -171,7 +171,7 @@ export default async function AdminOrdersPage({
         <div className="space-y-6">
             <PageHeader title="订单管理" description="查看和管理客户订单" />
 
-            <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">
                 <StatCard
                     label="待完成"
                     value={orderStats.PENDING}

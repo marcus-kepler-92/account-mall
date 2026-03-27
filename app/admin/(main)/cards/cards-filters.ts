@@ -1,7 +1,11 @@
+const CARD_STATUS_VALUES = ["UNSOLD", "RESERVED", "SOLD", "DISABLED"] as const
+export type CardStatusFilter = (typeof CARD_STATUS_VALUES)[number]
+
 export type CardFiltersState = {
     page: number
     pageSize: number
-    status: "ALL" | "UNSOLD" | "RESERVED" | "SOLD" | "DISABLED"
+    status: "ALL" | CardStatusFilter
+    statusList: CardStatusFilter[]
     productKeyword: string
     orderNo: string
     codeLike: string
@@ -20,6 +24,7 @@ export const DEFAULT_CARD_FILTERS: CardFiltersState = {
     page: 1,
     pageSize: 20,
     status: "ALL",
+    statusList: [],
     productKeyword: "",
     orderNo: "",
     codeLike: "",
@@ -31,16 +36,23 @@ export function parseCardFilters(input: CardFiltersInput): CardFiltersState {
         parseInt(input.pageSize ?? "", 10) || DEFAULT_CARD_FILTERS.pageSize
     const pageSize = Math.min(100, Math.max(1, rawPageSize))
 
-    const statusRaw = input.status ?? DEFAULT_CARD_FILTERS.status
+    const statusRaw = (input.status ?? "").trim()
+    const statusList = statusRaw
+        ? statusRaw
+              .split(",")
+              .map((s) => s.trim())
+              .filter((s): s is CardStatusFilter =>
+                  CARD_STATUS_VALUES.includes(s as CardStatusFilter)
+              )
+        : []
     const status: CardFiltersState["status"] =
-        statusRaw === "UNSOLD" || statusRaw === "RESERVED" || statusRaw === "SOLD" || statusRaw === "DISABLED"
-            ? statusRaw
-            : "ALL"
+        statusList.length === 1 ? statusList[0] : "ALL"
 
     return {
         page,
         pageSize,
         status,
+        statusList,
         productKeyword: (input.productKeyword ?? "").trim(),
         orderNo: (input.orderNo ?? "").trim(),
         codeLike: (input.codeLike ?? "").trim(),
@@ -58,8 +70,8 @@ export function buildCardFiltersQuery(filters: CardFiltersState): string {
         params.set("pageSize", String(filters.pageSize))
     }
 
-    if (filters.status !== "ALL") {
-        params.set("status", filters.status)
+    if (filters.statusList.length > 0) {
+        params.set("status", filters.statusList.join(","))
     }
 
     if (filters.productKeyword) {
@@ -77,4 +89,3 @@ export function buildCardFiltersQuery(filters: CardFiltersState): string {
     const query = params.toString()
     return query ? `?${query}` : ""
 }
-

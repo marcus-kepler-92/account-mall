@@ -1,57 +1,83 @@
-"use client";
+"use client"
 
-import { Table } from "@tanstack/react-table";
-import { X } from "lucide-react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { Table } from "@tanstack/react-table"
+import { X } from "lucide-react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { useEffect, useState, useTransition } from "react"
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { DataTableViewOptions } from "./data-table-view-options";
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { DataTableViewOptions } from "./data-table-view-options"
+
+interface StatusOption {
+    label: string
+    value: string
+}
 
 interface DataTableToolbarProps<TData> {
-    table: Table<TData>;
-    searchPlaceholder?: string;
-    searchParamKey?: string;
-    children?: React.ReactNode;
+    table: Table<TData>
+    searchPlaceholder?: string
+    searchParamKey?: string
+    statusOptions?: StatusOption[]
+    statusParamKey?: string
+    children?: React.ReactNode
 }
 
 export function DataTableToolbar<TData>({
     table,
     searchPlaceholder = "搜索...",
     searchParamKey = "search",
+    statusOptions,
+    statusParamKey,
     children,
 }: DataTableToolbarProps<TData>) {
-    const router = useRouter();
-    const searchParams = useSearchParams();
-    const [isPending, startTransition] = useTransition();
-    
-    const initialSearch = searchParams.get(searchParamKey) || "";
-    const [searchValue, setSearchValue] = useState(initialSearch);
+    const router = useRouter()
+    const searchParams = useSearchParams()
+    const [, startTransition] = useTransition()
+
+    const initialSearch = searchParams.get(searchParamKey) || ""
+    const [searchValue, setSearchValue] = useState(initialSearch)
 
     useEffect(() => {
-        setSearchValue(searchParams.get(searchParamKey) || "");
-    }, [searchParams, searchParamKey]);
+        setSearchValue(searchParams.get(searchParamKey) || "")
+    }, [searchParams, searchParamKey])
 
     const updateSearch = (value: string) => {
-        const params = new URLSearchParams(searchParams.toString());
+        const params = new URLSearchParams(searchParams.toString())
         if (value) {
-            params.set(searchParamKey, value);
+            params.set(searchParamKey, value)
         } else {
-            params.delete(searchParamKey);
+            params.delete(searchParamKey)
         }
-        params.set("page", "1");
+        params.set("page", "1")
         startTransition(() => {
-            router.push(`?${params.toString()}`);
-        });
-    };
+            router.push(`?${params.toString()}`)
+        })
+    }
 
-    const hasFilters = searchParams.toString().length > 0;
+    const hasFilters = searchParams.toString().length > 0
 
     const clearAllFilters = () => {
-        setSearchValue("");
-        router.push("?");
-    };
+        setSearchValue("")
+        router.push("?")
+    }
+
+    // Status badge filter: single-select via URL param
+    const rawStatus = statusParamKey ? (searchParams.get(statusParamKey) ?? "") : ""
+    const activeStatus = statusOptions?.some((opt) => opt.value === rawStatus) ? rawStatus : ""
+
+    const handleStatusClick = (value: string) => {
+        if (!statusParamKey) return
+        const params = new URLSearchParams(searchParams.toString())
+        if (value === "" || activeStatus === value) {
+            params.delete(statusParamKey)
+        } else {
+            params.set(statusParamKey, value)
+        }
+        params.set("page", "1")
+        router.push(`?${params.toString()}`)
+    }
 
     return (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -59,21 +85,36 @@ export function DataTableToolbar<TData>({
                 <Input
                     placeholder={searchPlaceholder}
                     value={searchValue}
-                    onChange={(e) => {
-                        setSearchValue(e.target.value);
-                    }}
+                    onChange={(e) => setSearchValue(e.target.value)}
                     onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                            updateSearch(searchValue);
-                        }
+                        if (e.key === "Enter") updateSearch(searchValue)
                     }}
                     onBlur={() => {
-                        if (searchValue !== initialSearch) {
-                            updateSearch(searchValue);
-                        }
+                        if (searchValue !== initialSearch) updateSearch(searchValue)
                     }}
                     className="h-8 w-[150px] lg:w-[250px]"
                 />
+                {statusOptions && statusParamKey && (
+                    <div className="flex items-center gap-1">
+                        <Badge
+                            variant={activeStatus === "" ? "default" : "outline"}
+                            className="cursor-pointer"
+                            onClick={() => handleStatusClick("")}
+                        >
+                            全部
+                        </Badge>
+                        {statusOptions.map((opt) => (
+                            <Badge
+                                key={opt.value}
+                                variant={activeStatus === opt.value ? "default" : "outline"}
+                                className="cursor-pointer"
+                                onClick={() => handleStatusClick(opt.value)}
+                            >
+                                {opt.label}
+                            </Badge>
+                        ))}
+                    </div>
+                )}
                 {children}
                 {hasFilters && (
                     <Button
@@ -88,5 +129,5 @@ export function DataTableToolbar<TData>({
             </div>
             <DataTableViewOptions table={table} />
         </div>
-    );
+    )
 }

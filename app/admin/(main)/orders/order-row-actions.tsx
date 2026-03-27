@@ -27,9 +27,10 @@ import type { OrderRow } from "./orders-columns"
 
 export function OrderRowActions({ order }: { order: OrderRow }) {
     const router = useRouter()
-    const [actionLoading, setActionLoading] = useState(false)
     const [closeDialogOpen, setCloseDialogOpen] = useState(false)
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+    const [closing, setClosing] = useState(false)
+    const [deleting, setDeleting] = useState(false)
 
     const handleCopyOrderNo = async () => {
         try {
@@ -41,48 +42,48 @@ export function OrderRowActions({ order }: { order: OrderRow }) {
     }
 
     const handleClose = async () => {
-        setActionLoading(true)
+        setClosing(true)
         try {
             const res = await fetch("/api/orders/batch", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ action: "CLOSE", orderIds: [order.id] }),
             })
-            const data = await res.json()
-            if (!res.ok) {
-                toast.error(data.error || "关闭失败")
-                return
+            if (res.ok) {
+                setCloseDialogOpen(false)
+                toast.success("订单已关闭")
+                router.refresh()
+            } else {
+                const data = await res.json().catch(() => ({}))
+                toast.error(data?.error ?? "关闭失败")
             }
-            toast.success("订单已关闭")
-            setCloseDialogOpen(false)
-            router.refresh()
         } catch {
             toast.error("操作失败")
         } finally {
-            setActionLoading(false)
+            setClosing(false)
         }
     }
 
     const handleDelete = async () => {
-        setActionLoading(true)
+        setDeleting(true)
         try {
             const res = await fetch("/api/orders/batch", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ action: "DELETE", orderIds: [order.id] }),
             })
-            const data = await res.json()
-            if (!res.ok) {
-                toast.error(data.error || "删除失败")
-                return
+            if (res.ok) {
+                setDeleteDialogOpen(false)
+                toast.success("订单已删除")
+                router.refresh()
+            } else {
+                const data = await res.json().catch(() => ({}))
+                toast.error(data?.error ?? "删除失败")
             }
-            toast.success("订单已删除")
-            setDeleteDialogOpen(false)
-            router.refresh()
         } catch {
             toast.error("操作失败")
         } finally {
-            setActionLoading(false)
+            setDeleting(false)
         }
     }
 
@@ -94,30 +95,31 @@ export function OrderRowActions({ order }: { order: OrderRow }) {
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon" className="size-8">
-                        <span className="sr-only">打开菜单</span>
-                        {actionLoading ? (
-                            <Loader2 className="size-4 animate-spin" />
-                        ) : (
-                            <MoreHorizontal className="size-4" />
-                        )}
+                        <MoreHorizontal className="size-4" />
+                        <span className="sr-only">操作菜单</span>
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                     <DropdownMenuItem asChild>
                         <Link href={`/admin/orders/${order.id}`}>
-                            <Eye className="mr-2 size-4" />
+                            <Eye className="size-4" />
                             查看详情
                         </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={handleCopyOrderNo}>
-                        <Copy className="mr-2 size-4" />
+                        <Copy className="size-4" />
                         复制订单号
                     </DropdownMenuItem>
                     {canClose && (
                         <>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => setCloseDialogOpen(true)} disabled={actionLoading}>
-                                <XCircle className="mr-2 size-4" />
+                            <DropdownMenuItem
+                                onSelect={(e) => {
+                                    e.preventDefault()
+                                    setCloseDialogOpen(true)
+                                }}
+                            >
+                                <XCircle className="size-4" />
                                 关闭订单
                             </DropdownMenuItem>
                         </>
@@ -126,10 +128,13 @@ export function OrderRowActions({ order }: { order: OrderRow }) {
                         <>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
-                                variant="destructive"
-                                onClick={() => setDeleteDialogOpen(true)}
+                                className="text-destructive focus:text-destructive"
+                                onSelect={(e) => {
+                                    e.preventDefault()
+                                    setDeleteDialogOpen(true)
+                                }}
                             >
-                                <Trash2 className="mr-2 size-4" />
+                                <Trash2 className="size-4" />
                                 删除
                             </DropdownMenuItem>
                         </>
@@ -146,9 +151,16 @@ export function OrderRowActions({ order }: { order: OrderRow }) {
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>取消</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleClose} disabled={actionLoading}>
-                            {actionLoading ? "处理中..." : "确认关闭"}
+                        <AlertDialogCancel disabled={closing}>取消</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={(e) => {
+                                e.preventDefault()
+                                handleClose()
+                            }}
+                            disabled={closing}
+                        >
+                            {closing && <Loader2 className="size-4 animate-spin" />}
+                            确认关闭
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -163,13 +175,17 @@ export function OrderRowActions({ order }: { order: OrderRow }) {
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>取消</AlertDialogCancel>
+                        <AlertDialogCancel disabled={deleting}>取消</AlertDialogCancel>
                         <AlertDialogAction
-                            onClick={handleDelete}
-                            disabled={actionLoading}
+                            onClick={(e) => {
+                                e.preventDefault()
+                                handleDelete()
+                            }}
+                            disabled={deleting}
                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
-                            {actionLoading ? "删除中..." : "删除"}
+                            {deleting && <Loader2 className="size-4 animate-spin" />}
+                            删除
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

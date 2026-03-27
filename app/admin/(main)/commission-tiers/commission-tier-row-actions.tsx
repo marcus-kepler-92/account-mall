@@ -26,8 +26,8 @@ export function CommissionTierRowActions({ id }: { id: string }) {
         try {
             const res = await fetch(`/api/admin/commission-tiers/${id}`, { method: "DELETE" })
             if (!res.ok) {
-                const err = await res.json()
-                toast.error(err.error || "删除失败")
+                const err = await res.json().catch(() => ({}))
+                toast.error(err?.error ?? "删除失败")
                 return
             }
             setOpen(false)

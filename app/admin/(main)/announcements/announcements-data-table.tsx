@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 import {
     useReactTable,
     getCoreRowModel,
@@ -11,6 +11,8 @@ import {
     type ColumnFiltersState,
     type VisibilityState,
 } from "@tanstack/react-table"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Separator } from "@/components/ui/separator"
 import { DataTable, ClientDataTableToolbar, ClientDataTablePagination } from "@/app/admin/components"
 import { announcementsColumns, type AnnouncementRow } from "./announcements-columns"
 
@@ -20,7 +22,7 @@ const statusOptions = [
     { label: "草稿", value: "DRAFT" },
 ]
 
-export function AnnouncementsDataTable({ data }: { data: AnnouncementRow[] }) {
+export function AnnouncementsDataTable({ data, actions }: { data: AnnouncementRow[]; actions?: ReactNode }) {
     const [sorting, setSorting] = useState<SortingState>([])
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
@@ -41,16 +43,25 @@ export function AnnouncementsDataTable({ data }: { data: AnnouncementRow[] }) {
     })
 
     return (
-        <div className="space-y-4">
-            <ClientDataTableToolbar
-                table={table}
-                searchColumn="title"
-                searchPlaceholder="搜索标题…"
-                statusColumn="status"
-                statusOptions={statusOptions}
-            />
-            <DataTable table={table} columns={announcementsColumns} emptyMessage="暂无公告" />
-            <ClientDataTablePagination table={table} />
-        </div>
+        <Card>
+            <CardHeader className="pb-4">
+                <div className="flex items-center justify-between">
+                    <CardTitle className="text-base">公告列表</CardTitle>
+                    {actions}
+                </div>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-0">
+                <ClientDataTableToolbar
+                    table={table}
+                    searchColumn="title"
+                    searchPlaceholder="搜索标题…"
+                    statusColumn="status"
+                    statusOptions={statusOptions}
+                />
+                <Separator />
+                <DataTable table={table} columns={announcementsColumns} emptyMessage="暂无公告" />
+                <ClientDataTablePagination table={table} />
+            </CardContent>
+        </Card>
     )
 }

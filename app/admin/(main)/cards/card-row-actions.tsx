@@ -42,7 +42,8 @@ import type { CardRow } from "./cards-columns"
 // Row actions for the cards admin list (dropdown menu style)
 export function CardRowActions({ card }: { card: CardRow }) {
     const router = useRouter()
-    const [actionLoading, setActionLoading] = useState(false)
+    const [toggleLoading, setToggleLoading] = useState(false)
+    const [deleteLoading, setDeleteLoading] = useState(false)
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
     const [viewDialogOpen, setViewDialogOpen] = useState(false)
 
@@ -57,45 +58,45 @@ export function CardRowActions({ card }: { card: CardRow }) {
 
     const handleToggleStatus = async () => {
         const targetStatus = card.status === "UNSOLD" ? "DISABLED" : "UNSOLD"
-        setActionLoading(true)
+        setToggleLoading(true)
         try {
             const res = await fetch(`/api/cards/${card.id}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ status: targetStatus }),
             })
-            const data = await res.json()
-            if (!res.ok) {
-                toast.error(data.error || "操作失败")
-                return
+            if (res.ok) {
+                toast.success(targetStatus === "DISABLED" ? "已停用" : "已启用")
+                router.refresh()
+            } else {
+                const data = await res.json().catch(() => ({}))
+                toast.error(data?.error ?? "操作失败")
             }
-            toast.success(targetStatus === "DISABLED" ? "已停用" : "已启用")
-            router.refresh()
         } catch {
             toast.error("操作失败")
         } finally {
-            setActionLoading(false)
+            setToggleLoading(false)
         }
     }
 
     const handleDelete = async () => {
-        setActionLoading(true)
+        setDeleteLoading(true)
         try {
             const res = await fetch(`/api/cards/${card.id}`, {
                 method: "DELETE",
             })
-            const data = await res.json()
-            if (!res.ok) {
-                toast.error(data.error || "删除失败")
-                return
+            if (res.ok) {
+                setDeleteDialogOpen(false)
+                toast.success("已删除")
+                router.refresh()
+            } else {
+                const data = await res.json().catch(() => ({}))
+                toast.error(data?.error ?? "删除失败")
             }
-            toast.success("已删除")
-            router.refresh()
         } catch {
             toast.error("删除失败")
         } finally {
-            setActionLoading(false)
-            setDeleteDialogOpen(false)
+            setDeleteLoading(false)
         }
     }
 
@@ -107,27 +108,23 @@ export function CardRowActions({ card }: { card: CardRow }) {
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon" className="size-8">
-                        <span className="sr-only">打开菜单</span>
-                        {actionLoading ? (
-                            <Loader2 className="size-4 animate-spin" />
-                        ) : (
-                            <MoreHorizontal className="size-4" />
-                        )}
+                        <MoreHorizontal className="size-4" />
+                        <span className="sr-only">操作菜单</span>
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                     <DropdownMenuItem onClick={handleCopy}>
-                        <Copy className="mr-2 size-4" />
+                        <Copy className="size-4" />
                         复制卡密
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setViewDialogOpen(true)}>
-                        <Eye className="mr-2 size-4" />
+                    <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setViewDialogOpen(true) }}>
+                        <Eye className="size-4" />
                         查看完整内容
                     </DropdownMenuItem>
                     {!card.product.isFree && (
                         <DropdownMenuItem asChild>
                             <Link href={`/admin/products/${card.product.id}/cards`}>
-                                <ExternalLink className="mr-2 size-4" />
+                                <ExternalLink className="size-4" />
                                 前往商品卡密页
                             </Link>
                         </DropdownMenuItem>
@@ -135,15 +132,18 @@ export function CardRowActions({ card }: { card: CardRow }) {
                     {canToggle && (
                         <>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={handleToggleStatus} disabled={actionLoading}>
+                            <DropdownMenuItem
+                                onSelect={(e) => { e.preventDefault(); handleToggleStatus() }}
+                                disabled={toggleLoading}
+                            >
                                 {card.status === "UNSOLD" ? (
                                     <>
-                                        <PowerOff className="mr-2 size-4" />
+                                        <PowerOff className="size-4" />
                                         停用
                                     </>
                                 ) : (
                                     <>
-                                        <CircleDot className="mr-2 size-4" />
+                                        <CircleDot className="size-4" />
                                         启用
                                     </>
                                 )}
@@ -154,10 +154,10 @@ export function CardRowActions({ card }: { card: CardRow }) {
                         <>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
-                                variant="destructive"
-                                onClick={() => setDeleteDialogOpen(true)}
+                                className="text-destructive focus:text-destructive"
+                                onSelect={(e) => { e.preventDefault(); setDeleteDialogOpen(true) }}
                             >
-                                <Trash2 className="mr-2 size-4" />
+                                <Trash2 className="size-4" />
                                 删除
                             </DropdownMenuItem>
                         </>
@@ -174,13 +174,14 @@ export function CardRowActions({ card }: { card: CardRow }) {
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>取消</AlertDialogCancel>
+                        <AlertDialogCancel disabled={deleteLoading}>取消</AlertDialogCancel>
                         <AlertDialogAction
-                            onClick={handleDelete}
-                            disabled={actionLoading}
+                            onClick={(e) => { e.preventDefault(); handleDelete() }}
+                            disabled={deleteLoading}
                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
-                            {actionLoading ? "删除中..." : "删除"}
+                            {deleteLoading && <Loader2 className="size-4 animate-spin" />}
+                            删除
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -198,7 +199,7 @@ export function CardRowActions({ card }: { card: CardRow }) {
                         {card.content}
                     </div>
                     <Button onClick={handleCopy} variant="outline" className="w-full">
-                        <Copy className="mr-2 size-4" />
+                        <Copy className="size-4" />
                         复制到剪贴板
                     </Button>
                 </DialogContent>
@@ -239,45 +240,24 @@ export function CardCompactActions({
         }
     }
 
-    const handleDisable = async () => {
+    const handleToggleStatus = async () => {
+        const targetStatus = status === "UNSOLD" ? "DISABLED" : "UNSOLD"
         setActionLoading(true)
         try {
             const res = await fetch(`/api/cards/${cardId}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ status: "DISABLED" }),
+                body: JSON.stringify({ status: targetStatus }),
             })
-            const data = await res.json()
-            if (!res.ok) {
-                toast.error(data.error || "停用失败")
-                return
+            if (res.ok) {
+                toast.success(targetStatus === "DISABLED" ? "已停用" : "已启用")
+                router.refresh()
+            } else {
+                const data = await res.json().catch(() => ({}))
+                toast.error(data?.error ?? "操作失败")
             }
-            toast.success("已停用")
-            router.refresh()
         } catch {
-            toast.error("停用失败")
-        } finally {
-            setActionLoading(false)
-        }
-    }
-
-    const handleEnable = async () => {
-        setActionLoading(true)
-        try {
-            const res = await fetch(`/api/cards/${cardId}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ status: "UNSOLD" }),
-            })
-            const data = await res.json()
-            if (!res.ok) {
-                toast.error(data.error || "启用失败")
-                return
-            }
-            toast.success("已启用")
-            router.refresh()
-        } catch {
-            toast.error("启用失败")
+            toast.error("操作失败")
         } finally {
             setActionLoading(false)
         }
@@ -308,7 +288,7 @@ export function CardCompactActions({
                                 variant="ghost"
                                 size="icon"
                                 className="size-8 shrink-0 text-muted-foreground hover:text-foreground"
-                                onClick={status === "UNSOLD" ? handleDisable : handleEnable}
+                                onClick={handleToggleStatus}
                                 disabled={actionLoading}
                                 aria-label={status === "UNSOLD" ? "停用" : "启用"}
                             >

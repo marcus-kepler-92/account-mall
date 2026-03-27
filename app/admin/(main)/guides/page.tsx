@@ -35,15 +35,18 @@ export default async function AdminGuidesPage() {
 
     return (
         <div className="space-y-6">
-            <PageHeader title="分销指南" description="管理分销员入门手册，已发布的指南将展示在分销员端「入门手册」">
-                <Button asChild>
-                    <Link href="/admin/guides/new">
-                        <Plus className="size-4" />
-                        新建指南
-                    </Link>
-                </Button>
-            </PageHeader>
-            <GuidesDataTable data={data} />
+            <PageHeader title="分销指南" description="管理分销员入门手册，已发布的指南将展示在分销员端「入门手册」" />
+            <GuidesDataTable
+                data={data}
+                actions={
+                    <Button asChild size="sm">
+                        <Link href="/admin/guides/new">
+                            <Plus className="size-4" />
+                            新建指南
+                        </Link>
+                    </Button>
+                }
+            />
         </div>
     )
 }

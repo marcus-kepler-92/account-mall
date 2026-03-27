@@ -1,11 +1,11 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { Card, CardContent } from "@/components/ui/card";
-import { CreditCard, Package } from "lucide-react";
+import { Package, CircleDot, Clock, CheckCircle2, Ban } from "lucide-react";
 import { BackButton } from "./back-button";
 import { BulkImportCards } from "./bulk-import-cards";
 import { ExportCards } from "./export-cards";
 import { ProductCardsDataTable } from "./product-cards-data-table";
+import { StatCard } from "@/app/admin/components";
 import type { ProductCardRow } from "./product-cards-columns";
 
 export const dynamic = "force-dynamic";
@@ -99,7 +99,7 @@ export default async function AdminProductCardsPage({ params, searchParams }: Pa
     return (
         <div className="space-y-6">
             {/* Page header */}
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-4">
                     <BackButton />
                     <div>
@@ -112,54 +112,26 @@ export default async function AdminProductCardsPage({ params, searchParams }: Pa
                         </p>
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
-                    <ExportCards productId={productId} statusCounts={stats} />
-                    <BulkImportCards productId={productId} defaultOpen={rawParams.action === "import"} />
-                </div>
             </div>
 
             {/* Stats */}
             <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">
-                <Card>
-                    <CardContent className="pt-4">
-                        <div className="flex items-center gap-2">
-                            <CreditCard className="size-5 text-muted-foreground" />
-                            <span className="text-sm font-medium text-muted-foreground">未售</span>
-                        </div>
-                        <p className="text-2xl font-bold mt-2">{stats.UNSOLD}</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardContent className="pt-4">
-                        <div className="flex items-center gap-2">
-                            <CreditCard className="size-5 text-muted-foreground" />
-                            <span className="text-sm font-medium text-muted-foreground">预占中</span>
-                        </div>
-                        <p className="text-2xl font-bold mt-2">{stats.RESERVED}</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardContent className="pt-4">
-                        <div className="flex items-center gap-2">
-                            <CreditCard className="size-5 text-muted-foreground" />
-                            <span className="text-sm font-medium text-muted-foreground">已售</span>
-                        </div>
-                        <p className="text-2xl font-bold mt-2">{stats.SOLD}</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardContent className="pt-4">
-                        <div className="flex items-center gap-2">
-                            <CreditCard className="size-5 text-muted-foreground" />
-                            <span className="text-sm font-medium text-muted-foreground">停用</span>
-                        </div>
-                        <p className="text-2xl font-bold mt-2">{stats.DISABLED}</p>
-                    </CardContent>
-                </Card>
+                <StatCard label="未售" value={stats.UNSOLD} icon={CircleDot} borderColor="border-l-success" iconColor="text-success" />
+                <StatCard label="预占中" value={stats.RESERVED} icon={Clock} borderColor="border-l-warning" iconColor="text-warning" />
+                <StatCard label="已售" value={stats.SOLD} icon={CheckCircle2} borderColor="border-l-muted-foreground" iconColor="text-muted-foreground" />
+                <StatCard label="停用" value={stats.DISABLED} icon={Ban} borderColor="border-l-muted-foreground" iconColor="text-muted-foreground" />
             </div>
 
             {/* DataTable */}
-            <ProductCardsDataTable data={serializedCards} total={total} statusCounts={stats} />
+            <ProductCardsDataTable
+                data={serializedCards}
+                total={total}
+                statusCounts={stats}
+                actions={<>
+                    <ExportCards productId={productId} statusCounts={stats} />
+                    <BulkImportCards productId={productId} defaultOpen={rawParams.action === "import"} />
+                </>}
+            />
         </div>
     );
 }

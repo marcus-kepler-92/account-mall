@@ -42,15 +42,18 @@ export default async function AdminProductsPage() {
 
     return (
         <div className="space-y-6">
-            <PageHeader title="商品管理" description="管理数字商品和价格">
-                <Button asChild>
-                    <Link href="/admin/products/new">
-                        <Plus className="size-4" />
-                        添加商品
-                    </Link>
-                </Button>
-            </PageHeader>
-            <ProductsDataTable data={data} />
+            <PageHeader title="商品管理" description="管理数字商品和价格" />
+            <ProductsDataTable
+                data={data}
+                actions={
+                    <Button asChild size="sm">
+                        <Link href="/admin/products/new">
+                            <Plus className="size-4" />
+                            添加商品
+                        </Link>
+                    </Button>
+                }
+            />
         </div>
     )
 }

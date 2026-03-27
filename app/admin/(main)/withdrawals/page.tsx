@@ -16,11 +16,11 @@ type SearchParams = Promise<WithdrawalFiltersInput>
 
 export default async function AdminWithdrawalsPage({ searchParams }: { searchParams: SearchParams }) {
     const filters = parseWithdrawalFilters(await searchParams)
-    const { page, pageSize, status, search } = filters
+    const { page, pageSize, statusList, search } = filters
 
     // Build where clause for main query
     const where = {
-        ...(status !== "ALL" ? { status } : {}),
+        ...(statusList.length > 0 ? { status: { in: statusList } } : {}),
         ...(search
             ? {
                   distributor: {
@@ -159,15 +159,27 @@ export default async function AdminWithdrawalsPage({ searchParams }: { searchPar
         REJECTED: counts.REJECTED,
     }
 
+    const buildStatusLink = (statusKey: "PENDING" | "REJECTED") => {
+        const params = new URLSearchParams()
+        const nextList = filters.statusList.includes(statusKey)
+            ? filters.statusList.filter((s) => s !== statusKey)
+            : [...filters.statusList, statusKey]
+        if (nextList.length > 0) {
+            params.set("status", nextList.join(","))
+        }
+        const query = params.toString()
+        return `/admin/withdrawals${query ? `?${query}` : ""}`
+    }
+
     return (
         <div className="space-y-6">
             <PageHeader title="提现管理" description="处理分销员提现申请，线下打款后标记已打款或拒绝" />
 
             <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
-                <StatCard label="待处理" value={counts.PENDING} icon={Clock} borderColor="border-l-warning" iconColor="text-warning" />
+                <StatCard label="待处理" value={counts.PENDING} icon={Clock} borderColor="border-l-warning" iconColor="text-warning" active={filters.statusList.includes("PENDING")} href={buildStatusLink("PENDING")} />
                 <StatCard label="待处理金额" value={formatCurrency(amounts.PENDING)} icon={DollarSign} borderColor="border-l-warning" iconColor="text-warning" />
                 <StatCard label="已打款金额" value={formatCurrency(amounts.PAID)} icon={CheckCircle2} borderColor="border-l-success" iconColor="text-success" />
-                <StatCard label="已拒绝" value={counts.REJECTED} icon={XCircle} borderColor="border-l-muted-foreground" iconColor="text-muted-foreground" />
+                <StatCard label="已拒绝" value={counts.REJECTED} icon={XCircle} borderColor="border-l-muted-foreground" iconColor="text-muted-foreground" active={filters.statusList.includes("REJECTED")} href={buildStatusLink("REJECTED")} />
                 <StatCard label="平台待提现总额" value={formatCurrency(platformTotalWithdrawable)} icon={Wallet} borderColor="border-l-primary" iconColor="text-primary" />
             </div>
 

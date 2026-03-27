@@ -17,8 +17,8 @@ export default function CardsLoading() {
             </div>
 
             {/* Stats cards */}
-            <div className="grid gap-4 sm:grid-cols-3">
-                {[1, 2, 3].map((i) => (
+            <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">
+                {[1, 2, 3, 4].map((i) => (
                     <Card key={i} className="border-l-4 border-l-muted">
                         <CardContent className="pt-4 pb-4">
                             <div className="flex items-center justify-between">
@@ -27,10 +27,6 @@ export default function CardsLoading() {
                                     <Skeleton className="h-8 w-16" />
                                 </div>
                                 <Skeleton className="size-8 rounded" />
-                            </div>
-                            <div className="mt-2 flex items-center gap-2">
-                                <Skeleton className="h-1.5 flex-1 rounded-full" />
-                                <Skeleton className="h-3 w-8" />
                             </div>
                         </CardContent>
                     </Card>

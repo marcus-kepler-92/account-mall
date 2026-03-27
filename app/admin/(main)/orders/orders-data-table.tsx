@@ -12,6 +12,8 @@ import {
 import { XCircle, Trash2, Loader2, TimerOff } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -26,7 +28,6 @@ import {
     DataTable,
     DataTableToolbar,
     DataTablePagination,
-    DataTableFacetedFilter,
     DataTableSelectionBar,
 } from "@/app/admin/components";
 import { ordersColumns, type OrderRow } from "./orders-columns";
@@ -136,72 +137,69 @@ export function OrdersDataTable({ data, total, statusCounts }: OrdersDataTablePr
         }
     };
 
-    const statusOptionsWithCounts = statusOptions.map((opt) => ({
-        ...opt,
-        count: statusCounts[opt.value as keyof typeof statusCounts],
-    }));
-
     return (
-        <div className="space-y-4">
-            <DataTableToolbar
-                table={table}
-                searchPlaceholder="搜索邮箱或订单号..."
-                searchParamKey="search"
-            >
-                <DataTableFacetedFilter
-                    column={table.getColumn("status")}
-                    title="状态"
-                    options={statusOptionsWithCounts}
-                    paramKey="status"
-                />
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleCloseExpired}
-                    disabled={closeExpiredLoading}
-                >
-                    {closeExpiredLoading ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                        <TimerOff className="mr-2 h-4 w-4" />
-                    )}
-                    关闭过期订单
-                </Button>
-            </DataTableToolbar>
-
-            <DataTableSelectionBar table={table}>
-                {canBatchClose && (
+        <Card>
+            <CardHeader className="pb-4">
+                <div className="flex items-center justify-between">
+                    <CardTitle className="text-base">订单列表</CardTitle>
                     <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setBatchAction("CLOSE")}
-                        disabled={batchLoading}
+                        onClick={handleCloseExpired}
+                        disabled={closeExpiredLoading}
                     >
-                        <XCircle className="mr-2 h-4 w-4" />
-                        批量关闭 ({pendingSelected.length})
-                    </Button>
-                )}
-                {canBatchDelete && (
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setBatchAction("DELETE")}
-                        disabled={batchLoading}
-                        className="text-destructive hover:text-destructive"
-                    >
-                        {batchLoading ? (
+                        {closeExpiredLoading ? (
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         ) : (
-                            <Trash2 className="mr-2 h-4 w-4" />
+                            <TimerOff className="mr-2 h-4 w-4" />
                         )}
-                        批量删除 ({closedSelected.length})
+                        关闭过期订单
                     </Button>
-                )}
-            </DataTableSelectionBar>
+                </div>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-0">
+                <DataTableToolbar
+                    table={table}
+                    searchPlaceholder="搜索邮箱或订单号..."
+                    searchParamKey="search"
+                    statusOptions={statusOptions}
+                    statusParamKey="status"
+                />
 
-            <DataTable table={table} columns={ordersColumns} emptyMessage="暂无订单" />
+                <DataTableSelectionBar table={table}>
+                    {canBatchClose && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setBatchAction("CLOSE")}
+                            disabled={batchLoading}
+                        >
+                            <XCircle className="mr-2 h-4 w-4" />
+                            批量关闭 ({pendingSelected.length})
+                        </Button>
+                    )}
+                    {canBatchDelete && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setBatchAction("DELETE")}
+                            disabled={batchLoading}
+                            className="text-destructive hover:text-destructive"
+                        >
+                            {batchLoading ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                                <Trash2 className="mr-2 h-4 w-4" />
+                            )}
+                            批量删除 ({closedSelected.length})
+                        </Button>
+                    )}
+                </DataTableSelectionBar>
 
-            <DataTablePagination table={table} total={total} />
+                <Separator />
+                <DataTable table={table} columns={ordersColumns} emptyMessage="暂无订单" />
+                <DataTablePagination table={table} total={total} />
+            </CardContent>
 
             <AlertDialog open={batchAction !== null} onOpenChange={(open) => !open && setBatchAction(null)}>
                 <AlertDialogContent>
@@ -230,6 +228,6 @@ export function OrdersDataTable({ data, total, statusCounts }: OrdersDataTablePr
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-        </div>
+        </Card>
     );
 }

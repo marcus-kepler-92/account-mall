@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 import {
     useReactTable,
     getCoreRowModel,
@@ -11,6 +11,8 @@ import {
     type ColumnFiltersState,
     type VisibilityState,
 } from "@tanstack/react-table"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Separator } from "@/components/ui/separator"
 import { DataTable, ClientDataTableToolbar, ClientDataTablePagination } from "@/app/admin/components"
 import { guidesColumns, type GuideRow } from "./guides-columns"
 
@@ -20,7 +22,7 @@ const statusOptions = [
     { label: "草稿", value: "DRAFT" },
 ]
 
-export function GuidesDataTable({ data }: { data: GuideRow[] }) {
+export function GuidesDataTable({ data, actions }: { data: GuideRow[]; actions?: ReactNode }) {
     const [sorting, setSorting] = useState<SortingState>([])
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
@@ -41,16 +43,25 @@ export function GuidesDataTable({ data }: { data: GuideRow[] }) {
     })
 
     return (
-        <div className="space-y-4">
-            <ClientDataTableToolbar
-                table={table}
-                searchColumn="title"
-                searchPlaceholder="搜索标题…"
-                statusColumn="status"
-                statusOptions={statusOptions}
-            />
-            <DataTable table={table} columns={guidesColumns} emptyMessage="暂无指南" />
-            <ClientDataTablePagination table={table} />
-        </div>
+        <Card>
+            <CardHeader className="pb-4">
+                <div className="flex items-center justify-between">
+                    <CardTitle className="text-base">指南列表</CardTitle>
+                    {actions}
+                </div>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-0">
+                <ClientDataTableToolbar
+                    table={table}
+                    searchColumn="title"
+                    searchPlaceholder="搜索标题…"
+                    statusColumn="status"
+                    statusOptions={statusOptions}
+                />
+                <Separator />
+                <DataTable table={table} columns={guidesColumns} emptyMessage="暂无指南" />
+                <ClientDataTablePagination table={table} />
+            </CardContent>
+        </Card>
     )
 }

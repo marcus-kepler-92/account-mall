@@ -12,6 +12,8 @@ import {
 import { Trash2, PowerOff, CircleDot, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -26,10 +28,11 @@ import {
     DataTable,
     DataTableToolbar,
     DataTablePagination,
-    DataTableFacetedFilter,
     DataTableSelectionBar,
 } from "@/app/admin/components";
 import { cardsColumns, type CardRow } from "./cards-columns";
+
+import type { ReactNode } from "react";
 
 interface CardsDataTableProps {
     data: CardRow[];
@@ -40,6 +43,7 @@ interface CardsDataTableProps {
         SOLD: number;
         DISABLED: number;
     };
+    actions?: ReactNode;
 }
 
 const statusOptions = [
@@ -49,7 +53,7 @@ const statusOptions = [
     { label: "停用", value: "DISABLED" },
 ];
 
-export function CardsDataTable({ data, total, statusCounts }: CardsDataTableProps) {
+export function CardsDataTable({ data, total, statusCounts, actions }: CardsDataTableProps) {
     const router = useRouter();
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
@@ -117,70 +121,68 @@ export function CardsDataTable({ data, total, statusCounts }: CardsDataTableProp
         }
     };
 
-    const statusOptionsWithCounts = statusOptions.map((opt) => ({
-        ...opt,
-        count: statusCounts[opt.value as keyof typeof statusCounts],
-    }));
-
     return (
-        <div className="space-y-4">
-            <DataTableToolbar
-                table={table}
-                searchPlaceholder="搜索卡密内容..."
-                searchParamKey="codeLike"
-            >
-                <DataTableFacetedFilter
-                    column={table.getColumn("status")}
-                    title="状态"
-                    options={statusOptionsWithCounts}
-                    paramKey="status"
+        <Card>
+            <CardHeader className="pb-4">
+                <div className="flex items-center justify-between">
+                    <CardTitle className="text-base">卡密列表</CardTitle>
+                    {actions}
+                </div>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-0">
+                <DataTableToolbar
+                    table={table}
+                    searchPlaceholder="搜索卡密内容..."
+                    searchParamKey="codeLike"
+                    statusOptions={statusOptions}
+                    statusParamKey="status"
                 />
-            </DataTableToolbar>
 
-            <DataTableSelectionBar table={table}>
-                {canBatchDisable && (
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setBatchAction("DISABLE")}
-                        disabled={batchLoading}
-                    >
-                        <PowerOff className="mr-2 h-4 w-4" />
-                        批量停用 ({unsoldSelected.length})
-                    </Button>
-                )}
-                {canBatchEnable && (
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setBatchAction("ENABLE")}
-                        disabled={batchLoading}
-                    >
-                        <CircleDot className="mr-2 h-4 w-4" />
-                        批量启用 ({disabledSelected.length})
-                    </Button>
-                )}
-                {canBatchDelete && (
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setBatchAction("DELETE")}
-                        disabled={batchLoading}
-                        className="text-destructive hover:text-destructive"
-                    >
-                        {batchLoading ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                            <Trash2 className="mr-2 h-4 w-4" />
-                        )}
-                        批量删除 ({unsoldSelected.length})
-                    </Button>
-                )}
-            </DataTableSelectionBar>
+                <DataTableSelectionBar table={table}>
+                    {canBatchDisable && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setBatchAction("DISABLE")}
+                            disabled={batchLoading}
+                        >
+                            <PowerOff className="mr-2 h-4 w-4" />
+                            批量停用 ({unsoldSelected.length})
+                        </Button>
+                    )}
+                    {canBatchEnable && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setBatchAction("ENABLE")}
+                            disabled={batchLoading}
+                        >
+                            <CircleDot className="mr-2 h-4 w-4" />
+                            批量启用 ({disabledSelected.length})
+                        </Button>
+                    )}
+                    {canBatchDelete && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setBatchAction("DELETE")}
+                            disabled={batchLoading}
+                            className="text-destructive hover:text-destructive"
+                        >
+                            {batchLoading ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                                <Trash2 className="mr-2 h-4 w-4" />
+                            )}
+                            批量删除 ({unsoldSelected.length})
+                        </Button>
+                    )}
+                </DataTableSelectionBar>
 
-            <DataTable table={table} columns={cardsColumns} emptyMessage="暂无卡密" />
-
-            <DataTablePagination table={table} total={total} />
+                <Separator />
+                <DataTable table={table} columns={cardsColumns} emptyMessage="暂无卡密" />
+                <DataTablePagination table={table} total={total} />
+            </CardContent>
 
             <AlertDialog open={batchAction !== null} onOpenChange={(open) => !open && setBatchAction(null)}>
                 <AlertDialogContent>
@@ -212,6 +214,6 @@ export function CardsDataTable({ data, total, statusCounts }: CardsDataTableProp
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-        </div>
+        </Card>
     );
 }
