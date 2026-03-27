@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma"
+import { formatCurrency } from "@/lib/utils"
 import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card"
 import { ShoppingCart, Clock, CheckCircle2, XCircle, DollarSign } from "lucide-react"
 import Link from "next/link"
@@ -207,7 +208,7 @@ export default async function AdminOrdersPage({
         {
             key: "REVENUE",
             label: "总营收",
-            value: `¥${totalRevenue.toFixed(2)}`,
+            value: formatCurrency(totalRevenue),
             icon: DollarSign,
             color: "text-primary",
             borderColor: "border-l-primary",

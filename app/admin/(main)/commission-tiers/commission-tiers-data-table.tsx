@@ -22,6 +22,7 @@ export function CommissionTiersDataTable({ data }: { data: TierRow[] }) {
         getSortedRowModel: getSortedRowModel(),
         onSortingChange: setSorting,
         onColumnVisibilityChange: setColumnVisibility,
+        getRowId: (row) => row.id,
         state: { sorting, columnVisibility },
     })
 

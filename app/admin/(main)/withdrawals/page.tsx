@@ -1,21 +1,51 @@
 import { prisma } from "@/lib/prisma"
+import { formatCurrency } from "@/lib/utils"
 import { Card, CardContent } from "@/components/ui/card"
 import { Clock, CheckCircle2, XCircle, Wallet, DollarSign } from "lucide-react"
 import { WithdrawalsDataTable } from "./withdrawals-data-table"
 import type { WithdrawalRow } from "./withdrawals-columns"
+import {
+    DEFAULT_WITHDRAWAL_FILTERS,
+    parseWithdrawalFilters,
+    type WithdrawalFiltersInput,
+} from "./withdrawals-filters"
 
 export const dynamic = "force-dynamic"
 
-export default async function AdminWithdrawalsPage() {
-    const [withdrawals, statusCounts] = await Promise.all([
+type SearchParams = Promise<WithdrawalFiltersInput>
+
+export default async function AdminWithdrawalsPage({ searchParams }: { searchParams: SearchParams }) {
+    const filters = parseWithdrawalFilters(await searchParams)
+    const { page, pageSize, status, search } = filters
+
+    // Build where clause for main query
+    const where = {
+        ...(status !== "ALL" ? { status } : {}),
+        ...(search
+            ? {
+                  distributor: {
+                      OR: [
+                          { name: { contains: search, mode: "insensitive" as const } },
+                          { email: { contains: search, mode: "insensitive" as const } },
+                      ],
+                  },
+              }
+            : {}),
+    }
+
+    const [withdrawals, total, statusCounts] = await Promise.all([
         prisma.withdrawal.findMany({
+            where,
             include: {
                 distributor: {
                     select: { id: true, email: true, name: true },
                 },
             },
             orderBy: { createdAt: "desc" },
+            skip: (page - 1) * pageSize,
+            take: pageSize,
         }),
+        prisma.withdrawal.count({ where }),
         prisma.withdrawal.groupBy({
             by: ["status"],
             _count: { id: true },
@@ -62,7 +92,7 @@ export default async function AdminWithdrawalsPage() {
         Number(allPaid._sum.amount ?? 0) -
         Number(allPending._sum.amount ?? 0)
 
-    // Per-distributor balance for withdrawal rows
+    // Per-distributor balance for current page
     const withdrawalDistIds = [...new Set(withdrawals.map((w) => w.distributorId))]
     const [distL1, distL2, distPaid, distPending] =
         withdrawalDistIds.length > 0
@@ -133,14 +163,14 @@ export default async function AdminWithdrawalsPage() {
         },
         {
             label: "待处理金额",
-            value: `¥${amounts.PENDING.toFixed(2)}`,
+            value: formatCurrency(amounts.PENDING),
             icon: DollarSign,
             color: "text-warning",
             borderColor: "border-l-warning",
         },
         {
             label: "已打款金额",
-            value: `¥${amounts.PAID.toFixed(2)}`,
+            value: formatCurrency(amounts.PAID),
             icon: CheckCircle2,
             color: "text-success",
             borderColor: "border-l-success",
@@ -154,12 +184,18 @@ export default async function AdminWithdrawalsPage() {
         },
         {
             label: "平台待提现总额",
-            value: `¥${platformTotalWithdrawable.toFixed(2)}`,
+            value: formatCurrency(platformTotalWithdrawable),
             icon: Wallet,
             color: "text-primary",
             borderColor: "border-l-primary",
         },
     ]
+
+    const statusCounts2 = {
+        PENDING: counts.PENDING,
+        PAID: counts.PAID,
+        REJECTED: counts.REJECTED,
+    }
 
     return (
         <div className="space-y-6">
@@ -193,8 +229,12 @@ export default async function AdminWithdrawalsPage() {
                 ))}
             </div>
 
-            <WithdrawalsDataTable data={data} />
+            <WithdrawalsDataTable
+                data={data}
+                total={total}
+                statusCounts={statusCounts2}
+                defaultFilters={DEFAULT_WITHDRAWAL_FILTERS}
+            />
         </div>
     )
 }
-

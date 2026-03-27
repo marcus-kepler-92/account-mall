@@ -37,6 +37,7 @@ export function AnnouncementsDataTable({ data }: { data: AnnouncementRow[] }) {
         onSortingChange: setSorting,
         onColumnFiltersChange: setColumnFilters,
         onColumnVisibilityChange: setColumnVisibility,
+        getRowId: (row) => row.id,
         state: { sorting, columnFilters, columnVisibility },
     })
 

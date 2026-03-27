@@ -37,6 +37,7 @@ export function GuidesDataTable({ data }: { data: GuideRow[] }) {
         onSortingChange: setSorting,
         onColumnFiltersChange: setColumnFilters,
         onColumnVisibilityChange: setColumnVisibility,
+        getRowId: (row) => row.id,
         state: { sorting, columnFilters, columnVisibility },
     })
 

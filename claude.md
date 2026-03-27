@@ -220,22 +220,45 @@ const form = useForm(...)
 return <FormProvider {...form}><ProductFormBasicFields /></FormProvider>
 ```
 
-### 后台列表页模式（DataTable 三件套）
+### 后台列表页模式（DataTable 四件套）
 
-后台 CRUD 列表统一使用 `DataTable` 组件（基于 TanStack Table），每个列表页固定三文件：
+后台 CRUD 列表统一使用 `DataTable` 组件（基于 TanStack Table），每个列表页标准文件结构：
 
 ```
 app/admin/(main)/{resource}/
-├── page.tsx               # 服务端数据获取，数据传给 DataTable
-├── {resource}-columns.tsx # 列定义（ColumnDef[]），含行内 {resource}Row 类型
-├── {resource}-data-table.tsx  # useReactTable + 搜索/筛选 UI（客户端状态）
-└── {resource}-row-actions.tsx # 行操作弹窗（可选，被 columns 引用）
+├── page.tsx                    # 服务端数据获取 + 页面布局
+├── {resource}-columns.tsx      # 列定义（ColumnDef[]）+ Row 类型导出
+├── {resource}-data-table.tsx   # useReactTable + Toolbar + Pagination
+├── {resource}-row-actions.tsx  # 行操作（DropdownMenu + 确认弹窗）
+├── {resource}-filters.ts       # （服务端分页时）URL 参数解析
+└── loading.tsx                 # 加载骨架
 ```
 
-**约定**：
-- 筛选状态（搜索关键字、状态过滤）用 `useState` 管理（客户端数据，无需 URL 同步）。
-- 状态过滤使用 `Badge` 切换按钮 + `column.setFilterValue()`，**不用** `DataTableFacetedFilter`（后者依赖 URL params）。
-- `filterFn` 使用 `(row, _colId, filterValue) => !filterValue || row.getValue(...) === filterValue`。
+**两种数据模式**（按数据量选择）：
+- **客户端过滤**（数据量 <100，如 products/announcements/guides/commission-tiers）：`page.tsx` 全量查询，DataTable 用 `getFilteredRowModel()` + `getSortedRowModel()`
+- **服务端分页**（数据量可增长，如 cards/orders/distributors/withdrawals）：`page.tsx` 接收 `searchParams` 解析筛选/分页，DataTable 用 `manualPagination: true` + `manualFiltering: true`
+
+**`*-columns.tsx` 规范**：
+- 只放 `ColumnDef` 定义 + `Row` 类型导出，不放有状态的组件
+- `import type { ColumnDef }` (type-only import)
+- 从 barrel 导入：`from "@/app/admin/components"`
+- 始终设置 `getRowId: (row) => row.id`
+- 货币用 `formatCurrency()` from `@/lib/utils`，日期用 `formatDateTime()`
+
+**`*-row-actions.tsx` 规范**：
+- 始终独立文件，不在 columns 中内联有状态组件
+- 触发按钮：`<Button variant="ghost" size="icon" className="size-8">`，图标 `size-4`
+- 破坏性操作用 `AlertDialog`（state-controlled open），非破坏性用 `Dialog`
+- 操作后 `router.refresh()` 刷新数据
+
+**`*-data-table.tsx` 规范**：
+- 服务端分页页面：`DataTableToolbar` + `DataTableFacetedFilter` + `DataTablePagination`（均从 `@/app/admin/components` 导入）
+- 客户端过滤页面：`DataTable` + `DataTableViewOptions`（可手工搭配 Input + Badge 筛选）
+- 批量操作用 `DataTableSelectionBar`
+
+**代码风格**：
+- 不用分号（ASI）
+- 图标 `size-4`（Tailwind 4 shorthand），不用 `h-4 w-4`
 
 ### URL 状态同步
 

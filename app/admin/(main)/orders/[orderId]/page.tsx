@@ -14,7 +14,7 @@ import {
     TableRow,
 } from "@/components/ui/table"
 import { ArrowLeft, CreditCard, Package, ShoppingCart } from "lucide-react"
-import { CardRowActions } from "@/app/admin/(main)/cards/card-row-actions"
+import { CardCompactActions } from "@/app/admin/(main)/cards/card-row-actions"
 
 export const dynamic = "force-dynamic"
 
@@ -218,7 +218,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
                                                 {formatDateTime(card.createdAt)}
                                             </TableCell>
                                             <TableCell className="text-right pr-4">
-                                                <CardRowActions
+                                                <CardCompactActions
                                                     cardId={card.id}
                                                     content={card.content}
                                                     status={card.status}

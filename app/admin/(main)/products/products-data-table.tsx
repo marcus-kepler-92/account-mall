@@ -37,6 +37,7 @@ export function ProductsDataTable({ data }: { data: ProductRow[] }) {
         onSortingChange: setSorting,
         onColumnFiltersChange: setColumnFilters,
         onColumnVisibilityChange: setColumnVisibility,
+        getRowId: (row) => row.id,
         state: { sorting, columnFilters, columnVisibility },
     })
 

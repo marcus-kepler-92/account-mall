@@ -43,6 +43,13 @@ export function formatDateTime(date: Date | string | null | undefined): string {
 }
 
 /**
+ * Format a number as CNY currency, e.g. 12.5 → "¥12.50"
+ */
+export function formatCurrency(amount: number): string {
+  return `¥${amount.toFixed(2)}`
+}
+
+/**
  * 格式化为短日期时间（不含年份），如 "01/15 14:30"
  * 服务端/客户端均可用，始终使用 Asia/Shanghai 时区。
  */

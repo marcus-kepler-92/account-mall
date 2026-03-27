@@ -1,6 +1,7 @@
 "use client"
 
 import type { ColumnDef } from "@tanstack/react-table"
+import { formatCurrency } from "@/lib/utils"
 import { DataTableColumnHeader } from "@/app/admin/components"
 import { CommissionTierRowActions } from "./commission-tier-row-actions"
 
@@ -22,14 +23,14 @@ export const commissionTiersColumns: ColumnDef<TierRow>[] = [
         accessorKey: "minAmount",
         header: () => <div className="text-right">当周销售额下限（元）</div>,
         cell: ({ row }) => (
-            <div className="text-right">¥{row.original.minAmount.toFixed(2)}</div>
+            <div className="text-right">{formatCurrency(row.original.minAmount)}</div>
         ),
     },
     {
         accessorKey: "maxAmount",
         header: () => <div className="text-right">当周销售额上限（元）</div>,
         cell: ({ row }) => (
-            <div className="text-right">¥{row.original.maxAmount.toFixed(2)}</div>
+            <div className="text-right">{formatCurrency(row.original.maxAmount)}</div>
         ),
     },
     {

@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import type { ColumnDef } from "@tanstack/react-table"
+import { formatCurrency } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { DataTableColumnHeader } from "@/app/admin/components"
 import { ProductRowActions } from "./product-row-actions"
@@ -44,7 +45,7 @@ export const productsColumns: ColumnDef<ProductRow>[] = [
     {
         accessorKey: "price",
         header: ({ column }) => <DataTableColumnHeader column={column} title="价格" />,
-        cell: ({ row }) => `¥${row.original.price.toFixed(2)}`,
+        cell: ({ row }) => formatCurrency(row.original.price),
     },
     {
         accessorKey: "stock",
