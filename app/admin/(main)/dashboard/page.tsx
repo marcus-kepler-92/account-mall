@@ -33,6 +33,7 @@ import {
     DashboardTopProductsChart,
 } from "./dashboard-charts"
 import { config } from "@/lib/config"
+import { PageHeader } from "@/app/admin/components"
 
 export const dynamic = "force-dynamic"
 
@@ -102,12 +103,7 @@ export default async function AdminDashboardPage() {
 
     return (
         <div className="space-y-6">
-            <div>
-                <h2 className="text-2xl font-bold tracking-tight">概览</h2>
-                <p className="text-muted-foreground">
-                    欢迎使用 {config.siteName} {config.adminPanelLabel}
-                </p>
-            </div>
+            <PageHeader title="概览" description={`欢迎使用 ${config.siteName} ${config.adminPanelLabel}`} />
 
             {/* 第一层：财务核心 */}
             <section className="min-w-0" aria-label="财务核心指标">

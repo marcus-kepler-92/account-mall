@@ -1,15 +1,13 @@
 import { prisma } from "@/lib/prisma"
 import { formatCurrency } from "@/lib/utils"
-import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card"
-import { ShoppingCart, Clock, CheckCircle2, XCircle, DollarSign } from "lucide-react"
-import Link from "next/link"
+import { Clock, CheckCircle2, XCircle, DollarSign } from "lucide-react"
 import {
-    DEFAULT_ORDER_FILTERS,
     parseOrderFilters,
     type OrderFiltersInput,
 } from "./orders-filters"
 import { OrdersDataTable } from "./orders-data-table"
 import type { OrderRow } from "./orders-columns"
+import { PageHeader, StatCard } from "@/app/admin/components"
 
 export const dynamic = "force-dynamic"
 
@@ -169,93 +167,47 @@ export default async function AdminOrdersPage({
         return `/admin/orders${query ? `?${query}` : ""}`
     }
 
-    const hasFilters =
-        filters.statusList.length > 0 ||
-        filters.search ||
-        filters.email ||
-        filters.orderNo ||
-        filters.dateFrom ||
-        filters.dateTo
-
-    const statCards = [
-        {
-            key: "PENDING" as const,
-            label: "待完成",
-            value: String(orderStats.PENDING),
-            icon: Clock,
-            color: "text-warning",
-            borderColor: "border-l-warning",
-            active: filters.statusList.includes("PENDING"),
-        },
-        {
-            key: "COMPLETED" as const,
-            label: "已完成",
-            value: String(orderStats.COMPLETED),
-            icon: CheckCircle2,
-            color: "text-success",
-            borderColor: "border-l-success",
-            active: filters.statusList.includes("COMPLETED"),
-        },
-        {
-            key: "CLOSED" as const,
-            label: "已关闭",
-            value: String(orderStats.CLOSED),
-            icon: XCircle,
-            color: "text-muted-foreground",
-            borderColor: "border-l-muted-foreground",
-            active: filters.statusList.includes("CLOSED"),
-        },
-        {
-            key: "REVENUE",
-            label: "总营收",
-            value: formatCurrency(totalRevenue),
-            icon: DollarSign,
-            color: "text-primary",
-            borderColor: "border-l-primary",
-            active: false,
-            noLink: true,
-        },
-    ]
-
     return (
         <div className="space-y-6">
-            {/* Page header */}
-            <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                    <h2 className="text-2xl font-bold tracking-tight">订单管理</h2>
-                    <p className="text-muted-foreground">
-                        查看和管理客户订单
-                    </p>
-                </div>
-            </div>
+            <PageHeader title="订单管理" description="查看和管理客户订单" />
 
-            {/* Stats cards */}
             <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-                {statCards.map((stat) => {
-                    const cardEl = (
-                        <Card className={`border-l-4 ${stat.borderColor} transition-colors ${!("noLink" in stat && stat.noLink) ? "hover:bg-accent/50 cursor-pointer" : ""} ${stat.active ? "ring-2 ring-primary/20 bg-accent/30" : ""}`}>
-                            <CardContent className="pt-4 pb-4">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm font-medium text-muted-foreground">{stat.label}</p>
-                                        <p className="text-2xl font-bold mt-1">{stat.value}</p>
-                                    </div>
-                                    <stat.icon className={`size-8 ${stat.color} opacity-80`} />
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )
-                    if ("noLink" in stat && stat.noLink) return <div key={stat.key}>{cardEl}</div>
-                    const statusKey = stat.key as "PENDING" | "COMPLETED" | "CLOSED"
-                    return (
-                        <Link key={stat.key} href={buildStatusLink(statusKey)}>
-                            {cardEl}
-                        </Link>
-                    )
-                })}
+                <StatCard
+                    label="待完成"
+                    value={orderStats.PENDING}
+                    icon={Clock}
+                    borderColor="border-l-warning"
+                    iconColor="text-warning"
+                    active={filters.statusList.includes("PENDING")}
+                    href={buildStatusLink("PENDING")}
+                />
+                <StatCard
+                    label="已完成"
+                    value={orderStats.COMPLETED}
+                    icon={CheckCircle2}
+                    borderColor="border-l-success"
+                    iconColor="text-success"
+                    active={filters.statusList.includes("COMPLETED")}
+                    href={buildStatusLink("COMPLETED")}
+                />
+                <StatCard
+                    label="已关闭"
+                    value={orderStats.CLOSED}
+                    icon={XCircle}
+                    borderColor="border-l-muted-foreground"
+                    iconColor="text-muted-foreground"
+                    active={filters.statusList.includes("CLOSED")}
+                    href={buildStatusLink("CLOSED")}
+                />
+                <StatCard
+                    label="总营收"
+                    value={formatCurrency(totalRevenue)}
+                    icon={DollarSign}
+                    borderColor="border-l-primary"
+                    iconColor="text-primary"
+                />
             </div>
 
-            {/* Orders DataTable (Toolbar + SelectionBar + Table + Pagination) */}
             <OrdersDataTable
                 data={serializedOrders}
                 total={total}

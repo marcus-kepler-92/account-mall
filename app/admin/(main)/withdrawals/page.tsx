@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma"
 import { formatCurrency } from "@/lib/utils"
-import { Card, CardContent } from "@/components/ui/card"
 import { Clock, CheckCircle2, XCircle, Wallet, DollarSign } from "lucide-react"
 import { WithdrawalsDataTable } from "./withdrawals-data-table"
 import type { WithdrawalRow } from "./withdrawals-columns"
@@ -9,6 +8,7 @@ import {
     parseWithdrawalFilters,
     type WithdrawalFiltersInput,
 } from "./withdrawals-filters"
+import { PageHeader, StatCard } from "@/app/admin/components"
 
 export const dynamic = "force-dynamic"
 
@@ -153,44 +153,6 @@ export default async function AdminWithdrawalsPage({ searchParams }: { searchPar
         }
     })
 
-    const statCards = [
-        {
-            label: "待处理",
-            value: counts.PENDING,
-            icon: Clock,
-            color: "text-warning",
-            borderColor: "border-l-warning",
-        },
-        {
-            label: "待处理金额",
-            value: formatCurrency(amounts.PENDING),
-            icon: DollarSign,
-            color: "text-warning",
-            borderColor: "border-l-warning",
-        },
-        {
-            label: "已打款金额",
-            value: formatCurrency(amounts.PAID),
-            icon: CheckCircle2,
-            color: "text-success",
-            borderColor: "border-l-success",
-        },
-        {
-            label: "已拒绝",
-            value: counts.REJECTED,
-            icon: XCircle,
-            color: "text-muted-foreground",
-            borderColor: "border-l-muted-foreground",
-        },
-        {
-            label: "平台待提现总额",
-            value: formatCurrency(platformTotalWithdrawable),
-            icon: Wallet,
-            color: "text-primary",
-            borderColor: "border-l-primary",
-        },
-    ]
-
     const statusCounts2 = {
         PENDING: counts.PENDING,
         PAID: counts.PAID,
@@ -199,34 +161,14 @@ export default async function AdminWithdrawalsPage({ searchParams }: { searchPar
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                    <h2 className="text-2xl font-bold tracking-tight">提现管理</h2>
-                    <p className="text-muted-foreground">
-                        处理分销员提现申请，线下打款后标记已打款或拒绝
-                    </p>
-                </div>
-            </div>
+            <PageHeader title="提现管理" description="处理分销员提现申请，线下打款后标记已打款或拒绝" />
 
             <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
-                {statCards.map((stat) => (
-                    <Card
-                        key={stat.label}
-                        className={`border-l-4 ${stat.borderColor}`}
-                    >
-                        <CardContent className="pt-4 pb-4">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm font-medium text-muted-foreground">
-                                        {stat.label}
-                                    </p>
-                                    <p className="text-2xl font-bold mt-1">{stat.value}</p>
-                                </div>
-                                <stat.icon className={`size-8 ${stat.color} opacity-80`} />
-                            </div>
-                        </CardContent>
-                    </Card>
-                ))}
+                <StatCard label="待处理" value={counts.PENDING} icon={Clock} borderColor="border-l-warning" iconColor="text-warning" />
+                <StatCard label="待处理金额" value={formatCurrency(amounts.PENDING)} icon={DollarSign} borderColor="border-l-warning" iconColor="text-warning" />
+                <StatCard label="已打款金额" value={formatCurrency(amounts.PAID)} icon={CheckCircle2} borderColor="border-l-success" iconColor="text-success" />
+                <StatCard label="已拒绝" value={counts.REJECTED} icon={XCircle} borderColor="border-l-muted-foreground" iconColor="text-muted-foreground" />
+                <StatCard label="平台待提现总额" value={formatCurrency(platformTotalWithdrawable)} icon={Wallet} borderColor="border-l-primary" iconColor="text-primary" />
             </div>
 
             <WithdrawalsDataTable

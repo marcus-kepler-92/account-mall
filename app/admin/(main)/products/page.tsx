@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
 import { ProductsDataTable } from "./products-data-table"
 import type { ProductRow } from "./products-columns"
+import { PageHeader } from "@/app/admin/components"
 
 export const dynamic = "force-dynamic"
 
@@ -41,18 +42,14 @@ export default async function AdminProductsPage() {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                    <h2 className="text-2xl font-bold tracking-tight">商品管理</h2>
-                    <p className="text-muted-foreground">管理数字商品和价格</p>
-                </div>
+            <PageHeader title="商品管理" description="管理数字商品和价格">
                 <Button asChild>
                     <Link href="/admin/products/new">
                         <Plus className="size-4" />
                         添加商品
                     </Link>
                 </Button>
-            </div>
+            </PageHeader>
             <ProductsDataTable data={data} />
         </div>
     )

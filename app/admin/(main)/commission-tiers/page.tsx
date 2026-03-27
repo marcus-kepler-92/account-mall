@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { CommissionTiersDataTable } from "./commission-tiers-data-table"
 import { AddTierDialog } from "./add-tier-dialog"
 import type { TierRow } from "./commission-tiers-columns"
+import { PageHeader } from "@/app/admin/components"
 
 export const dynamic = "force-dynamic"
 
@@ -22,15 +23,9 @@ export default async function AdminCommissionTiersPage() {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                    <h2 className="text-2xl font-bold tracking-tight">阶梯佣金配置</h2>
-                    <p className="text-muted-foreground">
-                        全局适用，按自然周累计销售额分档，每档按订单金额的百分比计算阶梯佣金。
-                    </p>
-                </div>
+            <PageHeader title="阶梯佣金配置" description="全局适用，按自然周累计销售额分档，每档按订单金额的百分比计算阶梯佣金。">
                 <AddTierDialog />
-            </div>
+            </PageHeader>
             <Card>
                 <CardHeader>
                     <CardTitle>档位列表</CardTitle>

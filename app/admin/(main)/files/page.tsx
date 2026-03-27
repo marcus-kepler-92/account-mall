@@ -14,6 +14,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { PageHeader } from "@/app/admin/components"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
     Table,
@@ -213,52 +214,44 @@ export default function AdminFilesPage() {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                    <h2 className="text-2xl font-bold tracking-tight">文件管理</h2>
-                    <p className="text-muted-foreground">
-                        按目录查看、上传与删除已上传的图片与凭证，可复制链接用于内容中引用
-                    </p>
-                </div>
-                <div className="flex items-center gap-2">
-                    <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        className="hidden"
-                        onChange={(e) => {
-                            const files = e.target.files
-                            if (files?.length) uploadFiles(files)
-                            e.target.value = ""
-                        }}
-                    />
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
-                    >
-                        {viewMode === "grid" ? (
-                            <List className="size-4" />
-                        ) : (
-                            <LayoutGrid className="size-4" />
-                        )}
-                        <span className="ml-1.5">{viewMode === "grid" ? "列表" : "网格"}</span>
-                    </Button>
-                    <Button
-                        size="sm"
-                        disabled={uploading}
-                        onClick={() => fileInputRef.current?.click()}
-                    >
-                        {uploading ? (
-                            <Loader2 className="size-4 animate-spin" />
-                        ) : (
-                            <Upload className="size-4" />
-                        )}
-                        <span className="ml-1.5">上传</span>
-                    </Button>
-                </div>
-            </div>
+            <PageHeader title="文件管理" description="按目录查看、上传与删除已上传的图片与凭证，可复制链接用于内容中引用">
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => {
+                        const files = e.target.files
+                        if (files?.length) uploadFiles(files)
+                        e.target.value = ""
+                    }}
+                />
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
+                >
+                    {viewMode === "grid" ? (
+                        <List className="size-4" />
+                    ) : (
+                        <LayoutGrid className="size-4" />
+                    )}
+                    <span className="ml-1.5">{viewMode === "grid" ? "列表" : "网格"}</span>
+                </Button>
+                <Button
+                    size="sm"
+                    disabled={uploading}
+                    onClick={() => fileInputRef.current?.click()}
+                >
+                    {uploading ? (
+                        <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                        <Upload className="size-4" />
+                    )}
+                    <span className="ml-1.5">上传</span>
+                </Button>
+            </PageHeader>
 
             <Tabs value={prefix} onValueChange={(v) => setPrefix(v as Prefix)}>
                 <TabsList className="w-full sm:w-auto">

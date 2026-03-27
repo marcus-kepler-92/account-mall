@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/c
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { CreditCard, CircleDot, Clock, CheckCircle2, Ban } from "lucide-react";
+import { PageHeader } from "@/app/admin/components";
 import {
     DEFAULT_CARD_FILTERS,
     parseCardFilters,
@@ -191,16 +192,9 @@ export default async function AdminCardsPage({
 
     return (
         <div className="space-y-6">
-            {/* Page header */}
-            <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                    <h2 className="text-2xl font-bold tracking-tight">卡密管理</h2>
-                    <p className="text-muted-foreground">
-                        跨商品查看和管理所有卡密库存
-                    </p>
-                </div>
+            <PageHeader title="卡密管理" description="跨商品查看和管理所有卡密库存">
                 <CardsHeaderActions />
-            </div>
+            </PageHeader>
 
             {/* Stats cards - clickable to filter by status */}
             <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">

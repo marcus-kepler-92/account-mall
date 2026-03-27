@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
 import { GuidesDataTable } from "./guides-data-table"
 import type { GuideRow } from "./guides-columns"
+import { PageHeader } from "@/app/admin/components"
 
 export const dynamic = "force-dynamic"
 
@@ -34,20 +35,14 @@ export default async function AdminGuidesPage() {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                    <h2 className="text-2xl font-bold tracking-tight">分销指南</h2>
-                    <p className="text-muted-foreground">
-                        管理分销员入门手册，已发布的指南将展示在分销员端「入门手册」
-                    </p>
-                </div>
+            <PageHeader title="分销指南" description="管理分销员入门手册，已发布的指南将展示在分销员端「入门手册」">
                 <Button asChild>
                     <Link href="/admin/guides/new">
                         <Plus className="size-4" />
                         新建指南
                     </Link>
                 </Button>
-            </div>
+            </PageHeader>
             <GuidesDataTable data={data} />
         </div>
     )
