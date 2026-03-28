@@ -38,6 +38,7 @@ jest.mock("@/lib/config", () => {
     turnstileSecretKey: undefined as string | undefined,
     nodeEnv: "test" as string,
     siteUrl: "http://localhost:3000",
+    basePromoDiscountPercent: 5,
   };
   (global as { __configMock?: typeof mock }).__configMock = mock;
   return { config: mock, getConfig: () => mock };
@@ -1624,12 +1625,13 @@ describe("POST /api/orders (create order)", () => {
         }),
       );
 
+      // Master switch off → no discount
       const call = (tx.order.create as jest.Mock).mock.calls[0][0];
       expect(call.data.amount).toBe(100);
       expect(call.data).not.toHaveProperty("discountPercentApplied");
     });
 
-    it("no discount when distributor has discountCodeEnabled true but discountPercent null", async () => {
+    it("applies base discount when distributor has discountCodeEnabled true but discountPercent null", async () => {
       prismaMock.user.findFirst.mockResolvedValueOnce({
         id: "dist_1",
         discountCodeEnabled: true,
@@ -1650,11 +1652,11 @@ describe("POST /api/orders (create order)", () => {
       );
 
       const call = (tx.order.create as jest.Mock).mock.calls[0][0];
-      expect(call.data.amount).toBe(100);
-      expect(call.data).not.toHaveProperty("discountPercentApplied");
+      expect(call.data.amount).toBe(95);
+      expect(call.data.discountPercentApplied).toBe(5);
     });
 
-    it("no discount when distributor has discountPercent 0", async () => {
+    it("applies base discount when distributor has discountPercent 0", async () => {
       prismaMock.user.findFirst.mockResolvedValueOnce({
         id: "dist_1",
         discountCodeEnabled: true,
@@ -1675,11 +1677,11 @@ describe("POST /api/orders (create order)", () => {
       );
 
       const call = (tx.order.create as jest.Mock).mock.calls[0][0];
-      expect(call.data.amount).toBe(100);
-      expect(call.data).not.toHaveProperty("discountPercentApplied");
+      expect(call.data.amount).toBe(95);
+      expect(call.data.discountPercentApplied).toBe(5);
     });
 
-    it("no discount when distributor has discountPercent greater than 100", async () => {
+    it("applies base discount when distributor has discountPercent greater than 100", async () => {
       prismaMock.user.findFirst.mockResolvedValueOnce({
         id: "dist_1",
         discountCodeEnabled: true,
@@ -1699,9 +1701,10 @@ describe("POST /api/orders (create order)", () => {
         }),
       );
 
+      // Invalid admin percent (>100) is ignored; base discount still applies
       const call = (tx.order.create as jest.Mock).mock.calls[0][0];
-      expect(call.data.amount).toBe(100);
-      expect(call.data).not.toHaveProperty("discountPercentApplied");
+      expect(call.data.amount).toBe(95);
+      expect(call.data.discountPercentApplied).toBe(5);
     });
   });
 

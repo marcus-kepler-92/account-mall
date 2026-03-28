@@ -30,10 +30,18 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ valid: false, discountPercent: null })
     }
 
-    let discountPercent: number | null = null
-    if (distributor.discountCodeEnabled && distributor.discountPercent != null) {
-        const pct = Number(distributor.discountPercent)
-        if (pct > 0 && pct <= 100) discountPercent = pct
+    // discountCodeEnabled is the master switch; when off, no discount at all
+    if (!distributor.discountCodeEnabled) {
+        return NextResponse.json({ valid: true, discountPercent: null })
+    }
+
+    // Use custom rate if set and higher than base; otherwise fall back to base
+    let discountPercent = config.basePromoDiscountPercent
+    if (distributor.discountPercent != null) {
+        const adminPct = Number(distributor.discountPercent)
+        if (adminPct > discountPercent && adminPct > 0 && adminPct <= 100) {
+            discountPercent = adminPct
+        }
     }
 
     return NextResponse.json({ valid: true, discountPercent })

@@ -132,7 +132,7 @@ export async function completePendingOrder(
       if (ratePercent == null && tiers.length > 0) {
         ratePercent = toNumber(tiers[0].ratePercent);
       }
-      // 佣金按原价（折前）计算：有折扣时用 实付 / (1 - 折扣比例) 反推原价
+      // Commission is calculated on original price (pre-discount); platform absorbs the discount cost.
       const paidAmount = toNumber(order.amount);
       const discountPct = toNumber(order.discountPercentApplied);
       const commissionBase =

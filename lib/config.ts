@@ -83,6 +83,8 @@ const envSchema = z
     autoFetchMaxQuantityPerOrder: z.coerce.number().int().min(1).default(1),
     /** 推荐码/优惠码：最大长度（字符），用于校验与防抖校验 API */
     promoCodeMaxLength: z.coerce.number().int().min(1).max(256).default(64),
+    /** 推荐码/优惠码：所有使用推荐码的客户默认享受的基础折扣比例（%），折扣成本从分销员佣金中扣除 */
+    basePromoDiscountPercent: z.coerce.number().min(0).max(50).default(5),
     /** 推荐码/优惠码：前端防抖校验延迟（毫秒），输入停止后多久发起校验 */
     promoValidateDebounceMs: z.coerce.number().int().min(0).default(400),
     /** Product JSON-LD：品牌名，用于 schema.org Brand */
@@ -242,6 +244,7 @@ function getEnvInput() {
       e.AUTO_FETCH_MAX_QUANTITY_PER_ORDER ??
       e.FREE_SHARED_MAX_QUANTITY_PER_ORDER,
     promoCodeMaxLength: e.PROMO_CODE_MAX_LENGTH,
+    basePromoDiscountPercent: e.BASE_PROMO_DISCOUNT_PERCENT,
     promoValidateDebounceMs: e.PROMO_VALIDATE_DEBOUNCE_MS,
     schemaBrandName: e.SCHEMA_BRAND_NAME,
     schemaShippingCountry: e.SCHEMA_SHIPPING_COUNTRY,

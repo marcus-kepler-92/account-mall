@@ -56,6 +56,7 @@ jest.mock("@/lib/config", () => {
     exitDiscountSecret: "test-exit-secret" as string | undefined,
     exitDiscountPercent: 5,
     exitDiscountTtlMs: 900_000,
+    basePromoDiscountPercent: 5,
   };
   (
     global as { __ordersExitDiscountConfigMock?: typeof mock }

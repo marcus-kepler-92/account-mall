@@ -111,7 +111,7 @@ export function EditDiscountDialog({
                     <DialogTitle>优惠码设置</DialogTitle>
                     <DialogDescription>
                         {distributorCode ? (
-                            <>推荐码 <code className="font-mono text-xs">{distributorCode}</code> 作为优惠码时，仅当开启下方开关并设置折扣比例后，访客下单才享受折扣。</>
+                            <>推荐码 <code className="font-mono text-xs">{distributorCode}</code> 开启后访客下单享受折扣（默认 5%）；关闭则无折扣。可设置更高的自定义折扣比例覆盖默认值。</>
                         ) : (
                             "该分销员暂无推荐码，请先确保其已生成推荐码。"
                         )}

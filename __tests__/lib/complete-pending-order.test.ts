@@ -304,7 +304,7 @@ describe("completePendingOrder", () => {
 
       await completePendingOrder("order-1");
 
-      // 佣金按原价：原价 = 18 / (1 - 0.1) = 20，20 * 10% = 2
+      // Commission on original price: original = 18/(1-0.1) = 20, 20 * 10% = 2
       expect(prismaMock.commission.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           orderId: "ord_1",

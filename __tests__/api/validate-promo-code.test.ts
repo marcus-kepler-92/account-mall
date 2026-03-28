@@ -60,7 +60,21 @@ describe("GET /api/validate-promo-code", () => {
         expect(data).toEqual({ valid: true, discountPercent: 5 })
     })
 
-    it("returns valid: true and discountPercent null when distributor has discount disabled", async () => {
+    it("returns admin-set discountPercent when it exceeds the base discount", async () => {
+        prismaMock.user.findFirst.mockResolvedValueOnce({
+            id: "u1",
+            discountCodeEnabled: true,
+            discountPercent: new Prisma.Decimal("10"),
+        } as any)
+        const req = new NextRequest("http://localhost:3000/api/validate-promo-code?promoCode=PROMO1")
+        const res = await GET(req)
+        const data = await res.json()
+        expect(res.status).toBe(200)
+        // Admin-set 10% overrides the 5% base
+        expect(data).toEqual({ valid: true, discountPercent: 10 })
+    })
+
+    it("returns valid: true and discountPercent null when discountCodeEnabled is false", async () => {
         prismaMock.user.findFirst.mockResolvedValueOnce({
             id: "u1",
             discountCodeEnabled: false,
@@ -70,10 +84,11 @@ describe("GET /api/validate-promo-code", () => {
         const res = await GET(req)
         const data = await res.json()
         expect(res.status).toBe(200)
+        // Master switch off → no discount at all
         expect(data).toEqual({ valid: true, discountPercent: null })
     })
 
-    it("returns valid: true and discountPercent null when distributor has discountPercent null", async () => {
+    it("returns base discountPercent when discountCodeEnabled is true but discountPercent not set", async () => {
         prismaMock.user.findFirst.mockResolvedValueOnce({
             id: "u1",
             discountCodeEnabled: true,
@@ -83,6 +98,7 @@ describe("GET /api/validate-promo-code", () => {
         const res = await GET(req)
         const data = await res.json()
         expect(res.status).toBe(200)
-        expect(data).toEqual({ valid: true, discountPercent: null })
+        // Enabled with no custom rate → base 5%
+        expect(data).toEqual({ valid: true, discountPercent: 5 })
     })
 })

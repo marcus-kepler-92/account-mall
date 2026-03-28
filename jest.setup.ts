@@ -16,6 +16,7 @@ jest.mock("@/lib/config", () => {
         siteUrl: "http://localhost:3000",
         nodeEnv: "test" as const,
         pendingOrderTimeoutMs: 900_000,
+        basePromoDiscountPercent: 5,
     }
     return { config: mock, getConfig: () => mock }
 })

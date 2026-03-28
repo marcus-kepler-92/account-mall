@@ -42,6 +42,7 @@ jest.mock("@/lib/config", () => {
         autoFetchSourceUrls: ["https://example.com/share/accounts"],
         pendingOrderTimeoutMs: 900_000,
         exitDiscountSecret: undefined as string | undefined,
+        basePromoDiscountPercent: 5,
     }
     ;(global as { __configMockAutoFetch?: typeof mock }).__configMockAutoFetch = mock
     return { config: mock, getConfig: () => mock }

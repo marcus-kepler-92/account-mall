@@ -223,7 +223,7 @@ async function createAutoFetchOrder(params: {
                         ...(distributorId && { distributorId }),
                         ...(promoCode && { promoCode }),
                         ...(fingerprintHash && { fingerprintHash }),
-                        ...(distributorDiscountPercent != null && { discountPercent: distributorDiscountPercent }),
+                        ...(distributorDiscountPercent != null && { discountPercentApplied: distributorDiscountPercent }),
                     },
                 })
                 await tx.card.create({
@@ -452,10 +452,16 @@ export async function POST(request: NextRequest) {
         })
         if (distributor) {
             distributorId = distributor.id
-            // 同码优惠：仅当启用优惠码且设置了折扣比例时应用
-            if (distributor.discountCodeEnabled && distributor.discountPercent != null) {
-                const pct = Number(distributor.discountPercent)
-                if (pct > 0 && pct <= 100) distributorDiscountPercent = pct
+            // discountCodeEnabled is the master switch; when off, no discount at all
+            if (distributor.discountCodeEnabled) {
+                let effectiveDiscount = config.basePromoDiscountPercent
+                if (distributor.discountPercent != null) {
+                    const adminPct = Number(distributor.discountPercent)
+                    if (adminPct > effectiveDiscount && adminPct > 0 && adminPct <= 100) {
+                        effectiveDiscount = adminPct
+                    }
+                }
+                if (effectiveDiscount > 0) distributorDiscountPercent = effectiveDiscount
             }
         }
     }
