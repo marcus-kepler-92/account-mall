@@ -95,7 +95,7 @@ export default async function DistributorGuidePage({ searchParams }: PageProps) 
                     description="请稍后再看。"
                 />
             ) : (
-                <Card>
+                <Card className="py-0">
                     <CardContent className="p-0">
                         <GuideAccordionClient
                             guides={guides.map((g) => ({
