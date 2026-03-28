@@ -18,7 +18,7 @@ const DRAG_THRESHOLD = 4 // px moved before treating as drag
 function getInitialPos(): { x: number; y: number } {
     return {
         x: window.innerWidth - BTN - 16,
-        y: window.innerHeight - BTN - (window.innerWidth >= 1024 ? 24 : 80),
+        y: window.innerHeight - BTN - (window.innerWidth >= 1024 ? 24 : 112),
     }
 }
 
@@ -129,7 +129,7 @@ export function CustomerServiceFab() {
         onPointerMove,
         onPointerUp,
         onClickCapture,
-        style: { position: "fixed" as const, left: pos.x, top: pos.y, zIndex: 30 },
+        style: { position: "fixed" as const, left: pos.x, top: pos.y, zIndex: 50 },
     }
 
     // TG only — no popover
