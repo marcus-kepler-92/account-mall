@@ -57,6 +57,8 @@ export default async function DistributorInviteesPage() {
     0,
   );
 
+  const level2RatePercent = config.level2CommissionRatePercent
+
   const rows: InviteeRow[] = invitees.map((u) => ({
     id: u.id,
     name: u.name,
@@ -69,7 +71,7 @@ export default async function DistributorInviteesPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-bold tracking-tight sm:text-2xl">我的团队</h1>
-        <p className="text-muted-foreground">已邀请加入的团队成员</p>
+        <p className="text-muted-foreground">邀请分销员加入团队，团队成员每成一单，您可获得其佣金的 {level2RatePercent}% 作为团队奖金</p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -91,7 +93,7 @@ export default async function DistributorInviteesPage() {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold">¥{totalLevel2.toFixed(2)}</p>
-            <p className="text-xs text-muted-foreground">累计已结算</p>
+            <p className="text-xs text-muted-foreground">团队成员每笔销售佣金的 {level2RatePercent}% 归您</p>
           </CardContent>
         </Card>
       </div>
