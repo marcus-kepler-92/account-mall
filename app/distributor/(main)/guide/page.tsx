@@ -1,10 +1,12 @@
 import { redirect } from "next/navigation"
 import Link from "next/link"
+import { BookOpen } from "lucide-react"
 import { getDistributorSession } from "@/lib/auth-guard"
 import { prisma } from "@/lib/prisma"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { GuideMarkdownView } from "./guide-markdown-view"
+import { EmptyState } from "@/app/components/empty-state"
+import { GuideAccordionClient } from "./guide-accordion-client"
 
 export const dynamic = "force-dynamic"
 
@@ -86,31 +88,26 @@ export default async function DistributorGuidePage({ searchParams }: PageProps) 
             </div>
 
             {/* 指南列表 */}
-            <div className="space-y-6">
-                {guides.length === 0 ? (
-                    <Card>
-                        <CardContent className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
-                            暂无指南，请稍后再看。
-                        </CardContent>
-                    </Card>
-                ) : (
-                    guides.map((guide) => (
-                        <Card key={guide.id}>
-                            <CardHeader>
-                                <CardTitle className="text-lg">{guide.title}</CardTitle>
-                                {guide.tag && (
-                                    <Badge variant="outline" className="w-fit">
-                                        {guide.tag.name}
-                                    </Badge>
-                                )}
-                            </CardHeader>
-                            <CardContent>
-                                <GuideMarkdownView content={guide.content ?? ""} />
-                            </CardContent>
-                        </Card>
-                    ))
-                )}
-            </div>
+            {guides.length === 0 ? (
+                <EmptyState
+                    icon={<BookOpen className="size-8 text-muted-foreground" />}
+                    title="暂无指南"
+                    description="请稍后再看。"
+                />
+            ) : (
+                <Card>
+                    <CardContent className="p-0">
+                        <GuideAccordionClient
+                            guides={guides.map((g) => ({
+                                id: g.id,
+                                title: g.title,
+                                content: g.content,
+                                tagName: g.tag?.name ?? null,
+                            }))}
+                        />
+                    </CardContent>
+                </Card>
+            )}
         </div>
     )
 }

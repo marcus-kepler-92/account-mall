@@ -43,7 +43,8 @@ export function DistributorTopbarActions() {
             </Button>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="relative size-9 min-w-9 rounded-full touch-manipulation">
+                    {/* suppressHydrationWarning: radix-ui 1.4.x + React 19 known useId() mismatch */}
+                    <Button suppressHydrationWarning variant="ghost" className="relative size-9 min-w-9 rounded-full touch-manipulation">
                         <Avatar className="size-8">
                             <AvatarFallback className="bg-primary text-primary-foreground text-sm">
                                 {initial}
