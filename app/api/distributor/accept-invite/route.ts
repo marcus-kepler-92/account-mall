@@ -4,6 +4,7 @@ import { badRequest, conflict, notFound, validationError } from "@/lib/api-respo
 import { acceptInviteSchema } from "@/lib/validations/distributor-invite";
 import { hashPassword } from "better-auth/crypto";
 import { checkAcceptInviteRateLimit } from "@/lib/rate-limit";
+import { config } from "@/lib/config";
 
 export async function POST(request: NextRequest) {
     const rateLimitRes = await checkAcceptInviteRateLimit(request);
@@ -81,6 +82,7 @@ export async function POST(request: NextRequest) {
                     emailVerified: true,
                     role: "DISTRIBUTOR",
                     distributorCode,
+                    discountPercent: config.basePromoDiscountPercent,
                     inviterId: newUserInviterId,
                     createdAt: now,
                     updatedAt: now,
