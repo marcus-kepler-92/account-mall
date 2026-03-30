@@ -83,7 +83,7 @@ export default async function AdminOrdersPage({
         where.createdAt = createdAt
     }
 
-    const [orders, total, statusCounts, revenueAgg] = await Promise.all([
+    const [orders, total, statusCounts, revenueAgg, distributors] = await Promise.all([
         prisma.order.findMany({
             where,
             include: {
@@ -115,6 +115,11 @@ export default async function AdminOrdersPage({
         prisma.order.aggregate({
             where: { status: "COMPLETED" },
             _sum: { amount: true },
+        }),
+        prisma.user.findMany({
+            where: { role: "DISTRIBUTOR" },
+            select: { id: true, name: true, distributorCode: true },
+            orderBy: { name: "asc" },
         }),
     ])
 
@@ -212,6 +217,11 @@ export default async function AdminOrdersPage({
                 data={serializedOrders}
                 total={total}
                 statusCounts={orderStats}
+                distributors={distributors.map((d) => ({
+                    id: d.id,
+                    name: d.name ?? "",
+                    distributorCode: d.distributorCode,
+                }))}
             />
         </div>
     )
