@@ -14,14 +14,13 @@ const schema = z.object({
   distributorId: z.string().nullable(),
 })
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ orderId: string }> }
-) {
+type RouteContext = { params: Promise<{ orderId: string }> }
+
+export async function PATCH(request: NextRequest, context: RouteContext) {
   const session = await getAdminSession()
   if (!session) return unauthorized()
 
-  const { orderId } = await params
+  const { orderId } = await context.params
 
   let body: unknown
   try {
