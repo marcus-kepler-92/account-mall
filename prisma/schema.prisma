@@ -226,6 +226,7 @@ enum CommissionStatus {
   PENDING
   SETTLED
   WITHDRAWN
+  CANCELLED
 }
 
 model Commission {
