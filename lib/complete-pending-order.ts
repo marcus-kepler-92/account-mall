@@ -63,6 +63,7 @@ export async function completePendingOrder(
       });
     }
 
+    // Commission: only when we actually completed this order and order has a distributor
     if (!didUpdate) return;
     const distributorId = order.distributorId;
     if (distributorId) {
