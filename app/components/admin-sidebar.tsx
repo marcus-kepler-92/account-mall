@@ -15,6 +15,7 @@ import {
     Wallet,
     BookOpen,
     FolderOpen,
+    FlaskConical,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { authClient } from "@/lib/auth-client"
@@ -86,6 +87,11 @@ const navItems = [
         title: "文件管理",
         href: "/admin/files",
         icon: FolderOpen,
+    },
+    {
+        title: "自动获取验证",
+        href: "/admin/auto-fetch",
+        icon: FlaskConical,
     },
 ]
 

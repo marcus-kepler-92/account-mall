@@ -23,6 +23,7 @@ const routeLabels: Record<string, string> = {
     "commission-tiers": "佣金档位",
     withdrawals: "提现",
     files: "文件管理",
+    "auto-fetch": "自动获取验证",
 }
 
 function isIdSegment(seg: string) {
