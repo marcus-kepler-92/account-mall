@@ -55,6 +55,13 @@ export function OrderDistributorCell({
   }
 
   const handleSelect = (selected: DistributorOption | "clear") => {
+    if (
+      selected !== "clear" &&
+      distributor?.id === (selected as DistributorOption).id
+    ) {
+      setOpen(false)
+      return
+    }
     setPending(selected)
     setStep("confirm")
   }
@@ -108,7 +115,7 @@ export function OrderDistributorCell({
         : ""
 
   return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
+    <Popover open={open} onOpenChange={(next) => !loading && handleOpenChange(next)}>
       <PopoverTrigger asChild>
         <button
           className={cn(
