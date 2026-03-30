@@ -43,7 +43,7 @@ const paymentMethodLabel: Record<string, string> = {
 }
 
 export function createOrdersColumns(distributors: DistributorOption[]): ColumnDef<OrderRow>[] {
-  return [
+    return [
     {
         id: "select",
         header: ({ table }) => (
@@ -196,5 +196,5 @@ export function createOrdersColumns(distributors: DistributorOption[]): ColumnDe
         id: "actions",
         cell: ({ row }) => <OrderRowActions order={row.original} />,
     },
-  ]
+    ]
 }

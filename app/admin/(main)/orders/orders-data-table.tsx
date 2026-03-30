@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -58,9 +58,11 @@ export function OrdersDataTable({ data, total, statusCounts, distributors }: Ord
     const [batchAction, setBatchAction] = useState<"CLOSE" | "DELETE" | null>(null);
     const [closeExpiredLoading, setCloseExpiredLoading] = useState(false);
 
+    const columns = useMemo(() => createOrdersColumns(distributors), [distributors]);
+
     const table = useReactTable({
         data,
-        columns: createOrdersColumns(distributors),
+        columns,
         state: {
             columnVisibility,
             rowSelection,
@@ -199,7 +201,7 @@ export function OrdersDataTable({ data, total, statusCounts, distributors }: Ord
                 </DataTableSelectionBar>
 
                 <Separator />
-                <DataTable table={table} columns={createOrdersColumns(distributors)} emptyMessage="暂无订单" />
+                <DataTable table={table} columns={columns} emptyMessage="暂无订单" />
                 <DataTablePagination table={table} total={total} />
             </CardContent>
 
