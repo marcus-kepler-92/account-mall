@@ -77,8 +77,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
           return conflict("分销员存在待处理提现申请，无法修改分销归属")
         }
 
-        // 4b. Balance check
-        const [settledAgg, paidAgg, pendingAgg] = await Promise.all([
+        // 4b. Balance check (PENDING withdrawals already blocked above, so formula is settled − cancel − paid)
+        const [settledAgg, paidAgg] = await Promise.all([
           prisma.commission.aggregate({
             where: { distributorId: distId, status: "SETTLED" },
             _sum: { amount: true },
@@ -87,15 +87,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
             where: { distributorId: distId, status: "PAID" },
             _sum: { amount: true },
           }),
-          prisma.withdrawal.aggregate({
-            where: { distributorId: distId, status: "PENDING" },
-            _sum: { amount: true },
-          }),
         ])
         const settled = toNumber(settledAgg._sum.amount)
         const paid = toNumber(paidAgg._sum.amount)
-        const pendingW = toNumber(pendingAgg._sum.amount)
-        const balanceAfter = settled - cancelAmount - paid - pendingW
+        const balanceAfter = settled - cancelAmount - paid
         if (balanceAfter < 0) {
           return conflict("此订单佣金已被提现消耗，无法修改分销归属")
         }

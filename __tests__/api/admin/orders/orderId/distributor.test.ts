@@ -97,11 +97,9 @@ describe("PATCH /api/admin/orders/[orderId]/distributor", () => {
       { id: "c-1", distributorId: "old-dist", amount: "100", status: "SETTLED" },
     ])
     prismaMock.withdrawal.count.mockResolvedValue(0)
-    // settled=100, commission_to_cancel=100, paid=80, pending=0 → 100-100-80-0 = -80 < 0
+    // settled=100, commission_to_cancel=100, paid=80 → 100-100-80 = -80 < 0
     prismaMock.commission.aggregate.mockResolvedValue({ _sum: { amount: "100" } })
-    prismaMock.withdrawal.aggregate
-      .mockResolvedValueOnce({ _sum: { amount: "80" } })  // PAID
-      .mockResolvedValueOnce({ _sum: { amount: "0" } })   // PENDING
+    prismaMock.withdrawal.aggregate.mockResolvedValue({ _sum: { amount: "80" } })  // PAID
     const res = await PATCH(makeRequest({ distributorId: null }), makeContext())
     expect(res.status).toBe(409)
     const data = await res.json()
