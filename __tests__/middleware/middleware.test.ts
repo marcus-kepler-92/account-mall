@@ -243,6 +243,15 @@ describe("Public APIs (no auth required)", () => {
 
     expect(response.status).toBe(200);
   });
+
+  it("should allow POST /api/orders/:orderNo/switch-account (success token auth)", async () => {
+    const request = createRequest("/api/orders/order_123/switch-account", {
+      method: "POST",
+    });
+    const response = await middleware(request);
+
+    expect(response.status).toBe(200);
+  });
 });
 
 // ─── Admin login page with session ───────────────────────────────

@@ -58,6 +58,11 @@ function isPublicApi(pathname: string, method: string): boolean {
         return true;
     }
 
+    // POST /api/orders/:orderNo/switch-account is public (authenticated via success token)
+    if (/^\/api\/orders\/[^/]+\/switch-account$/.test(pathname) && method === "POST") {
+        return true;
+    }
+
     // Restock subscription API (subscribe / check status) is public
     if (pathname.startsWith("/api/restock-subscriptions")) {
         return true;
