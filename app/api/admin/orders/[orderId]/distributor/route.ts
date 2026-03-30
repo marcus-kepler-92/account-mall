@@ -8,7 +8,10 @@ import {
   invalidJsonBody,
   validationError,
   badRequest,
+  conflict,
+  internalServerError,
 } from "@/lib/api-response"
+import { createOrderCommissions, toNumber } from "@/lib/calculate-order-commission"
 
 const schema = z.object({
   distributorId: z.string().nullable(),
@@ -34,22 +37,102 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
   const { distributorId } = parsed.data
 
-  const order = await prisma.order.findUnique({ where: { id: orderId } })
-  if (!order) return notFound("Order not found")
-
-  if (distributorId !== null) {
-    const user = await prisma.user.findUnique({ where: { id: distributorId } })
-    if (!user || user.role !== "DISTRIBUTOR") {
-      return badRequest("Invalid distributor")
+  try {
+    // 1. Find order
+    const order = await prisma.order.findUnique({ where: { id: orderId } })
+    if (!order) return notFound("Order not found")
+    if (order.status !== "COMPLETED") {
+      return badRequest("只能对已完成（COMPLETED）订单修改分销员")
     }
+
+    // 2. Validate new distributor
+    if (distributorId !== null) {
+      const user = await prisma.user.findUnique({ where: { id: distributorId } })
+      if (!user || user.role !== "DISTRIBUTOR") {
+        return badRequest("Invalid distributor")
+      }
+    }
+
+    // 3. Find all existing commissions for this order
+    const existingCommissions = await prisma.commission.findMany({
+      where: { orderId, status: { in: ["SETTLED", "PENDING"] } },
+      select: { id: true, distributorId: true, amount: true },
+    })
+
+    // 4. Check each affected distributor
+    if (existingCommissions.length > 0) {
+      // Group by distributorId
+      const amountByDistributor = new Map<string, number>()
+      for (const c of existingCommissions) {
+        const prev = amountByDistributor.get(c.distributorId) ?? 0
+        amountByDistributor.set(c.distributorId, prev + toNumber(c.amount))
+      }
+
+      for (const [distId, cancelAmount] of amountByDistributor) {
+        // 4a. PENDING withdrawal check
+        const pendingWithdrawals = await prisma.withdrawal.count({
+          where: { distributorId: distId, status: "PENDING" },
+        })
+        if (pendingWithdrawals > 0) {
+          return conflict("分销员存在待处理提现申请，无法修改分销归属")
+        }
+
+        // 4b. Balance check
+        const [settledAgg, paidAgg, pendingAgg] = await Promise.all([
+          prisma.commission.aggregate({
+            where: { distributorId: distId, status: "SETTLED" },
+            _sum: { amount: true },
+          }),
+          prisma.withdrawal.aggregate({
+            where: { distributorId: distId, status: "PAID" },
+            _sum: { amount: true },
+          }),
+          prisma.withdrawal.aggregate({
+            where: { distributorId: distId, status: "PENDING" },
+            _sum: { amount: true },
+          }),
+        ])
+        const settled = toNumber(settledAgg._sum.amount)
+        const paid = toNumber(paidAgg._sum.amount)
+        const pendingW = toNumber(pendingAgg._sum.amount)
+        const balanceAfter = settled - cancelAmount - paid - pendingW
+        if (balanceAfter < 0) {
+          return conflict("此订单佣金已被提现消耗，无法修改分销归属")
+        }
+      }
+    }
+
+    // 5. Transaction: cancel old commissions + update order + create new commissions
+    await prisma.$transaction(async (tx) => {
+      // Cancel all existing commissions for this order
+      await tx.commission.updateMany({
+        where: { orderId, status: { in: ["SETTLED", "PENDING"] } },
+        data: { status: "CANCELLED" },
+      })
+
+      // Update order distributorId
+      await tx.order.update({
+        where: { id: orderId },
+        data: { distributorId },
+      })
+
+      // Create new commissions if assigning a distributor
+      if (distributorId !== null && order.paidAt) {
+        await createOrderCommissions(tx, {
+          orderId,
+          distributorId,
+          orderEmail: order.email ?? "",
+          orderAmount: order.amount,
+          discountPercentApplied: order.discountPercentApplied,
+          paidAt: order.paidAt,
+        })
+      }
+    })
+
+    return NextResponse.json({ ok: true })
+  } catch {
+    return internalServerError()
   }
-
-  await prisma.order.update({
-    where: { id: orderId },
-    data: { distributorId },
-  })
-
-  return NextResponse.json({ ok: true })
 }
 
 export const runtime = "nodejs"
