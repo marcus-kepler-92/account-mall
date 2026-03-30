@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
 import { DataTableColumnHeader } from "@/app/admin/components"
 import { OrderRowActions } from "./order-row-actions"
+import { OrderDistributorCell, type DistributorOption } from "./order-distributor-cell"
 
 export type OrderRow = {
     id: string
@@ -41,7 +42,8 @@ const paymentMethodLabel: Record<string, string> = {
     qqpay: "QQ钱包",
 }
 
-export const ordersColumns: ColumnDef<OrderRow>[] = [
+export function createOrdersColumns(distributors: DistributorOption[]): ColumnDef<OrderRow>[] {
+  return [
     {
         id: "select",
         header: ({ table }) => (
@@ -91,18 +93,13 @@ export const ordersColumns: ColumnDef<OrderRow>[] = [
     {
         accessorKey: "distributor",
         header: "分销员",
-        cell: ({ row }) => {
-            const d = row.original.distributor
-            if (!d) return <span className="text-muted-foreground">—</span>
-            return (
-                <div className="flex flex-col text-xs">
-                    <span>{d.name}</span>
-                    {d.distributorCode && (
-                        <span className="text-muted-foreground font-mono">{d.distributorCode}</span>
-                    )}
-                </div>
-            )
-        },
+        cell: ({ row }) => (
+            <OrderDistributorCell
+                orderId={row.original.id}
+                distributor={row.original.distributor}
+                distributors={distributors}
+            />
+        ),
         enableSorting: false,
     },
     {
@@ -199,4 +196,5 @@ export const ordersColumns: ColumnDef<OrderRow>[] = [
         id: "actions",
         cell: ({ row }) => <OrderRowActions order={row.original} />,
     },
-]
+  ]
+}

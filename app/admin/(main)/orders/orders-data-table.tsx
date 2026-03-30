@@ -30,7 +30,8 @@ import {
     DataTablePagination,
     DataTableSelectionBar,
 } from "@/app/admin/components";
-import { ordersColumns, type OrderRow } from "./orders-columns";
+import { createOrdersColumns, type OrderRow } from "./orders-columns"
+import type { DistributorOption } from "./order-distributor-cell";
 
 interface OrdersDataTableProps {
     data: OrderRow[];
@@ -40,6 +41,7 @@ interface OrdersDataTableProps {
         COMPLETED: number;
         CLOSED: number;
     };
+    distributors: DistributorOption[];
 }
 
 const statusOptions = [
@@ -48,7 +50,7 @@ const statusOptions = [
     { label: "已关闭", value: "CLOSED" },
 ];
 
-export function OrdersDataTable({ data, total, statusCounts }: OrdersDataTableProps) {
+export function OrdersDataTable({ data, total, statusCounts, distributors }: OrdersDataTableProps) {
     const router = useRouter();
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
@@ -58,7 +60,7 @@ export function OrdersDataTable({ data, total, statusCounts }: OrdersDataTablePr
 
     const table = useReactTable({
         data,
-        columns: ordersColumns,
+        columns: createOrdersColumns(distributors),
         state: {
             columnVisibility,
             rowSelection,
@@ -197,7 +199,7 @@ export function OrdersDataTable({ data, total, statusCounts }: OrdersDataTablePr
                 </DataTableSelectionBar>
 
                 <Separator />
-                <DataTable table={table} columns={ordersColumns} emptyMessage="暂无订单" />
+                <DataTable table={table} columns={createOrdersColumns(distributors)} emptyMessage="暂无订单" />
                 <DataTablePagination table={table} total={total} />
             </CardContent>
 
