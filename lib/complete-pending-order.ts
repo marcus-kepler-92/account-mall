@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { sendOrderCompletionEmail } from "@/lib/order-completion-email";
-import { createOrderCommissions } from "@/lib/calculate-order-commission"
+import { createOrderCommissions } from "@/lib/calculate-order-commission";
 
 export type CompletePendingOrderResult =
   | { done: true; orderNo: string }
@@ -63,8 +63,8 @@ export async function completePendingOrder(
       });
     }
 
-    if (!didUpdate) return
-    const distributorId = order.distributorId
+    if (!didUpdate) return;
+    const distributorId = order.distributorId;
     if (distributorId) {
       await createOrderCommissions(tx, {
         orderId: order.id,
@@ -73,7 +73,7 @@ export async function completePendingOrder(
         orderAmount: order.amount,
         discountPercentApplied: order.discountPercentApplied,
         paidAt,
-      })
+      });
     }
   });
 
