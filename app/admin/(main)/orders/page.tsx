@@ -117,7 +117,7 @@ export default async function AdminOrdersPage({
             _sum: { amount: true },
         }),
         prisma.user.findMany({
-            where: { role: "DISTRIBUTOR" },
+            where: { role: "DISTRIBUTOR", name: { not: null } },
             select: { id: true, name: true, distributorCode: true },
             orderBy: { name: "asc" },
         }),
