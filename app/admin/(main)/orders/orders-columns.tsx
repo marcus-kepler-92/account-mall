@@ -96,6 +96,7 @@ export function createOrdersColumns(distributors: DistributorOption[]): ColumnDe
         cell: ({ row }) => (
             <OrderDistributorCell
                 orderId={row.original.id}
+                orderStatus={row.original.status}
                 distributor={row.original.distributor}
                 distributors={distributors}
             />

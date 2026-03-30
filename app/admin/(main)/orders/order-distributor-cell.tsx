@@ -29,6 +29,7 @@ export type DistributorOption = {
 
 interface OrderDistributorCellProps {
   orderId: string
+  orderStatus: "PENDING" | "COMPLETED" | "CLOSED"
   distributor: { id: string; name: string; distributorCode: string | null } | null
   distributors: DistributorOption[]
 }
@@ -37,6 +38,7 @@ type Step = "select" | "confirm"
 
 export function OrderDistributorCell({
   orderId,
+  orderStatus,
   distributor,
   distributors,
 }: OrderDistributorCellProps) {
@@ -54,7 +56,24 @@ export function OrderDistributorCell({
     }
   }
 
+  if (orderStatus !== "COMPLETED") {
+    return distributor ? (
+      <div className="flex flex-col text-xs">
+        <span>{distributor.name}</span>
+        {distributor.distributorCode && (
+          <span className="text-muted-foreground font-mono">{distributor.distributorCode}</span>
+        )}
+      </div>
+    ) : (
+      <span className="text-muted-foreground">—</span>
+    )
+  }
+
   const handleSelect = (selected: DistributorOption | "clear") => {
+    if (selected === "clear" && !distributor) {
+      setOpen(false)
+      return
+    }
     if (
       selected !== "clear" &&
       distributor?.id === (selected as DistributorOption).id
@@ -85,6 +104,7 @@ export function OrderDistributorCell({
       router.refresh()
     } catch {
       toast.error("操作失败")
+      setOpen(false)
     } finally {
       setLoading(false)
     }
