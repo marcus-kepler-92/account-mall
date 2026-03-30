@@ -56,6 +56,7 @@ describe("cards-filters", () => {
             ...DEFAULT_CARD_FILTERS,
             page: 2,
             status: "UNSOLD",
+            statusList: ["UNSOLD"],
             productKeyword: "abc",
             orderNo: "NO",
             codeLike: "1234",
@@ -80,6 +81,7 @@ describe("cards-filters", () => {
         const query = buildCardFiltersQuery({
             ...DEFAULT_CARD_FILTERS,
             status: "DISABLED",
+            statusList: ["DISABLED"],
         })
         expect(query).toContain("status=DISABLED")
     })

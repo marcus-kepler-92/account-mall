@@ -15,7 +15,7 @@ export type DistributorCommissionRow = {
     id: string
     orderNo: string
     amount: number
-    status: "PENDING" | "SETTLED" | "WITHDRAWN"
+    status: "PENDING" | "SETTLED" | "WITHDRAWN" | "CANCELLED"
     level: 1 | 2
     sourceDistributorName?: string
     createdAt: string
@@ -25,6 +25,7 @@ const statusMap = {
     PENDING: { label: "待结算", variant: "warning" as const },
     SETTLED: { label: "已结算", variant: "success" as const },
     WITHDRAWN: { label: "已提现", variant: "secondary" as const },
+    CANCELLED: { label: "已取消", variant: "destructive" as const },
 }
 
 export const distributorCommissionsColumns: ColumnDef<DistributorCommissionRow>[] = [

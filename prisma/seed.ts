@@ -122,6 +122,64 @@ async function seed() {
     process.exit(1);
   }
 
+  // Seed dev level-2 distributor account (invited by DDEV0001)
+  const devDist2Email = "distributor2@example.com";
+  const devDist2Password = "distributor123";
+  console.log(`  Creating level-2 distributor account: ${devDist2Email}`);
+
+  try {
+    const existingDist2 = await prisma.user.findUnique({
+      where: { email: devDist2Email },
+    });
+
+    if (existingDist2) {
+      console.log("  ✅ Level-2 distributor account already exists, skipping.");
+    } else {
+      const inviter = await prisma.user.findUnique({
+        where: { email: devDistEmail },
+      });
+
+      const now = new Date();
+      const hashedPassword = await hashPassword(devDist2Password);
+
+      const dist2User = await prisma.user.create({
+        data: {
+          email: devDist2Email,
+          name: "测试二级分销员",
+          emailVerified: true,
+          role: "DISTRIBUTOR",
+          distributorCode: "DDEV0002",
+          inviterId: inviter?.id ?? null,
+          createdAt: now,
+          updatedAt: now,
+        },
+      });
+
+      await prisma.account.create({
+        data: {
+          userId: dist2User.id,
+          accountId: dist2User.id,
+          providerId: "credential",
+          password: hashedPassword,
+          createdAt: now,
+          updatedAt: now,
+        },
+      });
+
+      console.log("  ✅ Level-2 distributor account created successfully!");
+      console.log("");
+      console.log("  ╔══════════════════════════════════════╗");
+      console.log(`  ║  Email:    ${devDist2Email.padEnd(26)}║`);
+      console.log(`  ║  Password: ${devDist2Password.padEnd(26)}║`);
+      console.log(`  ║  Inviter:  DDEV0001${"".padEnd(18)}║`);
+      console.log("  ╚══════════════════════════════════════╝");
+      console.log("");
+    }
+  } catch (error) {
+    console.error("  ❌ Failed to create level-2 distributor account:", error);
+    process.exit(1);
+  }
+
   // 阶梯佣金预设：L1–L5 固定档位（若无任何档位则写入）
   const tierCount = await prisma.commissionTier.count();
   if (tierCount === 0) {

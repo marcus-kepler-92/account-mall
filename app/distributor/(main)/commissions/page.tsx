@@ -28,20 +28,15 @@ export default async function DistributorCommissionsPage({
     const params = await searchParams
     const filters = parseDistributorCommissionFilters(params as DistributorCommissionFiltersInput)
 
-    const where: {
-        distributorId: string
-        status?: { in: ("PENDING" | "SETTLED" | "WITHDRAWN")[] }
-        order?: { orderNo: { contains: string } }
-    } = {
-        distributorId: user.id,
-    }
-    if (filters.statusList.length > 0) {
-        where.status = { in: filters.statusList }
-    }
-    if (filters.search) {
-        where.order = { orderNo: { contains: filters.search.trim() } }
-    }
+    const statusFilter = filters.statusList.length > 0
+        ? { in: filters.statusList }
+        : { not: "CANCELLED" as const }
 
+    const where = {
+        distributorId: user.id,
+        status: statusFilter,
+        ...(filters.search ? { order: { orderNo: { contains: filters.search.trim() } } } : {}),
+    }
     const level2Rate = config.level2CommissionRatePercent
 
     const [
@@ -67,7 +62,7 @@ export default async function DistributorCommissionsPage({
         prisma.commission.count({ where }),
         prisma.commission.groupBy({
             by: ["status"],
-            where: { distributorId: user.id },
+            where: { distributorId: user.id, status: { not: "CANCELLED" } },
             _count: { id: true },
         }),
         prisma.commission.aggregate({

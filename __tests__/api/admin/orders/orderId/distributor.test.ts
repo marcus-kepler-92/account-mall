@@ -82,6 +82,12 @@ describe("PATCH /api/admin/orders/[orderId]/distributor", () => {
     expect(res.status).toBe(400)
   })
 
+  it("returns 400 when distributorId references non-existent user", async () => {
+    prismaMock.user.findUnique.mockResolvedValue(null)
+    const res = await PATCH(makeRequest({ distributorId: "ghost-user" }), makeContext())
+    expect(res.status).toBe(400)
+  })
+
   it("returns 409 when order has WITHDRAWN commissions", async () => {
     prismaMock.commission.count.mockResolvedValue(1)
     const res = await PATCH(makeRequest({ distributorId: "dist-1" }), makeContext())
@@ -113,6 +119,30 @@ describe("PATCH /api/admin/orders/[orderId]/distributor", () => {
     expect(res.status).toBe(409)
     const data = await res.json()
     expect(data.error).toMatch(/提现/)
+  })
+
+  it("skips createOrderCommissions when order has no paidAt", async () => {
+    prismaMock.order.findUnique.mockResolvedValue({ ...mockCompletedOrder, paidAt: null })
+    const res = await PATCH(makeRequest({ distributorId: "dist-1" }), makeContext())
+    expect(res.status).toBe(200)
+    expect(commissionsModule.createOrderCommissions).not.toHaveBeenCalled()
+  })
+
+  it("checks PENDING withdrawal and balance for each affected distributor", async () => {
+    // level-1 → dist-a, level-2 → dist-b, each with a SETTLED commission
+    prismaMock.commission.findMany.mockResolvedValue([
+      { id: "c-1", distributorId: "dist-a", amount: "80", status: "SETTLED" },
+      { id: "c-2", distributorId: "dist-b", amount: "20", status: "SETTLED" },
+    ])
+    // no PENDING withdrawals for either
+    prismaMock.withdrawal.count.mockResolvedValue(0)
+    // both have enough settled balance to absorb the cancellation
+    prismaMock.commission.aggregate.mockResolvedValue({ _sum: { amount: "200" } })
+    prismaMock.withdrawal.aggregate.mockResolvedValue({ _sum: { amount: "0" } })
+    const res = await PATCH(makeRequest({ distributorId: "dist-1" }), makeContext())
+    expect(res.status).toBe(200)
+    // withdrawal.count called once per distinct distributorId
+    expect(prismaMock.withdrawal.count).toHaveBeenCalledTimes(2)
   })
 
   it("cancels existing commissions and assigns new distributor in transaction", async () => {
