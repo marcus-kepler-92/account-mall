@@ -53,13 +53,26 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       }
     }
 
-    // 3. Find all existing commissions for this order
+    // 3. Block if any commission has already been paid out (WITHDRAWN).
+    // WITHDRAWN commissions represent real money already disbursed — cancelling them would
+    // create an irreconcilable ledger discrepancy.
+    // Note: guards 3–4 run outside the transaction (pre-flight reads). Under READ COMMITTED
+    // isolation a concurrent event could theoretically invalidate these checks, but the
+    // window is negligible for an admin-only operation with low concurrency.
+    const withdrawnCount = await prisma.commission.count({
+      where: { orderId, status: "WITHDRAWN" },
+    })
+    if (withdrawnCount > 0) {
+      return conflict("此订单佣金已提现，无法修改分销归属")
+    }
+
+    // 4. Find all existing SETTLED/PENDING commissions for this order
     const existingCommissions = await prisma.commission.findMany({
       where: { orderId, status: { in: ["SETTLED", "PENDING"] } },
       select: { id: true, distributorId: true, amount: true },
     })
 
-    // 4. Check each affected distributor
+    // 5. Check each affected distributor
     if (existingCommissions.length > 0) {
       // Group by distributorId
       const amountByDistributor = new Map<string, number>()
@@ -69,7 +82,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       }
 
       for (const [distId, cancelAmount] of amountByDistributor) {
-        // 4a. PENDING withdrawal check
+        // 5a. PENDING withdrawal check
         const pendingWithdrawals = await prisma.withdrawal.count({
           where: { distributorId: distId, status: "PENDING" },
         })
@@ -77,7 +90,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
           return conflict("分销员存在待处理提现申请，无法修改分销归属")
         }
 
-        // 4b. Balance check (PENDING withdrawals already blocked above, so formula is settled − cancel − paid)
+        // 5b. Balance check (PENDING withdrawals already blocked above, so formula is settled − cancel − paid)
         const [settledAgg, paidAgg] = await Promise.all([
           prisma.commission.aggregate({
             where: { distributorId: distId, status: "SETTLED" },
@@ -97,7 +110,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       }
     }
 
-    // 5. Transaction: cancel old commissions + update order + create new commissions
+    // 6. Transaction: cancel old commissions + update order + create new commissions
     await prisma.$transaction(async (tx) => {
       // Cancel all existing commissions for this order
       await tx.commission.updateMany({

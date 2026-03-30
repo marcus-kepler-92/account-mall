@@ -44,6 +44,7 @@ beforeEach(() => {
   jest.clearAllMocks()
   ;(getAdminSession as jest.Mock).mockResolvedValue(mockSession)
   prismaMock.order.findUnique.mockResolvedValue(mockCompletedOrder)
+  prismaMock.commission.count.mockResolvedValue(0)  // no WITHDRAWN commissions by default
   prismaMock.commission.findMany.mockResolvedValue([])
   prismaMock.user.findUnique.mockResolvedValue({ id: "dist-1", role: "DISTRIBUTOR" })
   prismaMock.$transaction.mockImplementation((fn: (tx: unknown) => Promise<unknown>) =>
@@ -79,6 +80,14 @@ describe("PATCH /api/admin/orders/[orderId]/distributor", () => {
     prismaMock.user.findUnique.mockResolvedValue({ id: "dist-1", role: "ADMIN" })
     const res = await PATCH(makeRequest({ distributorId: "dist-1" }), makeContext())
     expect(res.status).toBe(400)
+  })
+
+  it("returns 409 when order has WITHDRAWN commissions", async () => {
+    prismaMock.commission.count.mockResolvedValue(1)
+    const res = await PATCH(makeRequest({ distributorId: "dist-1" }), makeContext())
+    expect(res.status).toBe(409)
+    const data = await res.json()
+    expect(data.error).toMatch(/提现/)
   })
 
   it("returns 409 when affected distributor has PENDING withdrawal", async () => {
