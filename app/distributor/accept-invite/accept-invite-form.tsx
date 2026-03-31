@@ -20,6 +20,7 @@ import { Loader2 } from "lucide-react";
 
 const formSchema = z
   .object({
+    name: z.string().min(1, "请输入昵称").max(50, "昵称不能超过 50 字符"),
     password: z.string().min(6, "密码至少 6 位").max(128, "密码不能超过 128 位"),
     confirmPassword: z.string(),
   })
@@ -39,7 +40,7 @@ export function AcceptInviteForm({ token, email }: AcceptInviteFormProps) {
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: { password: "", confirmPassword: "" },
+    defaultValues: { name: "", password: "", confirmPassword: "" },
   });
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
@@ -48,7 +49,7 @@ export function AcceptInviteForm({ token, email }: AcceptInviteFormProps) {
       const res = await fetch("/api/distributor/accept-invite", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, password: values.password }),
+        body: JSON.stringify({ token, name: values.name, password: values.password }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -71,6 +72,20 @@ export function AcceptInviteForm({ token, email }: AcceptInviteFormProps) {
           <p className="text-sm font-medium">受邀邮箱</p>
           <Input value={email} disabled className="bg-muted" />
         </div>
+
+        <FormField
+          control={form.control}
+          name="name"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>昵称</FormLabel>
+              <FormControl>
+                <Input placeholder="您的昵称" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <FormField
           control={form.control}

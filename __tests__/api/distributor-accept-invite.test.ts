@@ -50,14 +50,29 @@ describe("POST /api/distributor/accept-invite", () => {
         expect(res.status).toBe(400)
     })
 
+    it("returns 400 when name is missing", async () => {
+        const res = await AcceptInvitePost(createRequest({ token: "valid-token", password: "password123" }))
+        expect(res.status).toBe(400)
+    })
+
+    it("returns 400 when name is empty string", async () => {
+        const res = await AcceptInvitePost(createRequest({ token: "valid-token", name: "", password: "password123" }))
+        expect(res.status).toBe(400)
+    })
+
+    it("returns 400 when name exceeds 50 characters", async () => {
+        const res = await AcceptInvitePost(createRequest({ token: "valid-token", name: "a".repeat(51), password: "password123" }))
+        expect(res.status).toBe(400)
+    })
+
     it("returns 400 when password is too short", async () => {
-        const res = await AcceptInvitePost(createRequest({ token: "valid-token", password: "12345" }))
+        const res = await AcceptInvitePost(createRequest({ token: "valid-token", name: "Alice", password: "12345" }))
         expect(res.status).toBe(400)
     })
 
     it("returns 404 when token does not exist", async () => {
         prismaMock.distributorInvitation.findUnique.mockResolvedValue(null)
-        const res = await AcceptInvitePost(createRequest({ token: "no-such-token", password: "password123" }))
+        const res = await AcceptInvitePost(createRequest({ token: "no-such-token", name: "Alice", password: "password123" }))
         expect(res.status).toBe(404)
     })
 
@@ -65,7 +80,7 @@ describe("POST /api/distributor/accept-invite", () => {
         prismaMock.distributorInvitation.findUnique.mockResolvedValue(
             makeInvitation({ acceptedAt: new Date("2025-01-01") })
         )
-        const res = await AcceptInvitePost(createRequest({ token: "used-token", password: "password123" }))
+        const res = await AcceptInvitePost(createRequest({ token: "used-token", name: "Alice", password: "password123" }))
         expect(res.status).toBe(400)
         const body = await res.json()
         expect(body.code).toBe("INVITE_USED")
@@ -75,7 +90,7 @@ describe("POST /api/distributor/accept-invite", () => {
         prismaMock.distributorInvitation.findUnique.mockResolvedValue(
             makeInvitation({ expiresAt: new Date("2020-01-01") })
         )
-        const res = await AcceptInvitePost(createRequest({ token: "expired-token", password: "password123" }))
+        const res = await AcceptInvitePost(createRequest({ token: "expired-token", name: "Alice", password: "password123" }))
         expect(res.status).toBe(400)
         const body = await res.json()
         expect(body.code).toBe("INVITE_EXPIRED")
@@ -84,7 +99,7 @@ describe("POST /api/distributor/accept-invite", () => {
     it("returns 400 when email is already registered", async () => {
         prismaMock.distributorInvitation.findUnique.mockResolvedValue(makeInvitation())
         prismaMock.user.findUnique.mockResolvedValue({ id: "existing_user" } as any)
-        const res = await AcceptInvitePost(createRequest({ token: "valid-token", password: "password123" }))
+        const res = await AcceptInvitePost(createRequest({ token: "valid-token", name: "Alice", password: "password123" }))
         expect(res.status).toBe(400)
     })
 
@@ -103,8 +118,32 @@ describe("POST /api/distributor/accept-invite", () => {
             })
         })
 
-        const res = await AcceptInvitePost(createRequest({ token: "valid-token", password: "password123" }))
+        const res = await AcceptInvitePost(createRequest({ token: "valid-token", name: "Alice", password: "password123" }))
         expect(res.status).toBe(200)
+    })
+
+    it("saves provided name to user record", async () => {
+        prismaMock.distributorInvitation.findUnique.mockResolvedValue(makeInvitation())
+        prismaMock.user.findUnique.mockResolvedValue(null)
+
+        let userCreateArgs: any
+        ;(prismaMock.$transaction as any).mockImplementation(async (fn: (tx: any) => Promise<void>) => {
+            const userCreateMock = jest.fn().mockResolvedValue({ id: "new_user" })
+            await fn({
+                ...prismaMock,
+                distributorInvitation: {
+                    findUnique: jest.fn().mockResolvedValue({ acceptedAt: null }),
+                    update: jest.fn().mockResolvedValue({}),
+                },
+                user: { create: userCreateMock },
+                account: { create: jest.fn().mockResolvedValue({}) },
+            })
+            userCreateArgs = userCreateMock.mock.calls[0][0]
+        })
+
+        const res = await AcceptInvitePost(createRequest({ token: "valid-token", name: "我的昵称", password: "password123" }))
+        expect(res.status).toBe(200)
+        expect(userCreateArgs.data.name).toBe("我的昵称")
     })
 
     it("creates user with inviterId=null when invited by admin", async () => {
@@ -128,7 +167,7 @@ describe("POST /api/distributor/accept-invite", () => {
             userCreateArgs = userCreateMock.mock.calls[0][0]
         })
 
-        const res = await AcceptInvitePost(createRequest({ token: "valid-token", password: "password123" }))
+        const res = await AcceptInvitePost(createRequest({ token: "valid-token", name: "Alice", password: "password123" }))
         expect(res.status).toBe(200)
         expect(userCreateArgs.data.inviterId).toBeNull()
     })
@@ -148,7 +187,7 @@ describe("POST /api/distributor/accept-invite", () => {
             })
         })
 
-        const res = await AcceptInvitePost(createRequest({ token: "valid-token", password: "password123" }))
+        const res = await AcceptInvitePost(createRequest({ token: "valid-token", name: "Alice", password: "password123" }))
         expect(res.status).toBe(409)
     })
 
@@ -156,7 +195,7 @@ describe("POST /api/distributor/accept-invite", () => {
         checkAcceptInviteRateLimit.mockResolvedValueOnce(
             new Response(JSON.stringify({ error: "请求过于频繁" }), { status: 429 })
         )
-        const res = await AcceptInvitePost(createRequest({ token: "valid-token", password: "password123" }))
+        const res = await AcceptInvitePost(createRequest({ token: "valid-token", name: "Alice", password: "password123" }))
         expect(res.status).toBe(429)
         expect(prismaMock.distributorInvitation.findUnique).not.toHaveBeenCalled()
     })
@@ -169,7 +208,7 @@ describe("POST /api/distributor/accept-invite", () => {
         p2002.meta = { target: ["distributorCode"] }
         prismaMock.$transaction.mockRejectedValue(p2002)
 
-        const res = await AcceptInvitePost(createRequest({ token: "valid-token", password: "password123" }))
+        const res = await AcceptInvitePost(createRequest({ token: "valid-token", name: "Alice", password: "password123" }))
         expect(res.status).toBe(409)
         const body = await res.json()
         expect(body.error).toMatch(/冲突|重试/)
@@ -190,13 +229,13 @@ describe("POST /api/distributor/accept-invite", () => {
             })
         })
 
-        const res = await AcceptInvitePost(createRequest({ token: "valid-token", password: "123456" }))
+        const res = await AcceptInvitePost(createRequest({ token: "valid-token", name: "Alice", password: "123456" }))
         expect(res.status).toBe(200)
     })
 
     it("returns 400 when password exceeds max length (129 chars)", async () => {
         const longPassword = "a".repeat(129)
-        const res = await AcceptInvitePost(createRequest({ token: "valid-token", password: longPassword }))
+        const res = await AcceptInvitePost(createRequest({ token: "valid-token", name: "Alice", password: longPassword }))
         expect(res.status).toBe(400)
     })
 
@@ -215,12 +254,31 @@ describe("POST /api/distributor/accept-invite", () => {
             })
         })
 
-        const res = await AcceptInvitePost(createRequest({ token: "valid-token", password: "a".repeat(128) }))
+        const res = await AcceptInvitePost(createRequest({ token: "valid-token", name: "Alice", password: "a".repeat(128) }))
         expect(res.status).toBe(200)
     })
 
     it("returns 400 when token is empty string", async () => {
-        const res = await AcceptInvitePost(createRequest({ token: "", password: "password123" }))
+        const res = await AcceptInvitePost(createRequest({ token: "", name: "Alice", password: "password123" }))
         expect(res.status).toBe(400)
+    })
+
+    it("accepts name at exact max length (50 chars)", async () => {
+        prismaMock.distributorInvitation.findUnique.mockResolvedValue(makeInvitation())
+        prismaMock.user.findUnique.mockResolvedValue(null)
+        ;(prismaMock.$transaction as any).mockImplementation(async (fn: (tx: any) => Promise<void>) => {
+            await fn({
+                ...prismaMock,
+                distributorInvitation: {
+                    findUnique: jest.fn().mockResolvedValue({ acceptedAt: null }),
+                    update: jest.fn().mockResolvedValue({}),
+                },
+                user: { create: jest.fn().mockResolvedValue({ id: "new_user" }) },
+                account: { create: jest.fn().mockResolvedValue({}) },
+            })
+        })
+
+        const res = await AcceptInvitePost(createRequest({ token: "valid-token", name: "a".repeat(50), password: "password123" }))
+        expect(res.status).toBe(200)
     })
 })

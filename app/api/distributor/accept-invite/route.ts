@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
         return validationError(parsed.error.flatten().fieldErrors);
     }
 
-    const { token, password } = parsed.data;
+    const { token, name, password } = parsed.data;
 
     // Find and validate invitation
     const invitation = await prisma.distributorInvitation.findUnique({
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
             const user = await tx.user.create({
                 data: {
                     email: invitation.email,
-                    name: invitation.email.split("@")[0],
+                    name,
                     emailVerified: true,
                     role: "DISTRIBUTOR",
                     distributorCode,
