@@ -43,7 +43,7 @@ export function AdminTopbarActions() {
             </Button>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="relative size-9 rounded-full">
+                    <Button variant="ghost" className="relative size-9 rounded-full" suppressHydrationWarning>
                         <Avatar className="size-8">
                             <AvatarFallback className="bg-primary text-primary-foreground text-sm">
                                 {initial}

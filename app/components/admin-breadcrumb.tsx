@@ -24,6 +24,9 @@ const routeLabels: Record<string, string> = {
     withdrawals: "提现",
     files: "文件管理",
     "auto-fetch": "自动获取验证",
+    "email-marketing": "邮件营销",
+    templates: "邮件模板",
+    campaigns: "群发活动",
 }
 
 function isIdSegment(seg: string) {
@@ -68,6 +71,24 @@ function getBreadcrumbItems(pathname: string) {
                 label = "新建指南"
             } else if (isIdSegment(seg)) {
                 label = "编辑指南"
+            } else {
+                label = routeLabels[seg] ?? seg
+            }
+        } else if (prev === "templates") {
+            if (seg === "new") {
+                label = "新建模板"
+            } else if (isIdSegment(seg)) {
+                label = "模板详情"
+            } else {
+                label = routeLabels[seg] ?? seg
+            }
+        } else if (prev && isIdSegment(prev) && seg === "edit") {
+            label = "编辑模板"
+        } else if (prev === "campaigns") {
+            if (seg === "new") {
+                label = "新建活动"
+            } else if (isIdSegment(seg)) {
+                label = "活动详情"
             } else {
                 label = routeLabels[seg] ?? seg
             }

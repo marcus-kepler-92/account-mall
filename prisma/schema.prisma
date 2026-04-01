@@ -371,3 +371,50 @@ model AccountBlacklist {
   @@index([productId])
 }
 
+// ─── Email Marketing ────────────────────────────────────────────────────────
+
+enum CampaignStatus {
+  DRAFT
+  SENDING
+  SENT
+  FAILED
+}
+
+enum CampaignRecipientType {
+  CUSTOMERS
+  DISTRIBUTORS
+}
+
+model EmailTemplate {
+  id             String          @id @default(cuid())
+  title          String
+  description    String?
+  defaultSubject String
+  unlayerDesign  Json            // Unlayer editor JSON (for re-editing); {} = preset (HTML-only)
+  html           String          @db.Text
+  isPreset       Boolean         @default(false) // true = seeded from transactional template
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  campaigns      EmailCampaign[]
+}
+
+model EmailCampaign {
+  id              String                @id @default(cuid())
+  name            String
+  subject         String
+  templateId      String?
+  template        EmailTemplate?        @relation(fields: [templateId], references: [id])
+  html            String                @db.Text
+  status          CampaignStatus        @default(DRAFT)
+  recipientType   CampaignRecipientType
+  recipientFilter Json
+  recipientCount  Int                   @default(0)
+  successCount    Int                   @default(0)
+  failCount       Int                   @default(0)
+  sentAt          DateTime?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+}
