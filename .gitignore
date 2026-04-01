@@ -67,4 +67,5 @@ automation/error_logs/*
 
 # AI
 .cursor
-.claude.worktrees/
+.claude
+.worktrees/
