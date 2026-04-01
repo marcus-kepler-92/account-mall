@@ -126,6 +126,8 @@ model Product {
   allowAccountSwitch Boolean     @default(true)
   /// AUTO_FETCH：每个订单允许换号的最大次数
   accountSwitchLimit Int         @default(1)
+  /// Whether promo/coupon codes are accepted for this product
+  couponEnabled          Boolean   @default(false)
   /// Risk warning dialog shown to users before they can proceed (configurable per product)
   riskWarningEnabled     Boolean   @default(false)
   riskWarningTitle       String?   @db.VarChar(100)

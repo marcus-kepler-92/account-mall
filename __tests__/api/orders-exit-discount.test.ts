@@ -117,6 +117,7 @@ const product = {
   validityHours: null,
   allowAccountSwitch: true,
   accountSwitchLimit: 1,
+  couponEnabled: true,
   riskWarningEnabled: false,
   riskWarningTitle: null,
   riskWarningContent: null,
@@ -235,12 +236,18 @@ describe("POST /api/orders -- exit discount token handling", () => {
     expect(meta.discountPercent).toBe(5);
   });
 
-  it("ignores exitDiscountToken and applies promoCode discount when both present", async () => {
+  it("stacks promoCode and exitDiscount on first paid order", async () => {
     const { verifyExitDiscountToken } = require("@/lib/exit-discount");
-    // verifyExitDiscountToken should NOT be called when promoCode is present
     (verifyExitDiscountToken as jest.Mock).mockReturnValue({
       valid: true,
-      payload: { discountPercent: 5 },
+      payload: {
+        productId: "prod_1",
+        discountPercent: 5,
+        visitorId: "v1",
+        fingerprintHash: "fp1",
+        ip: "1.2.3.4",
+        exp: Date.now() + 60_000,
+      },
     });
 
     prismaMock.user.findFirst.mockResolvedValueOnce({
@@ -249,16 +256,16 @@ describe("POST /api/orders -- exit discount token handling", () => {
       discountPercent: new Prisma.Decimal("10"),
     } as any);
     prismaMock.product.findUnique.mockResolvedValueOnce(product as any);
+    // first-order check: no prior paid order
+    prismaMock.order.findFirst.mockResolvedValueOnce(null);
     prismaMock.card.count.mockResolvedValueOnce(5);
-    const tx = mockTransaction({
-      ...baseCreatedOrder,
-      amount: new Prisma.Decimal("90"),
-    });
+    // 100 * 0.9 * 0.95 = 85.5
+    const tx = mockTransaction({ ...baseCreatedOrder, amount: new Prisma.Decimal("85.5") });
 
-    await POST(
+    const res = await POST(
       createJsonRequest({
         productId: "prod_1",
-        email: "user@example.com",
+        email: "new@example.com",
         orderPassword: "password123",
         quantity: 1,
         promoCode: "DIST10",
@@ -266,11 +273,54 @@ describe("POST /api/orders -- exit discount token handling", () => {
       }),
     );
 
-    // verifyExitDiscountToken should NOT have been called since promoCode takes precedence
-    expect(verifyExitDiscountToken).not.toHaveBeenCalled();
-    // Amount should be distributor discount: 100 * 0.9 = 90
+    expect(res.status).toBe(200);
     const createCall = (tx.order.create as jest.Mock).mock.calls[0][0];
-    expect(createCall.data.amount).toBe(90);
+    // 100 * (1 - 0.10) * (1 - 0.05) = 85.5 → effectiveDiscount = 14.5%
+    expect(createCall.data.amount).toBeCloseTo(85.5, 1);
+    expect(createCall.data.discountPercentApplied).toBeCloseTo(14.5, 1);
+    expect(createCall.data).toHaveProperty("exitDiscountMeta");
+    expect(tx.exitDiscountUsage.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("applies only promoCode when both present but not first paid order", async () => {
+    const { verifyExitDiscountToken } = require("@/lib/exit-discount");
+    (verifyExitDiscountToken as jest.Mock).mockReturnValue({
+      valid: true,
+      payload: {
+        productId: "prod_1",
+        discountPercent: 5,
+        visitorId: "v1",
+        fingerprintHash: "fp1",
+        ip: "1.2.3.4",
+        exp: Date.now() + 60_000,
+      },
+    });
+
+    prismaMock.user.findFirst.mockResolvedValueOnce({
+      id: "dist_1",
+      discountCodeEnabled: true,
+      discountPercent: new Prisma.Decimal("10"),
+    } as any);
+    prismaMock.product.findUnique.mockResolvedValueOnce(product as any);
+    // first-order check: prior paid order exists
+    prismaMock.order.findFirst.mockResolvedValueOnce({ id: "old_order" } as any);
+    prismaMock.card.count.mockResolvedValueOnce(5);
+    // only promoCode: 100 * 0.9 = 90
+    const tx = mockTransaction({ ...baseCreatedOrder, amount: new Prisma.Decimal("90") });
+
+    await POST(
+      createJsonRequest({
+        productId: "prod_1",
+        email: "returning@example.com",
+        orderPassword: "password123",
+        quantity: 1,
+        promoCode: "DIST10",
+        exitDiscountToken: "valid.token.here",
+      }),
+    );
+
+    const createCall = (tx.order.create as jest.Mock).mock.calls[0][0];
+    expect(createCall.data.amount).toBeCloseTo(90, 1);
     expect(createCall.data.discountPercentApplied).toBe(10);
     expect(createCall.data).not.toHaveProperty("exitDiscountMeta");
   });
@@ -397,8 +447,19 @@ describe("POST /api/orders -- exit discount token handling", () => {
     expect(tx.exitDiscountUsage.create).not.toHaveBeenCalled();
   });
 
-  it("does not write ExitDiscountUsage when promoCode takes precedence", async () => {
+  it("does not write ExitDiscountUsage when not first paid order", async () => {
     const { verifyExitDiscountToken } = require("@/lib/exit-discount");
+    (verifyExitDiscountToken as jest.Mock).mockReturnValue({
+      valid: true,
+      payload: {
+        productId: "prod_1",
+        discountPercent: 5,
+        visitorId: "v1",
+        fingerprintHash: "fp1",
+        ip: "1.2.3.4",
+        exp: Date.now() + 60_000,
+      },
+    });
 
     prismaMock.user.findFirst.mockResolvedValueOnce({
       id: "dist_1",
@@ -406,6 +467,8 @@ describe("POST /api/orders -- exit discount token handling", () => {
       discountPercent: new Prisma.Decimal("10"),
     } as any);
     prismaMock.product.findUnique.mockResolvedValueOnce(product as any);
+    // not first order
+    prismaMock.order.findFirst.mockResolvedValueOnce({ id: "old_order" } as any);
     prismaMock.card.count.mockResolvedValueOnce(5);
     const tx = mockTransaction({
       ...baseCreatedOrder,
@@ -415,7 +478,7 @@ describe("POST /api/orders -- exit discount token handling", () => {
     await POST(
       createJsonRequest({
         productId: "prod_1",
-        email: "user@example.com",
+        email: "returning@example.com",
         orderPassword: "password123",
         quantity: 1,
         promoCode: "DIST10",
@@ -423,7 +486,6 @@ describe("POST /api/orders -- exit discount token handling", () => {
       }),
     );
 
-    expect(verifyExitDiscountToken).not.toHaveBeenCalled();
     expect(tx.exitDiscountUsage.create).not.toHaveBeenCalled();
   });
 

@@ -15,6 +15,7 @@ type ProductOrderSectionProps = {
     productType?: "NORMAL" | "AUTO_FETCH"
     /** AUTO_FETCH 商品的账号有效时长（小时），用于展示限领规则 */
     validityHours?: number | null
+    couponEnabled?: boolean
 }
 
 /**
@@ -30,6 +31,7 @@ export function ProductOrderSection({
     formId = "product-order-form",
     productType = "NORMAL",
     validityHours,
+    couponEnabled = false,
 }: ProductOrderSectionProps) {
     const [exitDiscountToken, setExitDiscountToken] = useState<string | null>(null)
     const [exitDiscountPercent, setExitDiscountPercent] = useState<number | null>(null)
@@ -66,6 +68,7 @@ export function ProductOrderSection({
                 inStock={inStock}
                 formId={formId}
                 productType={productType}
+                couponEnabled={couponEnabled}
                 exitDiscountToken={exitDiscountToken}
                 exitDiscountPercent={exitDiscountPercent}
                 onExitDiscountConsumed={handleConsumed}

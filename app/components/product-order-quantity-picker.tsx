@@ -19,6 +19,8 @@ type PromoValidation = {
 
 type Props = {
     isAutoFetch: boolean
+    isFree: boolean
+    couponEnabled?: boolean
     maxQuantity: number
     inStock: boolean
     discountCode: string
@@ -34,6 +36,8 @@ function isValidDiscountCodeFormat(code: string): boolean {
 
 export function ProductOrderQuantityPicker({
     isAutoFetch,
+    isFree,
+    couponEnabled = false,
     maxQuantity,
     inStock,
     discountCode,
@@ -43,66 +47,100 @@ export function ProductOrderQuantityPicker({
 }: Props) {
     const { control } = useFormContext<OrderFormSchema>()
 
-    if (isAutoFetch) return null
+    // Free auto-fetch products have nothing to show
+    if (isAutoFetch && isFree) return null
+    // Paid auto-fetch with coupons disabled: also nothing to show
+    if (isAutoFetch && !couponEnabled) return null
+    if (!isAutoFetch && !couponEnabled) return (
+        <FormField
+            control={control}
+            name="quantity"
+            render={({ field }) => (
+                <FormItem>
+                    <FormLabel>购买数量</FormLabel>
+                    <FormControl>
+                        <Input
+                            type="number"
+                            min={1}
+                            max={maxQuantity}
+                            disabled={!inStock}
+                            {...field}
+                            onChange={(e) => {
+                                const v = parseInt(e.target.value, 10)
+                                if (Number.isNaN(v) || v < 1) field.onChange(1)
+                                else if (v > maxQuantity) field.onChange(maxQuantity)
+                                else field.onChange(v)
+                            }}
+                        />
+                    </FormControl>
+                    <FormMessage />
+                </FormItem>
+            )}
+        />
+    )
 
     return (
         <>
-            <FormField
-                control={control}
-                name="quantity"
-                render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>购买数量</FormLabel>
-                        <FormControl>
-                            <Input
-                                type="number"
-                                min={1}
-                                max={maxQuantity}
-                                disabled={!inStock}
-                                {...field}
-                                onChange={(e) => {
-                                    const v = parseInt(e.target.value, 10)
-                                    if (Number.isNaN(v) || v < 1) field.onChange(1)
-                                    else if (v > maxQuantity) field.onChange(maxQuantity)
-                                    else field.onChange(v)
-                                }}
-                            />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                )}
-            />
-
-            <div className="space-y-2">
-                <label className="text-sm font-medium leading-none">优惠码</label>
-                <Input
-                    type="text"
-                    placeholder={`选填，1–${configClient.promoCodeMaxLength} 字符`}
-                    disabled={!inStock}
-                    maxLength={configClient.promoCodeMaxLength}
-                    value={discountCode}
-                    onChange={(e) => onDiscountCodeChange(e.target.value)}
-                    className="font-mono"
+            {!isAutoFetch && (
+                <FormField
+                    control={control}
+                    name="quantity"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>购买数量</FormLabel>
+                            <FormControl>
+                                <Input
+                                    type="number"
+                                    min={1}
+                                    max={maxQuantity}
+                                    disabled={!inStock}
+                                    {...field}
+                                    onChange={(e) => {
+                                        const v = parseInt(e.target.value, 10)
+                                        if (Number.isNaN(v) || v < 1) field.onChange(1)
+                                        else if (v > maxQuantity) field.onChange(maxQuantity)
+                                        else field.onChange(v)
+                                    }}
+                                />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
                 />
-                {discountCode.trim() !== "" && !isValidDiscountCodeFormat(discountCode) && (
-                    <p className="text-xs text-destructive">
-                        优惠码格式：1–{configClient.promoCodeMaxLength} 个字符
-                    </p>
-                )}
-                {isValidDiscountCodeFormat(discountCode) && discountCode.trim() !== "" && (
-                    <p className="text-xs text-muted-foreground">
-                        {promoValidating
-                            ? "校验中…"
-                            : promoValidation?.valid && promoValidation.discountPercent != null
-                              ? `已享 ${promoValidation.discountPercent}% 优惠`
-                              : promoValidation?.valid
-                                ? "推荐码有效，但未开通折扣"
-                                : promoValidation && !promoValidation.valid
-                                  ? "推荐码无效"
-                                  : "校验中…"}
-                    </p>
-                )}
-            </div>
+            )}
+
+            {couponEnabled && (
+                <div className="space-y-2">
+                    <label className="text-sm font-medium leading-none">优惠码</label>
+                    <Input
+                        type="text"
+                        placeholder={`选填，1–${configClient.promoCodeMaxLength} 字符`}
+                        disabled={!inStock}
+                        maxLength={configClient.promoCodeMaxLength}
+                        value={discountCode}
+                        onChange={(e) => onDiscountCodeChange(e.target.value)}
+                        className="font-mono"
+                    />
+                    {discountCode.trim() !== "" && !isValidDiscountCodeFormat(discountCode) && (
+                        <p className="text-xs text-destructive">
+                            优惠码格式：1–{configClient.promoCodeMaxLength} 个字符
+                        </p>
+                    )}
+                    {isValidDiscountCodeFormat(discountCode) && discountCode.trim() !== "" && (
+                        <p className="text-xs text-muted-foreground">
+                            {promoValidating
+                                ? "校验中…"
+                                : promoValidation?.valid && promoValidation.discountPercent != null
+                                  ? `已享 ${promoValidation.discountPercent}% 优惠`
+                                  : promoValidation?.valid
+                                    ? "推荐码有效，但未开通折扣"
+                                    : promoValidation && !promoValidation.valid
+                                      ? "推荐码无效"
+                                      : "校验中…"}
+                        </p>
+                    )}
+                </div>
+            )}
         </>
     )
 }

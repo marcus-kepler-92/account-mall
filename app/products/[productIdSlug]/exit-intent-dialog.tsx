@@ -84,10 +84,6 @@ export function ExitIntentDialog({
         // 客户端预检：有本地订单历史则不弹
         if (hasLocalOrderHistory()) return
 
-        // 客户端预检：有分销员 promo code cookie 则不弹
-        const cookies = document.cookie
-        if (cookies.includes("distributor_promo_code=")) return
-
         setLoading(true)
         try {
             // fingerprintHash 未就绪时用空字符串降级（仍可触发，后端以 cookie/IP 信号判断资格）

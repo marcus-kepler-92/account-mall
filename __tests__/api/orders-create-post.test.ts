@@ -1406,6 +1406,7 @@ describe("POST /api/orders (create order)", () => {
       validityHours: null,
       allowAccountSwitch: true,
       accountSwitchLimit: 1,
+      couponEnabled: true,
       riskWarningEnabled: false,
       riskWarningTitle: null,
       riskWarningContent: null,
@@ -1512,11 +1513,8 @@ describe("POST /api/orders (create order)", () => {
       });
     });
 
-    it("does not set distributorId when promoCode is invalid or distributor disabled", async () => {
+    it("returns 400 when promoCode is provided but distributor not found", async () => {
       prismaMock.user.findFirst.mockResolvedValueOnce(null);
-      prismaMock.product.findUnique.mockResolvedValueOnce(product as any);
-      prismaMock.card.count.mockResolvedValueOnce(3);
-      const tx = mockTxWithCreate();
 
       const res = await POST(
         createJsonRequest({
@@ -1528,9 +1526,35 @@ describe("POST /api/orders (create order)", () => {
         }),
       );
 
-      expect(res.status).toBe(200);
-      const call = (tx.order.create as jest.Mock).mock.calls[0][0];
-      expect(call.data).not.toHaveProperty("distributorId");
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toMatch(/优惠码无效/);
+    });
+
+    it("returns 400 when promoCode is provided but product has couponEnabled=false", async () => {
+      prismaMock.user.findFirst.mockResolvedValueOnce({
+        id: "dist_1",
+        discountCodeEnabled: true,
+        discountPercent: new Prisma.Decimal("10"),
+      } as any);
+      prismaMock.product.findUnique.mockResolvedValueOnce({
+        ...product,
+        couponEnabled: false,
+      } as any);
+
+      const res = await POST(
+        createJsonRequest({
+          productId: "prod_1",
+          email: "user@example.com",
+          orderPassword: "password123",
+          quantity: 2,
+          promoCode: "DIST10",
+        }),
+      );
+
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toMatch(/该商品不支持使用优惠码/);
     });
 
     it("prefers body promoCode over cookie when both present", async () => {

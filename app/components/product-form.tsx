@@ -35,6 +35,7 @@ type ProductData = {
     validityHours?: number | null
     allowAccountSwitch?: boolean
     accountSwitchLimit?: number
+    couponEnabled?: boolean
     riskWarningEnabled?: boolean
     riskWarningTitle?: string | null
     riskWarningContent?: string | null
@@ -74,6 +75,7 @@ export function ProductForm({
             allowAccountSwitch: product?.allowAccountSwitch ?? true,
             accountSwitchLimit: product?.accountSwitchLimit != null ? String(product.accountSwitchLimit) : "1",
             tagIds: product?.tags.map((t) => t.id) ?? [],
+            couponEnabled: product?.couponEnabled ?? false,
             riskWarningEnabled: product?.riskWarningEnabled ?? false,
             riskWarningTitle: product?.riskWarningTitle ?? "",
             riskWarningContent: product?.riskWarningContent ?? "",
@@ -111,6 +113,7 @@ export function ProductForm({
                 accountSwitchLimit: data.accountSwitchLimit && data.accountSwitchLimit !== "" ? parseInt(data.accountSwitchLimit, 10) : 1,
             }),
             tagIds: data.tagIds ?? [],
+            couponEnabled: data.couponEnabled ?? false,
             riskWarningEnabled: data.riskWarningEnabled ?? false,
             riskWarningTitle: data.riskWarningTitle?.trim() || null,
             riskWarningContent: data.riskWarningContent?.trim() || null,

@@ -450,19 +450,20 @@ export async function POST(request: NextRequest) {
             where: { distributorCode: promoCode, role: "DISTRIBUTOR", disabledAt: null },
             select: { id: true, discountCodeEnabled: true, discountPercent: true },
         })
-        if (distributor) {
-            distributorId = distributor.id
-            // discountCodeEnabled is the master switch; when off, no discount at all
-            if (distributor.discountCodeEnabled) {
-                let effectiveDiscount = config.basePromoDiscountPercent
-                if (distributor.discountPercent != null) {
-                    const adminPct = Number(distributor.discountPercent)
-                    if (adminPct > effectiveDiscount && adminPct > 0 && adminPct <= 100) {
-                        effectiveDiscount = adminPct
-                    }
+        if (!distributor) {
+            return badRequest("优惠码无效")
+        }
+        distributorId = distributor.id
+        // discountCodeEnabled is the master switch; when off, no discount at all
+        if (distributor.discountCodeEnabled) {
+            let effectiveDiscount = config.basePromoDiscountPercent
+            if (distributor.discountPercent != null) {
+                const adminPct = Number(distributor.discountPercent)
+                if (adminPct > effectiveDiscount && adminPct > 0 && adminPct <= 100) {
+                    effectiveDiscount = adminPct
                 }
-                if (effectiveDiscount > 0) distributorDiscountPercent = effectiveDiscount
             }
+            if (effectiveDiscount > 0) distributorDiscountPercent = effectiveDiscount
         }
     }
 
@@ -518,6 +519,11 @@ export async function POST(request: NextRequest) {
         return notFound("Product not found or unavailable")
     }
 
+    // Reject promo code if this product does not accept coupons
+    if (promoCode && !product.couponEnabled) {
+        return badRequest("该商品不支持使用优惠码")
+    }
+
     const productWithType = product as unknown as ProductForAutoFetch
     const isAutoFetch = productWithType.productType === "AUTO_FETCH"
     const maxQty = isAutoFetch ? config.autoFetchMaxQuantityPerOrder : product.maxQuantity
@@ -552,11 +558,11 @@ export async function POST(request: NextRequest) {
         return badRequest(`Insufficient stock. Available: ${unsoldCount}`)
     }
 
-    // Exit intent 折扣：仅当无 promoCode 且配置了 secret 时生效
+    // Exit intent 折扣：token 有效即解析，是否叠加视首单判断
     let exitDiscountPercent: number | null = null
     let exitDiscountMeta: string | null = null
     let exitDiscountPayload: ExitDiscountPayload | null = null
-    if (!promoCode && exitDiscountToken && config.exitDiscountSecret) {
+    if (exitDiscountToken && config.exitDiscountSecret) {
         const verifyResult = verifyExitDiscountToken(exitDiscountToken, config.exitDiscountSecret)
         if (verifyResult.valid && verifyResult.payload.productId === productId) {
             exitDiscountPayload = verifyResult.payload
@@ -571,14 +577,39 @@ export async function POST(request: NextRequest) {
         }
     }
 
-    let amount = Number(product.price) * quantity
+    // Stacking rule: promoCode + exit discount only allowed on user's first paid order.
+    // Identified by email OR fingerprint — whichever matches a prior COMPLETED paid order.
+    if (exitDiscountPercent != null && distributorDiscountPercent != null) {
+        const pastPaidOrder = await prisma.order.findFirst({
+            where: {
+                status: "COMPLETED",
+                amount: { gt: 0 },
+                OR: [
+                    { email },
+                    ...(fingerprintHash ? [{ fingerprintHash }] : []),
+                ],
+            },
+            select: { id: true },
+        })
+        if (pastPaidOrder) {
+            // Not the first paid order: drop exit discount, keep promoCode only
+            exitDiscountPercent = null
+            exitDiscountPayload = null
+            exitDiscountMeta = null
+        }
+    }
+
+    const originalAmount = Number(product.price) * quantity
+    let amount = originalAmount
     let discountPercentApplied: number | null = null
     if (distributorDiscountPercent != null) {
         amount = amount * (1 - distributorDiscountPercent / 100)
-        discountPercentApplied = distributorDiscountPercent
-    } else if (exitDiscountPercent != null) {
+    }
+    if (exitDiscountPercent != null) {
         amount = amount * (1 - exitDiscountPercent / 100)
-        discountPercentApplied = exitDiscountPercent
+    }
+    if (amount < originalAmount) {
+        discountPercentApplied = Math.round((1 - amount / originalAmount) * 10000) / 100
     }
     const amountRounded = Math.round(amount * 100) / 100
     if (amountRounded <= 0 || amountRounded > 999_999.99) {

@@ -79,6 +79,7 @@ type ProductOrderFormProps = {
     inStock: boolean
     formId?: string
     productType?: "NORMAL" | "AUTO_FETCH"
+    couponEnabled?: boolean
     exitDiscountToken?: string | null
     exitDiscountPercent?: number | null
     onExitDiscountConsumed?: () => void
@@ -92,6 +93,7 @@ export function ProductOrderForm({
     inStock,
     formId = "product-order-form",
     productType = "NORMAL",
+    couponEnabled = false,
     exitDiscountToken = null,
     exitDiscountPercent = null,
     onExitDiscountConsumed,
@@ -102,10 +104,11 @@ export function ProductOrderForm({
     const turnstileStatus = useTurnstileStore((s) => s.status)
 
     const validatePromo = useCallback((code: string) => {
+        if (!couponEnabled) return Promise.resolve<ValidatePromoResponse>({})
         return fetch(`/api/validate-promo-code?promoCode=${encodeURIComponent(code)}`, {
             credentials: "same-origin",
         }).then((res) => res.json()) as Promise<ValidatePromoResponse>
-    }, [])
+    }, [couponEnabled])
 
     const {
         data: promoData,
@@ -157,32 +160,33 @@ export function ProductOrderForm({
         runValidatePromo(codeTrimmed)
     }, [codeTrimmed, discountCode, runValidatePromo, setPromoData])
 
-    // Exit discount 生效条件：有 token 且无 promoCode
+    // Exit discount: show whenever token is present (stacking allowed on first paid order)
     const activeExitDiscount =
-        exitDiscountToken && exitDiscountPercent != null && !codeTrimmed
+        exitDiscountToken && exitDiscountPercent != null
             ? exitDiscountPercent
             : null
 
     const totalPrice = isFree
         ? "0.00"
-        : promoValidation?.valid && promoValidation.discountPercent != null
-          ? (price * effectiveQuantity * (1 - promoValidation.discountPercent / 100)).toFixed(2)
-          : activeExitDiscount != null
-            ? (price * effectiveQuantity * (1 - activeExitDiscount / 100)).toFixed(2)
-            : (price * effectiveQuantity).toFixed(2)
+        : (() => {
+            let amt = price * effectiveQuantity
+            const promo = promoValidation?.valid ? promoValidation.discountPercent : null
+            if (promo != null) amt = amt * (1 - promo / 100)
+            if (activeExitDiscount != null) amt = amt * (1 - activeExitDiscount / 100)
+            return amt.toFixed(2)
+        })()
 
-    const activeDiscountPercent =
-        promoValidation?.valid && promoValidation.discountPercent != null
-            ? promoValidation.discountPercent
-            : activeExitDiscount
+    const activeDiscountPercent = (() => {
+        const promo = promoValidation?.valid ? promoValidation.discountPercent : null
+        if (promo != null && activeExitDiscount != null) {
+            return Math.round((1 - (1 - promo / 100) * (1 - activeExitDiscount / 100)) * 100)
+        }
+        return promo ?? activeExitDiscount
+    })()
 
     useEffect(() => {
-        setDisplay(
-            totalPrice,
-            isFree,
-            promoValidation?.valid ? promoValidation.discountPercent ?? null : activeExitDiscount
-        )
-    }, [totalPrice, isFree, promoValidation?.valid, promoValidation?.discountPercent, activeExitDiscount, setDisplay])
+        setDisplay(totalPrice, isFree, activeDiscountPercent ?? null)
+    }, [totalPrice, isFree, activeDiscountPercent, setDisplay])
 
     const onSubmit = async (data: OrderFormSchema) => {
         if (!inStock) return
@@ -332,6 +336,8 @@ export function ProductOrderForm({
 
                     <ProductOrderQuantityPicker
                         isAutoFetch={isAutoFetch}
+                        isFree={isFree}
+                        couponEnabled={couponEnabled}
                         maxQuantity={maxQuantity}
                         inStock={inStock}
                         discountCode={discountCode}

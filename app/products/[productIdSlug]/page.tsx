@@ -291,6 +291,7 @@ export default async function ProductDetailPage({
                 formId="product-order-form"
                 productType={product.productType}
                 validityHours={product.validityHours}
+                couponEnabled={product.couponEnabled}
               />
             </section>
 

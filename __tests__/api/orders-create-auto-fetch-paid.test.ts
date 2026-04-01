@@ -106,6 +106,7 @@ function makePaidAutoFetchProduct(overrides?: Record<string, unknown>) {
         validityHours: null,
         allowAccountSwitch: true,
         accountSwitchLimit: 1,
+        couponEnabled: true,
         riskWarningEnabled: false,
         riskWarningTitle: null,
         riskWarningContent: null,
