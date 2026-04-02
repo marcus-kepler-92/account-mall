@@ -4,8 +4,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/app/components/theme-provider";
 import { SiteNameProvider } from "@/app/components/site-name-provider";
 import { PromoCodeSync } from "@/app/components/promo-code-sync";
-import { QueryProvider } from "@/app/components/query-provider"
-import { VisibilityRefresh } from "@/app/components/visibility-refresh";
+import { QueryProvider } from "@/app/components/query-provider";
 import { NetworkStatusBar } from "@/app/components/network-status-bar";
 import { AnalyticsClient } from "@/app/components/analytics-client";
 import { CustomerServiceFab } from "@/app/components/customer-service-fab";
@@ -92,7 +91,6 @@ export default function RootLayout({
               siteSubtitle={config.siteSubtitle}
               adminPanelLabel={config.adminPanelLabel}
             >
-              <VisibilityRefresh />
               <PromoCodeSync />
               {children}
               <Toaster />

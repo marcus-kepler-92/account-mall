@@ -5,6 +5,7 @@ import { DistributorSidebar } from "@/app/components/distributor-sidebar"
 import { DistributorBreadcrumb } from "@/app/components/distributor-breadcrumb"
 import { DistributorTopbarActions } from "@/app/components/distributor-topbar-actions"
 import { DistributorMobileNav } from "./distributor-mobile-nav"
+import { VisibilityRefresh } from "@/app/components/visibility-refresh"
 
 export default async function DistributorMainLayout({
     children,
@@ -18,6 +19,7 @@ export default async function DistributorMainLayout({
 
     return (
         <SidebarProvider>
+            <VisibilityRefresh />
             <DistributorMobileNav />
             <DistributorSidebar />
             <SidebarInset className="pb-16 md:pb-0">

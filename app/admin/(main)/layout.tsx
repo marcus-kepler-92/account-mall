@@ -4,6 +4,7 @@ import { AdminSidebar } from "@/app/components/admin-sidebar"
 import { AdminBreadcrumb } from "@/app/components/admin-breadcrumb"
 import { AdminTopbarActions } from "@/app/components/admin-topbar-actions"
 import { getSessionForAdminArea } from "@/lib/auth-guard"
+import { VisibilityRefresh } from "@/app/components/visibility-refresh"
 
 export default async function AdminMainLayout({
     children,
@@ -20,6 +21,7 @@ export default async function AdminMainLayout({
 
     return (
         <SidebarProvider>
+            <VisibilityRefresh />
             <AdminSidebar />
             <SidebarInset>
                 {/* Top bar with sidebar trigger */}
