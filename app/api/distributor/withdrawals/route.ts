@@ -83,13 +83,6 @@ export async function POST(request: NextRequest) {
     if (amount < 0.01) {
         return NextResponse.json({ error: "提现金额至少 0.01 元" }, { status: 400 })
     }
-    const minAmount = config.withdrawalMinAmount
-    if (amount < minAmount) {
-        return NextResponse.json(
-            { error: `提现金额至少 ${minAmount} 元` },
-            { status: 400 }
-        )
-    }
 
     if (!file || !(file instanceof File) || file.size === 0) {
         return NextResponse.json({ error: "请上传收款码图片" }, { status: 400 })

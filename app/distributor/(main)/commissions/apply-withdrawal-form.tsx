@@ -21,13 +21,13 @@ import {
 } from "@/components/ui/form"
 import { Loader2, CheckCircle2, Wallet, ImagePlus, X } from "lucide-react"
 
-function buildWithdrawalSchema(minAmount: number, maxAmount: number) {
+function buildWithdrawalSchema(maxAmount: number) {
     return z.object({
         amount: z
             .string()
             .min(1, "请输入提现金额")
             .refine((v) => !Number.isNaN(parseFloat(v)), "请输入有效金额")
-            .refine((v) => parseFloat(v) >= minAmount, `不能低于最低提现额度 ¥${minAmount.toFixed(2)}`)
+            .refine((v) => parseFloat(v) > 0, "请输入有效金额")
             .refine((v) => parseFloat(v) <= maxAmount, "不能超过可提现余额"),
     })
 }
@@ -52,7 +52,7 @@ export function ApplyWithdrawalForm({
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     const form = useForm<FormValues>({
-        resolver: zodResolver(buildWithdrawalSchema(minAmount, withdrawableBalance)),
+        resolver: zodResolver(buildWithdrawalSchema(withdrawableBalance)),
         defaultValues: { amount: "" },
         mode: "onChange",
     })
@@ -167,7 +167,7 @@ export function ApplyWithdrawalForm({
                                 <FormControl>
                                     <Input
                                         type="number"
-                                        min={minAmount}
+                                        min={0.01}
                                         step={0.01}
                                         max={withdrawableBalance}
                                         placeholder="0.00"
@@ -190,7 +190,7 @@ export function ApplyWithdrawalForm({
                                 </Button>
                             </div>
                             <FormDescription>
-                                至少 ¥{minAmount.toFixed(2)}，最多可提现 ¥{withdrawableBalance.toFixed(2)}
+                                最多可提现 ¥{withdrawableBalance.toFixed(2)}。低于 ¥{minAmount.toFixed(2)} 的申请不会受理。
                             </FormDescription>
                             {feePercent > 0 && hasValidAmount && (
                                 <div className="mt-2 rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground space-y-0.5">

@@ -19,37 +19,31 @@ describe("ApplyWithdrawalForm", () => {
         minAmount: 50,
     }
 
-    it("renders amount input with min set to minAmount", () => {
+    it("renders amount input with min set to 0.01", () => {
         render(<ApplyWithdrawalForm {...defaultProps} />)
         const input = screen.getByLabelText(/提现金额/i)
-        expect(input).toHaveAttribute("min", "50")
+        expect(input).toHaveAttribute("min", "0.01")
     })
 
-    it("shows minimum amount hint in helper text", () => {
+    it("shows below-minimum notice in helper text", () => {
         render(<ApplyWithdrawalForm {...defaultProps} />)
-        expect(screen.getByText(/至少.*¥50|¥50.*至少/)).toBeInTheDocument()
+        expect(screen.getByText(/低于.*¥50.*不会受理/)).toBeInTheDocument()
     })
 
-    it("shows error when amount is below minAmount", async () => {
+    it("does not show validation error when amount is below minAmount", async () => {
         render(<ApplyWithdrawalForm {...defaultProps} />)
         const input = screen.getByLabelText(/提现金额/i)
         fireEvent.change(input, { target: { value: "20" } })
         await waitFor(() => {
-            expect(screen.getByText(/不能低于最低提现额度/)).toBeInTheDocument()
+            expect(screen.queryByText(/不能低于最低提现额度/)).not.toBeInTheDocument()
         })
     })
 
-    it("does not show below-minimum error when amount equals minAmount", () => {
-        render(<ApplyWithdrawalForm {...defaultProps} />)
-        const input = screen.getByLabelText(/提现金额/i)
-        fireEvent.change(input, { target: { value: "50" } })
-        expect(screen.queryByText(/不能低于最低提现额度/)).not.toBeInTheDocument()
-    })
-
-    it("submit button is disabled when amount is below minAmount", () => {
+    it("submit button is not disabled when amount is below minAmount but no file", () => {
         render(<ApplyWithdrawalForm {...defaultProps} />)
         const input = screen.getByLabelText(/提现金额/i)
         fireEvent.change(input, { target: { value: "20" } })
+        // disabled only because no file, not because of amount
         expect(screen.getByRole("button", { name: /提交申请/ })).toBeDisabled()
     })
 
@@ -69,14 +63,11 @@ describe("ApplyWithdrawalForm", () => {
         })
     })
 
-    it("uses default minAmount of 50 when prop is not provided", async () => {
+    it("uses default minAmount of 50 for notice text when prop is not provided", () => {
         render(<ApplyWithdrawalForm withdrawableBalance={200} />)
         const input = screen.getByLabelText(/提现金额/i)
-        expect(input).toHaveAttribute("min", "50")
-        fireEvent.change(input, { target: { value: "20" } })
-        await waitFor(() => {
-            expect(screen.getByText(/不能低于最低提现额度/)).toBeInTheDocument()
-        })
+        expect(input).toHaveAttribute("min", "0.01")
+        expect(screen.getByText(/低于.*¥50.*不会受理/)).toBeInTheDocument()
     })
 
     it("shows zero balance state when withdrawableBalance is 0", () => {
