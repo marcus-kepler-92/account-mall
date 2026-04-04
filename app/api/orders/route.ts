@@ -81,14 +81,31 @@ async function createAutoFetchOrder(params: {
             ],
         }
 
-        // 身份条件：邮箱 OR 指纹（独立信号），IP 需与另一信号配合（避免 NAT 误杀）
-        const identitySignals: object[] = [{ email: emailLower }]
-        if (fingerprintHash) identitySignals.push({ fingerprintHash })
-        const ipAuxiliary =
-            clientIp !== "unknown"
-                ? { clientIp, OR: [{ email: emailLower }, ...(fingerprintHash ? [{ fingerprintHash }] : [])] }
-                : null
-        const ownerCondition = { OR: [...identitySignals, ...(ipAuxiliary ? [ipAuxiliary] : [])] }
+        // Email is the only independent signal. Fingerprint and IP are both auxiliary —
+        // they must be corroborated by another signal to avoid false positives from
+        // Safari ITP-induced fingerprint collisions and NAT-shared IPs.
+        const emailSignal = { email: emailLower }
+        const auxiliarySignals: object[] = []
+
+        // Fingerprint auxiliary: must be paired with email or IP
+        if (fingerprintHash) {
+            const corroboration = [
+                { email: emailLower },
+                ...(clientIp !== "unknown" ? [{ clientIp }] : []),
+            ]
+            auxiliarySignals.push({ fingerprintHash, OR: corroboration })
+        }
+
+        // IP auxiliary: must be paired with email or fingerprint
+        if (clientIp !== "unknown") {
+            const corroboration = [
+                { email: emailLower },
+                ...(fingerprintHash ? [{ fingerprintHash }] : []),
+            ]
+            auxiliarySignals.push({ clientIp, OR: corroboration })
+        }
+
+        const ownerCondition = { OR: [emailSignal, ...auxiliarySignals] }
 
         const activeOrder = await prisma.order.findFirst({
             where: {

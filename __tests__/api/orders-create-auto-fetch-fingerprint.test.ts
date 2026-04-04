@@ -245,6 +245,42 @@ describe("POST /api/orders — AUTO_FETCH 多因素限领", () => {
       expect(res.status).toBe(200);
       expect(data.orderNo).toBeDefined();
     });
+
+    it("Safari 碰撞：换邮箱 + 换 IP + 同指纹 → WHERE 无法命中 → 允许下单（200）", async () => {
+      const { getClientIp } = require("@/lib/rate-limit");
+      getClientIp.mockReturnValueOnce("9.9.9.9"); // 不同 IP
+      prismaMock.product.findUnique.mockResolvedValue(makeFreeAutoFetchProduct());
+      prismaMock.order.findFirst.mockResolvedValue(null); // 无佐证信号，WHERE 不命中
+      mockSuccessfulFreeTransaction();
+
+      const res = await POST(makeRequest({
+        ...BASE_BODY,
+        email: "victim@example.com",
+        fingerprintHash: "fp-safari-collision",
+      }));
+
+      expect(res.status).toBe(200);
+    });
+
+    it("换邮箱 + 同 IP + 同指纹 → 指纹+IP 佐证命中 → 返回 429，不暴露他人 orderNo", async () => {
+      prismaMock.product.findUnique.mockResolvedValue(makeFreeAutoFetchProduct());
+      prismaMock.order.findFirst.mockResolvedValue({
+        id: "existing",
+        expiresAt: null,
+        orderNo: "original-order-uuid",
+        email: "original@example.com", // 与请求邮箱不同
+      } as any);
+
+      const res = await POST(makeRequest({
+        ...BASE_BODY,
+        email: "attacker@example.com",
+        fingerprintHash: "fp-abc123", // 同指纹 + 同 IP（mock 默认 1.2.3.4）
+      }));
+      const data = await res.json();
+
+      expect(res.status).toBe(429);
+      expect(data.orderNo).toBeUndefined(); // 不泄露他人订单号
+    });
   });
 
   // ─── WHERE 子句参数验证 ───────────────────────────────────────────────────
@@ -268,7 +304,7 @@ describe("POST /api/orders — AUTO_FETCH 多因素限领", () => {
       expect(hasStandaloneFingerprint).toBe(false);
     });
 
-    it("有指纹 → ownerCondition 含独立 fingerprintHash 信号", async () => {
+    it("有指纹 → ownerCondition 含辅助指纹信号（需佐证，不独立）", async () => {
       prismaMock.product.findUnique.mockResolvedValue(
         makeFreeAutoFetchProduct(),
       );
@@ -279,12 +315,37 @@ describe("POST /api/orders — AUTO_FETCH 多因素限领", () => {
 
       const call = prismaMock.order.findFirst.mock.calls[0]![0]!;
       const ownerOR: object[] = (call.where!.AND as any)[1].OR;
-      const hasStandaloneFingerprint = ownerOR.some(
-        (c) =>
-          (c as Record<string, unknown>).fingerprintHash === "fp-xyz" &&
-          !("clientIp" in c),
+
+      // Fingerprint should be auxiliary — paired with OR corroboration, not standalone
+      const fpEntry = ownerOR.find(
+        (c) => (c as Record<string, unknown>).fingerprintHash === "fp-xyz",
+      ) as Record<string, unknown> | undefined;
+      expect(fpEntry).toBeDefined();
+      // Must have an OR sub-condition (corroboration), not a bare { fingerprintHash } signal
+      expect(fpEntry!.OR).toBeDefined();
+      expect((fpEntry!.OR as object[]).length).toBeGreaterThan(0);
+    });
+
+    it("Safari 碰撞场景：指纹相同但邮箱和 IP 均不同 → WHERE 中指纹条件携带佐证（不单独触发）", async () => {
+      prismaMock.product.findUnique.mockResolvedValue(
+        makeFreeAutoFetchProduct(),
       );
-      expect(hasStandaloneFingerprint).toBe(true);
+      prismaMock.order.findFirst.mockResolvedValue(null);
+      mockSuccessfulFreeTransaction();
+
+      await POST(makeRequest({ ...BASE_BODY, email: "safari-user@example.com", fingerprintHash: "fp-collision" }));
+
+      const call = prismaMock.order.findFirst.mock.calls[0]![0]!;
+      const ownerOR: object[] = (call.where!.AND as any)[1].OR;
+
+      // There must be NO bare { fingerprintHash } entry — fingerprint alone should not block
+      const hasStandaloneFingerprint = ownerOR.some(
+        (c) => {
+          const keys = Object.keys(c as object);
+          return keys.length === 1 && keys[0] === "fingerprintHash";
+        },
+      );
+      expect(hasStandaloneFingerprint).toBe(false);
     });
 
     it("IP 辅助条件带 OR [email, fingerprint]", async () => {
