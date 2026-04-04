@@ -449,47 +449,52 @@ describe("POST /api/orders — AUTO_FETCH 多因素限领", () => {
   // ─── 错误文案 ─────────────────────────────────────────────────────────────
 
   describe("被拦截时的错误文案", () => {
-    it("免费商品被拦截 → 错误含「今日已领取」", async () => {
+    it("免费商品被拦截 → 错误含「已领取过该商品」", async () => {
       prismaMock.product.findUnique.mockResolvedValue(
         makeFreeAutoFetchProduct(),
       );
       prismaMock.order.findFirst.mockResolvedValue({
         id: "existing",
         expiresAt: null,
+        orderNo: "existing-uuid",
+        email: "user@example.com",
       } as any);
 
       const res = await POST(makeRequest(BASE_BODY));
       const data = await res.json();
 
       expect(res.status).toBe(429);
-      expect(data.error).toContain("今日已领取");
+      expect(data.error).toContain("已领取过该商品");
     });
 
-    it("免费商品被拦截且有 expiresAt → 错误含到期时间信息", async () => {
+    it("免费商品被拦截且有 expiresAt → 错误含「有效期至」时间信息", async () => {
       prismaMock.product.findUnique.mockResolvedValue(
         makeFreeAutoFetchProduct(),
       );
-      const expiresAt = new Date(Date.now() + 3600_000); // 1 小时后
+      const expiresAt = new Date(Date.now() + 3600_000);
       prismaMock.order.findFirst.mockResolvedValue({
         id: "existing",
         expiresAt,
+        orderNo: "existing-uuid",
+        email: "user@example.com",
       } as any);
 
       const res = await POST(makeRequest(BASE_BODY));
       const data = await res.json();
 
       expect(res.status).toBe(429);
-      // 包含可用至 xx:xx 格式
-      expect(data.error).toContain("可使用至");
+      expect(data.error).toContain("有效期至");
     });
 
-    it("收费商品被拦截 → 错误含「活跃订单」而非「今日已领取」", async () => {
+    it("收费商品被拦截 → 错误含「活跃订单」而非「已领取过」", async () => {
       prismaMock.product.findUnique.mockResolvedValue(
         makePaidAutoFetchProduct(),
       );
       prismaMock.order.findFirst.mockResolvedValue({
         id: "existing",
         expiresAt: null,
+        orderNo: "existing-uuid",
+        email: "user@example.com",
       } as any);
 
       const res = await POST(
@@ -499,7 +504,7 @@ describe("POST /api/orders — AUTO_FETCH 多因素限领", () => {
 
       expect(res.status).toBe(429);
       expect(data.error).toContain("活跃订单");
-      expect(data.error).not.toContain("今日已领取");
+      expect(data.error).not.toContain("已领取过");
     });
   });
 
@@ -656,6 +661,44 @@ describe("POST /api/orders — AUTO_FETCH 多因素限领", () => {
       const expectedMs = 48 * 60 * 60 * 1000
       expect(expiresAt - before).toBeGreaterThanOrEqual(expectedMs - 1000)
       expect(expiresAt - before).toBeLessThanOrEqual(expectedMs + 2000)
+    })
+  })
+
+  // ─── 429 响应中 orderNo 的安全性 ──────────────────────────────────────────
+
+  describe("429 响应 orderNo 安全性", () => {
+    it("邮箱命中自己的活跃订单 → 429 响应包含 orderNo 供用户找回订单", async () => {
+      prismaMock.product.findUnique.mockResolvedValue(makeFreeAutoFetchProduct())
+      prismaMock.order.findFirst.mockResolvedValue({
+        id: "existing",
+        expiresAt: null,
+        orderNo: "own-order-uuid",
+        email: "user@example.com", // 与请求邮箱一致
+      } as any)
+
+      const res = await POST(makeRequest(BASE_BODY)) // BASE_BODY.email = "user@example.com"
+      const data = await res.json()
+
+      expect(res.status).toBe(429)
+      expect(data.orderNo).toBe("own-order-uuid")
+    })
+
+    it("指纹命中他人订单（邮箱不同）→ 429 响应不含 orderNo，避免泄露他人订单号", async () => {
+      prismaMock.product.findUnique.mockResolvedValue(makeFreeAutoFetchProduct())
+      prismaMock.order.findFirst.mockResolvedValue({
+        id: "other-user-order",
+        expiresAt: null,
+        orderNo: "other-user-order-uuid",
+        email: "other@example.com", // 与请求邮箱不同
+      } as any)
+
+      const res = await POST(
+        makeRequest({ ...BASE_BODY, fingerprintHash: "fp-shared-device" }),
+      )
+      const data = await res.json()
+
+      expect(res.status).toBe(429)
+      expect(data.orderNo).toBeUndefined()
     })
   })
 });

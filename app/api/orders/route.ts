@@ -97,17 +97,23 @@ async function createAutoFetchOrder(params: {
                 ...(isFreeAutoFetch ? { amount: { equals: 0 } } : {}),
                 AND: [timeWindowCondition, ownerCondition],
             },
-            select: { id: true, expiresAt: true },
+            select: { id: true, expiresAt: true, orderNo: true, email: true },
         })
         if (activeOrder) {
             const expiresAt = activeOrder.expiresAt
             const expiresInfo = expiresAt
-                ? `，可使用至 ${formatDateTimeShort(expiresAt)}`
+                ? `，有效期至 ${formatDateTimeShort(expiresAt)}`
                 : ""
             const message = isFreeAutoFetch
-                ? `您今日已领取过该商品${expiresInfo}，请在可用时间内使用。`
-                : `您已有该商品的活跃订单${expiresInfo}，到期后再下单。`
-            return NextResponse.json({ error: message }, { status: 429 })
+                ? `您已领取过该商品${expiresInfo}，请使用之前的订单。`
+                : `您已有该商品的活跃订单${expiresInfo}，到期后可再下单。`
+            // Only expose orderNo when the matched order belongs to the current requester.
+            // Fingerprint or IP collisions may match another user's order — don't leak their orderNo.
+            const isOwnOrder = activeOrder.email === emailLower
+            return NextResponse.json(
+                { error: message, ...(isOwnOrder ? { orderNo: activeOrder.orderNo } : {}) },
+                { status: 429 },
+            )
         }
     }
 
@@ -454,19 +460,22 @@ export async function POST(request: NextRequest) {
             select: { id: true, discountCodeEnabled: true, discountPercent: true },
         })
         if (!distributor) {
-            return badRequest("优惠码无效")
-        }
-        distributorId = distributor.id
-        // 折扣仅在优惠码路径下生效；推广码仅归因，不给折扣
-        if (couponCode && distributor.discountCodeEnabled) {
-            let effectiveDiscount = config.basePromoDiscountPercent
-            if (distributor.discountPercent != null) {
-                const adminPct = Number(distributor.discountPercent)
-                if (adminPct > effectiveDiscount && adminPct > 0 && adminPct <= 100) {
-                    effectiveDiscount = adminPct
+            // User-typed coupon codes return an error; affiliate cookies are silently ignored
+            if (couponCode) return badRequest("优惠码无效")
+            // Invalid/expired affiliate cookie — proceed without attribution
+        } else {
+            distributorId = distributor.id
+            // 折扣仅在优惠码路径下生效；推广码仅归因，不给折扣
+            if (couponCode && distributor.discountCodeEnabled) {
+                let effectiveDiscount = config.basePromoDiscountPercent
+                if (distributor.discountPercent != null) {
+                    const adminPct = Number(distributor.discountPercent)
+                    if (adminPct > effectiveDiscount && adminPct > 0 && adminPct <= 100) {
+                        effectiveDiscount = adminPct
+                    }
                 }
+                if (effectiveDiscount > 0) distributorDiscountPercent = effectiveDiscount
             }
-            if (effectiveDiscount > 0) distributorDiscountPercent = effectiveDiscount
         }
     }
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useRequest } from "ahooks"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -128,6 +128,7 @@ export function ProductOrderForm({
     const isAutoFetch = productType === "AUTO_FETCH"
     const isFree = isAutoFetch && price === 0
     const fingerprintHash = useFingerprint()
+    const submittingRef = useRef(false)
 
     const form = useForm<OrderFormSchema>({
         resolver: zodResolver(createOrderFormSchema(maxQuantity)),
@@ -194,6 +195,8 @@ export function ProductOrderForm({
             toast.error("安全验证尚未完成，请稍候再试")
             return
         }
+        if (submittingRef.current) return
+        submittingRef.current = true
         dispatchOrderFormLoading(true)
         let willRedirect = false
         try {
@@ -250,10 +253,21 @@ export function ProductOrderForm({
             }
 
             applyFieldErrors(responseData, form.setError)
-            toast.error(responseData.error || "下单失败")
+            if (res.status === 429 && responseData.orderNo) {
+                toast.warning(responseData.error, {
+                    action: {
+                        label: "查看订单",
+                        onClick: () => router.push(`/orders/lookup?orderNo=${encodeURIComponent(responseData.orderNo)}`),
+                    },
+                    duration: 8000,
+                })
+            } else {
+                toast.error(responseData.error || "下单失败")
+            }
         } catch {
             toast.error("下单失败，请稍后重试")
         } finally {
+            submittingRef.current = false
             if (!willRedirect) dispatchOrderFormLoading(false)
         }
     }

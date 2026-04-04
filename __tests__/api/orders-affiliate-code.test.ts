@@ -346,4 +346,101 @@ describe("推广码（cookie）vs 优惠码（body）语义区分", () => {
             expect(body.orderNo).toBe("free-order-uuid")
         })
     })
+
+    describe("无效推广码（cookie）静默降级", () => {
+        it("推广码（cookie）失效（分销商不存在）→ 下单成功，无分销归因", async () => {
+            // 分销商不存在 → user.findFirst 返回 null
+            prismaMock.user.findFirst.mockResolvedValueOnce(null)
+            prismaMock.order.count.mockResolvedValueOnce(0)
+            prismaMock.product.findUnique.mockResolvedValueOnce(BASE_FREE_AUTO_FETCH_PRODUCT as any)
+            prismaMock.order.findFirst.mockResolvedValueOnce(null) // no active order
+            scrapeMultipleUrlsMock.mockResolvedValueOnce([SCRAPED_ACCOUNT])
+            prismaMock.accountBlacklist.findMany.mockResolvedValueOnce([])
+
+            const freeOrder = {
+                id: "order_free",
+                orderNo: "free-order-uuid",
+                productId: "prod_free",
+                email: "user@example.com",
+                amount: new Prisma.Decimal("0"),
+                status: "COMPLETED",
+            }
+            const tx = {
+                order: { create: jest.fn().mockResolvedValue(freeOrder) },
+                card: { create: jest.fn().mockResolvedValue({}) },
+            }
+            ;(prismaMock.$transaction as jest.Mock).mockImplementation(
+                (cb: (t: unknown) => Promise<unknown>) => cb(tx),
+            )
+
+            const res = await POST(
+                createRequest(
+                    { productId: "prod_free", email: "user@example.com", orderPassword: "pass123", quantity: 1 },
+                    withAffiliateCookie("EXPIRED_CODE"),
+                ),
+            )
+
+            expect(res.status).toBe(200)
+            // distributorId 不应写入订单
+            const createCall = (tx.order.create as jest.Mock).mock.calls[0][0]
+            expect(createCall.data).not.toHaveProperty("distributorId")
+        })
+
+        it("推广码（cookie）失效但 body 有优惠码 → 优惠码无效错误正常返回（400）", async () => {
+            // lookupCode = couponCode（优先），分销商不存在 → 报错
+            prismaMock.user.findFirst.mockResolvedValueOnce(null)
+
+            const res = await POST(
+                createRequest(
+                    { productId: "prod_1", email: "user@example.com", orderPassword: "pass123", quantity: 1, promoCode: "INVALID_COUPON" },
+                    withAffiliateCookie("EXPIRED_CODE"),
+                ),
+            )
+
+            expect(res.status).toBe(400)
+            const body = await res.json()
+            expect(body.error).toMatch(/优惠码无效/)
+        })
+
+        it("推广码（cookie）有效 → 归因写入订单，但不给折扣", async () => {
+            prismaMock.user.findFirst.mockResolvedValueOnce({
+                id: "dist_1",
+                discountCodeEnabled: true,
+                discountPercent: new Prisma.Decimal("10"),
+            } as any)
+            prismaMock.order.count.mockResolvedValueOnce(0)
+            prismaMock.product.findUnique.mockResolvedValueOnce(BASE_FREE_AUTO_FETCH_PRODUCT as any)
+            prismaMock.order.findFirst.mockResolvedValueOnce(null)
+            scrapeMultipleUrlsMock.mockResolvedValueOnce([SCRAPED_ACCOUNT])
+            prismaMock.accountBlacklist.findMany.mockResolvedValueOnce([])
+
+            const freeOrder = {
+                id: "order_free",
+                orderNo: "free-order-uuid",
+                productId: "prod_free",
+                email: "user@example.com",
+                amount: new Prisma.Decimal("0"),
+                status: "COMPLETED",
+            }
+            const tx = {
+                order: { create: jest.fn().mockResolvedValue(freeOrder) },
+                card: { create: jest.fn().mockResolvedValue({}) },
+            }
+            ;(prismaMock.$transaction as jest.Mock).mockImplementation(
+                (cb: (t: unknown) => Promise<unknown>) => cb(tx),
+            )
+
+            const res = await POST(
+                createRequest(
+                    { productId: "prod_free", email: "user@example.com", orderPassword: "pass123", quantity: 1 },
+                    withAffiliateCookie("VALID_AFFILIATE"),
+                ),
+            )
+
+            expect(res.status).toBe(200)
+            const createCall = (tx.order.create as jest.Mock).mock.calls[0][0]
+            expect(createCall.data.distributorId).toBe("dist_1") // 有归因
+            expect(createCall.data.amount).toBe(0)               // 免费，无折扣逻辑影响
+        })
+    })
 })
