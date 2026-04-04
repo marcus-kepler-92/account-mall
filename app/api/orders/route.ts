@@ -440,22 +440,25 @@ export async function POST(request: NextRequest) {
     const { productId, email, orderPassword, quantity, paymentMethod, turnstileToken, promoCode: bodyPromoCode, exitDiscountToken, fingerprintHash: rawFingerprintHash } = parsed.data
     const fingerprintHash = rawFingerprintHash?.trim() || null
 
-    // Resolve distributor from promoCode (cookie or body); include discount settings for 同码优惠
-    const cookiePromoCode = request.cookies?.get?.("distributor_promo_code")?.value?.trim()
-    const promoCode = (bodyPromoCode?.trim() || cookiePromoCode) || null
+    // 优惠码：用户主动填写，用于归因 + 折扣；受 couponEnabled 限制
+    const couponCode = bodyPromoCode?.trim() || null
+    // 推广码：分销商链路 cookie，仅用于归因，不受 couponEnabled 限制，不给折扣
+    const affiliateCode = request.cookies?.get?.("distributor_promo_code")?.value?.trim() || null
+    // 分销商查询用码：优先优惠码，其次推广码
+    const lookupCode = couponCode || affiliateCode
     let distributorId: string | null = null
     let distributorDiscountPercent: number | null = null
-    if (promoCode) {
+    if (lookupCode) {
         const distributor = await prisma.user.findFirst({
-            where: { distributorCode: promoCode, role: "DISTRIBUTOR", disabledAt: null },
+            where: { distributorCode: lookupCode, role: "DISTRIBUTOR", disabledAt: null },
             select: { id: true, discountCodeEnabled: true, discountPercent: true },
         })
         if (!distributor) {
             return badRequest("优惠码无效")
         }
         distributorId = distributor.id
-        // discountCodeEnabled is the master switch; when off, no discount at all
-        if (distributor.discountCodeEnabled) {
+        // 折扣仅在优惠码路径下生效；推广码仅归因，不给折扣
+        if (couponCode && distributor.discountCodeEnabled) {
             let effectiveDiscount = config.basePromoDiscountPercent
             if (distributor.discountPercent != null) {
                 const adminPct = Number(distributor.discountPercent)
@@ -519,8 +522,8 @@ export async function POST(request: NextRequest) {
         return notFound("Product not found or unavailable")
     }
 
-    // Reject promo code if this product does not accept coupons
-    if (promoCode && !product.couponEnabled) {
+    // 仅拦截手动填写的优惠码；推广码（cookie）不受此限制
+    if (couponCode && !product.couponEnabled) {
         return badRequest("该商品不支持使用优惠码")
     }
 
@@ -543,7 +546,7 @@ export async function POST(request: NextRequest) {
             price: autoFetchPrice,
             distributorId,
             distributorDiscountPercent,
-            promoCode,
+            promoCode: lookupCode,
             fingerprintHash,
             paymentMethod,
         })
