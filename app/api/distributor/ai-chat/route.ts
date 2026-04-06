@@ -36,12 +36,12 @@ export async function POST(request: NextRequest) {
   const trimmedMessages = messages.slice(-MAX_CONTEXT_MESSAGES)
 
   const qwen = createOpenAI({
-    baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    baseURL: "https://api.siliconflow.com/v1",
     apiKey: config.qwenApiKey ?? "",
   })
 
   const result = streamText({
-    model: qwen("qwen-plus"),
+    model: qwen.chat("Qwen/Qwen2.5-72B-Instruct"),
     system: buildSystemPrompt(user.name ?? "分销员"),
     messages: await convertToModelMessages(trimmedMessages),
     tools: buildTools(user.id),
