@@ -184,3 +184,29 @@ export async function checkTurnstileFallbackRateLimit(ip: string): Promise<boole
 }
 
 export const MAX_PENDING_ORDERS_PER_IP = config.maxPendingOrdersPerIp
+
+/** AI 对话：每用户每小时最多 30 条消息 */
+const AI_CHAT_POINTS = 30
+const AI_CHAT_DURATION = 3600
+const aiChatLimiter = new RateLimiterMemory({
+    points: AI_CHAT_POINTS,
+    duration: AI_CHAT_DURATION,
+})
+
+/**
+ * Check AI chat rate limit (30 messages per user per hour).
+ * Skipped in development.
+ */
+export async function checkAiChatRateLimit(userId: string): Promise<Response | null> {
+    if (config.nodeEnv === "development") return null
+    const key = `ai-chat:${userId}`
+    try {
+        await aiChatLimiter.consume(key)
+        return null
+    } catch {
+        return new Response(
+            JSON.stringify({ error: "AI 对话请求过于频繁，请稍后再试。" }),
+            { status: 429, headers: { "Content-Type": "application/json" } },
+        )
+    }
+}
