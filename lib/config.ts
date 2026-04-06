@@ -127,6 +127,8 @@ const envSchema = z
       .optional()
             .transform((v) => v === "true" || v === "1")
             .default(false),
+    /** 阿里云千问 API Key，AI 客服功能必填 */
+    qwenApiKey: z.string().optional(),
   })
   .transform((data) => {
     const urlFromEnv = data.databaseUrl?.trim();
@@ -263,6 +265,7 @@ function getEnvInput() {
     exitDiscountPercent: e.EXIT_DISCOUNT_PERCENT,
     exitDiscountTtlMs: e.EXIT_DISCOUNT_TTL_MS,
     orderCompletionEmailEnabled: e.ORDER_COMPLETION_EMAIL_ENABLED,
+    qwenApiKey: e.QWEN_API_KEY,
   };
 }
 
