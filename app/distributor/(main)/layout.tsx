@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation"
+import dynamic from "next/dynamic"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { getDistributorSession } from "@/lib/auth-guard"
 import { DistributorSidebar } from "@/app/components/distributor-sidebar"
@@ -6,6 +7,11 @@ import { DistributorBreadcrumb } from "@/app/components/distributor-breadcrumb"
 import { DistributorTopbarActions } from "@/app/components/distributor-topbar-actions"
 import { DistributorMobileNav } from "./distributor-mobile-nav"
 import { VisibilityRefresh } from "@/app/components/visibility-refresh"
+
+const FloatingChat = dynamic(
+    () => import("./floating-chat").then((m) => m.FloatingChat),
+    { ssr: false },
+)
 
 export default async function DistributorMainLayout({
     children,
@@ -32,6 +38,7 @@ export default async function DistributorMainLayout({
                     {children}
                 </div>
             </SidebarInset>
+            <FloatingChat />
         </SidebarProvider>
     )
 }
