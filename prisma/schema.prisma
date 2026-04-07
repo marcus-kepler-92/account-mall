@@ -197,6 +197,8 @@ model Order {
   exitDiscountMeta        String?     @db.Text // Exit intent 折扣信号 JSON，订单 COMPLETED 后转存到 ExitDiscountUsage
   /// AUTO_FETCH：用户已使用的换号次数
   switchAccountCount      Int         @default(0)
+  paymentChannelId        String?
+  paymentChannel          PaymentChannel? @relation(fields: [paymentChannelId], references: [id])
   product                 Product     @relation(fields: [productId], references: [id])
   distributor             User?       @relation(fields: [distributorId], references: [id])
   cards                   Card[]
@@ -208,6 +210,7 @@ model Order {
   @@index([clientIp, status])
   @@index([fingerprintHash])
   @@index([distributorId])
+  @@index([paymentChannelId])
 }
 
 model RestockSubscription {
@@ -287,6 +290,36 @@ model Withdrawal {
 
   @@index([distributorId])
   @@index([status])
+}
+
+model PaymentChannel {
+  id          String              @id @default(cuid())
+  nickname    String
+  pid         String
+  key         String
+  submitUrl   String
+  siteName    String
+  type        String              // "alipay" | "wxpay" | "qqpay"
+  annualLimit Decimal             @db.Decimal(10, 2) @default(65000)
+  sortOrder   Int                 @default(0)
+  isActive    Boolean             @default(true)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  orders      Order[]
+  withdrawals ChannelWithdrawal[]
+
+  @@index([type, isActive, sortOrder])
+}
+
+model ChannelWithdrawal {
+  id        String         @id @default(cuid())
+  channelId String
+  amount    Decimal        @db.Decimal(10, 2)
+  note      String?        @db.Text
+  createdAt DateTime       @default(now())
+  channel   PaymentChannel @relation(fields: [channelId], references: [id])
+
+  @@index([channelId])
 }
 
 // 邀请奖励：被邀请人（分销员）首单完成时，给邀请人发放一笔固定金额，每名被邀请人只触发一次
