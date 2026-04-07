@@ -18,8 +18,8 @@ export type OrderRow = {
     product: {
         id: string
         name: string
-        price: number
     }
+    unitPriceSnapshot: number | null
     quantity: number
     amount: number
     status: "PENDING" | "COMPLETED" | "CLOSED"
@@ -108,12 +108,15 @@ export function createOrdersColumns(distributors: DistributorOption[]): ColumnDe
         header: "商品",
         cell: ({ row }) => {
             const product = row.original.product
+            const unitPrice = row.original.unitPriceSnapshot
             return (
                 <div className="flex flex-col">
                     <span className="font-medium">{product.name}</span>
-                    <span className="text-xs text-muted-foreground">
-                        {formatCurrency(product.price)}
-                    </span>
+                    {unitPrice != null && (
+                        <span className="text-xs text-muted-foreground">
+                            {formatCurrency(unitPrice)}
+                        </span>
+                    )}
                 </div>
             )
         },

@@ -91,7 +91,6 @@ export default async function AdminOrdersPage({
                     select: {
                         id: true,
                         name: true,
-                        price: true,
                     },
                 },
                 distributor: {
@@ -146,8 +145,10 @@ export default async function AdminOrdersPage({
             product: {
                 id: order.product.id,
                 name: order.product.name,
-                price: Number(order.product.price),
             },
+            unitPriceSnapshot: order.unitPriceSnapshot != null
+                ? Number(order.unitPriceSnapshot)
+                : null,
             quantity: order.quantity,
             amount: Number(order.amount),
             status: order.status,
