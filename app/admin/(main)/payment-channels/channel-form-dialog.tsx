@@ -11,7 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { createPaymentChannelSchema } from "@/lib/validations/payment-channel"
+import { createPaymentChannelSchema, updatePaymentChannelSchema } from "@/lib/validations/payment-channel"
 import type { ChannelRow } from "./payment-channels-columns"
 
 // Use z.output to get the resolved type (defaults filled in) for form field values
@@ -40,7 +40,7 @@ export function ChannelFormDialog({ open, onOpenChange, channel }: Props) {
 
     const form = useForm<FormValues>({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        resolver: zodResolver(createPaymentChannelSchema) as any,
+        resolver: zodResolver(isEdit ? updatePaymentChannelSchema : createPaymentChannelSchema) as any,
         defaultValues: channel
             ? {
                   nickname: channel.nickname,
