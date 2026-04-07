@@ -159,6 +159,7 @@ describe("POST /api/orders -- exit discount token handling", () => {
     getConfigMock().nodeEnv = "test";
     getConfigMock().exitDiscountSecret = "test-exit-secret";
     (prismaMock.$transaction as jest.Mock).mockReset();
+    (prismaMock.paymentChannel.findMany as jest.Mock).mockResolvedValue([]);
   });
 
   it("applies 5% discount and stores exitDiscountMeta when valid token provided without promoCode", async () => {

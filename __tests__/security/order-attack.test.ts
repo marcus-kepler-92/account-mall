@@ -67,6 +67,10 @@ function createJsonRequest(body: unknown): NextRequest {
     return { json: async () => body } as unknown as NextRequest
 }
 
+beforeEach(() => {
+    ;(prismaMock.paymentChannel.findMany as jest.Mock).mockResolvedValue([])
+})
+
 describe("Security: AuthZ / IDOR (admin and order access)", () => {
     beforeEach(() => {
         getAdminSession.mockReset()
