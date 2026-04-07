@@ -33,31 +33,42 @@ function md5(str: string): string {
  * Build full submit URL: prestr + sign=MD5(prestr+key) + sign_type=MD5.
  * Key must be kept server-side only.
  */
-export function buildSubmitUrl(params: Record<string, string>, key: string): string {
+export function buildSubmitUrl(params: Record<string, string>, key: string, submitUrl?: string): string {
     const prestr = getVerifyParams(params)
     const sign = md5(prestr + key)
-    const base = config.yipaySubmitUrl ?? ""
+    const base = submitUrl ?? config.yipaySubmitUrl ?? ""
     return `${base}?${prestr}&sign=${sign}&sign_type=MD5`
+}
+
+export type YipayChannelConfig = {
+    pid: string
+    key: string
+    submitUrl: string
+    siteName: string
 }
 
 /**
  * Generate Yipay page pay URL. Uses orderNo, totalAmount, subject; notify_url and return_url from config.siteUrl.
- * Returns null if Yipay is not configured.
+ * Returns null if required config (pid/key/submitUrl/siteName) is missing.
  * @param params.type - Payment channel: "alipay" | "wxpay" | "qqpay" (default: "alipay")
+ * @param params.channel - Optional per-channel config overrides; falls back to global env vars.
  */
 export function getYipayPagePayUrl(params: {
     orderNo: string
     totalAmount: string
     subject: string
     type?: string
+    channel?: YipayChannelConfig
 }): string | null {
-    if (!isYipayConfigured()) return null
-    const base = config.siteUrl
-    const pid = config.yipayPid!
-    const key = config.yipayKey!
-    const _submitUrl = config.yipaySubmitUrl!
-    const siteName = config.yipaySiteName!
+    const channel = params.channel
+    const pid = channel?.pid ?? config.yipayPid
+    const key = channel?.key ?? config.yipayKey
+    const submitUrl = channel?.submitUrl ?? config.yipaySubmitUrl
+    const siteName = channel?.siteName ?? config.yipaySiteName
 
+    if (!pid || !key || !submitUrl || !siteName) return null
+
+    const base = config.siteUrl
     const requestParams: Record<string, string> = {
         pid,
         money: params.totalAmount,
@@ -69,7 +80,7 @@ export function getYipayPagePayUrl(params: {
         type: params.type ?? "alipay",
     }
     try {
-        return buildSubmitUrl(requestParams, key)
+        return buildSubmitUrl(requestParams, key, submitUrl)
     } catch {
         return null
     }
@@ -78,9 +89,9 @@ export function getYipayPagePayUrl(params: {
 /**
  * Verify Yipay async notify sign. Same algorithm as submit: prestr from params (exclude sign/sign_type), mysign = MD5(prestr+key), compare with sign (lowercase).
  */
-export function verifyYipayNotifySign(postData: Record<string, unknown>): boolean {
-    if (!isYipayConfigured()) return false
-    const key = config.yipayKey!
+export function verifyYipayNotifySign(postData: Record<string, unknown>, key?: string): boolean {
+    const signingKey = key ?? config.yipayKey
+    if (!signingKey) return false
     const signReceived = postData.sign
     if (typeof signReceived !== "string" || !signReceived) return false
     const stringParams: Record<string, string> = {}
@@ -90,6 +101,6 @@ export function verifyYipayNotifySign(postData: Record<string, unknown>): boolea
         }
     }
     const prestr = getVerifyParams(stringParams)
-    const mysign = md5(prestr + key)
+    const mysign = md5(prestr + signingKey)
     return mysign === signReceived.toLowerCase()
 }

@@ -6,6 +6,7 @@ import {
     isYipayConfigured,
     getYipayPagePayUrl,
 } from "@/lib/yipay"
+import type { YipayChannelConfig } from "@/lib/yipay"
 
 jest.mock("@/lib/config", () => ({
     config: {
@@ -148,5 +149,39 @@ describe("getYipayPagePayUrl", () => {
         } finally {
             config.yipayPid = orig
         }
+    })
+})
+
+describe("getYipayPagePayUrl with channel override", () => {
+    it("uses channel config instead of global config when provided", () => {
+        const url = getYipayPagePayUrl({
+            orderNo: "ord_1",
+            totalAmount: "99.00",
+            subject: "Test Product",
+            type: "alipay",
+            channel: {
+                pid: "channel_pid",
+                key: "channel_key",
+                submitUrl: "https://other-pay.com/submit.php",
+                siteName: "Other Site",
+            } satisfies YipayChannelConfig,
+        })
+        expect(url).not.toBeNull()
+        expect(url).toContain("https://other-pay.com/submit.php")
+        expect(url).toContain("pid=channel_pid")
+        expect(url).toContain("sitename=Other Site")
+    })
+})
+
+describe("verifyYipayNotifySign with explicit key", () => {
+    it("verifies with provided key instead of config key", () => {
+        const params = { pid: "1", money: "10.00", out_trade_no: "ord_1" }
+        const key = "channel_signing_key"
+        const url = buildSubmitUrl(params, key, "https://pay.com/submit.php")
+        const urlParams = new URLSearchParams(url.split("?")[1])
+        const sign = urlParams.get("sign")!
+        const postData = { ...params, sign, sign_type: "MD5" }
+        expect(verifyYipayNotifySign(postData, key)).toBe(true)
+        expect(verifyYipayNotifySign(postData, "wrong_key")).toBe(false)
     })
 })
