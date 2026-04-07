@@ -183,6 +183,7 @@ model Order {
   amount                    Decimal     @db.Decimal(10, 2)
   discountPercentApplied    Decimal?     @db.Decimal(5, 2) // 下单时若使用分销员优惠码，记录当时应用的折扣比例
   productNameSnapshot       String?     @db.VarChar(500) // 下单时商品名称快照，便于历史订单展示
+  unitPriceSnapshot         Decimal?    @db.Decimal(10, 2) // 下单时商品单价快照（不含折扣）
   status                    OrderStatus @default(PENDING)
   paidAt                  DateTime?
   /// AUTO_FETCH：订单有效期截止时间；免费=创建时+validityHours，收费=支付时+validityHours
