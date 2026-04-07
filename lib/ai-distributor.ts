@@ -3,41 +3,61 @@ import { z } from "zod"
 import { prisma } from "@/lib/prisma"
 import { config } from "@/lib/config"
 
+// Only non-sensitive business config fields allowed in the system prompt.
+// Never add API keys, secrets, or credentials here.
+const promptConfig = {
+    siteName: config.siteName,
+    siteUrl: config.siteUrl,
+    withdrawalMinAmount: config.withdrawalMinAmount,
+    withdrawalFeePercent: config.withdrawalFeePercent,
+    distributorInviteTtlDays: config.distributorInviteTtlDays,
+    basePromoDiscountPercent: config.basePromoDiscountPercent,
+    level2CommissionRatePercent: config.level2CommissionRatePercent,
+}
+
 /**
  * Build the system prompt for the distributor AI assistant.
  * Injects platform static rules and site URL from config.
  */
 export function buildSystemPrompt(distributorName: string): string {
-    return `你是${config.siteName}平台的 AI 助手，专门帮助分销员了解平台规则和业务操作。
+    return `你是${promptConfig.siteName}平台的 AI 助手，专门帮助分销员了解平台规则和业务操作。
 
 当前用户：${distributorName}
 
 ## 平台静态规则
-- 站点地址：${config.siteUrl}
-- 提现最低金额：¥${config.withdrawalMinAmount}
-- 提现手续费比例：${config.withdrawalFeePercent}%
-- 邀请链接有效期：${config.distributorInviteTtlDays} 天
-- 买家使用推荐码可享受 ${config.basePromoDiscountPercent}% 折扣（折扣成本从佣金中扣除）
-- 二级佣金比例：团队成员佣金的 ${config.level2CommissionRatePercent}%
+- 站点地址：${promptConfig.siteUrl}
+- 提现最低金额：¥${promptConfig.withdrawalMinAmount}
+- 提现手续费比例：${promptConfig.withdrawalFeePercent}%
+- 邀请链接有效期：${promptConfig.distributorInviteTtlDays} 天
+- 买家使用推荐码可享受 ${promptConfig.basePromoDiscountPercent}% 折扣（折扣成本从佣金中扣除）
+- 二级佣金比例：团队成员佣金的 ${promptConfig.level2CommissionRatePercent}%
 
 ## 工具调用规则
-- 用户询问自己的账户信息、推广码、分享链接时 → 调用 get_my_profile
-- 用户询问余额、收益、订单数量等统计数据时 → 调用 get_my_stats
-- 用户询问自己的订单列表时 → 调用 get_my_orders
-- 用户询问佣金记录时 → 调用 get_my_commissions
-- 用户询问提现记录或提现状态时 → 调用 get_my_withdrawals
-- 用户询问团队成员、下线时 → 调用 get_my_team
-- 用户询问邀请记录、邀请进度时 → 调用 get_my_invitations
-- 用户询问佣金阶梯规则时 → 调用 get_commission_tiers
-- 用户询问平台商品、在售商品时 → 调用 get_products
-- 用户询问操作指南、新手教程时 → 调用 get_guides
-- 用户询问平台公告、通知时 → 调用 get_announcements
-- 分享链接 = ${config.siteUrl}/?ref=<分销员推广码>，通过 get_my_profile 获取推广码后拼接
+
+根据用户**意图**判断，不要求字面匹配：
+
+- **账户/推广/优惠码**：用户想了解自己的账号、推广方式、如何让买家享受折扣，或询问任何形式的"码"（推广码、优惠码、折扣码、邀请码、分享码）和分享链接 → 调用 get_my_profile
+- **数据统计**：用户想查余额、可提现金额、收益、销售额、总收入、订单数等汇总数字 → 调用 get_my_stats
+- **订单明细**：用户想看具体订单列表、历史成交记录 → 调用 get_my_orders
+- **佣金明细**：用户想了解哪笔订单产生了多少佣金、佣金流水 → 调用 get_my_commissions
+- **提现记录**：用户想查提现申请、打款状态、到账情况 → 调用 get_my_withdrawals
+- **团队/下线**：用户想了解自己邀请的人、团队成员、下级分销员 → 调用 get_my_team
+- **邀请记录**：用户想查发出的邀请、邀请进度、邀请链接 → 调用 get_my_invitations
+- **佣金规则**：用户想了解佣金比例、阶梯规则、如何计算佣金 → 调用 get_commission_tiers
+- **商品信息**：用户想了解平台在卖什么、商品列表、商品价格 → 调用 get_products
+- **操作指南**：用户是新手、不知道怎么操作、想看教程 → 调用 get_guides
+- **公告通知**：用户想看平台通知、最新公告、动态 → 调用 get_announcements
+
+**推广码即优惠码**：get_my_profile 返回的 distributorCode 就是分销员的推广码，它既用于拼接分享链接（${promptConfig.siteUrl}/?ref=<推广码>），也是买家在下单页"优惠码"输入框里可以直接填写的那个码，两种用法的码值完全相同。
 
 ## 回答规范
 - 使用中文，简洁友好
 - 对新手耐心解释，避免行业术语
 - 遇到无法解答的问题，引导用户联系平台客服
+
+## 工具调用行为
+- 需要调用工具时，**直接调用，不要在调用前输出任何文字**（不要说"我来帮你查"、"请稍等"等）
+- 获得工具结果后再组织回复
 
 ## 严格禁止的行为（必须遵守）
 - **禁止编造任何数字**：余额、佣金、订单金额等数据必须通过工具获取，工具未返回则明确说"暂无数据"
@@ -55,7 +75,7 @@ export function buildSystemPrompt(distributorName: string): string {
 export function buildTools(distributorId: string) {
     return {
         get_my_profile: tool({
-            description: "查询当前分销员的账户信息：推广码、分享链接、折扣配置、上级邀请人",
+            description: "查询当前分销员的账户信息：推广码（即优惠码）、分享链接、折扣配置、上级邀请人",
             inputSchema: z.object({}),
             execute: async () => {
                 const user = await prisma.user.findUnique({
@@ -77,10 +97,15 @@ export function buildTools(distributorId: string) {
                     shareLink: user.distributorCode
                         ? `${config.siteUrl}/?ref=${user.distributorCode}`
                         : null,
-                    discountCodeEnabled: user.discountCodeEnabled,
+                    discountEnabled: user.discountCodeEnabled,
                     discountPercent: user.discountPercent
                         ? Number(user.discountPercent).toFixed(2)
                         : null,
+                    discountPercentNote: user.discountPercent
+                        ? null
+                        : user.discountCodeEnabled
+                            ? "未单独设置，使用平台基础折扣比例"
+                            : "优惠码已禁用，买家使用该码不享受折扣",
                     inviterName: user.inviter?.name ?? null,
                 }
             },

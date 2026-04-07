@@ -8,16 +8,31 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent } from "@/components/ui/card"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+// react-markdown used intentionally — @vercel/ai-elements not available in @ai-sdk/react 3.x
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import type { UIMessage } from "ai"
 
+function stripToolCallArtifacts(text: string): string {
+    return text
+        // Complete blocks
+        .replace(/<tool_call>[\s\S]*?<\/tool_call>/g, "")
+        // Incomplete block (streaming: opened but not yet closed)
+        .replace(/<tool_call>[\s\S]*/g, "")
+        // Stray closing tag
+        .replace(/<\/tool_call>/g, "")
+        // Orphaned braces on their own line (JSON remnants)
+        .replace(/^\s*[{}]\s*$/gm, "")
+        .trim()
+}
+
 function MessageBubble({ message }: { message: UIMessage }) {
     const isUser = message.role === "user"
-    const textContent = message.parts
+    const rawText = message.parts
         .filter((p) => p.type === "text")
         .map((p) => p.text)
         .join("")
+    const textContent = isUser ? rawText : stripToolCallArtifacts(rawText)
 
     return (
         <div className={`mb-3 flex ${isUser ? "justify-end" : "justify-start"}`}>
