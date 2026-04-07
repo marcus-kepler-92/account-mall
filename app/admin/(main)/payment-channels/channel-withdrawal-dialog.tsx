@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -30,6 +30,12 @@ export function ChannelWithdrawalDialog({ open, onOpenChange, channelId, channel
             note: "",
         },
     })
+
+    useEffect(() => {
+        if (!open) {
+            form.reset()
+        }
+    }, [open, form])
 
     const onSubmit = async (values: CreateChannelWithdrawalInput) => {
         setError(null)

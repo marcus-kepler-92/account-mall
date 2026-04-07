@@ -29,5 +29,6 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         where: { id },
         data: parsed.data,
     })
-    return NextResponse.json({ data: updated })
+    const { key: _k, ...rest } = updated
+    return NextResponse.json({ data: rest })
 }
