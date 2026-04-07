@@ -28,6 +28,7 @@ function makePendingOrder(overrides?: Record<string, unknown>) {
         amount: 99,
         product: { name: "Test" },
         cards: [{ id: "c1", status: "RESERVED" }],
+        paymentChannel: null,
         ...overrides,
     } as any
 }
@@ -41,6 +42,7 @@ describe("processYipayNotifyAndComplete", () => {
     })
 
     it("returns { ok: false } when sign verification fails", async () => {
+        prismaMock.order.findFirst.mockResolvedValue(makePendingOrder())
         verifyMock.mockReturnValue(false)
         const result = await processYipayNotifyAndComplete({
             out_trade_no: "order-1",
@@ -49,7 +51,10 @@ describe("processYipayNotifyAndComplete", () => {
             sign: "bad",
         })
         expect(result).toEqual({ ok: false })
-        expect(prismaMock.order.findFirst).not.toHaveBeenCalled()
+        // order lookup happens before verify now (to get channel key)
+        expect(prismaMock.order.findFirst).toHaveBeenCalledWith(
+            expect.objectContaining({ where: { orderNo: "order-1" } })
+        )
     })
 
     it("returns { ok: false } when out_trade_no missing", async () => {
@@ -70,7 +75,8 @@ describe("processYipayNotifyAndComplete", () => {
         expect(result).toEqual({ ok: false })
     })
 
-    it("returns { ok: true } without DB query for non-success trade_status", async () => {
+    it("returns { ok: true } for non-success trade_status", async () => {
+        prismaMock.order.findFirst.mockResolvedValue(makePendingOrder())
         verifyMock.mockReturnValue(true)
         const result = await processYipayNotifyAndComplete({
             out_trade_no: "order-1",
@@ -78,10 +84,11 @@ describe("processYipayNotifyAndComplete", () => {
             trade_status: "WAIT_BUYER_PAY",
         })
         expect(result).toEqual({ ok: true })
-        expect(prismaMock.order.findFirst).not.toHaveBeenCalled()
+        expect(prismaMock.$transaction).not.toHaveBeenCalled()
     })
 
-    it("returns { ok: true } without DB query when trade_status is empty", async () => {
+    it("returns { ok: true } when trade_status is empty", async () => {
+        prismaMock.order.findFirst.mockResolvedValue(makePendingOrder())
         verifyMock.mockReturnValue(true)
         const result = await processYipayNotifyAndComplete({
             out_trade_no: "order-1",
@@ -89,7 +96,7 @@ describe("processYipayNotifyAndComplete", () => {
             trade_status: "",
         })
         expect(result).toEqual({ ok: true })
-        expect(prismaMock.order.findFirst).not.toHaveBeenCalled()
+        expect(prismaMock.$transaction).not.toHaveBeenCalled()
     })
 
     it("returns { ok: false } when order not found", async () => {
@@ -265,5 +272,33 @@ describe("processYipayNotifyAndComplete", () => {
         })
         expect(result).toEqual({ ok: true })
         expect(prismaMock.order.updateMany).toHaveBeenCalled()
+    })
+
+    it("uses channel key for verification when order has a channel", async () => {
+        prismaMock.order.findFirst.mockResolvedValue(
+            makePendingOrder({ paymentChannel: { key: "channel_key" } })
+        )
+        verifyMock.mockReturnValue(true)
+        prismaMock.$transaction.mockResolvedValue(undefined)
+        await processYipayNotifyAndComplete({
+            out_trade_no: "order-1",
+            money: "99.00",
+            trade_status: "TRADE_SUCCESS",
+            sign: "any",
+        })
+        expect(verifyMock).toHaveBeenCalledWith(expect.any(Object), "channel_key")
+    })
+
+    it("falls back to env var key when order has no channel", async () => {
+        prismaMock.order.findFirst.mockResolvedValue(makePendingOrder({ paymentChannel: null }))
+        verifyMock.mockReturnValue(true)
+        prismaMock.$transaction.mockResolvedValue(undefined)
+        await processYipayNotifyAndComplete({
+            out_trade_no: "order-1",
+            money: "99.00",
+            trade_status: "TRADE_SUCCESS",
+            sign: "any",
+        })
+        expect(verifyMock).toHaveBeenCalledWith(expect.any(Object), undefined)
     })
 })

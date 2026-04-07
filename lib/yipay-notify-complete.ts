@@ -7,20 +7,36 @@ import { completePendingOrder } from "@/lib/complete-pending-order"
  * Used by POST /api/payment/yipay/notify (async notify) and by pay-return page (sync return_url).
  * Returns { ok: true } when we should respond success (order completed or already completed);
  * { ok: false } when we should respond failure (bad sign, order not found, amount mismatch, etc).
+ *
+ * Sign verification uses the channel key from the order's payment channel when available,
+ * falling back to the global env var key for historical orders without a channel.
  */
 export async function processYipayNotifyAndComplete(
     postData: Record<string, unknown>,
 ): Promise<{ ok: boolean }> {
-    if (!verifyYipayNotifySign(postData)) {
-        return { ok: false }
-    }
-
     const outTradeNo = postData.out_trade_no as string | undefined
     const totalAmount =
         (postData.money as string | undefined) ?? (postData.total_fee as string | undefined)
     const tradeStatus = (postData.trade_status as string | undefined) ?? (postData.status as string | undefined)
 
     if (!outTradeNo || !totalAmount) {
+        return { ok: false }
+    }
+
+    // Look up order first to get the channel key for signature verification
+    const order = await prisma.order.findFirst({
+        where: { orderNo: outTradeNo },
+        include: {
+            paymentChannel: { select: { key: true } },
+            product: { select: { name: true } },
+            cards: { select: { id: true, status: true } },
+        },
+    })
+
+    // Use channel key when available, otherwise fall back to env var key
+    const channelKey = order?.paymentChannel?.key ?? undefined
+
+    if (!verifyYipayNotifySign(postData, channelKey)) {
         return { ok: false }
     }
 
@@ -32,10 +48,6 @@ export async function processYipayNotifyAndComplete(
         return { ok: true }
     }
 
-    const order = await prisma.order.findFirst({
-        where: { orderNo: outTradeNo },
-        include: { product: { select: { name: true } }, cards: { select: { id: true, status: true } } },
-    })
     if (!order) {
         return { ok: false }
     }
