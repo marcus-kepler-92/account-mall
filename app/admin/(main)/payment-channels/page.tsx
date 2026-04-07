@@ -1,0 +1,91 @@
+import { prisma } from "@/lib/prisma"
+import { formatCurrency } from "@/lib/utils"
+import { Wallet, TrendingUp, ArrowDownToLine } from "lucide-react"
+import { PaymentChannelsDataTable } from "./payment-channels-data-table"
+import type { ChannelRow } from "./payment-channels-columns"
+import { PageHeader, StatCard } from "@/app/admin/components"
+
+export const dynamic = "force-dynamic"
+
+function getYearBounds() {
+    const year = new Date().getFullYear()
+    return { start: new Date(year, 0, 1), end: new Date(year + 1, 0, 1) }
+}
+
+export default async function AdminPaymentChannelsPage() {
+    const channels = await prisma.paymentChannel.findMany({
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    })
+
+    const channelIds = channels.map((c) => c.id)
+    const { start, end } = getYearBounds()
+
+    const [yearIncomeRows, totalIncomeRows, withdrawalRows] =
+        channelIds.length > 0
+            ? await Promise.all([
+                  prisma.order.groupBy({
+                      by: ["paymentChannelId"],
+                      where: { paymentChannelId: { in: channelIds }, status: "COMPLETED", paidAt: { gte: start, lt: end } },
+                      _sum: { amount: true },
+                  }),
+                  prisma.order.groupBy({
+                      by: ["paymentChannelId"],
+                      where: { paymentChannelId: { in: channelIds }, status: "COMPLETED" },
+                      _sum: { amount: true },
+                  }),
+                  prisma.channelWithdrawal.groupBy({
+                      by: ["channelId"],
+                      where: { channelId: { in: channelIds } },
+                      _sum: { amount: true },
+                  }),
+              ])
+            : [[], [], []]
+
+    const yearMap = new Map(yearIncomeRows.map((r) => [r.paymentChannelId, Number(r._sum.amount ?? 0)]))
+    const totalMap = new Map(totalIncomeRows.map((r) => [r.paymentChannelId, Number(r._sum.amount ?? 0)]))
+    const withdrawnMap = new Map(withdrawalRows.map((r) => [r.channelId, Number(r._sum.amount ?? 0)]))
+
+    const data: ChannelRow[] = channels.map((c) => {
+        const yearIncome = yearMap.get(c.id) ?? 0
+        const totalIncome = totalMap.get(c.id) ?? 0
+        const totalWithdrawn = withdrawnMap.get(c.id) ?? 0
+        return {
+            id: c.id,
+            nickname: c.nickname,
+            pid: c.pid,
+            key: c.key,
+            submitUrl: c.submitUrl,
+            siteName: c.siteName,
+            type: c.type,
+            annualLimit: Number(c.annualLimit),
+            sortOrder: c.sortOrder,
+            isActive: c.isActive,
+            createdAt: c.createdAt.toISOString(),
+            yearIncome,
+            totalIncome,
+            totalWithdrawn,
+            balance: totalIncome - totalWithdrawn,
+        }
+    })
+
+    const totalYearIncome = data.reduce((s, c) => s + c.yearIncome, 0)
+    const totalBalance = data.reduce((s, c) => s + c.balance, 0)
+    const totalWithdrawn = data.reduce((s, c) => s + c.totalWithdrawn, 0)
+
+    return (
+        <div className="space-y-6">
+            <PageHeader
+                title="收款渠道"
+                description="管理易支付收款渠道，记录提现，追踪年度进度与余额"
+            />
+
+            <div className="grid gap-4 grid-cols-3">
+                <StatCard label="今年总收入" value={formatCurrency(totalYearIncome)} icon={TrendingUp} borderColor="border-l-primary" iconColor="text-primary" />
+                <StatCard label="累计已提现" value={formatCurrency(totalWithdrawn)} icon={ArrowDownToLine} borderColor="border-l-muted-foreground" iconColor="text-muted-foreground" />
+                <StatCard label="总余额" value={formatCurrency(totalBalance)} icon={Wallet} borderColor="border-l-success" iconColor="text-success" />
+            </div>
+
+            <PaymentChannelsDataTable data={data} />
+        </div>
+    )
+}
