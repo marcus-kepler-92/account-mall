@@ -25,8 +25,9 @@ The platform collects revenue through multiple 易支付 accounts registered und
 | key | String | 易支付 signing key |
 | submitUrl | String | 易支付 submit endpoint |
 | siteName | String | 易支付 site name |
+| type | String | Payment method type: "alipay" | "wxpay" | "qqpay" |
 | annualLimit | Decimal(10,2) | Annual income limit, default 65000 |
-| sortOrder | Int | Rotation order, lower = higher priority |
+| sortOrder | Int | Rotation order, lower = higher priority (within same type) |
 | isActive | Boolean | Whether this channel participates in routing |
 | createdAt | DateTime | |
 | updatedAt | DateTime | |
@@ -49,13 +50,15 @@ The platform collects revenue through multiple 易支付 accounts registered und
 
 ## Channel Selection Strategy
 
-`selectPaymentChannel()` is called at order creation time:
+`selectPaymentChannel(type: string)` is called at order creation time with the user's chosen payment method:
 
-1. Fetch all `isActive = true` channels ordered by `sortOrder ASC`
+1. Fetch all `isActive = true AND type = X` channels ordered by `sortOrder ASC`
 2. For each channel, compute **annual income** = `SUM(order.amount WHERE paymentChannelId = X AND status = COMPLETED AND paidAt in current calendar year)`
 3. Return the first channel where `annualIncome < annualLimit`
-4. If all channels are over limit → return the channel with the most remaining capacity (soft limit, does not block payments)
-5. If no channels exist in DB → fall back to env var config
+4. If all channels of that type are over limit → return the channel with the most remaining capacity (soft limit, does not block payments)
+5. If no channels of that type exist in DB → fall back to env var config
+
+Rotation is scoped to the same type: alipay orders only rotate among alipay channels, wxpay among wxpay channels, etc.
 
 This is a soft limit: slight overruns are acceptable since the primary goal is tax management, not hard enforcement.
 
