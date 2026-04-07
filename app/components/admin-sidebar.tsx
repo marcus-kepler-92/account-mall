@@ -17,6 +17,7 @@ import {
     FolderOpen,
     FlaskConical,
     Mail,
+    Landmark,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { authClient } from "@/lib/auth-client"
@@ -83,6 +84,11 @@ const navItems = [
         title: "提现管理",
         href: "/admin/withdrawals",
         icon: Wallet,
+    },
+    {
+        title: "收款渠道",
+        href: "/admin/payment-channels",
+        icon: Landmark,
     },
     {
         title: "文件管理",
