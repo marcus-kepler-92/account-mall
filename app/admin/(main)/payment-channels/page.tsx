@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { formatCurrency } from "@/lib/utils"
-import { Wallet, TrendingUp, ArrowDownToLine } from "lucide-react"
+import { Wallet, TrendingUp, LayoutGrid } from "lucide-react"
 import { PaymentChannelsDataTable } from "./payment-channels-data-table"
 import type { ChannelRow } from "./payment-channels-columns"
 import { PageHeader, StatCard } from "@/app/admin/components"
@@ -70,7 +70,6 @@ export default async function AdminPaymentChannelsPage() {
 
     const totalYearIncome = data.reduce((s, c) => s + c.yearIncome, 0)
     const totalBalance = data.reduce((s, c) => s + c.balance, 0)
-    const totalWithdrawn = data.reduce((s, c) => s + c.totalWithdrawn, 0)
 
     return (
         <div className="space-y-6">
@@ -80,8 +79,8 @@ export default async function AdminPaymentChannelsPage() {
             />
 
             <div className="grid gap-4 grid-cols-3">
-                <StatCard label="今年总收入" value={formatCurrency(totalYearIncome)} icon={TrendingUp} borderColor="border-l-primary" iconColor="text-primary" />
-                <StatCard label="累计已提现" value={formatCurrency(totalWithdrawn)} icon={ArrowDownToLine} borderColor="border-l-muted-foreground" iconColor="text-muted-foreground" />
+                <StatCard label="总渠道数" value={String(channels.length)} icon={LayoutGrid} borderColor="border-l-primary" iconColor="text-primary" />
+                <StatCard label="年度总收入" value={formatCurrency(totalYearIncome)} icon={TrendingUp} borderColor="border-l-muted-foreground" iconColor="text-muted-foreground" />
                 <StatCard label="总余额" value={formatCurrency(totalBalance)} icon={Wallet} borderColor="border-l-success" iconColor="text-success" />
             </div>
 
