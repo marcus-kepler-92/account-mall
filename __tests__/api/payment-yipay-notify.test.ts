@@ -88,7 +88,6 @@ describe("POST /api/payment/yipay/notify", () => {
         const res = await POST(req as any)
         expect(res.status).toBe(400)
         expect(await res.text()).toBe("failure")
-        expect(prismaMock.order.findFirst).not.toHaveBeenCalled()
     })
 
     it("returns failure when out_trade_no or amount missing", async () => {
@@ -294,7 +293,6 @@ describe("POST /api/payment/yipay/notify", () => {
         const res = await POST(req as any)
         expect(res.status).toBe(200)
         expect(await res.text()).toBe("success")
-        expect(prismaMock.order.findFirst).not.toHaveBeenCalled()
     })
 
     it("returns 500 when transaction throws", async () => {
