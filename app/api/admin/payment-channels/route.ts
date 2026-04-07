@@ -87,5 +87,6 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) return validationError(parsed.error.flatten())
 
     const channel = await prisma.paymentChannel.create({ data: parsed.data })
-    return NextResponse.json({ data: channel }, { status: 201 })
+    const { key: _k, ...rest } = channel
+    return NextResponse.json({ data: rest }, { status: 201 })
 }
