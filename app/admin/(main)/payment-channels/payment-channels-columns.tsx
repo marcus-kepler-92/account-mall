@@ -47,7 +47,7 @@ export const paymentChannelsColumns: ColumnDef<ChannelRow>[] = [
         header: "年度进度",
         cell: ({ row }) => {
             const { yearIncome, annualLimit } = row.original
-            const pct = Math.min(100, Math.round((yearIncome / annualLimit) * 100))
+            const pct = annualLimit > 0 ? Math.min(100, Math.round((yearIncome / annualLimit) * 100)) : 0
             const isWarning = pct >= 80
             return (
                 <div className="space-y-1 min-w-32">

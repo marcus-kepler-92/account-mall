@@ -90,7 +90,7 @@ export function ChannelWithdrawalDialog({ open, onOpenChange, channelId, channel
                         />
                         {error && <p className="text-sm text-destructive">{error}</p>}
                         <div className="flex justify-end gap-2 pt-2">
-                            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>取消</Button>
+                            <Button type="button" variant="outline" onClick={() => { form.reset(); onOpenChange(false) }}>取消</Button>
                             <Button type="submit" disabled={form.formState.isSubmitting}>
                                 {form.formState.isSubmitting ? "保存中..." : "确认"}
                             </Button>

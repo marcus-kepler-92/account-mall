@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -65,6 +65,36 @@ export function ChannelFormDialog({ open, onOpenChange, channel }: Props) {
                   isActive: true,
               },
     })
+
+    useEffect(() => {
+        if (open) {
+            form.reset(
+                channel
+                    ? {
+                          nickname: channel.nickname,
+                          pid: channel.pid,
+                          key: channel.key,
+                          submitUrl: channel.submitUrl,
+                          siteName: channel.siteName,
+                          type: channel.type as "alipay" | "wxpay" | "qqpay",
+                          annualLimit: Number(channel.annualLimit),
+                          sortOrder: channel.sortOrder,
+                          isActive: channel.isActive,
+                      }
+                    : {
+                          nickname: "",
+                          pid: "",
+                          key: "",
+                          submitUrl: "",
+                          siteName: "",
+                          type: "alipay",
+                          annualLimit: 65000,
+                          sortOrder: 0,
+                          isActive: true,
+                      }
+            )
+        }
+    }, [open, channel])
 
     const onSubmit = async (data: FormValues) => {
         setLoading(true)
