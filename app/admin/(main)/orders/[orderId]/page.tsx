@@ -40,7 +40,6 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
                     id: true,
                     name: true,
                     slug: true,
-                    price: true,
                 },
             },
             cards: {
@@ -140,6 +139,12 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
                                 ¥{Number(order.amount).toFixed(2)}
                             </p>
                         </div>
+                        {order.unitPriceSnapshot != null && (
+                            <div>
+                                <p className="text-muted-foreground">原始单价</p>
+                                <p>¥{Number(order.unitPriceSnapshot).toFixed(2)}</p>
+                            </div>
+                        )}
                         <div>
                             <p className="text-muted-foreground">支付方式</p>
                             <p>
