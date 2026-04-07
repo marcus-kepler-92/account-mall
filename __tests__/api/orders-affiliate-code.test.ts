@@ -185,6 +185,7 @@ describe("推广码（cookie）vs 优惠码（body）语义区分", () => {
     beforeEach(() => {
         jest.clearAllMocks()
         ;(global as { __configMockAffiliateCode?: { nodeEnv?: string } }).__configMockAffiliateCode!.nodeEnv = "test"
+        ;(prismaMock.paymentChannel.findMany as jest.Mock).mockResolvedValue([])
     })
 
     describe("正常商品 + couponEnabled=false", () => {
