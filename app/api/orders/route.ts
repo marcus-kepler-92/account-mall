@@ -19,6 +19,7 @@ import { scrapeMultipleUrls } from "@/lib/scrape-shared-accounts"
 import { sharedAccountToCardPayload, toCardContentJson } from "@/lib/auto-fetch-card"
 import { createOrderSuccessToken } from "@/lib/order-success-token"
 import { completePendingOrder } from "@/lib/complete-pending-order"
+import { selectPaymentChannel } from "@/lib/payment-channel"
 import { unauthorized, validationError, badRequest, invalidJsonBody, notFound, internalServerError } from "@/lib/api-response"
 
 /**
@@ -228,6 +229,7 @@ async function createAutoFetchOrder(params: {
         })
     } else {
         // 收费流程：PENDING + RESERVED，等待支付
+        const channel = await selectPaymentChannel(paymentMethod)
         let paidOrder: { orderNo: string; orderId: string }
         try {
             paidOrder = await prisma.$transaction(async (tx) => {
@@ -249,6 +251,7 @@ async function createAutoFetchOrder(params: {
                         ...(promoCode && { promoCode }),
                         ...(fingerprintHash && { fingerprintHash }),
                         ...(distributorDiscountPercent != null && { discountPercentApplied: distributorDiscountPercent }),
+                        ...(channel && { paymentChannelId: channel.id }),
                     },
                 })
                 await tx.card.create({
@@ -286,6 +289,7 @@ async function createAutoFetchOrder(params: {
             totalAmount: String(amount),
             subject: product.name,
             paymentMethod,
+            channel,
         })
 
         return NextResponse.json({
@@ -648,6 +652,8 @@ export async function POST(request: NextRequest) {
     }
     const passwordHash = await hashPassword(orderPassword)
 
+    const channel = await selectPaymentChannel(paymentMethod)
+
     // Generate unique order number using UUID v4 (guaranteed uniqueness)
     // Retry only if there's an extremely rare collision (shouldn't happen in practice)
     const MAX_RETRIES = 3
@@ -676,6 +682,7 @@ export async function POST(request: NextRequest) {
                         ...(clientIp !== "unknown" && { clientIp }),
                         ...(fingerprintHash && { fingerprintHash }),
                         ...(exitDiscountMeta && { exitDiscountMeta }),
+                        ...(channel && { paymentChannelId: channel.id }),
                     },
                 })
 
@@ -763,6 +770,7 @@ export async function POST(request: NextRequest) {
         totalAmount: amountStr,
         subject,
         paymentMethod,
+        channel,
     })
 
     // Non-development: return payment URL (or null if no payment configured)
