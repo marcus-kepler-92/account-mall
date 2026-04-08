@@ -59,6 +59,8 @@ const envSchema = z
     autoFetchScrapeUserAgent: z.string().optional(),
     /** AUTO_FETCH：同一 IP/邮箱 同一商品 领取冷却时间（小时），仅生产/测试环境生效 */
     autoFetchCooldownHours: z.coerce.number().positive().default(1),
+    /** AUTO_FETCH：自动拉黑过期时间（小时），管理员手动拉黑不受影响 */
+    blacklistExpiryHours: z.coerce.number().int().positive().default(12),
     /** AUTO_FETCH：全局爬取来源 URL 列表（逗号分隔；商品 sourceUrl 为空时取第一个；未配置时使用默认地址） */
     autoFetchSourceUrls: z
       .string()
@@ -240,6 +242,7 @@ function getEnvInput() {
       e.AUTO_FETCH_SCRAPE_USER_AGENT ?? e.FREE_SHARED_SCRAPE_USER_AGENT,
     autoFetchCooldownHours:
       e.AUTO_FETCH_COOLDOWN_HOURS ?? e.FREE_SHARED_COOLDOWN_HOURS,
+    blacklistExpiryHours: e.BLACKLIST_EXPIRY_HOURS,
     autoFetchSourceUrls:
       e.AUTO_FETCH_SOURCE_URLS ?? e.AUTO_FETCH_SOURCE_URL ?? e.FREE_SHARED_SOURCE_URL,
     autoFetchMaxQuantityPerOrder:

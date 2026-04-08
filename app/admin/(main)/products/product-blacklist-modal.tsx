@@ -10,8 +10,9 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Copy, Check, Trash2, Loader2, ShieldOff, RefreshCw } from "lucide-react"
+import { Copy, Check, Trash2, Loader2, ShieldOff, RefreshCw, Clock } from "lucide-react"
 import { toast } from "sonner"
+import { MANUAL_BLACKLIST_REASON } from "@/lib/auto-fetch-card"
 
 interface BlacklistEntry {
     id: string
@@ -31,7 +32,9 @@ type Props = {
 
 export function ProductBlacklistModal({ productId, productName, open, onOpenChange }: Props) {
     const [entries, setEntries] = useState<BlacklistEntry[]>([])
+    const [expiryHours, setExpiryHours] = useState<number>(12)
     const [loading, setLoading] = useState(false)
+    const [purging, setPurging] = useState(false)
     const [removingId, setRemovingId] = useState<string | null>(null)
     const [copiedId, setCopiedId] = useState<string | null>(null)
 
@@ -40,14 +43,35 @@ export function ProductBlacklistModal({ productId, productName, open, onOpenChan
         try {
             const res = await fetch(`/api/admin/products/${productId}/blacklist`)
             if (!res.ok) { toast.error("获取黑名单失败"); return }
-            const data = await res.json() as { blacklist: BlacklistEntry[] }
+            const data = await res.json() as { blacklist: BlacklistEntry[]; expiryHours: number }
             setEntries(data.blacklist)
+            setExpiryHours(data.expiryHours)
         } catch {
             toast.error("网络异常")
         } finally {
             setLoading(false)
         }
     }, [productId])
+
+    const handlePurge = async () => {
+        setPurging(true)
+        try {
+            const res = await fetch(`/api/admin/products/${productId}/blacklist`, { method: "POST" })
+            if (!res.ok) { toast.error("清理失败"); return }
+            const data = await res.json() as { removed: number }
+            toast.success(`已清理 ${data.removed} 条过期记录`)
+            await fetchBlacklist()
+        } catch {
+            toast.error("网络异常")
+        } finally {
+            setPurging(false)
+        }
+    }
+
+    const isExpired = (entry: BlacklistEntry) => {
+        if (entry.reason === MANUAL_BLACKLIST_REASON) return false
+        return new Date(entry.createdAt).getTime() + expiryHours * 60 * 60 * 1000 < Date.now()
+    }
 
     useEffect(() => {
         if (open) fetchBlacklist()
@@ -99,20 +123,36 @@ export function ProductBlacklistModal({ productId, productName, open, onOpenChan
                     <span className="text-sm text-muted-foreground">
                         {loading ? "加载中…" : `共 ${entries.length} 条`}
                     </span>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={loading}
-                        onClick={fetchBlacklist}
-                        className="gap-1.5"
-                    >
-                        {loading ? (
-                            <Loader2 className="size-3.5 animate-spin" />
-                        ) : (
-                            <RefreshCw className="size-3.5" />
-                        )}
-                        刷新
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={loading || purging}
+                            onClick={handlePurge}
+                            className="gap-1.5"
+                        >
+                            {purging ? (
+                                <Loader2 className="size-3.5 animate-spin" />
+                            ) : (
+                                <Clock className="size-3.5" />
+                            )}
+                            清理过期
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={loading}
+                            onClick={fetchBlacklist}
+                            className="gap-1.5"
+                        >
+                            {loading ? (
+                                <Loader2 className="size-3.5 animate-spin" />
+                            ) : (
+                                <RefreshCw className="size-3.5" />
+                            )}
+                            刷新
+                        </Button>
+                    </div>
                 </div>
 
                 {/* List */}
@@ -187,6 +227,11 @@ export function ProductBlacklistModal({ productId, productName, open, onOpenChan
                                     {entry.reason && (
                                         <Badge variant="secondary" className="text-xs">
                                             {entry.reason}
+                                        </Badge>
+                                    )}
+                                    {isExpired(entry) && (
+                                        <Badge variant="outline" className="text-xs text-muted-foreground">
+                                            已过期
                                         </Badge>
                                     )}
                                     <span className="text-xs text-muted-foreground">

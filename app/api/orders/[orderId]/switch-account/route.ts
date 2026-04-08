@@ -6,6 +6,7 @@ import {
     parseAutoFetchCardContent,
     sharedAccountToCardPayload,
     toCardContentJson,
+    MANUAL_BLACKLIST_REASON,
 } from "@/lib/auto-fetch-card"
 import { config } from "@/lib/config"
 import { badRequest, notFound, invalidJsonBody } from "@/lib/api-response"
@@ -93,7 +94,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const [scrapedList, blacklisted] = await Promise.all([
         scrapeMultipleUrls(sourceUrl),
         prisma.accountBlacklist.findMany({
-            where: { productId: order.product.id },
+            where: {
+                productId: order.product.id,
+                OR: [
+                    { reason: MANUAL_BLACKLIST_REASON },
+                    { createdAt: { gt: new Date(Date.now() - config.blacklistExpiryHours * 60 * 60 * 1000) } },
+                ],
+            },
             select: { account: true },
         }),
     ])

@@ -4,6 +4,7 @@ import { getAdminSession } from "@/lib/auth-guard"
 import { unauthorized, notFound, badRequest, invalidJsonBody } from "@/lib/api-response"
 import { scrapeMultipleUrls } from "@/lib/scrape-shared-accounts"
 import { config } from "@/lib/config"
+import { MANUAL_BLACKLIST_REASON } from "@/lib/auto-fetch-card"
 
 type RouteContext = {
     params: Promise<{ productId: string }>
@@ -12,6 +13,7 @@ type RouteContext = {
 /**
  * GET /api/admin/products/[productId]/blacklist
  * Admin: get the account blacklist for a specific AUTO_FETCH product.
+ * Response includes `expiryHours` (from BLACKLIST_EXPIRY_HOURS env) for client-side expiry display.
  */
 export async function GET(_request: NextRequest, context: RouteContext) {
     const session = await getAdminSession()
@@ -47,7 +49,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
         password: scraped_map.get(entry.account) ?? null,
     }))
 
-    return NextResponse.json({ blacklist: enriched })
+    return NextResponse.json({ blacklist: enriched, expiryHours: config.blacklistExpiryHours })
 }
 
 /**
@@ -81,4 +83,33 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     await prisma.accountBlacklist.delete({ where: { id } })
 
     return NextResponse.json({ removed: true })
+}
+
+/**
+ * POST /api/admin/products/[productId]/blacklist
+ * Admin: purge auto-blacklist entries older than BLACKLIST_EXPIRY_HOURS.
+ * Manual entries (reason = "管理员手动拉黑") are never purged.
+ */
+export async function POST(_request: NextRequest, context: RouteContext) {
+    const session = await getAdminSession()
+    if (!session) return unauthorized()
+
+    const { productId } = await context.params
+
+    const product = await prisma.product.findUnique({
+        where: { id: productId },
+        select: { id: true },
+    })
+    if (!product) return notFound("商品不存在")
+
+    const expiryDate = new Date(Date.now() - config.blacklistExpiryHours * 60 * 60 * 1000)
+    const { count } = await prisma.accountBlacklist.deleteMany({
+        where: {
+            productId,
+            OR: [{ reason: null }, { reason: { not: MANUAL_BLACKLIST_REASON } }],
+            createdAt: { lt: expiryDate },
+        },
+    })
+
+    return NextResponse.json({ removed: count })
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getAdminSession } from "@/lib/auth-guard"
 import { unauthorized, notFound, badRequest, invalidJsonBody } from "@/lib/api-response"
+import { MANUAL_BLACKLIST_REASON } from "@/lib/auto-fetch-card"
 
 type RouteContext = { params: Promise<{ productId: string }> }
 
@@ -42,7 +43,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         return NextResponse.json({ isBlacklisted: false })
     } else {
         await prisma.accountBlacklist.create({
-            data: { productId, account, reason: "管理员手动拉黑" },
+            data: { productId, account, reason: MANUAL_BLACKLIST_REASON },
         })
         return NextResponse.json({ isBlacklisted: true })
     }

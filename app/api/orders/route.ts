@@ -17,7 +17,7 @@ import { verifyTurnstileToken } from "@/lib/turnstile"
 import { isStorefrontTurnstileEnforced } from "@/lib/turnstile-policy"
 import { verifyExitDiscountToken, type ExitDiscountPayload } from "@/lib/exit-discount"
 import { scrapeMultipleUrls } from "@/lib/scrape-shared-accounts"
-import { sharedAccountToCardPayload, toCardContentJson } from "@/lib/auto-fetch-card"
+import { sharedAccountToCardPayload, toCardContentJson, MANUAL_BLACKLIST_REASON } from "@/lib/auto-fetch-card"
 import { createOrderSuccessToken } from "@/lib/order-success-token"
 import { completePendingOrder } from "@/lib/complete-pending-order"
 import { selectPaymentChannel } from "@/lib/payment-channel"
@@ -150,8 +150,12 @@ async function createAutoFetchOrder(params: {
         return badRequest("暂无可领取账号，请稍后再试。")
     }
 
+    const expiryDate = new Date(Date.now() - config.blacklistExpiryHours * 60 * 60 * 1000)
     const blacklisted = await prisma.accountBlacklist.findMany({
-        where: { productId },
+        where: {
+            productId,
+            OR: [{ reason: MANUAL_BLACKLIST_REASON }, { createdAt: { gt: expiryDate } }],
+        },
         select: { account: true },
     })
     const blackSet = new Set(blacklisted.map((b) => b.account))

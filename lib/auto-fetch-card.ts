@@ -3,6 +3,9 @@
  * Card.content 存此处定义的 payload JSON；API 返回与前端展示共用此形状。
  */
 
+/** 管理员手动拉黑的 reason 值；用于区分自动拉黑（有过期）与永久拉黑 */
+export const MANUAL_BLACKLIST_REASON = "管理员手动拉黑"
+
 import type { SharedAccount } from "@/lib/scrape-shared-accounts"
 
 /** 前端/API 用的卡密 payload（不含 status，不对外展示） */
