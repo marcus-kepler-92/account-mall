@@ -1,3 +1,6 @@
+"use client"
+
+import Link from "next/link"
 import type { ColumnDef } from "@tanstack/react-table"
 import { Badge } from "@/components/ui/badge"
 import { formatCurrency } from "@/lib/utils"
@@ -32,7 +35,12 @@ export const paymentChannelsColumns: ColumnDef<ChannelRow>[] = [
         header: "渠道",
         cell: ({ row }) => (
             <div className="space-y-1">
-                <div className="font-medium">{row.original.nickname}</div>
+                <Link
+                    href={`/admin/payment-channels/${row.original.id}`}
+                    className="font-medium hover:underline"
+                >
+                    {row.original.nickname}
+                </Link>
                 <div className="text-xs text-muted-foreground">{row.original.pid}</div>
             </div>
         ),
