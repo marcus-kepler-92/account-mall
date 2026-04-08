@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { prisma } from "@/lib/prisma";
 import { config } from "@/lib/config";
+import { isStorefrontTurnstileEnforced } from "@/lib/turnstile-policy";
 import { Zap, Clock, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -133,6 +134,9 @@ export default async function ProductDetailPage({
     stockCount > 0 &&
     stockCount <= lowStockThreshold;
   const priceNumber = Number(product.price);
+  const requireTurnstile =
+    Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY) &&
+    isStorefrontTurnstileEnforced();
 
   const productUrl = `${config.siteUrl}/products/${product.id}-${product.slug}`;
   const descriptionPlain = product.description
@@ -292,6 +296,7 @@ export default async function ProductDetailPage({
                 productType={product.productType}
                 validityHours={product.validityHours}
                 couponEnabled={product.couponEnabled}
+                requireTurnstile={requireTurnstile}
               />
             </section>
 
@@ -316,10 +321,7 @@ export default async function ProductDetailPage({
         restockSectionId={isSoldOut ? "restock-section" : undefined}
         formId="product-order-form"
         isFree={isFree}
-        requireTurnstile={
-          Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY) &&
-          process.env.NODE_ENV !== "development"
-        }
+        requireTurnstile={requireTurnstile}
       />
     </div>
   );

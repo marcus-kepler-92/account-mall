@@ -14,6 +14,7 @@ import {
 } from "@/lib/rate-limit"
 import { config } from "@/lib/config"
 import { verifyTurnstileToken } from "@/lib/turnstile"
+import { isStorefrontTurnstileEnforced } from "@/lib/turnstile-policy"
 import { verifyExitDiscountToken, type ExitDiscountPayload } from "@/lib/exit-discount"
 import { scrapeMultipleUrls } from "@/lib/scrape-shared-accounts"
 import { sharedAccountToCardPayload, toCardContentJson } from "@/lib/auto-fetch-card"
@@ -498,9 +499,9 @@ export async function POST(request: NextRequest) {
         }
     }
 
-    const secretKey = config.turnstileSecretKey
-    const turnstileEnabled = secretKey && config.nodeEnv !== "development"
-    if (turnstileEnabled) {
+    const turnstileSecret = config.turnstileSecretKey
+    const turnstileEnabled = Boolean(turnstileSecret) && isStorefrontTurnstileEnforced()
+    if (turnstileEnabled && turnstileSecret) {
         if (!turnstileToken || !turnstileToken.trim()) {
             // Graceful degradation: allow if fingerprint is present AND fallback rate limit passes
             const clientIpForFallback = getClientIp(request)
@@ -513,7 +514,7 @@ export async function POST(request: NextRequest) {
             const clientIp = getClientIp(request)
             const verifyResult = await verifyTurnstileToken(
                 turnstileToken.trim(),
-                secretKey,
+                turnstileSecret,
                 clientIp !== "unknown" ? clientIp : undefined
             )
             if (!verifyResult.success) {

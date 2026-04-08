@@ -45,9 +45,6 @@ function dispatchOrderFormLoading(loading: boolean) {
     }
 }
 
-const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? ""
-const IS_DEV = process.env.NODE_ENV === "development"
-
 function isValidDiscountCodeFormat(code: string): boolean {
     const t = code.trim()
     return t.length >= 1 && t.length <= configClient.promoCodeMaxLength
@@ -80,6 +77,7 @@ type ProductOrderFormProps = {
     formId?: string
     productType?: "NORMAL" | "AUTO_FETCH"
     couponEnabled?: boolean
+    requireTurnstile: boolean
     exitDiscountToken?: string | null
     exitDiscountPercent?: number | null
     onExitDiscountConsumed?: () => void
@@ -94,6 +92,7 @@ export function ProductOrderForm({
     formId = "product-order-form",
     productType = "NORMAL",
     couponEnabled = false,
+    requireTurnstile,
     exitDiscountToken = null,
     exitDiscountPercent = null,
     onExitDiscountConsumed,
@@ -123,7 +122,6 @@ export function ProductOrderForm({
     const promoValidation = normalizePromoValidation(promoData)
     const setDisplay = useProductPriceSyncStore((s) => s.setDisplay)
     const router = useRouter()
-    const requireTurnstile = Boolean(TURNSTILE_SITE_KEY) && !IS_DEV
     const turnstileLoading = requireTurnstile && turnstileStatus !== "ready" && turnstileStatus !== "unsupported"
     const isAutoFetch = productType === "AUTO_FETCH"
     const isFree = isAutoFetch && price === 0
