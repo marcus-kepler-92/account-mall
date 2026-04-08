@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { createChannelWithdrawalSchema, type CreateChannelWithdrawalInput } from "@/lib/validations/payment-channel"
+import { createChannelWithdrawalSchema } from "@/lib/validations/payment-channel"
 import type { WithdrawalRow } from "./withdrawal-columns"
 
 type Props = {
@@ -25,7 +25,7 @@ export function WithdrawalFormDialog({ open, onOpenChange, channelId, withdrawal
     const isEdit = !!withdrawal
     const [error, setError] = useState<string | null>(null)
 
-    const form = useForm<CreateChannelWithdrawalInput>({
+    const form = useForm({
         resolver: zodResolver(createChannelWithdrawalSchema),
         defaultValues: { amount: 0, note: "" },
     })
@@ -41,7 +41,7 @@ export function WithdrawalFormDialog({ open, onOpenChange, channelId, withdrawal
         }
     }, [open, withdrawal, form])
 
-    const onSubmit = async (values: CreateChannelWithdrawalInput) => {
+    const onSubmit = async (values: { amount: number; note?: string }) => {
         setError(null)
         try {
             const url = isEdit
