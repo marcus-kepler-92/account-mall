@@ -19,6 +19,9 @@ export const createChannelWithdrawalSchema = z.object({
     note: z.string().max(500).optional(),
 })
 
+export const updateChannelWithdrawalSchema = createChannelWithdrawalSchema.partial()
+
 export type CreatePaymentChannelInput = z.infer<typeof createPaymentChannelSchema>
 export type UpdatePaymentChannelInput = z.infer<typeof updatePaymentChannelSchema>
 export type CreateChannelWithdrawalInput = z.infer<typeof createChannelWithdrawalSchema>
+export type UpdateChannelWithdrawalInput = z.infer<typeof updateChannelWithdrawalSchema>

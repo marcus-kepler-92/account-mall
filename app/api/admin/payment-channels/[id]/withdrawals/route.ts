@@ -6,6 +6,23 @@ import { createChannelWithdrawalSchema } from "@/lib/validations/payment-channel
 
 type RouteContext = { params: Promise<{ id: string }> }
 
+export async function GET(_request: NextRequest, context: RouteContext) {
+    const session = await getAdminSession()
+    if (!session) return unauthorized()
+
+    const { id } = await context.params
+
+    const channel = await prisma.paymentChannel.findUnique({ where: { id } })
+    if (!channel) return notFound("渠道不存在")
+
+    const withdrawals = await prisma.channelWithdrawal.findMany({
+        where: { channelId: id },
+        orderBy: { createdAt: "desc" },
+    })
+
+    return NextResponse.json({ data: withdrawals })
+}
+
 export async function POST(request: NextRequest, context: RouteContext) {
     const session = await getAdminSession()
     if (!session) return unauthorized()
