@@ -15,14 +15,210 @@ const promptConfig = {
     level2CommissionRatePercent: config.level2CommissionRatePercent,
 }
 
+export interface DistributorContext {
+    name: string
+    email: string
+    distributorCode: string | null
+    shareLink: string | null
+    discountEnabled: boolean
+    discountPercent: string | null
+    inviterName: string | null
+    withdrawableBalance: string
+    orderCount: number
+    weekSalesAmount: string
+    teamMemberCount: number
+}
+
+/**
+ * Pre-fetch distributor profile and stats to inject into the system prompt.
+ * Avoids tool calls for the most common "basic info" questions.
+ */
+export async function fetchDistributorContext(distributorId: string): Promise<DistributorContext | null> {
+    const weekStart = new Date()
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay())
+    weekStart.setHours(0, 0, 0, 0)
+
+    const [user, l1, l2, paid, pending, orderCount, weekSales, teamCount] = await Promise.all([
+        prisma.user.findUnique({
+            where: { id: distributorId },
+            select: {
+                name: true,
+                email: true,
+                distributorCode: true,
+                discountCodeEnabled: true,
+                discountPercent: true,
+                inviter: { select: { name: true } },
+            },
+        }),
+        prisma.commission.aggregate({ where: { distributorId, level: 1, status: "SETTLED" }, _sum: { amount: true } }),
+        prisma.commission.aggregate({ where: { distributorId, level: 2, status: "SETTLED" }, _sum: { amount: true } }),
+        prisma.withdrawal.aggregate({ where: { distributorId, status: "PAID" }, _sum: { amount: true } }),
+        prisma.withdrawal.aggregate({ where: { distributorId, status: "PENDING" }, _sum: { amount: true } }),
+        prisma.order.count({ where: { distributorId } }),
+        prisma.order.aggregate({
+            where: { distributorId, status: "COMPLETED", paidAt: { gte: weekStart } },
+            _sum: { amount: true },
+        }),
+        prisma.user.count({ where: { inviterId: distributorId } }),
+    ])
+
+    if (!user) return null
+
+    const level1 = Number(l1._sum.amount ?? 0)
+    const level2 = Number(l2._sum.amount ?? 0)
+    const paidAmt = Number(paid._sum.amount ?? 0)
+    const pendingAmt = Number(pending._sum.amount ?? 0)
+
+    return {
+        name: user.name ?? "分销员",
+        email: user.email,
+        distributorCode: user.distributorCode ?? null,
+        shareLink: user.distributorCode ? `${config.siteUrl}/?ref=${user.distributorCode}` : null,
+        discountEnabled: user.discountCodeEnabled,
+        discountPercent: user.discountPercent ? Number(user.discountPercent).toFixed(2) : null,
+        inviterName: user.inviter?.name ?? null,
+        withdrawableBalance: (level1 + level2 - paidAmt - pendingAmt).toFixed(2),
+        orderCount,
+        weekSalesAmount: Number(weekSales._sum.amount ?? 0).toFixed(2),
+        teamMemberCount: teamCount,
+    }
+}
+
+export interface PlatformContext {
+    commissionTiers: Array<{ minAmount: string; maxAmount: string; ratePercent: string }>
+    guides: Array<{ title: string; content: string; category: string | null }>
+    announcements: Array<{ title: string; content: string | null; publishedAt: string | null }>
+    products: Array<{ name: string; price: string; summary: string | null; productUrl: string }>
+}
+
+/**
+ * Pre-fetch platform-wide data (commission tiers, guides, announcements, products).
+ * These are injected into the system prompt to avoid tool calls for common questions.
+ */
+export async function fetchPlatformContext(): Promise<PlatformContext> {
+    const [tiers, guides, announcements, products] = await Promise.all([
+        prisma.commissionTier.findMany({
+            orderBy: { sortOrder: "asc" },
+            select: { minAmount: true, maxAmount: true, ratePercent: true },
+        }),
+        prisma.distributorGuide.findMany({
+            where: { status: "PUBLISHED" },
+            orderBy: [{ sortOrder: "desc" }, { publishedAt: "desc" }],
+            take: 20,
+            select: { title: true, content: true, tag: { select: { name: true } } },
+        }),
+        prisma.announcement.findMany({
+            where: { status: "PUBLISHED" },
+            orderBy: [{ sortOrder: "desc" }, { publishedAt: "desc" }],
+            take: 10,
+            select: { title: true, content: true, publishedAt: true },
+        }),
+        prisma.product.findMany({
+            where: { status: "ACTIVE" },
+            orderBy: [{ pinnedAt: "desc" }, { createdAt: "desc" }],
+            take: 30,
+            select: { name: true, price: true, summary: true, slug: true },
+        }),
+    ])
+
+    return {
+        commissionTiers: tiers.map((t) => ({
+            minAmount: Number(t.minAmount).toFixed(2),
+            maxAmount: Number(t.maxAmount).toFixed(2),
+            ratePercent: Number(t.ratePercent).toFixed(2),
+        })),
+        guides: guides.map((g) => ({
+            title: g.title,
+            content: g.content,
+            category: g.tag?.name ?? null,
+        })),
+        announcements: announcements.map((a) => ({
+            title: a.title,
+            content: a.content ?? null,
+            publishedAt: a.publishedAt?.toISOString().slice(0, 10) ?? null,
+        })),
+        products: products.map((p) => ({
+            name: p.name,
+            price: Number(p.price).toFixed(2),
+            summary: p.summary ?? null,
+            productUrl: `${config.siteUrl}/products/${p.slug}`,
+        })),
+    }
+}
+
+function renderPlatformSection(platform: PlatformContext | null): string {
+    if (!platform) return ""
+
+    const tiersText =
+        platform.commissionTiers.length === 0
+            ? "暂无阶梯配置"
+            : platform.commissionTiers
+                  .map((t) => `  - 销售额 ¥${t.minAmount}～¥${t.maxAmount}：佣金比例 ${t.ratePercent}%`)
+                  .join("\n")
+
+    const guidesText =
+        platform.guides.length === 0
+            ? "暂无指南"
+            : platform.guides
+                  .map((g) => `### ${g.title}${g.category ? `（${g.category}）` : ""}\n${g.content}`)
+                  .join("\n\n")
+
+    const announcementsText =
+        platform.announcements.length === 0
+            ? "暂无公告"
+            : platform.announcements
+                  .map((a) => `- **${a.title}**${a.publishedAt ? `（${a.publishedAt}）` : ""}${a.content ? `：${a.content}` : ""}`)
+                  .join("\n")
+
+    const productsText =
+        platform.products.length === 0
+            ? "暂无在售商品"
+            : platform.products
+                  .map((p) => `- ${p.name}：¥${p.price}${p.summary ? `，${p.summary}` : ""}（${p.productUrl}）`)
+                  .join("\n")
+
+    return `
+## 佣金阶梯规则（已预加载，直接引用）
+${tiersText}
+
+## 在售商品（已预加载，直接引用）
+${productsText}
+
+## 平台公告（已预加载，直接引用）
+${announcementsText}
+
+## 操作指南（已预加载，直接引用）
+${guidesText}`
+}
+
 /**
  * Build the system prompt for the distributor AI assistant.
- * Injects platform static rules and site URL from config.
+ * Injects platform static rules, pre-fetched user context, and platform data.
  */
-export function buildSystemPrompt(distributorName: string): string {
+export function buildSystemPrompt(
+    ctx: DistributorContext | null,
+    platform: PlatformContext | null,
+    fallbackName?: string,
+): string {
+    const name = ctx?.name ?? fallbackName ?? "分销员"
+
+    const userSection = ctx
+        ? `## 当前用户信息（已预加载，直接引用，无需调工具）
+- 姓名：${ctx.name}
+- 邮箱：${ctx.email}
+- 推广码（即优惠码）：${ctx.distributorCode ?? "未设置"}
+- 分享链接：${ctx.shareLink ?? "未设置"}
+- 折扣码功能：${ctx.discountEnabled ? "已启用" : "已禁用"}${ctx.discountPercent ? `，折扣比例 ${ctx.discountPercent}%` : ""}
+- 邀请人：${ctx.inviterName ?? "无"}
+- 可提现余额：¥${ctx.withdrawableBalance}
+- 累计带单数：${ctx.orderCount} 单
+- 本周销售额：¥${ctx.weekSalesAmount}
+- 团队人数：${ctx.teamMemberCount} 人`
+        : `当前用户：${name}`
+
     return `你是${promptConfig.siteName}平台的 AI 助手，专门帮助分销员了解平台规则和业务操作。
 
-当前用户：${distributorName}
+${userSection}
 
 ## 平台静态规则
 - 站点地址：${promptConfig.siteUrl}
@@ -31,39 +227,36 @@ export function buildSystemPrompt(distributorName: string): string {
 - 邀请链接有效期：${promptConfig.distributorInviteTtlDays} 天
 - 买家使用推荐码可享受 ${promptConfig.basePromoDiscountPercent}% 折扣（折扣成本从佣金中扣除）
 - 二级佣金比例：团队成员佣金的 ${promptConfig.level2CommissionRatePercent}%
-
+- 推广码即优惠码：分享链接格式为 ${promptConfig.siteUrl}/?ref=<推广码>，推广码也可直接填入下单页"优惠码"输入框
+${renderPlatformSection(platform)}
 ## 工具调用规则
 
-根据用户**意图**判断，不要求字面匹配：
+以下数据**已预加载在上方**，直接引用，**不要再调工具**：
+- 用户基本信息、余额、订单数、团队人数 → 已在"当前用户信息"中
+- 佣金阶梯规则 → 已在"佣金阶梯规则"中
+- 在售商品列表 → 已在"在售商品"中
+- 平台公告 → 已在"平台公告"中
+- 操作指南 → 已在"操作指南"中
 
-- **账户/推广/优惠码**：用户想了解自己的账号、推广方式、如何让买家享受折扣，或询问任何形式的"码"（推广码、优惠码、折扣码、邀请码、分享码）和分享链接 → 调用 get_my_profile
-- **数据统计**：用户想查余额、可提现金额、收益、销售额、总收入、订单数等汇总数字 → 调用 get_my_stats
-- **订单明细**：用户想看具体订单列表、历史成交记录 → 调用 get_my_orders
+以下数据**需要调工具实时查询**，根据用户**意图**判断（不要求字面匹配）：
+- **订单明细**：用户想看具体订单列表、历史成交记录、某笔订单详情 → 调用 get_my_orders
 - **佣金明细**：用户想了解哪笔订单产生了多少佣金、佣金流水 → 调用 get_my_commissions
 - **提现记录**：用户想查提现申请、打款状态、到账情况 → 调用 get_my_withdrawals
-- **团队/下线**：用户想了解自己邀请的人、团队成员、下级分销员 → 调用 get_my_team
-- **邀请记录**：用户想查发出的邀请、邀请进度、邀请链接 → 调用 get_my_invitations
-- **佣金规则**：用户想了解佣金比例、阶梯规则、如何计算佣金 → 调用 get_commission_tiers
-- **商品信息**：用户想了解平台在卖什么、商品列表、商品价格 → 调用 get_products
-- **操作指南**：用户是新手、不知道怎么操作、想看教程 → 调用 get_guides
-- **公告通知**：用户想看平台通知、最新公告、动态 → 调用 get_announcements
+- **团队成员详情**：用户想看下线名单、每个成员带来的二级佣金 → 调用 get_my_team
+- **邀请记录**：用户想查发出的邀请、邀请进度 → 调用 get_my_invitations
 
-**推广码即优惠码**：get_my_profile 返回的 distributorCode 就是分销员的推广码，它既用于拼接分享链接（${promptConfig.siteUrl}/?ref=<推广码>），也是买家在下单页"优惠码"输入框里可以直接填写的那个码，两种用法的码值完全相同。
+需要调工具时，**直接调用，不要在调用前输出任何文字**（不要说"我来帮你查"、"请稍等"等）。
 
 ## 回答规范
 - 使用中文，简洁友好
 - 对新手耐心解释，避免行业术语
 - 遇到无法解答的问题，引导用户联系平台客服
 
-## 工具调用行为
-- 需要调用工具时，**直接调用，不要在调用前输出任何文字**（不要说"我来帮你查"、"请稍等"等）
-- 获得工具结果后再组织回复
-
 ## 严格禁止的行为（必须遵守）
-- **禁止编造任何数字**：余额、佣金、订单金额等数据必须通过工具获取，工具未返回则明确说"暂无数据"
+- **禁止编造任何数字**：工具未返回的数据明确说"暂无数据"
 - **禁止推断或估算**：不要说"大概"、"应该是"、"通常"等模糊表述来替代真实数据
-- **禁止凭空描述平台功能**：只能描述系统提示中已有的静态规则或工具返回的真实数据
-- **禁止补全工具返回的空数据**：如果工具返回空列表，只说"暂无记录"，不要自行补充示例或说明
+- **禁止凭空描述平台功能**：只能描述系统提示中已有的内容或工具返回的真实数据
+- **禁止补全工具返回的空数据**：如果工具返回空列表，只说"暂无记录"
 - **禁止描述平台状态**：不要说"平台目前没有发布..."、"平台尚未配置..."等评论性内容
 - 如果用户问的问题超出你的知识范围，直接说"这个问题我无法确认，建议联系平台客服"`
 }
@@ -74,96 +267,6 @@ export function buildSystemPrompt(distributorName: string): string {
  */
 export function buildTools(distributorId: string) {
     return {
-        get_my_profile: tool({
-            description: "查询当前分销员的账户信息：推广码（即优惠码）、分享链接、折扣配置、上级邀请人",
-            inputSchema: z.object({}),
-            execute: async () => {
-                const user = await prisma.user.findUnique({
-                    where: { id: distributorId },
-                    select: {
-                        name: true,
-                        email: true,
-                        distributorCode: true,
-                        discountCodeEnabled: true,
-                        discountPercent: true,
-                        inviter: { select: { name: true } },
-                    },
-                })
-                if (!user) return { error: "用户不存在" }
-                return {
-                    name: user.name,
-                    email: user.email,
-                    distributorCode: user.distributorCode ?? null,
-                    shareLink: user.distributorCode
-                        ? `${config.siteUrl}/?ref=${user.distributorCode}`
-                        : null,
-                    discountEnabled: user.discountCodeEnabled,
-                    discountPercent: user.discountPercent
-                        ? Number(user.discountPercent).toFixed(2)
-                        : null,
-                    discountPercentNote: user.discountPercent
-                        ? null
-                        : user.discountCodeEnabled
-                            ? "未单独设置，使用平台基础折扣比例"
-                            : "优惠码已禁用，买家使用该码不享受折扣",
-                    inviterName: user.inviter?.name ?? null,
-                }
-            },
-        }),
-
-        get_my_stats: tool({
-            description: "查询当前分销员的可提现余额、累计佣金、本周销售额、订单数、团队人数",
-            inputSchema: z.object({}),
-            execute: async () => {
-                const weekStart = new Date()
-                weekStart.setDate(weekStart.getDate() - weekStart.getDay())
-                weekStart.setHours(0, 0, 0, 0)
-
-                const [l1, l2, paid, pending, orderCount, weekSales, teamCount] =
-                    await Promise.all([
-                        prisma.commission.aggregate({
-                            where: { distributorId, level: 1, status: "SETTLED" },
-                            _sum: { amount: true },
-                        }),
-                        prisma.commission.aggregate({
-                            where: { distributorId, level: 2, status: "SETTLED" },
-                            _sum: { amount: true },
-                        }),
-                        prisma.withdrawal.aggregate({
-                            where: { distributorId, status: "PAID" },
-                            _sum: { amount: true },
-                        }),
-                        prisma.withdrawal.aggregate({
-                            where: { distributorId, status: "PENDING" },
-                            _sum: { amount: true },
-                        }),
-                        prisma.order.count({ where: { distributorId } }),
-                        prisma.order.aggregate({
-                            where: {
-                                distributorId,
-                                status: "COMPLETED",
-                                paidAt: { gte: weekStart },
-                            },
-                            _sum: { amount: true },
-                        }),
-                        prisma.user.count({ where: { inviterId: distributorId } }),
-                    ])
-                const level1 = Number(l1._sum.amount ?? 0)
-                const level2 = Number(l2._sum.amount ?? 0)
-                const paidAmt = Number(paid._sum.amount ?? 0)
-                const pendingAmt = Number(pending._sum.amount ?? 0)
-                return {
-                    withdrawableBalance: (level1 + level2 - paidAmt - pendingAmt).toFixed(2),
-                    level1EarnedTotal: level1.toFixed(2),
-                    level2EarnedTotal: level2.toFixed(2),
-                    pendingWithdrawal: pendingAmt.toFixed(2),
-                    orderCount,
-                    weekSalesAmount: Number(weekSales._sum.amount ?? 0).toFixed(2),
-                    teamMemberCount: teamCount,
-                }
-            },
-        }),
-
         get_my_orders: tool({
             description: "查询当前分销员最近的订单列表",
             inputSchema: z.object({
@@ -318,90 +421,5 @@ export function buildTools(distributorId: string) {
             },
         }),
 
-        get_commission_tiers: tool({
-            description: "查询平台佣金阶梯规则（不同销售额区间对应的佣金比例）",
-            inputSchema: z.object({}),
-            execute: async () => {
-                const tiers = await prisma.commissionTier.findMany({
-                    orderBy: { sortOrder: "asc" },
-                    select: { minAmount: true, maxAmount: true, ratePercent: true },
-                })
-                return tiers.map((t) => ({
-                    minAmount: Number(t.minAmount).toFixed(2),
-                    maxAmount: Number(t.maxAmount).toFixed(2),
-                    ratePercent: Number(t.ratePercent).toFixed(2),
-                }))
-            },
-        }),
-
-        get_products: tool({
-            description: "查询平台当前在售商品列表（名称、价格、简介）",
-            inputSchema: z.object({}),
-            execute: async () => {
-                const products = await prisma.product.findMany({
-                    where: { status: "ACTIVE" },
-                    orderBy: [{ pinnedAt: "desc" }, { createdAt: "desc" }],
-                    take: 30,
-                    select: {
-                        name: true,
-                        price: true,
-                        summary: true,
-                        slug: true,
-                        couponEnabled: true,
-                    },
-                })
-                return products.map((p) => ({
-                    name: p.name,
-                    price: Number(p.price).toFixed(2),
-                    summary: p.summary ?? null,
-                    productUrl: `${config.siteUrl}/products/${p.slug}`,
-                    couponEnabled: p.couponEnabled,
-                }))
-            },
-        }),
-
-        get_guides: tool({
-            description: "查询平台入门指南内容，用于回答新人操作相关问题",
-            inputSchema: z.object({}),
-            execute: async () => {
-                const guides = await prisma.distributorGuide.findMany({
-                    where: { status: "PUBLISHED" },
-                    orderBy: [{ sortOrder: "desc" }, { publishedAt: "desc" }],
-                    take: 20,
-                    select: {
-                        title: true,
-                        content: true,
-                        tag: { select: { name: true } },
-                    },
-                })
-                return guides.map((g) => ({
-                    title: g.title,
-                    content: g.content,
-                    category: g.tag?.name ?? null,
-                }))
-            },
-        }),
-
-        get_announcements: tool({
-            description: "查询平台最新公告和通知",
-            inputSchema: z.object({}),
-            execute: async () => {
-                const announcements = await prisma.announcement.findMany({
-                    where: { status: "PUBLISHED" },
-                    orderBy: [{ sortOrder: "desc" }, { publishedAt: "desc" }],
-                    take: 10,
-                    select: {
-                        title: true,
-                        content: true,
-                        publishedAt: true,
-                    },
-                })
-                return announcements.map((a) => ({
-                    title: a.title,
-                    content: a.content ?? null,
-                    publishedAt: a.publishedAt?.toISOString().slice(0, 10) ?? null,
-                }))
-            },
-        }),
     }
 }

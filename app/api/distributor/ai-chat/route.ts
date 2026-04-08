@@ -4,7 +4,7 @@ import { createOpenAI } from "@ai-sdk/openai"
 import { getDistributorSession } from "@/lib/auth-guard"
 import { config } from "@/lib/config"
 import { checkAiChatRateLimit } from "@/lib/rate-limit"
-import { buildSystemPrompt, buildTools } from "@/lib/ai-distributor"
+import { buildSystemPrompt, buildTools, fetchDistributorContext, fetchPlatformContext } from "@/lib/ai-distributor"
 
 const MAX_MESSAGE_LENGTH = 500
 const MAX_CONTEXT_MESSAGES = 10
@@ -40,9 +40,14 @@ export async function POST(request: NextRequest) {
     apiKey: config.qwenApiKey ?? "",
   })
 
+  const [distributorCtx, platformCtx] = await Promise.all([
+    fetchDistributorContext(user.id),
+    fetchPlatformContext(),
+  ])
+
   const result = streamText({
     model: qwen.chat("Qwen/Qwen2.5-72B-Instruct"),
-    system: buildSystemPrompt(user.name ?? "分销员"),
+    system: buildSystemPrompt(distributorCtx, platformCtx, user.name ?? "分销员"),
     messages: await convertToModelMessages(trimmedMessages),
     tools: buildTools(user.id),
     stopWhen: stepCountIs(5),
