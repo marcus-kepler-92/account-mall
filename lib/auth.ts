@@ -23,8 +23,8 @@ export const auth = betterAuth({
     },
     trustedOrigins: [
         config.siteUrl,
-        // Allow any Vercel preview deployment for this project
-        ...(process.env.VERCEL_URL ? [`https://${process.env.VERCEL_URL}`] : []),
+        // Allow Vercel preview deployments (wildcard supported by better-auth)
+        "https://account-mall-*.vercel.app",
     ],
     rateLimit: {
         enabled: true,
