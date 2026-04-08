@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { ChevronLeft } from "lucide-react"
 import { formatCurrency } from "@/lib/utils"
 import { WithdrawalDataTable } from "./withdrawal-data-table"
+import { BackfillButton } from "./backfill-button"
 
 type Props = { params: Promise<{ id: string }> }
 
@@ -30,7 +31,7 @@ export default async function PaymentChannelDetailPage({ params }: Props) {
     const yearStart = new Date(year, 0, 1)
     const yearEnd = new Date(year + 1, 0, 1)
 
-    const [yearIncomeAgg, totalIncomeAgg, totalWithdrawnAgg, withdrawals] = await Promise.all([
+    const [yearIncomeAgg, totalIncomeAgg, totalWithdrawnAgg, withdrawals, pendingBackfillCount] = await Promise.all([
         prisma.order.aggregate({
             where: {
                 paymentChannelId: id,
@@ -51,6 +52,9 @@ export default async function PaymentChannelDetailPage({ params }: Props) {
             where: { channelId: id },
             orderBy: { createdAt: "desc" },
         }),
+        prisma.order.count({
+            where: { paymentChannelId: null, paymentMethod: channel.type },
+        }),
     ])
 
     const yearIncome = Number(yearIncomeAgg._sum.amount ?? 0)
@@ -69,13 +73,19 @@ export default async function PaymentChannelDetailPage({ params }: Props) {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between">
                 <Button variant="ghost" size="sm" asChild>
                     <Link href="/admin/payment-channels">
                         <ChevronLeft className="size-4" />
                         收款渠道
                     </Link>
                 </Button>
+                <BackfillButton
+                    channelId={id}
+                    channelNickname={channel.nickname}
+                    pendingCount={pendingBackfillCount}
+                    typeLabel={TYPE_LABELS[channel.type] ?? channel.type}
+                />
             </div>
 
             <Card>
