@@ -32,6 +32,7 @@ const yipayDisabledPaymentTypes = rawDisabledTypes
 
 const supportTelegram = (process.env.NEXT_PUBLIC_SUPPORT_TELEGRAM ?? "@Marcus_Kepler").trim()
 const supportWechat = (process.env.NEXT_PUBLIC_SUPPORT_WECHAT ?? "Mashangbang0").trim()
+const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? ""
 
 export const configClient = {
     promoCodeMaxLength: Number.isInteger(promoCodeMaxLength) && promoCodeMaxLength >= 1 && promoCodeMaxLength <= 256
@@ -55,4 +56,6 @@ export const configClient = {
     supportTelegram,
     /** 客服微信号；空字符串时隐藏 */
     supportWechat,
+    /** Cloudflare Turnstile 站点密钥（客户端），空字符串表示未启用 */
+    turnstileSiteKey,
 }

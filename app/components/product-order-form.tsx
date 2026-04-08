@@ -407,7 +407,7 @@ export function ProductOrderForm({
                     )}
 
                     {requireTurnstile && (
-                        <ProductOrderTurnstile siteKey={TURNSTILE_SITE_KEY} />
+                        <ProductOrderTurnstile siteKey={configClient.turnstileSiteKey} />
                     )}
 
                     <div className="hidden lg:flex items-center justify-between pt-2">
