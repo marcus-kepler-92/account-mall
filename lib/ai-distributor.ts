@@ -86,7 +86,7 @@ export async function fetchDistributorContext(distributorId: string): Promise<Di
 
 export interface PlatformContext {
     commissionTiers: Array<{ minAmount: string; maxAmount: string; ratePercent: string }>
-    guides: Array<{ title: string; content: string; category: string | null }>
+    guides: Array<{ title: string; content: string | null; category: string | null }>
     announcements: Array<{ title: string; content: string | null; publishedAt: string | null }>
     products: Array<{ name: string; price: string; summary: string | null; productUrl: string }>
 }
@@ -160,7 +160,7 @@ function renderPlatformSection(platform: PlatformContext | null): string {
         platform.guides.length === 0
             ? "暂无指南"
             : platform.guides
-                  .map((g) => `### ${g.title}${g.category ? `（${g.category}）` : ""}\n${g.content}`)
+                  .map((g) => `### ${g.title}${g.category ? `（${g.category}）` : ""}\n${g.content ?? ""}`)
                   .join("\n\n")
 
     const announcementsText =
