@@ -21,7 +21,11 @@ export const auth = betterAuth({
         // and admin accounts are created via seed script.
         disableSignUp: true,
     },
-    trustedOrigins: [config.siteUrl],
+    trustedOrigins: [
+        config.siteUrl,
+        // Allow any Vercel preview deployment for this project
+        ...(process.env.VERCEL_URL ? [`https://${process.env.VERCEL_URL}`] : []),
+    ],
     rateLimit: {
         enabled: true,
         window: 60,
