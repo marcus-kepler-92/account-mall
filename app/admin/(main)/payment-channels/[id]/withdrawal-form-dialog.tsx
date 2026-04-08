@@ -76,11 +76,18 @@ export function WithdrawalFormDialog({ open, onOpenChange, channelId, withdrawal
                         <FormField
                             control={form.control}
                             name="amount"
-                            render={({ field }) => (
+                            render={({ field: { onChange, value, ...rest } }) => (
                                 <FormItem>
                                     <FormLabel>提现金额 (元)</FormLabel>
                                     <FormControl>
-                                        <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                                        <Input
+                                            type="number"
+                                            step="0.01"
+                                            placeholder="0.00"
+                                            value={value as number}
+                                            onChange={(e) => onChange(e.target.valueAsNumber)}
+                                            {...rest}
+                                        />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
