@@ -27,6 +27,7 @@ const routeLabels: Record<string, string> = {
     "email-marketing": "邮件营销",
     templates: "邮件模板",
     campaigns: "群发活动",
+    "payment-channels": "收款渠道",
 }
 
 function isIdSegment(seg: string) {
@@ -84,6 +85,12 @@ function getBreadcrumbItems(pathname: string) {
             }
         } else if (prev && isIdSegment(prev) && seg === "edit") {
             label = "编辑模板"
+        } else if (prev === "payment-channels") {
+            if (isIdSegment(seg)) {
+                label = "渠道详情"
+            } else {
+                label = routeLabels[seg] ?? seg
+            }
         } else if (prev === "campaigns") {
             if (seg === "new") {
                 label = "新建活动"
