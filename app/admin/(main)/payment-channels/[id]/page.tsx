@@ -5,8 +5,9 @@ import { getAdminSession } from "@/lib/auth-guard"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { ChevronLeft } from "lucide-react"
+import { ArrowLeft } from "lucide-react"
 import { formatCurrency } from "@/lib/utils"
+import { PageHeader } from "@/app/admin/components"
 import { WithdrawalDataTable } from "./withdrawal-data-table"
 import { BackfillButton } from "./backfill-button"
 
@@ -74,12 +75,14 @@ export default async function PaymentChannelDetailPage({ params }: Props) {
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
-                <Button variant="ghost" size="sm" asChild>
-                    <Link href="/admin/payment-channels">
-                        <ChevronLeft className="size-4" />
-                        收款渠道
-                    </Link>
-                </Button>
+                <div className="flex items-center gap-3">
+                    <Button variant="ghost" size="icon" asChild>
+                        <Link href="/admin/payment-channels">
+                            <ArrowLeft className="size-4" />
+                        </Link>
+                    </Button>
+                    <PageHeader title="渠道详情" description={channel.nickname} />
+                </div>
                 <BackfillButton
                     channelId={id}
                     channelNickname={channel.nickname}
