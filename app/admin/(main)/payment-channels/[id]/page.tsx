@@ -93,7 +93,7 @@ export default async function PaymentChannelDetailPage({ params }: Props) {
 
             <Card>
                 <CardContent className="pt-6">
-                    <div className="flex flex-wrap items-start gap-x-8 gap-y-4">
+                    <div className="grid grid-cols-2 gap-x-8 gap-y-4 sm:grid-cols-3 lg:grid-cols-5">
                         <div>
                             <p className="text-sm text-muted-foreground">渠道</p>
                             <p className="text-lg font-semibold">{channel.nickname}</p>

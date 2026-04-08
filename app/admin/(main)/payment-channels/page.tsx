@@ -78,7 +78,7 @@ export default async function AdminPaymentChannelsPage() {
                 description="管理易支付收款渠道，记录提现，追踪年度进度与余额"
             />
 
-            <div className="grid gap-4 grid-cols-3">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
                 <StatCard label="总渠道数" value={String(channels.length)} icon={LayoutGrid} borderColor="border-l-primary" iconColor="text-primary" />
                 <StatCard label="年度总收入" value={formatCurrency(totalYearIncome)} icon={TrendingUp} borderColor="border-l-muted-foreground" iconColor="text-muted-foreground" />
                 <StatCard label="总余额" value={formatCurrency(totalBalance)} icon={Wallet} borderColor="border-l-success" iconColor="text-success" />
