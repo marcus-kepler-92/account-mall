@@ -21,7 +21,9 @@ export const commissionTiersColumns: ColumnDef<TierRow>[] = [
     },
     {
         accessorKey: "minAmount",
-        header: () => <div className="text-right">当周销售额下限（元）</div>,
+        header: ({ column }) => (
+            <DataTableColumnHeader column={column} title="销售额下限" className="justify-end" />
+        ),
         cell: ({ row }) => (
             <div className="text-right">{formatCurrency(row.original.minAmount)}</div>
         ),
@@ -35,7 +37,9 @@ export const commissionTiersColumns: ColumnDef<TierRow>[] = [
     },
     {
         accessorKey: "ratePercent",
-        header: () => <div className="text-right">佣金比例（%）</div>,
+        header: ({ column }) => (
+            <DataTableColumnHeader column={column} title="佣金比例（%）" className="justify-end" />
+        ),
         cell: ({ row }) => (
             <div className="text-right">{row.original.ratePercent}%</div>
         ),
