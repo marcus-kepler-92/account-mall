@@ -13,6 +13,7 @@ const config = {
   },
   testMatch: ["**/__tests__/**/*.(test|spec).[jt]s?(x)"],
   testPathIgnorePatterns: ["/node_modules/", "/.worktrees/"],
+  transformIgnorePatterns: ["node_modules/(?!(nuqs)/)"],
   clearMocks: true,
 };
 
