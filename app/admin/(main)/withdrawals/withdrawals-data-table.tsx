@@ -6,6 +6,9 @@ import {
     getCoreRowModel,
     type VisibilityState,
 } from "@tanstack/react-table"
+import { useQueryStates, parseAsInteger } from "nuqs"
+import type { SortingState, Updater } from "@tanstack/react-table"
+import { sortQueryStates, parseSortingState, encodeSortingState } from "@/lib/table-sort"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import {
@@ -33,22 +36,34 @@ const statusOptions = [
     { label: "已拒绝", value: "REJECTED" },
 ]
 
+const SORT_DEFAULTS = { sort: "createdAt", sortDir: "desc" } as const
+
 export function WithdrawalsDataTable({
     data,
     total,
     statusCounts,
 }: WithdrawalsDataTableProps) {
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
+    const [sortState, setSortState] = useQueryStates(
+        { ...sortQueryStates, page: parseAsInteger },
+        { history: "push" }
+    )
+    const sorting: SortingState = parseSortingState(sortState.sort, sortState.sortDir, SORT_DEFAULTS)
 
     const table = useReactTable({
         data,
         columns: withdrawalsColumns,
-        state: { columnVisibility },
+        state: { columnVisibility, sorting },
         onColumnVisibilityChange: setColumnVisibility,
         getCoreRowModel: getCoreRowModel(),
         getRowId: (row) => row.id,
         manualPagination: true,
         manualFiltering: true,
+        manualSorting: true,
+        onSortingChange: (updater: Updater<SortingState>) => {
+            const next = typeof updater === "function" ? updater(sorting) : updater
+            setSortState({ ...encodeSortingState(next, SORT_DEFAULTS), page: null })
+        },
     })
 
     return (

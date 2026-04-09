@@ -9,14 +9,22 @@ import {
     type WithdrawalFiltersInput,
 } from "./withdrawals-filters"
 import { PageHeader, StatCard } from "@/app/admin/components"
+import { parseServerSort } from "@/lib/table-sort"
 
 export const dynamic = "force-dynamic"
 
-type SearchParams = Promise<WithdrawalFiltersInput>
+type SearchParams = Promise<WithdrawalFiltersInput & { sort?: string; sortDir?: string }>
 
 export default async function AdminWithdrawalsPage({ searchParams }: { searchParams: SearchParams }) {
-    const filters = parseWithdrawalFilters(await searchParams)
+    const raw = await searchParams
+    const filters = parseWithdrawalFilters(raw)
     const { page, pageSize, statusList, search } = filters
+    const { orderBy } = parseServerSort(
+        raw.sort ?? null,
+        raw.sortDir ?? null,
+        ["createdAt", "amount"] as const,
+        { sort: "createdAt", sortDir: "desc" }
+    )
 
     // Build where clause for main query
     const where = {
@@ -41,7 +49,7 @@ export default async function AdminWithdrawalsPage({ searchParams }: { searchPar
                     select: { id: true, email: true, name: true },
                 },
             },
-            orderBy: { createdAt: "desc" },
+            orderBy,
             skip: (page - 1) * pageSize,
             take: pageSize,
         }),

@@ -52,7 +52,9 @@ export const withdrawalsColumns: ColumnDef<WithdrawalRow>[] = [
     },
     {
         accessorKey: "amount",
-        header: () => <div className="text-right">申请金额</div>,
+        header: ({ column }) => (
+            <DataTableColumnHeader column={column} title="申请金额" className="justify-end" />
+        ),
         cell: ({ row }) => (
             <div className="text-right font-medium">{formatCurrency(row.original.amount)}</div>
         ),
@@ -99,7 +101,6 @@ export const withdrawalsColumns: ColumnDef<WithdrawalRow>[] = [
     {
         accessorKey: "createdAt",
         header: ({ column }) => <DataTableColumnHeader column={column} title="申请时间" />,
-        enableSorting: false,
         cell: ({ row }) => (
             <span className="text-muted-foreground text-sm">
                 {formatDateTime(row.original.createdAt)}
