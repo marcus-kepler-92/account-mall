@@ -5,6 +5,8 @@ import {
     useReactTable,
     getCoreRowModel,
     flexRender,
+    getSortedRowModel,
+    type SortingState,
 } from "@tanstack/react-table"
 import { Plus, Pencil, Wallet } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -23,12 +25,18 @@ export function PaymentChannelsDataTable({ data }: { data: ChannelRow[] }) {
         channelId: string
         channelNickname: string
     } | null>(null)
+    const [sorting, setSorting] = useState<SortingState>([])
 
     const table = useReactTable({
         data,
         columns: paymentChannelsColumns,
         getCoreRowModel: getCoreRowModel(),
+        getSortedRowModel: getSortedRowModel(),
         getRowId: (row) => row.id,
+        state: {
+            sorting,
+        },
+        onSortingChange: setSorting,
     })
 
     return (

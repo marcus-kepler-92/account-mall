@@ -4,6 +4,7 @@ import Link from "next/link"
 import type { ColumnDef } from "@tanstack/react-table"
 import { Badge } from "@/components/ui/badge"
 import { formatCurrency } from "@/lib/utils"
+import { DataTableColumnHeader } from "@/app/admin/components"
 
 export type ChannelRow = {
     id: string
@@ -32,7 +33,7 @@ const TYPE_LABELS: Record<string, string> = {
 export const paymentChannelsColumns: ColumnDef<ChannelRow>[] = [
     {
         accessorKey: "nickname",
-        header: "渠道",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="渠道" />,
         cell: ({ row }) => (
             <div className="space-y-1">
                 <Link
@@ -52,7 +53,7 @@ export const paymentChannelsColumns: ColumnDef<ChannelRow>[] = [
     },
     {
         accessorKey: "yearIncome",
-        header: "年度进度",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="年度进度" />,
         cell: ({ row }) => {
             const { yearIncome, annualLimit } = row.original
             const pct = annualLimit > 0 ? Math.min(100, Math.round((yearIncome / annualLimit) * 100)) : 0
@@ -78,7 +79,7 @@ export const paymentChannelsColumns: ColumnDef<ChannelRow>[] = [
     },
     {
         accessorKey: "balance",
-        header: "当前余额",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="当前余额" />,
         cell: ({ row }) => (
             <div className="space-y-0.5">
                 <div className="font-medium">{formatCurrency(row.original.balance)}</div>
