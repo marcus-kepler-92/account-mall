@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -64,9 +64,10 @@ export function ProductCardsDataTable({ data, total, statusCounts, actions }: Pr
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
     const [batchLoading, setBatchLoading] = useState(false);
     const [batchAction, setBatchAction] = useState<"DELETE" | "DISABLE" | "ENABLE" | null>(null);
+    const [isPending, startTransition] = useTransition()
     const [sortState, setSortState] = useQueryStates(
         { ...sortQueryStates, page: parseAsInteger },
-        { history: "push", shallow: false }
+        { history: "push", shallow: false, startTransition }
     );
     const sorting: SortingState = parseSortingState(sortState.sort, sortState.sortDir, SORT_DEFAULTS);
 
@@ -195,8 +196,10 @@ export function ProductCardsDataTable({ data, total, statusCounts, actions }: Pr
                 </DataTableSelectionBar>
 
                 <Separator />
-                <DataTable table={table} columns={productCardsColumns} emptyMessage="暂无卡密" />
-                <DataTablePagination table={table} total={total} />
+                <div className={isPending ? "opacity-50 pointer-events-none transition-opacity" : "transition-opacity"}>
+                    <DataTable table={table} columns={productCardsColumns} emptyMessage="暂无卡密" />
+                    <DataTablePagination table={table} total={total} />
+                </div>
             </CardContent>
 
             <AlertDialog open={batchAction !== null} onOpenChange={(open) => !open && setBatchAction(null)}>

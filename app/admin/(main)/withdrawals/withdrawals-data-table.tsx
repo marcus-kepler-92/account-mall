@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useTransition } from "react"
 import {
     useReactTable,
     getCoreRowModel,
@@ -44,9 +44,10 @@ export function WithdrawalsDataTable({
     statusCounts,
 }: WithdrawalsDataTableProps) {
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
+    const [isPending, startTransition] = useTransition()
     const [sortState, setSortState] = useQueryStates(
         { ...sortQueryStates, page: parseAsInteger },
-        { history: "push", shallow: false }
+        { history: "push", shallow: false, startTransition }
     )
     const sorting: SortingState = parseSortingState(sortState.sort, sortState.sortDir, SORT_DEFAULTS)
 
@@ -80,12 +81,14 @@ export function WithdrawalsDataTable({
                     statusParamKey="status"
                 />
                 <Separator />
-                <DataTable
-                    table={table}
-                    columns={withdrawalsColumns}
-                    emptyMessage="暂无提现记录"
-                />
-                <DataTablePagination table={table} total={total} />
+                <div className={isPending ? "opacity-50 pointer-events-none transition-opacity" : "transition-opacity"}>
+                    <DataTable
+                        table={table}
+                        columns={withdrawalsColumns}
+                        emptyMessage="暂无提现记录"
+                    />
+                    <DataTablePagination table={table} total={total} />
+                </div>
             </CardContent>
         </Card>
     )

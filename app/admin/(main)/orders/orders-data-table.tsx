@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -63,9 +63,10 @@ export function OrdersDataTable({ data, total, statusCounts, distributors }: Ord
     const [batchAction, setBatchAction] = useState<"CLOSE" | "DELETE" | null>(null);
     const [closeExpiredLoading, setCloseExpiredLoading] = useState(false);
 
+    const [isPending, startTransition] = useTransition()
     const [sortState, setSortState] = useQueryStates(
         { ...sortQueryStates, page: parseAsInteger },
-        { history: "push", shallow: false }
+        { history: "push", shallow: false, startTransition }
     )
     const sorting: SortingState = parseSortingState(sortState.sort, sortState.sortDir, SORT_DEFAULTS)
 
@@ -218,8 +219,10 @@ export function OrdersDataTable({ data, total, statusCounts, distributors }: Ord
                 </DataTableSelectionBar>
 
                 <Separator />
-                <DataTable table={table} columns={columns} emptyMessage="暂无订单" />
-                <DataTablePagination table={table} total={total} />
+                <div className={isPending ? "opacity-50 pointer-events-none transition-opacity" : "transition-opacity"}>
+                    <DataTable table={table} columns={columns} emptyMessage="暂无订单" />
+                    <DataTablePagination table={table} total={total} />
+                </div>
             </CardContent>
 
             <AlertDialog open={batchAction !== null} onOpenChange={(open) => !open && setBatchAction(null)}>
