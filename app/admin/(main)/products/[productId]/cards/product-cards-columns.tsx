@@ -42,7 +42,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
-import { DataTableColumnHeader } from "@/app/admin/components/data-table-column-header";
+import { DataTableColumnHeader } from "@/app/admin/components";
 
 export type ProductCardRow = {
     id: string;
