@@ -66,7 +66,7 @@ export function ProductCardsDataTable({ data, total, statusCounts, actions }: Pr
     const [batchAction, setBatchAction] = useState<"DELETE" | "DISABLE" | "ENABLE" | null>(null);
     const [sortState, setSortState] = useQueryStates(
         { ...sortQueryStates, page: parseAsInteger },
-        { history: "push" }
+        { history: "push", shallow: false }
     );
     const sorting: SortingState = parseSortingState(sortState.sort, sortState.sortDir, SORT_DEFAULTS);
 

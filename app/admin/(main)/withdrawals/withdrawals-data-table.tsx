@@ -46,7 +46,7 @@ export function WithdrawalsDataTable({
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
     const [sortState, setSortState] = useQueryStates(
         { ...sortQueryStates, page: parseAsInteger },
-        { history: "push" }
+        { history: "push", shallow: false }
     )
     const sorting: SortingState = parseSortingState(sortState.sort, sortState.sortDir, SORT_DEFAULTS)
 
