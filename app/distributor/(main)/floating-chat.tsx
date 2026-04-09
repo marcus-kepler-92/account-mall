@@ -8,9 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent } from "@/components/ui/card"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
-// react-markdown used intentionally — @vercel/ai-elements not available in @ai-sdk/react 3.x
-import ReactMarkdown from "react-markdown"
-import remarkGfm from "remark-gfm"
+import { MarkdownView } from "@/app/components/markdown-view"
 import type { UIMessage } from "ai"
 
 function stripToolCallArtifacts(text: string): string {
@@ -44,11 +42,7 @@ function MessageBubble({ message }: { message: UIMessage }) {
                 {isUser ? (
                     textContent
                 ) : (
-                    <div className="prose prose-sm dark:prose-invert max-w-none">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                            {textContent}
-                        </ReactMarkdown>
-                    </div>
+                    <MarkdownView content={textContent} />
                 )}
             </div>
         </div>
@@ -176,7 +170,7 @@ export function FloatingChat() {
         <>
             {/* Desktop: floating card panel — shown above trigger */}
             {!isMobile && open && (
-                <Card className="fixed bottom-24 right-6 z-50 w-96 h-125 flex flex-col shadow-xl py-0">
+                <Card className="fixed bottom-24 right-6 z-50 w-110 h-150 min-w-72 min-h-80 max-w-[90vw] max-h-[80vh] flex flex-col shadow-xl py-0 resize overflow-hidden">
                     <div className="flex flex-row items-center justify-between py-3 px-4 border-b shrink-0">
                         <span className="font-semibold text-sm">AI 助手</span>
                         <Button
