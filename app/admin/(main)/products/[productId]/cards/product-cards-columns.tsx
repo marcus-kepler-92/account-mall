@@ -285,7 +285,6 @@ export const productCardsColumns: ColumnDef<ProductCardRow>[] = [
         header: ({ column }) => (
             <DataTableColumnHeader column={column} title="创建时间" />
         ),
-        enableSorting: false,
         cell: ({ row }) => {
             const date = row.getValue("createdAt") as string;
             return (

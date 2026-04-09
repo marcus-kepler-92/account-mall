@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { Package, CircleDot, Clock, CheckCircle2, Ban } from "lucide-react";
+import { parseServerSort } from "@/lib/table-sort";
 import { BackButton } from "./back-button";
 import { BulkImportCards } from "./bulk-import-cards";
 import { ExportCards } from "./export-cards";
@@ -18,6 +19,8 @@ type PageProps = {
         pageSize?: string;
         status?: string;
         search?: string;
+        sort?: string;
+        sortDir?: string;
     }>;
 };
 
@@ -40,6 +43,13 @@ export default async function AdminProductCardsPage({ params, searchParams }: Pa
     if (!product) {
         notFound();
     }
+
+    const { orderBy } = parseServerSort(
+        rawParams.sort ?? null,
+        rawParams.sortDir ?? null,
+        ["createdAt"] as const,
+        { sort: "createdAt", sortDir: "desc" }
+    );
 
     const page = Math.max(1, parseInt(rawParams.page ?? "", 10) || 1);
     const pageSize = Math.min(100, Math.max(1, parseInt(rawParams.pageSize ?? "", 10) || 20));
@@ -68,7 +78,7 @@ export default async function AdminProductCardsPage({ params, searchParams }: Pa
             include: {
                 order: { select: { orderNo: true } },
             },
-            orderBy: [{ status: "asc" }, { createdAt: "desc" }],
+            orderBy,
             skip: (page - 1) * pageSize,
             take: pageSize,
         }),

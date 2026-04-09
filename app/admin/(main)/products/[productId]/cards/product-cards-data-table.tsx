@@ -9,6 +9,9 @@ import {
     VisibilityState,
     RowSelectionState,
 } from "@tanstack/react-table";
+import { useQueryStates, parseAsInteger } from "nuqs";
+import type { SortingState, Updater } from "@tanstack/react-table";
+import { sortQueryStates, parseSortingState, encodeSortingState } from "@/lib/table-sort";
 import { Trash2, PowerOff, CircleDot, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -53,12 +56,19 @@ const statusOptions = [
     { label: "停用", value: "DISABLED" },
 ];
 
+const SORT_DEFAULTS = { sort: "createdAt", sortDir: "desc" } as const;
+
 export function ProductCardsDataTable({ data, total, statusCounts, actions }: ProductCardsDataTableProps) {
     const router = useRouter();
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
     const [batchLoading, setBatchLoading] = useState(false);
     const [batchAction, setBatchAction] = useState<"DELETE" | "DISABLE" | "ENABLE" | null>(null);
+    const [sortState, setSortState] = useQueryStates(
+        { ...sortQueryStates, page: parseAsInteger },
+        { history: "push" }
+    );
+    const sorting: SortingState = parseSortingState(sortState.sort, sortState.sortDir, SORT_DEFAULTS);
 
     const table = useReactTable({
         data,
@@ -66,6 +76,7 @@ export function ProductCardsDataTable({ data, total, statusCounts, actions }: Pr
         state: {
             columnVisibility,
             rowSelection,
+            sorting,
         },
         enableRowSelection: true,
         onColumnVisibilityChange: setColumnVisibility,
@@ -74,6 +85,11 @@ export function ProductCardsDataTable({ data, total, statusCounts, actions }: Pr
         getRowId: (row) => row.id,
         manualPagination: true,
         manualFiltering: true,
+        manualSorting: true,
+        onSortingChange: (updater: Updater<SortingState>) => {
+            const next = typeof updater === "function" ? updater(sorting) : updater;
+            setSortState({ ...encodeSortingState(next, SORT_DEFAULTS), page: null });
+        },
     });
 
     const selectedRows = table.getSelectedRowModel().rows;
