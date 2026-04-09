@@ -6,6 +6,8 @@ import {
     getCoreRowModel,
     VisibilityState,
 } from "@tanstack/react-table"
+import { useQueryStates, parseAsInteger } from "nuqs"
+import type { SortingState, Updater } from "@tanstack/react-table"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import {
@@ -13,6 +15,7 @@ import {
     DataTableToolbar,
     DataTablePagination,
 } from "@/app/admin/components"
+import { sortQueryStates, parseSortingState, encodeSortingState } from "@/lib/table-sort"
 import { distributorsColumns, type DistributorRow } from "./distributors-columns"
 import { InviteDistributorButtonClient } from "./invite-distributor-button-client"
 
@@ -27,6 +30,8 @@ const statusOptions = [
     { label: "已停用", value: "disabled" },
 ]
 
+const SORT_DEFAULTS = { sort: "createdAt", sortDir: "desc" } as const
+
 export function DistributorsDataTable({
     data,
     total,
@@ -34,15 +39,26 @@ export function DistributorsDataTable({
 }: DistributorsDataTableProps) {
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
 
+    const [sortState, setSortState] = useQueryStates(
+        { ...sortQueryStates, page: parseAsInteger },
+        { history: "push" }
+    )
+    const sorting: SortingState = parseSortingState(sortState.sort, sortState.sortDir, SORT_DEFAULTS)
+
     const table = useReactTable({
         data,
         columns: distributorsColumns,
-        state: { columnVisibility },
+        state: { columnVisibility, sorting },
         onColumnVisibilityChange: setColumnVisibility,
         getCoreRowModel: getCoreRowModel(),
         getRowId: (row) => row.id,
         manualPagination: true,
         manualFiltering: true,
+        manualSorting: true,
+        onSortingChange: (updater: Updater<SortingState>) => {
+            const next = typeof updater === "function" ? updater(sorting) : updater
+            setSortState({ ...encodeSortingState(next, SORT_DEFAULTS), page: null })
+        },
     })
 
     return (

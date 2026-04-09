@@ -7,6 +7,7 @@ import {
 import { DistributorsDataTable } from "./distributors-data-table"
 import type { DistributorRow } from "./distributors-columns"
 import { PageHeader } from "@/app/admin/components"
+import { parseServerSort } from "@/lib/table-sort"
 
 export const dynamic = "force-dynamic"
 
@@ -15,6 +16,8 @@ type SearchParams = Promise<{
     pageSize?: string
     search?: string
     status?: string
+    sort?: string
+    sortDir?: string
 }>
 
 export default async function AdminDistributorsPage({
@@ -25,6 +28,13 @@ export default async function AdminDistributorsPage({
     const rawParams = await searchParams
     const filters = parseDistributorFilters(rawParams as DistributorFiltersInput)
     const { page, pageSize, search } = filters
+
+    const { orderBy } = parseServerSort(
+        rawParams.sort ?? null,
+        rawParams.sortDir ?? null,
+        ["createdAt", "name"] as const,
+        { sort: "createdAt", sortDir: "desc" }
+    )
 
     const where: Prisma.UserWhereInput = {
         role: "DISTRIBUTOR",
@@ -58,7 +68,7 @@ export default async function AdminDistributorsPage({
                     select: { id: true, name: true, distributorCode: true },
                 },
             },
-            orderBy: { createdAt: "desc" },
+            orderBy,
             skip: (page - 1) * pageSize,
             take: pageSize,
         }),

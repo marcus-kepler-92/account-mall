@@ -33,7 +33,6 @@ export const distributorsColumns: ColumnDef<DistributorRow>[] = [
         header: ({ column }) => (
             <DataTableColumnHeader column={column} title="昵称" />
         ),
-        enableSorting: false,
         cell: ({ row }) => (
             <span className="font-medium">{row.original.name}</span>
         ),
