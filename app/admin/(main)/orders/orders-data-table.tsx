@@ -32,6 +32,11 @@ import {
 } from "@/app/admin/components";
 import { createOrdersColumns, type OrderRow } from "./orders-columns"
 import type { DistributorOption } from "./order-distributor-cell";
+import { useQueryStates, parseAsInteger } from "nuqs"
+import type { SortingState, Updater } from "@tanstack/react-table"
+import { sortQueryStates, parseSortingState, encodeSortingState } from "@/lib/table-sort"
+
+const SORT_DEFAULTS = { sort: "createdAt", sortDir: "desc" } as const
 
 interface OrdersDataTableProps {
     data: OrderRow[];
@@ -58,6 +63,12 @@ export function OrdersDataTable({ data, total, statusCounts, distributors }: Ord
     const [batchAction, setBatchAction] = useState<"CLOSE" | "DELETE" | null>(null);
     const [closeExpiredLoading, setCloseExpiredLoading] = useState(false);
 
+    const [sortState, setSortState] = useQueryStates(
+        { ...sortQueryStates, page: parseAsInteger },
+        { history: "push" }
+    )
+    const sorting: SortingState = parseSortingState(sortState.sort, sortState.sortDir, SORT_DEFAULTS)
+
     const columns = useMemo(() => createOrdersColumns(distributors), [distributors]);
 
     const table = useReactTable({
@@ -66,11 +77,17 @@ export function OrdersDataTable({ data, total, statusCounts, distributors }: Ord
         state: {
             columnVisibility,
             rowSelection,
+            sorting,
         },
         enableRowSelection: true,
         onColumnVisibilityChange: setColumnVisibility,
         onRowSelectionChange: setRowSelection,
         getCoreRowModel: getCoreRowModel(),
+        manualSorting: true,
+        onSortingChange: (updater: Updater<SortingState>) => {
+            const next = typeof updater === "function" ? updater(sorting) : updater
+            setSortState({ ...encodeSortingState(next, SORT_DEFAULTS), page: null })
+        },
         getRowId: (row) => row.id,
         manualPagination: true,
         manualFiltering: true,

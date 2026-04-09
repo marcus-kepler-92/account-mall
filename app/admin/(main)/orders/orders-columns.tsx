@@ -127,7 +127,6 @@ export function createOrdersColumns(distributors: DistributorOption[]): ColumnDe
         header: ({ column }) => (
             <DataTableColumnHeader column={column} title="数量" />
         ),
-        enableSorting: false,
         cell: ({ row }) => (
             <span className="text-right">{row.getValue("quantity") as number}</span>
         ),
@@ -137,7 +136,6 @@ export function createOrdersColumns(distributors: DistributorOption[]): ColumnDe
         header: ({ column }) => (
             <DataTableColumnHeader column={column} title="金额" />
         ),
-        enableSorting: false,
         cell: ({ row }) => (
             <span className="text-right font-medium">
                 {formatCurrency(row.getValue("amount") as number)}
@@ -175,7 +173,6 @@ export function createOrdersColumns(distributors: DistributorOption[]): ColumnDe
         header: ({ column }) => (
             <DataTableColumnHeader column={column} title="创建时间" />
         ),
-        enableSorting: false,
         cell: ({ row }) => {
             const createdAt = row.getValue("createdAt") as string
             const paidAt = row.original.paidAt

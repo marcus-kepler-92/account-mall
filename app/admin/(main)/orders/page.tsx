@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma"
+import { parseServerSort } from "@/lib/table-sort"
 import { formatCurrency } from "@/lib/utils"
 import { Clock, CheckCircle2, XCircle, DollarSign } from "lucide-react"
 import {
@@ -20,6 +21,8 @@ type SearchParams = Promise<{
     orderNo?: string
     dateFrom?: string
     dateTo?: string
+    sort?: string
+    sortDir?: string
 }>
 
 export default async function AdminOrdersPage({
@@ -29,6 +32,12 @@ export default async function AdminOrdersPage({
 }) {
     const rawParams = await searchParams
     const filters = parseOrderFilters(rawParams as OrderFiltersInput)
+    const { orderBy } = parseServerSort(
+        rawParams.sort ?? null,
+        rawParams.sortDir ?? null,
+        ["createdAt", "amount", "quantity"] as const,
+        { sort: "createdAt", sortDir: "desc" }
+    )
 
     const page = filters.page
     const pageSize = filters.pageSize
@@ -102,7 +111,7 @@ export default async function AdminOrdersPage({
                     },
                 },
             },
-            orderBy: { createdAt: "desc" },
+            orderBy,
             skip: (page - 1) * pageSize,
             take: pageSize,
         }),
