@@ -2,6 +2,7 @@
 
 import type { ColumnDef } from "@tanstack/react-table"
 import { formatCurrency, formatDateTime } from "@/lib/utils"
+import { DataTableColumnHeader } from "@/app/admin/components"
 import { WithdrawalRowActions } from "./withdrawal-row-actions"
 
 export type WithdrawalRow = {
@@ -15,7 +16,7 @@ export type WithdrawalRow = {
 export const withdrawalColumns: ColumnDef<WithdrawalRow>[] = [
     {
         accessorKey: "amount",
-        header: "金额",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="金额" />,
         cell: ({ row }) => <span className="font-medium">{formatCurrency(row.original.amount)}</span>,
     },
     {
@@ -27,7 +28,7 @@ export const withdrawalColumns: ColumnDef<WithdrawalRow>[] = [
     },
     {
         accessorKey: "createdAt",
-        header: "记录时间",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="记录时间" />,
         cell: ({ row }) => <span className="text-sm">{formatDateTime(row.original.createdAt)}</span>,
     },
     {
