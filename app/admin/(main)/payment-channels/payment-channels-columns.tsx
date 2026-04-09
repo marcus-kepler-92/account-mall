@@ -53,7 +53,7 @@ export const paymentChannelsColumns: ColumnDef<ChannelRow>[] = [
     },
     {
         accessorKey: "yearIncome",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="年度进度" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title="年度进度" className="justify-end" />,
         cell: ({ row }) => {
             const { yearIncome, annualLimit } = row.original
             const pct = annualLimit > 0 ? Math.min(100, Math.round((yearIncome / annualLimit) * 100)) : 0
@@ -79,7 +79,7 @@ export const paymentChannelsColumns: ColumnDef<ChannelRow>[] = [
     },
     {
         accessorKey: "balance",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="当前余额" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title="当前余额" className="justify-end" />,
         cell: ({ row }) => (
             <div className="space-y-0.5">
                 <div className="font-medium">{formatCurrency(row.original.balance)}</div>

@@ -6,6 +6,7 @@ import {
     getCoreRowModel,
     getSortedRowModel,
     flexRender,
+    type SortingState,
 } from "@tanstack/react-table"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -20,6 +21,7 @@ type Props = {
 
 export function WithdrawalDataTable({ channelId, initialData }: Props) {
     const [dialogOpen, setDialogOpen] = useState(false)
+    const [sorting, setSorting] = useState<SortingState>([])
 
     const table = useReactTable({
         data: initialData,
@@ -27,6 +29,8 @@ export function WithdrawalDataTable({ channelId, initialData }: Props) {
         getRowId: (row) => row.id,
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
+        state: { sorting },
+        onSortingChange: setSorting,
     })
 
     return (

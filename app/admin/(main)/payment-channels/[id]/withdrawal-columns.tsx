@@ -16,7 +16,7 @@ export type WithdrawalRow = {
 export const withdrawalColumns: ColumnDef<WithdrawalRow>[] = [
     {
         accessorKey: "amount",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="金额" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title="金额" className="justify-end" />,
         cell: ({ row }) => <span className="font-medium">{formatCurrency(row.original.amount)}</span>,
     },
     {
