@@ -119,7 +119,6 @@ export const cardsColumns: ColumnDef<CardRow>[] = [
         header: ({ column }) => (
             <DataTableColumnHeader column={column} title="创建时间" />
         ),
-        enableSorting: false,
         cell: ({ row }) => (
             <span className="text-xs text-muted-foreground">
                 {formatDateTime(row.getValue("createdAt") as string)}

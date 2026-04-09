@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { CreditCard, CircleDot, Clock, CheckCircle2, Ban } from "lucide-react";
 import { PageHeader, StatCard } from "@/app/admin/components";
+import { parseServerSort } from "@/lib/table-sort";
 import {
     DEFAULT_CARD_FILTERS,
     parseCardFilters,
@@ -23,6 +24,8 @@ type SearchParams = Promise<{
     productKeyword?: string;
     orderNo?: string;
     codeLike?: string;
+    sort?: string;
+    sortDir?: string;
 }>;
 
 const MASK_LEN = 8;
@@ -39,6 +42,12 @@ export default async function AdminCardsPage({
 }) {
     const rawParams = await searchParams;
     const filters = parseCardFilters(rawParams as CardFiltersInput);
+    const { orderBy } = parseServerSort(
+        rawParams.sort ?? null,
+        rawParams.sortDir ?? null,
+        ["createdAt"] as const,
+        { sort: "createdAt", sortDir: "desc" }
+    );
 
     const page = filters.page;
     const pageSize = filters.pageSize;
@@ -103,7 +112,7 @@ export default async function AdminCardsPage({
                     },
                 },
             },
-            orderBy: [{ status: "asc" }, { createdAt: "desc" }],
+            orderBy,
             skip: (page - 1) * pageSize,
             take: pageSize,
         }),
