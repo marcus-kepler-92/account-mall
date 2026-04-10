@@ -32,7 +32,7 @@ export default async function AdminDistributorsPage({
     const { orderBy } = parseServerSort(
         rawParams.sort ?? null,
         rawParams.sortDir ?? null,
-        ["createdAt", "name", "salesTotal"] as const,
+        ["createdAt", "name"] as const,
         { sort: "createdAt", sortDir: "desc" }
     )
 
@@ -85,7 +85,6 @@ export default async function AdminDistributorsPage({
         level2Settled,
         withdrawalPaid,
         withdrawalPending,
-        salesTotals,
         inviteeCounts,
     ] =
         ids.length > 0
@@ -94,6 +93,7 @@ export default async function AdminDistributorsPage({
                       by: ["distributorId"],
                       where: { distributorId: { in: ids }, status: "COMPLETED" },
                       _count: { id: true },
+                      _sum: { amount: true },
                   }),
                   prisma.commission.groupBy({
                       by: ["distributorId"],
@@ -120,21 +120,19 @@ export default async function AdminDistributorsPage({
                       where: { distributorId: { in: ids }, status: "PENDING" },
                       _sum: { amount: true },
                   }),
-                  prisma.order.groupBy({
-                      by: ["distributorId"],
-                      where: { distributorId: { in: ids }, status: "COMPLETED" },
-                      _sum: { amount: true },
-                  }),
                   prisma.user.groupBy({
                       by: ["inviterId"],
                       where: { inviterId: { in: ids } },
                       _count: { id: true },
                   }),
               ])
-            : [[], [], [], [], [], [], [], []]
+            : [[], [], [], [], [], [], []]
 
     const orderCountMap = new Map(
         orderCounts.map((o) => [o.distributorId, o._count.id])
+    )
+    const salesTotalMap = new Map(
+        orderCounts.map((o) => [o.distributorId, Number(o._sum.amount ?? 0)])
     )
     const commissionAllMap = new Map(
         commissionAll.map((c) => [c.distributorId, Number(c._sum.amount ?? 0)])
@@ -150,9 +148,6 @@ export default async function AdminDistributorsPage({
     )
     const pendingMap = new Map(
         withdrawalPending.map((w) => [w.distributorId, Number(w._sum.amount ?? 0)])
-    )
-    const salesTotalMap = new Map(
-        salesTotals.map((o) => [o.distributorId, Number(o._sum.amount ?? 0)])
     )
     const inviteeCountMap = new Map(
         inviteeCounts.map((u) => [u.inviterId as string, u._count.id])
