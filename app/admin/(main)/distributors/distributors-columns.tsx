@@ -15,6 +15,7 @@ export type DistributorRow = {
     disabledAt: string | null
     createdAt: string
     completedOrderCount: number
+    salesTotal: number
     totalCommission: number
     level1CommissionTotal: number
     level2CommissionTotal: number

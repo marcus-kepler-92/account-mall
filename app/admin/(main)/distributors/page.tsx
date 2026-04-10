@@ -32,7 +32,7 @@ export default async function AdminDistributorsPage({
     const { orderBy } = parseServerSort(
         rawParams.sort ?? null,
         rawParams.sortDir ?? null,
-        ["createdAt", "name"] as const,
+        ["createdAt", "name", "salesTotal"] as const,
         { sort: "createdAt", sortDir: "desc" }
     )
 
@@ -85,6 +85,7 @@ export default async function AdminDistributorsPage({
         level2Settled,
         withdrawalPaid,
         withdrawalPending,
+        salesTotals,
         inviteeCounts,
     ] =
         ids.length > 0
@@ -119,13 +120,18 @@ export default async function AdminDistributorsPage({
                       where: { distributorId: { in: ids }, status: "PENDING" },
                       _sum: { amount: true },
                   }),
+                  prisma.order.groupBy({
+                      by: ["distributorId"],
+                      where: { distributorId: { in: ids }, status: "COMPLETED" },
+                      _sum: { amount: true },
+                  }),
                   prisma.user.groupBy({
                       by: ["inviterId"],
                       where: { inviterId: { in: ids } },
                       _count: { id: true },
                   }),
               ])
-            : [[], [], [], [], [], [], []]
+            : [[], [], [], [], [], [], [], []]
 
     const orderCountMap = new Map(
         orderCounts.map((o) => [o.distributorId, o._count.id])
@@ -144,6 +150,9 @@ export default async function AdminDistributorsPage({
     )
     const pendingMap = new Map(
         withdrawalPending.map((w) => [w.distributorId, Number(w._sum.amount ?? 0)])
+    )
+    const salesTotalMap = new Map(
+        salesTotals.map((o) => [o.distributorId, Number(o._sum.amount ?? 0)])
     )
     const inviteeCountMap = new Map(
         inviteeCounts.map((u) => [u.inviterId as string, u._count.id])
@@ -185,6 +194,7 @@ export default async function AdminDistributorsPage({
             disabledAt: d.disabledAt?.toISOString() ?? null,
             createdAt: d.createdAt.toISOString(),
             completedOrderCount: orderCountMap.get(d.id) ?? 0,
+            salesTotal: salesTotalMap.get(d.id) ?? 0,
             totalCommission: commissionAllMap.get(d.id) ?? 0,
             level1CommissionTotal: level1AllMap.get(d.id) ?? 0,
             level2CommissionTotal: level2AllMap.get(d.id) ?? 0,
