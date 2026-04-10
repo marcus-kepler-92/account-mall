@@ -1,5 +1,5 @@
-import Link from "next/link";
-import { prisma } from "@/lib/prisma";
+import Link from "next/link"
+import { prisma } from "@/lib/prisma"
 import {
   Card,
   CardContent,
@@ -7,46 +7,50 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { AlertCircle } from "lucide-react";
-import { AcceptInviteForm } from "./accept-invite-form";
+} from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { AlertCircle } from "lucide-react"
+import { AcceptInviteForm } from "./accept-invite-form"
 
 interface AcceptInvitePageProps {
-  searchParams: Promise<{ token?: string }>;
+  searchParams: Promise<{ token?: string }>
 }
 
 export default async function AcceptInvitePage({ searchParams }: AcceptInvitePageProps) {
-  const { token } = await searchParams;
+  const { token } = await searchParams
 
   if (!token) {
-    return <InvalidInvite reason="missing" />;
+    return <InvalidInvite reason="missing" />
   }
 
   const invitation = await prisma.distributorInvitation.findUnique({
     where: { token },
     select: { email: true, expiresAt: true, acceptedAt: true },
-  });
+  })
 
   if (!invitation) {
-    return <InvalidInvite reason="notfound" />;
+    return <InvalidInvite reason="notfound" />
   }
 
   if (invitation.acceptedAt) {
-    return <InvalidInvite reason="used" />;
+    return <InvalidInvite reason="used" />
   }
 
   if (invitation.expiresAt < new Date()) {
-    return <InvalidInvite reason="expired" />;
+    return <InvalidInvite reason="expired" />
   }
+
+  const isNoEmail = invitation.email === null
 
   return (
     <main className="flex min-h-svh items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>设置登录密码</CardTitle>
+          <CardTitle>设置登录{isNoEmail ? "用户名" : "密码"}</CardTitle>
           <CardDescription>
-            您已被邀请加入分销中心，请设置密码以完成注册。
+            {isNoEmail
+              ? "您已被邀请加入分销中心，请设置用户名和密码以完成注册，用户名将作为您的登录账号。"
+              : "您已被邀请加入分销中心，请设置密码以完成注册。"}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -62,7 +66,7 @@ export default async function AcceptInvitePage({ searchParams }: AcceptInvitePag
         </CardFooter>
       </Card>
     </main>
-  );
+  )
 }
 
 function InvalidInvite({ reason }: { reason: "missing" | "notfound" | "used" | "expired" }) {
@@ -71,7 +75,7 @@ function InvalidInvite({ reason }: { reason: "missing" | "notfound" | "used" | "
     notfound: "邀请链接无效或不存在。",
     used: "此邀请链接已被使用，每个邀请链接只能使用一次。",
     expired: "邀请链接已过期，请联系邀请人重新发送邀请。",
-  };
+  }
 
   return (
     <main className="flex min-h-svh items-center justify-center p-4">
@@ -91,5 +95,5 @@ function InvalidInvite({ reason }: { reason: "missing" | "notfound" | "used" | "
         </CardFooter>
       </Card>
     </main>
-  );
+  )
 }
