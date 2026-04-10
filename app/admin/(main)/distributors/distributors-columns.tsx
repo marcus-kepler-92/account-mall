@@ -28,6 +28,36 @@ export type DistributorRow = {
     inviter: { id: string; name: string; distributorCode: string | null } | null
 }
 
+export function DistributorIdentityCell({ row }: { row: DistributorRow }) {
+    const disabled = !!row.disabledAt
+    return (
+        <div className="space-y-0.5">
+            <div className="flex items-center gap-2">
+                <span className="font-medium">{row.name}</span>
+                <Badge variant={disabled ? "destructive" : "default"} className="text-xs">
+                    {disabled ? "已停用" : "启用"}
+                </Badge>
+            </div>
+            <div className="text-xs text-muted-foreground">{row.email}</div>
+            {row.distributorCode && (
+                <code className="text-xs font-mono text-muted-foreground">{row.distributorCode}</code>
+            )}
+        </div>
+    )
+}
+
+export function DistributorTeamCell({ row }: { row: DistributorRow }) {
+    if (!row.inviter) return <span className="text-muted-foreground">—</span>
+    return (
+        <div className="space-y-0.5">
+            <div className="text-sm">{row.inviter.name}</div>
+            <Badge variant="secondary" className="text-xs font-normal">
+                下线 {row.inviteeCount}
+            </Badge>
+        </div>
+    )
+}
+
 export const distributorsColumns: ColumnDef<DistributorRow>[] = [
     {
         accessorKey: "name",
