@@ -58,6 +58,23 @@ export function DistributorTeamCell({ row }: { row: DistributorRow }) {
     )
 }
 
+export function DistributorSalesCell({ row }: { row: DistributorRow }) {
+    return (
+        <div className="text-right space-y-0.5">
+            <div className="font-medium tabular-nums">¥{row.salesTotal.toFixed(2)}</div>
+            <div className="text-xs text-muted-foreground">{row.completedOrderCount} 单</div>
+        </div>
+    )
+}
+
+export function DistributorDiscountCell({ row }: { row: DistributorRow }) {
+    if (!row.discountCodeEnabled) {
+        return <span className="text-sm text-muted-foreground">关闭</span>
+    }
+    const label = row.discountPercent != null ? `已启用 · ${row.discountPercent}%` : "已启用"
+    return <Badge variant="secondary">{label}</Badge>
+}
+
 export const distributorsColumns: ColumnDef<DistributorRow>[] = [
     {
         accessorKey: "name",

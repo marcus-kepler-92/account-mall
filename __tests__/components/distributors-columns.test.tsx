@@ -66,6 +66,39 @@ describe("DistributorTeamCell", () => {
   })
 })
 
+import { DistributorSalesCell, DistributorDiscountCell } from "@/app/admin/(main)/distributors/distributors-columns"
+
+describe("DistributorSalesCell", () => {
+  it("shows formatted GMV and order count", () => {
+    render(<DistributorSalesCell row={baseRow} />)
+    expect(screen.getByText("¥500.00")).toBeInTheDocument()
+    expect(screen.getByText("3 单")).toBeInTheDocument()
+  })
+
+  it("shows ¥0.00 and 0 单 when sales are zero", () => {
+    render(<DistributorSalesCell row={{ ...baseRow, salesTotal: 0, completedOrderCount: 0 }} />)
+    expect(screen.getByText("¥0.00")).toBeInTheDocument()
+    expect(screen.getByText("0 单")).toBeInTheDocument()
+  })
+})
+
+describe("DistributorDiscountCell", () => {
+  it("shows '关闭' when discount code is not enabled", () => {
+    render(<DistributorDiscountCell row={baseRow} />)
+    expect(screen.getByText("关闭")).toBeInTheDocument()
+  })
+
+  it("shows enabled badge with percent", () => {
+    render(<DistributorDiscountCell row={{ ...baseRow, discountCodeEnabled: true, discountPercent: 8 }} />)
+    expect(screen.getByText("已启用 · 8%")).toBeInTheDocument()
+  })
+
+  it("shows enabled badge without percent when percent is null", () => {
+    render(<DistributorDiscountCell row={{ ...baseRow, discountCodeEnabled: true, discountPercent: null }} />)
+    expect(screen.getByText("已启用")).toBeInTheDocument()
+  })
+})
+
 describe("DistributorRow type includes salesTotal", () => {
   it("accepts salesTotal field", () => {
     const row: DistributorRow = {
