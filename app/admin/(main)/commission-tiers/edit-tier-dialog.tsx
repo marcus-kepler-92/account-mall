@@ -70,8 +70,8 @@ export function EditTierDialog({ tier }: { tier: Tier }) {
                 }),
             })
             if (!res.ok) {
-                const err = await res.json()
-                toast.error(err.error || "修改失败")
+                const err = await res.json().catch(() => ({}))
+                toast.error(err?.error || "修改失败")
                 return
             }
             toast.success("已修改")
