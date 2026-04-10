@@ -1,5 +1,12 @@
 "use client"
 
+declare module "@tanstack/react-table" {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    interface ColumnMeta<TData, TValue> {
+        className?: string
+    }
+}
+
 import type { ColumnDef } from "@tanstack/react-table"
 import { Badge } from "@/components/ui/badge"
 import { DataTableColumnHeader } from "@/app/admin/components"
@@ -79,102 +86,23 @@ export const distributorsColumns: ColumnDef<DistributorRow>[] = [
     {
         accessorKey: "name",
         header: ({ column }) => (
-            <DataTableColumnHeader column={column} title="昵称" />
+            <DataTableColumnHeader column={column} title="分销员" />
         ),
-        cell: ({ row }) => (
-            <span className="font-medium">{row.original.name}</span>
-        ),
-    },
-    {
-        accessorKey: "email",
-        header: "邮箱",
-        cell: ({ row }) => (
-            <span className="text-muted-foreground text-sm">
-                {row.original.email}
-            </span>
-        ),
-    },
-    {
-        accessorKey: "distributorCode",
-        header: "推荐码",
-        cell: ({ row }) =>
-            row.original.distributorCode ? (
-                <code className="text-xs font-mono">{row.original.distributorCode}</code>
-            ) : (
-                <span className="text-muted-foreground">—</span>
-            ),
+        cell: ({ row }) => <DistributorIdentityCell row={row.original} />,
     },
     {
         accessorKey: "inviter",
-        header: "上线",
-        cell: ({ row }) => {
-            const inv = row.original.inviter
-            if (!inv) return <span className="text-muted-foreground">—</span>
-            return (
-                <span className="text-sm">
-                    {inv.name}
-                    {inv.distributorCode && (
-                        <span className="text-muted-foreground font-mono ml-1 text-xs">
-                            {inv.distributorCode}
-                        </span>
-                    )}
-                </span>
-            )
-        },
-    },
-    {
-        accessorKey: "inviteeCount",
-        header: ({ column }) => (
-            <DataTableColumnHeader column={column} title="下线数" className="justify-end" />
-        ),
+        header: "团队",
         enableSorting: false,
-        cell: ({ row }) => (
-            <div className="text-right text-muted-foreground">
-                {row.original.inviteeCount}
-            </div>
-        ),
+        cell: ({ row }) => <DistributorTeamCell row={row.original} />,
+        meta: { className: "hidden sm:table-cell" },
     },
     {
-        accessorKey: "discountCodeEnabled",
-        header: "优惠码",
-        cell: ({ row }) =>
-            row.original.discountCodeEnabled ? (
-                <Badge variant="secondary">已启用</Badge>
-            ) : (
-                <span className="text-muted-foreground text-sm">关闭</span>
-            ),
-    },
-    {
-        accessorKey: "discountPercent",
-        header: "折扣比例",
-        cell: ({ row }) =>
-            row.original.discountPercent != null ? (
-                <span className="tabular-nums">{row.original.discountPercent}%</span>
-            ) : (
-                <span className="text-muted-foreground">—</span>
-            ),
-    },
-    {
-        accessorKey: "disabledAt",
-        header: "状态",
-        cell: ({ row }) => {
-            const disabled = !!row.original.disabledAt
-            return (
-                <Badge variant={disabled ? "destructive" : "default"}>
-                    {disabled ? "已停用" : "启用"}
-                </Badge>
-            )
-        },
-    },
-    {
-        accessorKey: "completedOrderCount",
+        accessorKey: "salesTotal",
         header: ({ column }) => (
-            <DataTableColumnHeader column={column} title="成交订单" className="justify-end" />
+            <DataTableColumnHeader column={column} title="销售额" className="justify-end" />
         ),
-        enableSorting: false,
-        cell: ({ row }) => (
-            <div className="text-right">{row.original.completedOrderCount}</div>
-        ),
+        cell: ({ row }) => <DistributorSalesCell row={row.original} />,
     },
     {
         accessorKey: "totalCommission",
@@ -187,6 +115,7 @@ export const distributorsColumns: ColumnDef<DistributorRow>[] = [
                 <CommissionTooltip row={row.original} />
             </div>
         ),
+        meta: { className: "hidden sm:table-cell" },
     },
     {
         accessorKey: "withdrawableBalance",
@@ -199,6 +128,14 @@ export const distributorsColumns: ColumnDef<DistributorRow>[] = [
                 <BalanceTooltip row={row.original} />
             </div>
         ),
+        meta: { className: "hidden lg:table-cell" },
+    },
+    {
+        accessorKey: "discountCodeEnabled",
+        header: "优惠码",
+        enableSorting: false,
+        cell: ({ row }) => <DistributorDiscountCell row={row.original} />,
+        meta: { className: "hidden lg:table-cell" },
     },
     {
         id: "actions",
