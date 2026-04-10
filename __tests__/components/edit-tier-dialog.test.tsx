@@ -4,6 +4,7 @@
 import "@testing-library/jest-dom"
 import { render, screen, fireEvent, waitFor } from "@testing-library/react"
 import { EditTierDialog } from "@/app/admin/(main)/commission-tiers/edit-tier-dialog"
+import { toast } from "sonner"
 
 const mockRefresh = jest.fn()
 
@@ -88,7 +89,7 @@ describe("EditTierDialog", () => {
                 "/api/admin/commission-tiers/tier-1",
                 expect.objectContaining({ method: "PATCH" })
             )
-            expect(require("sonner").toast.success).toHaveBeenCalledWith("已修改")
+            expect(toast.success).toHaveBeenCalledWith("已修改")
             expect(mockRefresh).toHaveBeenCalled()
         })
     })
@@ -106,7 +107,25 @@ describe("EditTierDialog", () => {
         fireEvent.click(screen.getByRole("button", { name: /^保存$/ }))
 
         await waitFor(() => {
-            expect(require("sonner").toast.error).toHaveBeenCalledWith("服务器错误")
+            expect(toast.error).toHaveBeenCalledWith("服务器错误")
+        })
+    })
+
+    it("resets form to original tier values when dialog is closed", async () => {
+        render(<EditTierDialog tier={defaultTier} />)
+        openDialog()
+        await waitFor(() => screen.getByLabelText(/当周销售额上限/))
+
+        // Change a value
+        fireEvent.change(screen.getByLabelText(/当周销售额上限/), { target: { value: "9999" } })
+
+        // Close via cancel button
+        fireEvent.click(screen.getByRole("button", { name: /取消/ }))
+
+        // Reopen and verify original value is restored
+        openDialog()
+        await waitFor(() => {
+            expect(screen.getByLabelText(/当周销售额上限/)).toHaveValue(1000)
         })
     })
 })
