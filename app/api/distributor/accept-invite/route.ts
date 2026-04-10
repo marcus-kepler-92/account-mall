@@ -3,12 +3,11 @@ import { prisma } from "@/lib/prisma"
 import { badRequest, conflict, notFound, validationError } from "@/lib/api-response"
 import {
     acceptInviteSchema,
-    usernameSchema,
+    acceptNoEmailInviteSchema,
 } from "@/lib/validations/distributor-invite"
 import { hashPassword } from "better-auth/crypto"
 import { checkAcceptInviteRateLimit } from "@/lib/rate-limit"
 import { config } from "@/lib/config"
-import * as z from "zod"
 
 export async function POST(request: NextRequest) {
     const rateLimitRes = await checkAcceptInviteRateLimit(request)
@@ -51,7 +50,7 @@ export async function POST(request: NextRequest) {
 
     if (isNoEmail) {
         // Require and validate username
-        const usernameResult = z.object({ username: usernameSchema }).safeParse(body)
+        const usernameResult = acceptNoEmailInviteSchema.safeParse(body)
         if (!usernameResult.success) {
             return validationError(usernameResult.error.flatten().fieldErrors)
         }
