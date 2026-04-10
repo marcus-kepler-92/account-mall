@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Copy, UserCheck, UserX, Percent, Trash2, Loader2 } from "lucide-react"
 import {
@@ -39,7 +38,6 @@ export function DistributorDetailSheet({
     onOpenChange,
     onSuccess,
 }: DistributorDetailSheetProps) {
-    const router = useRouter()
     const [toggleLoading, setToggleLoading] = useState(false)
     const [deleteOpen, setDeleteOpen] = useState(false)
     const [deleteLoading, setDeleteLoading] = useState(false)
