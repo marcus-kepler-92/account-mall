@@ -16,8 +16,13 @@ jest.mock("@/lib/send-distributor-invitation", () => ({
     sendDistributorInvitation: jest.fn(),
 }))
 
+jest.mock("@/lib/create-no-email-invite-link", () => ({
+    createNoEmailInviteLink: jest.fn(),
+}))
+
 const getAdminSession = require("@/lib/auth-guard").getAdminSession as jest.Mock
 const sendDistributorInvitation = require("@/lib/send-distributor-invitation").sendDistributorInvitation as jest.Mock
+const createNoEmailInviteLink = require("@/lib/create-no-email-invite-link").createNoEmailInviteLink as jest.Mock
 
 function createRequest(body: unknown): NextRequest {
     return {
@@ -29,6 +34,7 @@ describe("POST /api/admin/distributors/invite", () => {
     beforeEach(() => {
         getAdminSession.mockReset()
         sendDistributorInvitation.mockReset()
+        createNoEmailInviteLink.mockReset()
     })
 
     it("returns 401 when no session", async () => {
@@ -95,5 +101,25 @@ describe("POST /api/admin/distributors/invite", () => {
         expect(res.status).toBe(400)
         const body = await res.json()
         expect(body.error).toMatch(/邮件发送失败/)
+    })
+
+    it("calls createNoEmailInviteLink and returns link when body has no email", async () => {
+        getAdminSession.mockResolvedValue({ user: { id: "admin_1", name: "Admin" } })
+        createNoEmailInviteLink.mockResolvedValue({
+            link: "https://example.com/distributor/accept-invite?token=abc",
+        })
+        const res = await AdminInvitePost(createRequest({}))
+        expect(res.status).toBe(200)
+        const body = await res.json()
+        expect(body.link).toBe("https://example.com/distributor/accept-invite?token=abc")
+        expect(sendDistributorInvitation).not.toHaveBeenCalled()
+        expect(createNoEmailInviteLink).toHaveBeenCalledWith({ inviterId: "admin_1" })
+    })
+
+    it("returns 401 when unauthenticated admin tries no-email invite", async () => {
+        getAdminSession.mockResolvedValue(null)
+        const res = await AdminInvitePost(createRequest({}))
+        expect(res.status).toBe(401)
+        expect(createNoEmailInviteLink).not.toHaveBeenCalled()
     })
 })

@@ -20,9 +20,14 @@ jest.mock("@/lib/rate-limit", () => ({
     checkDistributorInviteRateLimit: jest.fn().mockResolvedValue(null),
 }))
 
+jest.mock("@/lib/create-no-email-invite-link", () => ({
+    createNoEmailInviteLink: jest.fn(),
+}))
+
 const getDistributorSession = require("@/lib/auth-guard").getDistributorSession as jest.Mock
 const sendDistributorInvitation = require("@/lib/send-distributor-invitation").sendDistributorInvitation as jest.Mock
 const checkDistributorInviteRateLimit = require("@/lib/rate-limit").checkDistributorInviteRateLimit as jest.Mock
+const createNoEmailInviteLink = require("@/lib/create-no-email-invite-link").createNoEmailInviteLink as jest.Mock
 
 function createRequest(body: unknown): NextRequest {
     return {
@@ -34,6 +39,7 @@ describe("POST /api/distributor/invite", () => {
     beforeEach(() => {
         getDistributorSession.mockReset()
         sendDistributorInvitation.mockReset()
+        createNoEmailInviteLink.mockReset()
     })
 
     it("returns 401 when no session", async () => {
@@ -126,5 +132,27 @@ describe("POST /api/distributor/invite", () => {
         const req = { json: () => Promise.reject(new Error("Bad JSON")) } as unknown as NextRequest
         const res = await DistInvitePost(req)
         expect(res.status).toBe(400)
+    })
+
+    it("calls createNoEmailInviteLink and returns link when body has no email", async () => {
+        getDistributorSession.mockResolvedValue({ user: { id: "dist_1", name: "Dist" } })
+        createNoEmailInviteLink.mockResolvedValue({
+            link: "https://example.com/distributor/accept-invite?token=abc",
+        })
+        const res = await DistInvitePost(createRequest({}))
+        expect(res.status).toBe(200)
+        const body = await res.json()
+        expect(body.link).toBe("https://example.com/distributor/accept-invite?token=abc")
+        expect(sendDistributorInvitation).not.toHaveBeenCalled()
+        expect(createNoEmailInviteLink).toHaveBeenCalledWith({ inviterId: "dist_1" })
+    })
+
+    it("returns 401 when disabled distributor tries to generate no-email link", async () => {
+        getDistributorSession.mockResolvedValue({
+            user: { id: "dist_1", name: "Dist", disabledAt: "2025-01-01T00:00:00.000Z" },
+        })
+        const res = await DistInvitePost(createRequest({}))
+        expect(res.status).toBe(401)
+        expect(createNoEmailInviteLink).not.toHaveBeenCalled()
     })
 })
