@@ -52,7 +52,16 @@ export default async function AdminDistributorsPage({
         ]
     }
 
-    const [distributors, total, enabledCount, disabledCount] = await Promise.all([
+    const now = new Date()
+    const dayOfWeek = now.getUTCDay()
+    const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
+    const weekStart = new Date(now)
+    weekStart.setUTCDate(now.getUTCDate() + diff)
+    weekStart.setUTCHours(0, 0, 0, 0)
+    const weekEnd = new Date(weekStart)
+    weekEnd.setUTCDate(weekStart.getUTCDate() + 7)
+
+    const [distributors, total, enabledCount, disabledCount, tiersRaw] = await Promise.all([
         prisma.user.findMany({
             where,
             select: {
@@ -75,17 +84,20 @@ export default async function AdminDistributorsPage({
         prisma.user.count({ where }),
         prisma.user.count({ where: { role: "DISTRIBUTOR", disabledAt: null } }),
         prisma.user.count({ where: { role: "DISTRIBUTOR", disabledAt: { not: null } } }),
+        prisma.commissionTier.findMany({ orderBy: { sortOrder: "asc" } }),
     ])
 
     const ids = distributors.map((d) => d.id)
     const [
         orderCounts,
+        weeklyOrders,
         commissionAll,
         level1Settled,
         level2Settled,
         withdrawalPaid,
         withdrawalPending,
         inviteeCounts,
+        inviteeList,
     ] =
         ids.length > 0
             ? await Promise.all([
@@ -93,6 +105,11 @@ export default async function AdminDistributorsPage({
                       by: ["distributorId"],
                       where: { distributorId: { in: ids }, status: "COMPLETED" },
                       _count: { id: true },
+                      _sum: { amount: true },
+                  }),
+                  prisma.order.groupBy({
+                      by: ["distributorId"],
+                      where: { distributorId: { in: ids }, status: "COMPLETED", paidAt: { gte: weekStart, lt: weekEnd } },
                       _sum: { amount: true },
                   }),
                   prisma.commission.groupBy({
@@ -125,14 +142,22 @@ export default async function AdminDistributorsPage({
                       where: { inviterId: { in: ids } },
                       _count: { id: true },
                   }),
+                  prisma.user.findMany({
+                      where: { inviterId: { in: ids }, role: "DISTRIBUTOR" },
+                      select: { id: true, name: true, distributorCode: true, inviterId: true },
+                      orderBy: { name: "asc" },
+                  }),
               ])
-            : [[], [], [], [], [], [], []]
+            : [[], [], [], [], [], [], [], [], []]
 
     const orderCountMap = new Map(
         orderCounts.map((o) => [o.distributorId, o._count.id])
     )
     const salesTotalMap = new Map(
         orderCounts.map((o) => [o.distributorId, Number(o._sum.amount ?? 0)])
+    )
+    const weeklyTotalMap = new Map(
+        weeklyOrders.map((o) => [o.distributorId, Number(o._sum.amount ?? 0)])
     )
     const commissionAllMap = new Map(
         commissionAll.map((c) => [c.distributorId, Number(c._sum.amount ?? 0)])
@@ -152,6 +177,13 @@ export default async function AdminDistributorsPage({
     const inviteeCountMap = new Map(
         inviteeCounts.map((u) => [u.inviterId as string, u._count.id])
     )
+    const inviteeListMap = new Map<string, { id: string; name: string; distributorCode: string | null }[]>()
+    for (const u of inviteeList) {
+        if (!u.inviterId) continue
+        const arr = inviteeListMap.get(u.inviterId) ?? []
+        arr.push({ id: u.id, name: u.name, distributorCode: u.distributorCode })
+        inviteeListMap.set(u.inviterId, arr)
+    }
 
     // Split totalCommission into level1 + level2 for display
     const level1AllMap = new Map<string, number>()
@@ -190,6 +222,7 @@ export default async function AdminDistributorsPage({
             createdAt: d.createdAt.toISOString(),
             completedOrderCount: orderCountMap.get(d.id) ?? 0,
             salesTotal: salesTotalMap.get(d.id) ?? 0,
+            weeklySalesTotal: weeklyTotalMap.get(d.id) ?? 0,
             totalCommission: commissionAllMap.get(d.id) ?? 0,
             level1CommissionTotal: level1AllMap.get(d.id) ?? 0,
             level2CommissionTotal: level2AllMap.get(d.id) ?? 0,
@@ -199,6 +232,7 @@ export default async function AdminDistributorsPage({
             pendingTotal: pending,
             withdrawableBalance,
             inviteeCount: inviteeCountMap.get(d.id) ?? 0,
+            invitees: inviteeListMap.get(d.id) ?? [],
             inviter: d.inviter
                 ? {
                       id: d.inviter.id,
@@ -210,11 +244,17 @@ export default async function AdminDistributorsPage({
     })
 
     const statusCounts = { enabled: enabledCount, disabled: disabledCount }
+    const tiers = tiersRaw.map((t) => ({
+        minAmount: Number(t.minAmount),
+        maxAmount: Number(t.maxAmount),
+        ratePercent: Number(t.ratePercent),
+        sortOrder: t.sortOrder,
+    }))
 
     return (
         <div className="space-y-6">
             <PageHeader title="分销员管理" description="查看分销员列表、启用/停用、订单与佣金汇总" />
-            <DistributorsDataTable data={data} total={total} statusCounts={statusCounts} />
+            <DistributorsDataTable data={data} total={total} statusCounts={statusCounts} tiers={tiers} />
         </div>
     )
 }

@@ -23,6 +23,7 @@ export type DistributorRow = {
     createdAt: string
     completedOrderCount: number
     salesTotal: number
+    weeklySalesTotal: number
     totalCommission: number
     level1CommissionTotal: number
     level2CommissionTotal: number
@@ -32,15 +33,22 @@ export type DistributorRow = {
     pendingTotal: number
     withdrawableBalance: number
     inviteeCount: number
+    invitees: { id: string; name: string; distributorCode: string | null }[]
     inviter: { id: string; name: string; distributorCode: string | null } | null
 }
 
-export function DistributorIdentityCell({ row }: { row: DistributorRow }) {
+export function DistributorIdentityCell({ row, onViewDetail }: { row: DistributorRow; onViewDetail?: () => void }) {
     const disabled = !!row.disabledAt
     return (
         <div className="space-y-0.5">
             <div className="flex items-center gap-2">
-                <span className="font-medium">{row.name}</span>
+                <button
+                    type="button"
+                    className="font-medium hover:underline text-left"
+                    onClick={onViewDetail}
+                >
+                    {row.name}
+                </button>
                 <Badge variant={disabled ? "destructive" : "default"} className="text-xs">
                     {disabled ? "已停用" : "启用"}
                 </Badge>
@@ -54,13 +62,19 @@ export function DistributorIdentityCell({ row }: { row: DistributorRow }) {
 }
 
 export function DistributorTeamCell({ row }: { row: DistributorRow }) {
-    if (!row.inviter) return <span className="text-muted-foreground">—</span>
     return (
         <div className="space-y-0.5">
-            <div className="text-sm">{row.inviter.name}</div>
-            <Badge variant="secondary" className="text-xs font-normal">
-                下线 {row.inviteeCount}
-            </Badge>
+            {row.inviter && (
+                <div className="text-sm">{row.inviter.name}</div>
+            )}
+            {row.inviteeCount > 0 && (
+                <Badge variant="secondary" className="text-xs font-normal">
+                    下线 {row.inviteeCount}
+                </Badge>
+            )}
+            {!row.inviter && row.inviteeCount === 0 && (
+                <span className="text-muted-foreground">—</span>
+            )}
         </div>
     )
 }
@@ -82,13 +96,14 @@ export function DistributorDiscountCell({ row }: { row: DistributorRow }) {
     return <Badge variant="secondary">{label}</Badge>
 }
 
-export const distributorsColumns: ColumnDef<DistributorRow>[] = [
+export function getDistributorsColumns(onViewDetail: (row: DistributorRow) => void): ColumnDef<DistributorRow>[] {
+  return [
     {
         accessorKey: "name",
         header: ({ column }) => (
             <DataTableColumnHeader column={column} title="分销员" />
         ),
-        cell: ({ row }) => <DistributorIdentityCell row={row.original} />,
+        cell: ({ row }) => <DistributorIdentityCell row={row.original} onViewDetail={() => onViewDetail(row.original)} />,
     },
     {
         accessorKey: "inviter",
@@ -139,6 +154,7 @@ export const distributorsColumns: ColumnDef<DistributorRow>[] = [
     },
     {
         id: "actions",
+        header: "操作",
         cell: ({ row }) => (
             <div onClick={(e) => e.stopPropagation()}>
                 <DistributorRowActions row={row.original} />
@@ -147,4 +163,5 @@ export const distributorsColumns: ColumnDef<DistributorRow>[] = [
         enableSorting: false,
         enableHiding: false,
     },
-]
+  ]
+}

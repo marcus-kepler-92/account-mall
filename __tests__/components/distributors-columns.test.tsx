@@ -17,6 +17,7 @@ const baseRow: DistributorRow = {
   createdAt: "2024-01-01T00:00:00Z",
   completedOrderCount: 3,
   salesTotal: 500,
+  weeklySalesTotal: 100,
   totalCommission: 50,
   level1CommissionTotal: 40,
   level2CommissionTotal: 10,
@@ -26,6 +27,7 @@ const baseRow: DistributorRow = {
   pendingTotal: 0,
   withdrawableBalance: 50,
   inviteeCount: 2,
+  invitees: [{ id: "3", name: "Carol", distributorCode: "D003" }],
   inviter: { id: "2", name: "Bob", distributorCode: "D002" },
 }
 
@@ -60,9 +62,14 @@ describe("DistributorTeamCell", () => {
     expect(screen.getByText("下线 2")).toBeInTheDocument()
   })
 
-  it("shows dash when no inviter", () => {
-    render(<DistributorTeamCell row={{ ...baseRow, inviter: null }} />)
+  it("shows dash when no inviter and no invitees", () => {
+    render(<DistributorTeamCell row={{ ...baseRow, inviter: null, inviteeCount: 0, invitees: [] }} />)
     expect(screen.getByText("—")).toBeInTheDocument()
+  })
+
+  it("shows invitee count badge when no inviter but has invitees", () => {
+    render(<DistributorTeamCell row={{ ...baseRow, inviter: null }} />)
+    expect(screen.getByText("下线 2")).toBeInTheDocument()
   })
 })
 
@@ -112,6 +119,7 @@ describe("DistributorRow type includes salesTotal", () => {
       createdAt: new Date().toISOString(),
       completedOrderCount: 3,
       salesTotal: 500,
+      weeklySalesTotal: 100,
       totalCommission: 50,
       level1CommissionTotal: 40,
       level2CommissionTotal: 10,
@@ -121,6 +129,7 @@ describe("DistributorRow type includes salesTotal", () => {
       pendingTotal: 0,
       withdrawableBalance: 50,
       inviteeCount: 2,
+      invitees: [],
       inviter: null,
     }
     expect(row.salesTotal).toBe(500)

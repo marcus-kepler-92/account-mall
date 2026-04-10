@@ -12,6 +12,7 @@ import { Suspense } from "react"
 import { DistributorCommissionsDataTable } from "./commissions-data-table"
 import type { DistributorCommissionRow } from "./commissions-columns"
 import { CommissionsBalanceSection } from "./commissions-balance-section"
+import { TierProgress } from "../tier-progress"
 import { config } from "@/lib/config"
 
 export const dynamic = "force-dynamic"
@@ -149,7 +150,13 @@ export default async function DistributorCommissionsPage({
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                    <p className="text-muted-foreground text-sm">{tierSummary.encouragementMessage}</p>
+                    {tierSummary.nextTier && (
+                    <TierProgress
+                        weeklySalesTotal={tierSummary.weeklySalesTotal}
+                        nextTierMinAmount={tierSummary.nextTier.minAmount}
+                    />
+                )}
+                <p className="text-muted-foreground text-sm">{tierSummary.encouragementMessage}</p>
                     {(tierSummary.currentTier ?? tierSummary.nextTier) && (() => {
                         const displayTier = tierSummary.currentTier ?? tierSummary.nextTier!
                         const rate = displayTier.ratePercent

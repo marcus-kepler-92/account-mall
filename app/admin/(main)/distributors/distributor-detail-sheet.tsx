@@ -24,12 +24,24 @@ import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { EditDiscountDialog } from "./edit-discount-dialog"
 import type { DistributorRow } from "./distributors-columns"
+import type { TierSummaryItem } from "@/lib/distributor-tier-summary"
 
 interface DistributorDetailSheetProps {
     row: DistributorRow | null
     open: boolean
     onOpenChange: (open: boolean) => void
     onSuccess: () => void
+    tiers: TierSummaryItem[]
+}
+
+function getCurrentTier(weeklySalesTotal: number, tiers: TierSummaryItem[]): { tier: TierSummaryItem; index: number } | null {
+    for (let i = 0; i < tiers.length; i++) {
+        const t = tiers[i]
+        if (weeklySalesTotal >= t.minAmount && weeklySalesTotal < t.maxAmount) {
+            return { tier: t, index: i }
+        }
+    }
+    return tiers.length > 0 ? { tier: tiers[0], index: 0 } : null
 }
 
 export function DistributorDetailSheet({
@@ -37,6 +49,7 @@ export function DistributorDetailSheet({
     open,
     onOpenChange,
     onSuccess,
+    tiers,
 }: DistributorDetailSheetProps) {
     const [toggleLoading, setToggleLoading] = useState(false)
     const [deleteOpen, setDeleteOpen] = useState(false)
@@ -103,8 +116,8 @@ export function DistributorDetailSheet({
     return (
         <>
             <Sheet open={open} onOpenChange={onOpenChange}>
-                <SheetContent className="w-full sm:max-w-md overflow-y-auto">
-                    <SheetHeader className="pb-4">
+                <SheetContent className="flex flex-col w-full sm:max-w-md">
+                    <SheetHeader className="border-b pb-4 shrink-0">
                         <SheetTitle className="flex items-center gap-2 flex-wrap">
                             {row.name}
                             <Badge variant={disabled ? "destructive" : "default"} className="text-xs">
@@ -127,7 +140,7 @@ export function DistributorDetailSheet({
                         )}
                     </SheetHeader>
 
-                    <div className="space-y-6">
+                    <div className="flex-1 overflow-y-auto p-4 space-y-6">
                         {/* Actions */}
                         <div className="flex flex-wrap gap-2">
                             <Button
@@ -158,6 +171,41 @@ export function DistributorDetailSheet({
                                 </Button>
                             )}
                         </div>
+
+                        <Separator />
+
+                        {/* 阶梯 */}
+                        {tiers.length > 0 && (() => {
+                            const result = getCurrentTier(row.weeklySalesTotal, tiers)
+                            const nextTier = result ? tiers[result.index + 1] : null
+                            return (
+                                <div>
+                                    <h4 className="text-sm font-medium mb-3">本周阶梯</h4>
+                                    <div className="space-y-2 text-sm">
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">当前档位</span>
+                                            <span>
+                                                {result
+                                                    ? `第 ${result.index + 1} 档 · ${result.tier.ratePercent}%`
+                                                    : "—"}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">本周销售额</span>
+                                            <span className="tabular-nums">¥{row.weeklySalesTotal.toFixed(2)}</span>
+                                        </div>
+                                        {nextTier && (
+                                            <div className="flex justify-between">
+                                                <span className="text-muted-foreground">距下一档</span>
+                                                <span className="tabular-nums text-muted-foreground">
+                                                    ¥{(nextTier.minAmount - row.weeklySalesTotal).toFixed(2)}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )
+                        })()}
 
                         <Separator />
 
@@ -246,6 +294,18 @@ export function DistributorDetailSheet({
                                     <span className="text-muted-foreground">下线人数</span>
                                     <span>{row.inviteeCount} 人</span>
                                 </div>
+                                {row.invitees.length > 0 && (
+                                    <div className="pt-1 space-y-1">
+                                        {row.invitees.map((inv) => (
+                                            <div key={inv.id} className="flex justify-between text-xs text-muted-foreground">
+                                                <span>{inv.name}</span>
+                                                {inv.distributorCode && (
+                                                    <code className="font-mono">{inv.distributorCode}</code>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </div>
 

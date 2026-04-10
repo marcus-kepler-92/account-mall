@@ -14,7 +14,8 @@ import { config } from "@/lib/config";
 import { prisma } from "@/lib/prisma";
 import { CopyButtonClient } from "@/app/components/copy-promo-button";
 import { getDistributorTierSummary, adjustRate } from "@/lib/distributor-tier-summary";
-import { DashboardKpiSection } from "./dashboard-kpi-section";
+import { DashboardKpiSection } from "./dashboard-kpi-section"
+import { TierProgress } from "./tier-progress";
 
 export const dynamic = "force-dynamic";
 
@@ -180,6 +181,12 @@ export default async function DistributorDashboardPage() {
               </div>
             );
           })()}
+          {tierSummary.nextTier && (
+            <TierProgress
+              weeklySalesTotal={tierSummary.weeklySalesTotal}
+              nextTierMinAmount={tierSummary.nextTier.minAmount}
+            />
+          )}
           <p className="text-sm text-muted-foreground">
             {tierSummary.encouragementMessage}
           </p>
