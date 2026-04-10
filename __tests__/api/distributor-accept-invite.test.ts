@@ -281,4 +281,98 @@ describe("POST /api/distributor/accept-invite", () => {
         const res = await AcceptInvitePost(createRequest({ token: "valid-token", name: "a".repeat(50), password: "password123" }))
         expect(res.status).toBe(200)
     })
+
+    it("returns 400 when no-email invite is accepted without username", async () => {
+        prismaMock.distributorInvitation.findUnique.mockResolvedValue(
+            makeInvitation({ email: null })
+        )
+        const res = await AcceptInvitePost(
+            createRequest({ token: "valid-token", name: "Alice", password: "password123" })
+        )
+        expect(res.status).toBe(400)
+        const body = await res.json()
+        expect(body.errors?.username).toBeDefined()
+    })
+
+    it("returns 400 when username is too short (< 6 chars) for no-email invite", async () => {
+        prismaMock.distributorInvitation.findUnique.mockResolvedValue(
+            makeInvitation({ email: null })
+        )
+        const res = await AcceptInvitePost(
+            createRequest({ token: "valid-token", name: "Alice", username: "abc", password: "password123" })
+        )
+        expect(res.status).toBe(400)
+    })
+
+    it("returns 409 when username is already taken for no-email invite", async () => {
+        prismaMock.distributorInvitation.findUnique.mockResolvedValue(
+            makeInvitation({ email: null })
+        )
+        prismaMock.user.findUnique.mockResolvedValue({ id: "existing_user" } as any)
+        const res = await AcceptInvitePost(
+            createRequest({ token: "valid-token", name: "Alice", username: "alice_123", password: "password123" })
+        )
+        expect(res.status).toBe(409)
+        const body = await res.json()
+        expect(body.error).toMatch(/用户名已被使用/)
+    })
+
+    it("creates user with email=null and username for no-email invite", async () => {
+        prismaMock.distributorInvitation.findUnique.mockResolvedValue(
+            makeInvitation({ email: null })
+        )
+        prismaMock.user.findUnique.mockResolvedValue(null)
+
+        let userCreateArgs: any
+        ;(prismaMock.$transaction as any).mockImplementation(async (fn: (tx: any) => Promise<void>) => {
+            const userCreateMock = jest.fn().mockResolvedValue({ id: "new_user" })
+            await fn({
+                ...prismaMock,
+                distributorInvitation: {
+                    findUnique: jest.fn().mockResolvedValue({ acceptedAt: null }),
+                    update: jest.fn().mockResolvedValue({}),
+                },
+                user: { create: userCreateMock },
+                account: { create: jest.fn().mockResolvedValue({}) },
+            })
+            userCreateArgs = userCreateMock.mock.calls[0][0]
+        })
+
+        const res = await AcceptInvitePost(
+            createRequest({ token: "valid-token", name: "Alice", username: "alice_123", password: "password123" })
+        )
+        expect(res.status).toBe(200)
+        expect(userCreateArgs.data.email).toBeNull()
+        expect(userCreateArgs.data.username).toBe("alice_123")
+        expect(userCreateArgs.data.name).toBe("Alice")
+    })
+
+    it("does not check email uniqueness for no-email invite", async () => {
+        prismaMock.distributorInvitation.findUnique.mockResolvedValue(
+            makeInvitation({ email: null })
+        )
+        prismaMock.user.findUnique.mockResolvedValue(null)
+        ;(prismaMock.$transaction as any).mockImplementation(async (fn: (tx: any) => Promise<void>) => {
+            await fn({
+                ...prismaMock,
+                distributorInvitation: {
+                    findUnique: jest.fn().mockResolvedValue({ acceptedAt: null }),
+                    update: jest.fn().mockResolvedValue({}),
+                },
+                user: { create: jest.fn().mockResolvedValue({ id: "new_user" }) },
+                account: { create: jest.fn().mockResolvedValue({}) },
+            })
+        })
+
+        const res = await AcceptInvitePost(
+            createRequest({ token: "valid-token", name: "Alice", username: "alice_123", password: "password123" })
+        )
+        expect(res.status).toBe(200)
+        expect(prismaMock.user.findUnique).toHaveBeenCalledWith(
+            expect.objectContaining({ where: { username: "alice_123" } })
+        )
+        expect(prismaMock.user.findUnique).not.toHaveBeenCalledWith(
+            expect.objectContaining({ where: expect.objectContaining({ email: expect.anything() }) })
+        )
+    })
 })
