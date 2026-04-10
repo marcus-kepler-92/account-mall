@@ -139,7 +139,11 @@ export const distributorsColumns: ColumnDef<DistributorRow>[] = [
     },
     {
         id: "actions",
-        cell: ({ row }) => <DistributorRowActions row={row.original} />,
+        cell: ({ row }) => (
+            <div onClick={(e) => e.stopPropagation()}>
+                <DistributorRowActions row={row.original} />
+            </div>
+        ),
         enableSorting: false,
         enableHiding: false,
     },

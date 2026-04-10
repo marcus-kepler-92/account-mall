@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useTransition } from "react"
+import { useRouter } from "next/navigation"
 import {
     useReactTable,
     getCoreRowModel,
@@ -18,6 +19,7 @@ import {
 import { sortQueryStates, parseSortingState, encodeSortingState } from "@/lib/table-sort"
 import { distributorsColumns, type DistributorRow } from "./distributors-columns"
 import { InviteDistributorButtonClient } from "./invite-distributor-button-client"
+import { DistributorDetailSheet } from "./distributor-detail-sheet"
 
 interface DistributorsDataTableProps {
     data: DistributorRow[]
@@ -37,7 +39,10 @@ export function DistributorsDataTable({
     total,
     statusCounts,
 }: DistributorsDataTableProps) {
+    const router = useRouter()
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
+    const [selectedRow, setSelectedRow] = useState<DistributorRow | null>(null)
+    const [sheetOpen, setSheetOpen] = useState(false)
 
     const [isPending, startTransition] = useTransition()
     const [sortState, setSortState] = useQueryStates(
@@ -63,31 +68,44 @@ export function DistributorsDataTable({
     })
 
     return (
-        <Card>
-            <CardHeader className="pb-4">
-                <div className="flex items-center justify-between">
-                    <CardTitle className="text-base">分销员列表</CardTitle>
-                    <InviteDistributorButtonClient />
-                </div>
-            </CardHeader>
-            <CardContent className="space-y-4 pt-0">
-                <DataTableToolbar
-                    table={table}
-                    searchPlaceholder="搜索昵称、邮箱、优惠码..."
-                    searchParamKey="search"
-                    statusOptions={statusOptions}
-                    statusParamKey="status"
-                />
-                <Separator />
-                <div className={isPending ? "opacity-50 pointer-events-none transition-opacity" : "transition-opacity"}>
-                    <DataTable
+        <>
+            <Card>
+                <CardHeader className="pb-4">
+                    <div className="flex items-center justify-between">
+                        <CardTitle className="text-base">分销员列表</CardTitle>
+                        <InviteDistributorButtonClient />
+                    </div>
+                </CardHeader>
+                <CardContent className="space-y-4 pt-0">
+                    <DataTableToolbar
                         table={table}
-                        columns={distributorsColumns}
-                        emptyMessage="暂无分销员，分销员可通过前台注册成为分销员。"
+                        searchPlaceholder="搜索昵称、邮箱、优惠码..."
+                        searchParamKey="search"
+                        statusOptions={statusOptions}
+                        statusParamKey="status"
                     />
-                    <DataTablePagination table={table} total={total} />
-                </div>
-            </CardContent>
-        </Card>
+                    <Separator />
+                    <div className={isPending ? "opacity-50 pointer-events-none transition-opacity" : "transition-opacity"}>
+                        <DataTable
+                            table={table}
+                            columns={distributorsColumns}
+                            emptyMessage="暂无分销员，分销员可通过前台注册成为分销员。"
+                            onRowClick={(row) => {
+                                setSelectedRow(row)
+                                setSheetOpen(true)
+                            }}
+                        />
+                        <DataTablePagination table={table} total={total} />
+                    </div>
+                </CardContent>
+            </Card>
+
+            <DistributorDetailSheet
+                row={selectedRow}
+                open={sheetOpen}
+                onOpenChange={setSheetOpen}
+                onSuccess={() => router.refresh()}
+            />
+        </>
     )
 }
