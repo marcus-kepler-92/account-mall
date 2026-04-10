@@ -291,7 +291,7 @@ describe("POST /api/distributor/accept-invite", () => {
         )
         expect(res.status).toBe(400)
         const body = await res.json()
-        expect(body.errors?.username).toBeDefined()
+        expect(body.details?.username).toBeDefined()
     })
 
     it("returns 400 when username is too short (< 6 chars) for no-email invite", async () => {

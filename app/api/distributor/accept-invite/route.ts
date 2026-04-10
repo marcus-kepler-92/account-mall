@@ -53,10 +53,7 @@ export async function POST(request: NextRequest) {
         // Require and validate username
         const usernameResult = z.object({ username: usernameSchema }).safeParse(body)
         if (!usernameResult.success) {
-            return NextResponse.json(
-                { error: "Validation failed", errors: usernameResult.error.flatten().fieldErrors, code: "VALIDATION_FAILED" },
-                { status: 400 }
-            )
+            return validationError(usernameResult.error.flatten().fieldErrors)
         }
         username = usernameResult.data.username
 
