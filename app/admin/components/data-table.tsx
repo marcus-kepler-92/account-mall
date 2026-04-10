@@ -5,7 +5,6 @@ import {
     flexRender,
     Table as TanstackTable,
 } from "@tanstack/react-table";
-import { cn } from "@/lib/utils";
 import {
     Table,
     TableBody,
@@ -14,17 +13,20 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 
 interface DataTableProps<TData, TValue> {
     table: TanstackTable<TData>;
     columns: ColumnDef<TData, TValue>[];
     emptyMessage?: string;
+    onRowClick?: (row: TData) => void;
 }
 
 export function DataTable<TData, TValue>({
     table,
     columns,
     emptyMessage = "暂无数据",
+    onRowClick,
 }: DataTableProps<TData, TValue>) {
     return (
         <div className="rounded-md border">
@@ -51,6 +53,8 @@ export function DataTable<TData, TValue>({
                             <TableRow
                                 key={row.id}
                                 data-state={row.getIsSelected() && "selected"}
+                                onClick={() => onRowClick?.(row.original)}
+                                className={cn(onRowClick && "cursor-pointer")}
                             >
                                 {row.getVisibleCells().map((cell) => (
                                     <TableCell key={cell.id} className={cn(cell.column.columnDef.meta?.className)}>
