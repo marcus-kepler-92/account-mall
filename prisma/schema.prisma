@@ -14,8 +14,7 @@ enum UserRole {
 
 model User {
   id               String        @id @default(cuid())
-  email            String?       @unique
-  username         String?       @unique
+  email            String        @unique
   name             String
   emailVerified    Boolean
   image            String?
@@ -328,7 +327,7 @@ model ChannelWithdrawal {
 /// 邀请分销员加入的邀请记录，支持管理员和分销员均可发起邀请
 model DistributorInvitation {
   id         String    @id @default(cuid())
-  email      String?
+  email      String
   token      String    @unique
   inviterId  String    // 邀请人 ID（可以是 ADMIN 或 DISTRIBUTOR）
   expiresAt  DateTime
@@ -337,6 +336,7 @@ model DistributorInvitation {
   inviter    User      @relation("DistributorInvitationInviter", fields: [inviterId], references: [id])
 
   @@index([token])
+  @@index([email])
 }
 
 enum AnnouncementStatus {

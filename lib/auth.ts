@@ -1,6 +1,7 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nextCookies } from "better-auth/next-js";
+import { username } from "better-auth/plugins";
 import { prisma } from "@/lib/prisma";
 import { config } from "@/lib/config";
 
@@ -34,5 +35,5 @@ export const auth = betterAuth({
     advanced: {
         useSecureCookies: config.nodeEnv === "production",
     },
-    plugins: [nextCookies()],
+    plugins: [username(), nextCookies()],
 });
