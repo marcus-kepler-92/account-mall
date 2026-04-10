@@ -47,6 +47,13 @@ export const commissionTiersColumns: ColumnDef<TierRow>[] = [
     {
         id: "actions",
         header: () => <div className="w-[80px]">操作</div>,
-        cell: ({ row }) => <CommissionTierRowActions id={row.original.id} />,
+        cell: ({ row }) => (
+            <CommissionTierRowActions
+                id={row.original.id}
+                minAmount={row.original.minAmount}
+                maxAmount={row.original.maxAmount}
+                ratePercent={row.original.ratePercent}
+            />
+        ),
     },
 ]

@@ -15,8 +15,16 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Loader2, Trash2 } from "lucide-react"
+import { EditTierDialog } from "./edit-tier-dialog"
 
-export function CommissionTierRowActions({ id }: { id: string }) {
+type Props = {
+    id: string
+    minAmount: number
+    maxAmount: number
+    ratePercent: number
+}
+
+export function CommissionTierRowActions({ id, minAmount, maxAmount, ratePercent }: Props) {
     const router = useRouter()
     const [open, setOpen] = useState(false)
     const [deleting, setDeleting] = useState(false)
@@ -42,15 +50,18 @@ export function CommissionTierRowActions({ id }: { id: string }) {
 
     return (
         <>
-            <Button
-                size="sm"
-                variant="ghost"
-                className="text-destructive hover:text-destructive"
-                onClick={() => setOpen(true)}
-            >
-                <Trash2 className="size-4" />
-                删除
-            </Button>
+            <div className="flex items-center gap-1">
+                <EditTierDialog tier={{ id, minAmount, maxAmount, ratePercent }} />
+                <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => setOpen(true)}
+                >
+                    <Trash2 className="size-4" />
+                    删除
+                </Button>
+            </div>
             <AlertDialog open={open} onOpenChange={setOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
