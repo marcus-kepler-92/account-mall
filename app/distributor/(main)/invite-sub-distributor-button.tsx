@@ -76,14 +76,16 @@ export function InviteSubDistributorButton({
 
   return (
     <>
-      <Button variant="outline" onClick={() => setEmailOpen(true)}>
-        <Mail className="mr-2 size-4" />
-        邮箱邀请
-      </Button>
-      <Button onClick={() => setLinkOpen(true)}>
-        <Link2 className="mr-2 size-4" />
-        生成邀请链接
-      </Button>
+      <div className="flex items-center gap-2">
+        <Button variant="outline" onClick={() => setEmailOpen(true)}>
+          <Mail className="mr-2 size-4" />
+          邮箱邀请
+        </Button>
+        <Button onClick={() => setLinkOpen(true)}>
+          <Link2 className="mr-2 size-4" />
+          生成邀请链接
+        </Button>
+      </div>
       <Dialog open={emailOpen} onOpenChange={handleEmailOpenChange}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>

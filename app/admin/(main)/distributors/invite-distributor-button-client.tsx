@@ -11,7 +11,7 @@ export function InviteDistributorButtonClient() {
     const [linkOpen, setLinkOpen] = useState(false)
 
     return (
-        <>
+        <div className="flex items-center gap-2">
             <Button variant="outline" onClick={() => setEmailOpen(true)}>
                 <Mail className="mr-2 size-4" />
                 邮箱邀请
@@ -26,6 +26,6 @@ export function InviteDistributorButtonClient() {
                 onOpenChange={setLinkOpen}
                 apiEndpoint="/api/admin/distributors/invite"
             />
-        </>
+        </div>
     )
 }

@@ -31,8 +31,10 @@ export function DataTableColumnHeader<TData, TValue>({
     return (
         <div className={cn("flex items-center space-x-2", className)}>
             <DropdownMenu>
+                {/* suppressHydrationWarning: radix-ui 1.4.x + React 19 known useId() mismatch */}
                 <DropdownMenuTrigger asChild>
                     <Button
+                        suppressHydrationWarning
                         variant="ghost"
                         size="sm"
                         className="-ml-3 h-8 data-[state=open]:bg-accent"
