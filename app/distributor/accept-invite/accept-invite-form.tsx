@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
+import { usernameSchema } from "@/lib/validations/distributor-invite"
 import { toast } from "sonner"
 import {
   Form,
@@ -31,11 +32,7 @@ const emailFormSchema = z
 
 const noEmailFormSchema = z
   .object({
-    username: z
-      .string()
-      .min(6, "用户名至少 6 位")
-      .max(30, "用户名不能超过 30 位")
-      .regex(/^[a-zA-Z0-9_]+$/, "用户名只能包含字母、数字和下划线"),
+    username: usernameSchema,
     name: z.string().min(1, "请输入昵称").max(50, "昵称不能超过 50 字符"),
     password: z.string().min(6, "密码至少 6 位").max(128, "密码不能超过 128 位"),
     confirmPassword: z.string(),
