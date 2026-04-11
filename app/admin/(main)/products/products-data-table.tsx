@@ -119,6 +119,9 @@ export function ProductsDataTable({ data, actions }: { data: ProductRow[]; actio
 
         setRows(reordered)
 
+        // Sends full dataset — safe because products use client-side pagination (small count).
+        // If server-side pagination is ever added, this needs to send only the visible page items
+        // with their correct absolute sort positions.
         try {
             const res = await fetch("/api/admin/products/reorder", {
                 method: "PATCH",
