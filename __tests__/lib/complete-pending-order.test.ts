@@ -275,7 +275,7 @@ describe("completePendingOrder", () => {
       });
     });
 
-    it("calculates commission on original amount when discount was applied (paid 18, 10% off => original 20)", async () => {
+    it("calculates commission on actual paid amount when discount was applied (paid 18, 10% off => commission on 18)", async () => {
       prismaMock.user.findUnique.mockResolvedValue({
         email: "other@example.com",
         inviterId: null,
@@ -304,12 +304,12 @@ describe("completePendingOrder", () => {
 
       await completePendingOrder("order-1");
 
-      // Commission on original price: original = 18/(1-0.1) = 20, 20 * 10% = 2
+      // Commission on actual paid amount: 18 * 10% = 1.8
       expect(prismaMock.commission.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           orderId: "ord_1",
           distributorId: "dist_1",
-          amount: 2,
+          amount: 1.8,
           status: "SETTLED",
           level: 1,
         }),
@@ -644,7 +644,7 @@ describe("completePendingOrder", () => {
       });
     });
 
-    it("折扣场景下二级佣金按原价计算的总佣金比例制拆分", async () => {
+    it("折扣场景下二级佣金按实收金额计算的总佣金比例制拆分", async () => {
       prismaMock.user.findUnique
         .mockResolvedValueOnce({
           email: "dist_b@example.com",
@@ -679,10 +679,10 @@ describe("completePendingOrder", () => {
 
       await completePendingOrder("order-1");
 
-      // 原价 = 90 / 0.9 = 100, total = 100 * 52% = 52
-      // level2 = 52 * 20% = 10.4, level1 = 52 * 80% = 41.6
+      // 实收 = 90, total = 90 * 52% = 46.8
+      // level2 = 46.8 * 20% = 9.36, level1 = 46.8 * 80% = 37.44
       expect(prismaMock.commission.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({ amount: 10.4, level: 2 }),
+        data: expect.objectContaining({ amount: 9.36, level: 2 }),
       });
     });
 

@@ -43,7 +43,6 @@ export async function createOrderCommissions(
     distributorId,
     orderEmail,
     orderAmount,
-    discountPercentApplied,
     paidAt,
   } = params
 
@@ -89,13 +88,9 @@ export async function createOrderCommissions(
     ratePercent = toNumber(tiers[0].ratePercent)
   }
 
-  // Commission base: pre-discount price
+  // Commission base: actual paid amount (discount cost shared proportionally)
   const paidAmount = toNumber(orderAmount)
-  const discountPct = toNumber(discountPercentApplied)
-  const commissionBase =
-    discountPct > 0 && discountPct < 100
-      ? paidAmount / (1 - discountPct / 100)
-      : paidAmount
+  const commissionBase = paidAmount
   const totalCommission =
     ratePercent != null && commissionBase > 0
       ? Math.round((commissionBase * ratePercent) / 100 * 100) / 100
