@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, type ReactNode } from "react"
+import { useState, useEffect, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
@@ -83,7 +83,10 @@ const statusOptions = [
 
 export function ProductsDataTable({ data, actions }: { data: ProductRow[]; actions?: ReactNode }) {
     const router = useRouter()
+    const [mounted, setMounted] = useState(false)
     const [rows, setRows] = useState<ProductRow[]>(data)
+
+    useEffect(() => { setMounted(true) }, [])
     const [sorting, setSorting] = useState<SortingState>([])
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
@@ -156,59 +159,86 @@ export function ProductsDataTable({ data, actions }: { data: ProductRow[]; actio
                     statusOptions={statusOptions}
                 />
                 <Separator />
-                <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    modifiers={[restrictToVerticalAxis]}
-                    onDragEnd={handleDragEnd}
-                >
-                    <SortableContext
-                        items={rowModel.rows.map((r) => r.id)}
-                        strategy={verticalListSortingStrategy}
-                    >
-                        <Table>
-                            <TableHeader>
-                                {table.getHeaderGroups().map((headerGroup) => (
-                                    <TableRow key={headerGroup.id}>
-                                        {headerGroup.headers.map((header) => (
-                                            <TableHead
-                                                key={header.id}
-                                                style={{ width: header.getSize() }}
+                <Table>
+                    <TableHeader>
+                        {table.getHeaderGroups().map((headerGroup) => (
+                            <TableRow key={headerGroup.id}>
+                                {headerGroup.headers.map((header) => (
+                                    <TableHead
+                                        key={header.id}
+                                        style={{ width: header.getSize() }}
+                                    >
+                                        {header.isPlaceholder
+                                            ? null
+                                            : flexRender(
+                                                  header.column.columnDef.header,
+                                                  header.getContext()
+                                              )}
+                                    </TableHead>
+                                ))}
+                            </TableRow>
+                        ))}
+                    </TableHeader>
+                    {mounted ? (
+                        // Client: wrap body in DnD context for drag-and-drop
+                        <DndContext
+                            sensors={sensors}
+                            collisionDetection={closestCenter}
+                            modifiers={[restrictToVerticalAxis]}
+                            onDragEnd={handleDragEnd}
+                        >
+                            <SortableContext
+                                items={rowModel.rows.map((r) => r.id)}
+                                strategy={verticalListSortingStrategy}
+                            >
+                                <TableBody>
+                                    {rowModel.rows.length ? (
+                                        rowModel.rows.map((row) => (
+                                            <SortableRow
+                                                key={row.id}
+                                                row={row}
+                                                isFiltered={isFiltered}
+                                            />
+                                        ))
+                                    ) : (
+                                        <TableRow>
+                                            <TableCell
+                                                colSpan={productsColumns.length}
+                                                className="h-24 text-center"
                                             >
-                                                {header.isPlaceholder
-                                                    ? null
-                                                    : flexRender(
-                                                          header.column.columnDef.header,
-                                                          header.getContext()
-                                                      )}
-                                            </TableHead>
+                                                暂无商品
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
+                                </TableBody>
+                            </SortableContext>
+                        </DndContext>
+                    ) : (
+                        // SSR: plain table body, no DnD
+                        <TableBody>
+                            {rowModel.rows.length ? (
+                                rowModel.rows.map((row) => (
+                                    <TableRow key={row.id}>
+                                        {row.getVisibleCells().map((cell) => (
+                                            <TableCell key={cell.id} style={{ width: cell.column.getSize() }}>
+                                                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                            </TableCell>
                                         ))}
                                     </TableRow>
-                                ))}
-                            </TableHeader>
-                            <TableBody>
-                                {rowModel.rows.length ? (
-                                    rowModel.rows.map((row) => (
-                                        <SortableRow
-                                            key={row.id}
-                                            row={row}
-                                            isFiltered={isFiltered}
-                                        />
-                                    ))
-                                ) : (
-                                    <TableRow>
-                                        <TableCell
-                                            colSpan={productsColumns.length}
-                                            className="h-24 text-center"
-                                        >
-                                            暂无商品
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    </SortableContext>
-                </DndContext>
+                                ))
+                            ) : (
+                                <TableRow>
+                                    <TableCell
+                                        colSpan={productsColumns.length}
+                                        className="h-24 text-center"
+                                    >
+                                        暂无商品
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    )}
+                </Table>
                 <ClientDataTablePagination table={table} />
             </CardContent>
         </Card>
