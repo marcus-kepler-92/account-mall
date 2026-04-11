@@ -284,6 +284,14 @@ app/admin/(main)/{resource}/
 - **E2E 测试**（Playwright）：放 `e2e/`，按用户流程命名（`home.spec.ts`、`payment-flow.spec.ts`）。
 - **Mock**：`__mocks__/` 放全局 mock（如 `prisma.ts`）。
 
+## Prisma 迁移与 Vercel 部署
+
+Vercel 构建命令（`vercel-build`）会自动执行 `prisma migrate deploy`，无需手动干预。
+
+**不要在部署前手动执行迁移 SQL**。Prisma 自己会在构建时跑，手动跑会导致迁移重复执行，触发 P3018（列已存在）→ P3009（有失败迁移记录）的连锁错误。
+
+唯一需要手动操作数据库的场景：迁移文件包含 Prisma 无法自动处理的操作（如某些 DDL 约束），此时用 `prisma migrate resolve --applied <migration_name>` 标记已手动完成，而不是直接跑 SQL。
+
 ## 环境变量
 
 - 所有环境变量在 `lib/config.ts` 用 Zod 集中校验，带默认值和类型。
