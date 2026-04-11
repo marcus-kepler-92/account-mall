@@ -4,17 +4,9 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { authClient } from "@/lib/auth-client"
 import { ThemeToggle } from "@/app/components/theme-toggle"
+import { TopbarUserMenu } from "@/app/components/topbar-user-menu"
 import { Button } from "@/components/ui/button"
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { ExternalLink, LogOut } from "lucide-react"
+import { ExternalLink } from "lucide-react"
 
 export function AdminTopbarActions() {
     const router = useRouter()
@@ -31,7 +23,9 @@ export function AdminTopbarActions() {
     }
 
     const email = session?.user?.email ?? ""
-    const initial = email ? email[0].toUpperCase() : "A"
+    const name = session?.user?.name ?? ""
+    const displayName = name || email || "管理员"
+    const initial = displayName[0].toUpperCase()
 
     return (
         <div className="ml-auto flex items-center gap-2">
@@ -41,32 +35,12 @@ export function AdminTopbarActions() {
                     <ExternalLink className="size-4" />
                 </Link>
             </Button>
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="relative size-9 rounded-full" suppressHydrationWarning>
-                        <Avatar className="size-8">
-                            <AvatarFallback className="bg-primary text-primary-foreground text-sm">
-                                {initial}
-                            </AvatarFallback>
-                        </Avatar>
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                    <DropdownMenuLabel>
-                        <div className="flex flex-col space-y-1">
-                            <p className="text-sm font-medium">管理员</p>
-                            <p className="text-xs text-muted-foreground truncate">
-                                {email || "—"}
-                            </p>
-                        </div>
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleSignOut}>
-                        <LogOut className="size-4" />
-                        退出登录
-                    </DropdownMenuItem>
-                </DropdownMenuContent>
-            </DropdownMenu>
+            <TopbarUserMenu
+                initial={initial}
+                displayName={displayName}
+                subLabel={name ? email : undefined}
+                onSignOut={handleSignOut}
+            />
         </div>
     )
 }

@@ -8,11 +8,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Link2, TrendingUp, BookOpen, ChevronRight } from "lucide-react";
+import { TrendingUp, BookOpen, ChevronRight, Link2 } from "lucide-react";
+import { CopyButtonClient } from "@/app/components/copy-promo-button";
 import { CommissionRateDetail } from "./commission-rate-detail";
 import { config } from "@/lib/config";
 import { prisma } from "@/lib/prisma";
-import { CopyButtonClient } from "@/app/components/copy-promo-button";
 import { getDistributorTierSummary, adjustRate } from "@/lib/distributor-tier-summary";
 import { DashboardKpiSection } from "./dashboard-kpi-section"
 import { TierProgress } from "./tier-progress";
@@ -109,53 +109,36 @@ export default async function DistributorDashboardPage() {
     level1Settled + level2Settled - paidTotal - pendingTotal;
 
   return (
-    <div className="space-y-4 md:space-y-6">
-      <div>
-        <h1 className="text-xl font-bold tracking-tight sm:text-2xl">总览</h1>
-        <p className="text-muted-foreground">推广链接与数据概览</p>
-      </div>
+    <div className="space-y-3">
+      <h1 className="text-xl font-bold tracking-tight sm:text-2xl">总览</h1>
 
-      {/* Guide entry — mobile only (desktop uses sidebar) */}
+      {/* 入门手册 — 醒目引导 */}
       <Link
         href="/distributor/guide"
-        className="flex items-center gap-3 rounded-lg border bg-card px-4 py-3 text-sm transition-colors hover:bg-accent md:hidden"
+        className="flex items-center gap-3 rounded-lg bg-primary px-4 py-3 text-primary-foreground transition-opacity hover:opacity-90"
       >
-        <BookOpen className="size-4 shrink-0 text-muted-foreground" />
-        <span className="flex-1 font-medium">入门手册</span>
-        <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+        <BookOpen className="size-5 shrink-0" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold">新手必读：入门手册</p>
+          <p className="text-xs opacity-80">了解如何推广赚取佣金</p>
+        </div>
+        <ChevronRight className="size-4 shrink-0" />
       </Link>
-
-      {/* 整站推广链接 — primary CTA */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Link2 className="size-4 text-primary" />
-            推广链接
-          </CardTitle>
-          <CardDescription>复制链接分享给客户，每笔成交获奖金</CardDescription>
-        </CardHeader>
-        <CardContent className="flex items-center gap-3">
-          <code className="flex-1 min-w-0 truncate rounded bg-muted px-3 py-2 text-xs sm:text-sm">
-            {promoUrl}
-          </code>
-          <CopyButtonClient text={promoUrl} successMessage="推广链接已复制到剪贴板" />
-        </CardContent>
-      </Card>
 
       {/* 当周业绩与阶梯 */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="size-5" />
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <TrendingUp className="size-4" />
             当周业绩与阶梯
           </CardTitle>
           <CardDescription>
             按自然周累计销售额确定当前档位，阶梯奖金 = 订单金额 × 该档奖金比例%
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-3">
           <div>
-            <p className="text-sm text-muted-foreground">当周累计销售额</p>
+            <p className="text-xs text-muted-foreground">当周累计销售额</p>
             <p className="text-2xl font-bold">
               ¥{tierSummary.weeklySalesTotal.toFixed(2)}
             </p>
@@ -164,13 +147,11 @@ export default async function DistributorDashboardPage() {
             const displayTier = tierSummary.currentTier ?? tierSummary.nextTier!;
             const rate = displayTier.ratePercent;
             return (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {tierSummary.currentTier && (
-                  <div>
-                    <p className="text-xs text-muted-foreground">
-                      第 {tierSummary.currentTier.sortOrder + 1} 档 · 区间 ¥{tierSummary.currentTier.minAmount.toFixed(2)} – ¥{tierSummary.currentTier.maxAmount.toFixed(2)}
-                    </p>
-                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    第 {tierSummary.currentTier.sortOrder + 1} 档 · 区间 ¥{tierSummary.currentTier.minAmount.toFixed(2)} – ¥{tierSummary.currentTier.maxAmount.toFixed(2)}
+                  </p>
                 )}
                 <CommissionRateDetail
                   myRate={adjustRate(rate, level2Rate, hasInviter)}
@@ -187,24 +168,40 @@ export default async function DistributorDashboardPage() {
               nextTierMinAmount={tierSummary.nextTier.minAmount}
             />
           )}
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             {tierSummary.encouragementMessage}
           </p>
         </CardContent>
       </Card>
 
+      {/* 推广链接 */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-sm font-medium">
+            <Link2 className="size-4 text-primary" />
+            推广链接
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex items-center gap-3">
+          <code className="flex-1 min-w-0 truncate rounded bg-muted px-3 py-2 text-xs sm:text-sm">
+            {promoUrl}
+          </code>
+          <CopyButtonClient text={promoUrl} successMessage="推广链接已复制到剪贴板" />
+        </CardContent>
+      </Card>
+
+      {/* KPI */}
       <DashboardKpiSection
         orderCount={orderCount}
         level1CommissionTotal={level1Total}
         level2CommissionTotal={level2Total}
         withdrawableBalance={withdrawableBalance}
         pendingWithdrawalTotal={pendingTotal}
-        distributorCode={distributorCode}
         inviteeCount={inviteeCount}
+        distributorCode={distributorCode}
         discountCodeEnabled={selfUser?.discountCodeEnabled ?? false}
         discountPercent={selfUser?.discountPercent != null ? Number(selfUser.discountPercent) : null}
       />
-
     </div>
   );
 }

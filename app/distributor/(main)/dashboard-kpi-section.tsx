@@ -4,9 +4,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ShoppingCart, Coins, Wallet, Users } from "lucide-react";
-import { CopyButtonClient } from "@/app/components/copy-promo-button";
 import { Badge } from "@/components/ui/badge";
+import { ShoppingCart, Coins, Wallet, Users, Tag } from "lucide-react";
+import { CopyButtonClient } from "@/app/components/copy-promo-button";
 
 interface DashboardKpiSectionProps {
   orderCount: number;
@@ -14,8 +14,8 @@ interface DashboardKpiSectionProps {
   level2CommissionTotal: number;
   withdrawableBalance: number;
   pendingWithdrawalTotal: number;
-  distributorCode: string;
   inviteeCount: number;
+  distributorCode: string;
   discountCodeEnabled: boolean;
   discountPercent: number | null;
 }
@@ -26,23 +26,27 @@ export function DashboardKpiSection({
   level2CommissionTotal,
   withdrawableBalance,
   pendingWithdrawalTotal,
-  distributorCode,
   inviteeCount,
+  distributorCode,
   discountCodeEnabled,
   discountPercent,
 }: DashboardKpiSectionProps) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-5">
+    <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-5">
+      {/* 邀请码 */}
       <Card>
-        <CardHeader className="pb-2 ">
+        <CardHeader className="pb-2">
           <div className="flex items-center gap-2 justify-between">
-          <CardTitle className="text-sm font-medium">优惠码</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-sm font-medium">
+              <Tag className="size-4 text-primary" />
+              邀请码
+            </CardTitle>
             {discountCodeEnabled ? (
-              <Badge variant="success" className="w-fit">
-                已启用{discountPercent != null ? ` · ${discountPercent}%` : ""}
+              <Badge variant="success" className="w-fit text-xs">
+                优惠{discountPercent != null ? ` ${discountPercent}%` : ""}
               </Badge>
             ) : (
-              <Badge variant="secondary" className="w-fit">未开通</Badge>
+              <Badge variant="secondary" className="w-fit text-xs">无优惠</Badge>
             )}
           </div>
         </CardHeader>
@@ -52,19 +56,20 @@ export function DashboardKpiSection({
             <CopyButtonClient
               text={distributorCode}
               label="复制"
-              successMessage="优惠码已复制"
+              successMessage="邀请码已复制"
               variant="ghost"
               className="h-7 px-2 text-xs text-muted-foreground"
             />
           </div>
           {discountCodeEnabled && discountPercent != null && (
             <p className="text-xs text-muted-foreground mt-1">
-              客户使用此码下单可享 {discountPercent}% 折扣
+              客户下单享 {discountPercent}% 折扣
             </p>
           )}
         </CardContent>
       </Card>
 
+      {/* 可提现余额 */}
       <Card>
         <CardHeader className="pb-2">
           <Wallet className="size-4 text-muted-foreground" />
@@ -82,6 +87,7 @@ export function DashboardKpiSection({
         </CardContent>
       </Card>
 
+      {/* 累计推广奖金 */}
       <Card>
         <CardHeader className="pb-2">
           <Coins className="size-4 text-muted-foreground" />
@@ -95,6 +101,7 @@ export function DashboardKpiSection({
         </CardContent>
       </Card>
 
+      {/* 成交订单数 */}
       <Card>
         <CardHeader className="pb-2">
           <ShoppingCart className="size-4 text-muted-foreground" />
@@ -106,6 +113,7 @@ export function DashboardKpiSection({
         </CardContent>
       </Card>
 
+      {/* 累计团队奖金 */}
       <Card>
         <CardHeader className="pb-2">
           <Users className="size-4 text-muted-foreground" />
@@ -120,7 +128,6 @@ export function DashboardKpiSection({
           </p>
         </CardContent>
       </Card>
-
     </div>
   );
 }
