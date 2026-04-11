@@ -4,7 +4,6 @@ import { prisma } from "@/lib/prisma"
 import { hashPassword } from "better-auth/crypto"
 import { getAdminSession } from "@/lib/auth-guard"
 import { createOrderSchema, orderListQuerySchema } from "@/lib/validations/order"
-import { formatDateTimeShort } from "@/lib/utils"
 import { getPaymentUrlForOrder } from "@/lib/get-payment-url"
 import {
     checkOrderCreateRateLimit,
@@ -67,74 +66,6 @@ async function createAutoFetchOrder(params: {
     }
 
     const isFreeAutoFetch = params.price === 0
-
-    // 多因素活跃订单检查：邮箱 / 指纹 / IP（辅助信号）三因素，任一命中则拒绝
-    if (config.nodeEnv !== "development") {
-        const emailLower = email.trim().toLowerCase()
-        const cooldownStart = new Date(Date.now() - config.autoFetchCooldownHours * 60 * 60 * 1000)
-
-        // 时间窗口条件（两种情形兼容）
-        const timeWindowCondition = {
-            OR: [
-                // expiresAt 未设置（旧数据）按冷却小时数兜底
-                { expiresAt: null, createdAt: { gte: cooldownStart } },
-                // expiresAt 已设置：未过期的即为活跃
-                { expiresAt: { gt: new Date() } },
-            ],
-        }
-
-        // Email is the only independent signal. Fingerprint and IP are both auxiliary —
-        // they must be corroborated by another signal to avoid false positives from
-        // Safari ITP-induced fingerprint collisions and NAT-shared IPs.
-        const emailSignal = { email: emailLower }
-        const auxiliarySignals: object[] = []
-
-        // Fingerprint auxiliary: must be paired with email or IP
-        if (fingerprintHash) {
-            const corroboration = [
-                { email: emailLower },
-                ...(clientIp !== "unknown" ? [{ clientIp }] : []),
-            ]
-            auxiliarySignals.push({ fingerprintHash, OR: corroboration })
-        }
-
-        // IP auxiliary: must be paired with email or fingerprint
-        if (clientIp !== "unknown") {
-            const corroboration = [
-                { email: emailLower },
-                ...(fingerprintHash ? [{ fingerprintHash }] : []),
-            ]
-            auxiliarySignals.push({ clientIp, OR: corroboration })
-        }
-
-        const ownerCondition = { OR: [emailSignal, ...auxiliarySignals] }
-
-        const activeOrder = await prisma.order.findFirst({
-            where: {
-                productId,
-                status: "COMPLETED",
-                ...(isFreeAutoFetch ? { amount: { equals: 0 } } : {}),
-                AND: [timeWindowCondition, ownerCondition],
-            },
-            select: { id: true, expiresAt: true, orderNo: true, email: true },
-        })
-        if (activeOrder) {
-            const expiresAt = activeOrder.expiresAt
-            const expiresInfo = expiresAt
-                ? `，有效期至 ${formatDateTimeShort(expiresAt)}`
-                : ""
-            const message = isFreeAutoFetch
-                ? `您已领取过该商品${expiresInfo}，请使用之前的订单。`
-                : `您已有该商品的活跃订单${expiresInfo}，到期后可再下单。`
-            // Only expose orderNo when the matched order belongs to the current requester.
-            // Fingerprint or IP collisions may match another user's order — don't leak their orderNo.
-            const isOwnOrder = activeOrder.email === emailLower
-            return NextResponse.json(
-                { error: message, ...(isOwnOrder ? { orderNo: activeOrder.orderNo } : {}) },
-                { status: 429 },
-            )
-        }
-    }
 
     if (config.nodeEnv === "development") {
         console.log("[AUTO_FETCH] 即将爬取 sourceUrl:", sourceUrl)
