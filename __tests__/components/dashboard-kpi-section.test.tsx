@@ -24,13 +24,13 @@ const defaultProps = {
 };
 
 describe("DashboardKpiSection — coupon status badge", () => {
-  it("shows '未开通' badge when discount code is not enabled", () => {
+  it("shows '无优惠' badge when discount code is not enabled", () => {
     render(<DashboardKpiSection {...defaultProps} />);
-    expect(screen.getByText("未开通")).toBeInTheDocument();
-    expect(screen.queryByText(/已启用/)).not.toBeInTheDocument();
+    expect(screen.getByText("无优惠")).toBeInTheDocument();
+    expect(screen.queryByText(/优惠 \d/)).not.toBeInTheDocument();
   });
 
-  it("shows '已启用' badge with percentage when enabled and percent is set", () => {
+  it("shows '优惠 8%' badge when enabled and percent is set", () => {
     render(
       <DashboardKpiSection
         {...defaultProps}
@@ -38,11 +38,11 @@ describe("DashboardKpiSection — coupon status badge", () => {
         discountPercent={8}
       />,
     );
-    expect(screen.getByText("已启用 · 8%")).toBeInTheDocument();
-    expect(screen.queryByText("未开通")).not.toBeInTheDocument();
+    expect(screen.getByText("优惠 8%")).toBeInTheDocument();
+    expect(screen.queryByText("无优惠")).not.toBeInTheDocument();
   });
 
-  it("shows '已启用' badge without percentage when enabled but percent is null", () => {
+  it("shows '优惠' badge without percentage when enabled but percent is null", () => {
     render(
       <DashboardKpiSection
         {...defaultProps}
@@ -50,8 +50,8 @@ describe("DashboardKpiSection — coupon status badge", () => {
         discountPercent={null}
       />,
     );
-    expect(screen.getByText("已启用")).toBeInTheDocument();
-    expect(screen.queryByText("未开通")).not.toBeInTheDocument();
+    expect(screen.getByText("优惠")).toBeInTheDocument();
+    expect(screen.queryByText("无优惠")).not.toBeInTheDocument();
   });
 
   it("shows discount subtitle when enabled with percent", () => {
@@ -62,7 +62,7 @@ describe("DashboardKpiSection — coupon status badge", () => {
         discountPercent={5}
       />,
     );
-    expect(screen.getByText(/客户使用此码下单可享 5% 折扣/)).toBeInTheDocument();
+    expect(screen.getByText(/客户下单享 5% 折扣/)).toBeInTheDocument();
   });
 
   it("does not show discount subtitle when not enabled", () => {
