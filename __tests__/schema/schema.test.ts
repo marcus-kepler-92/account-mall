@@ -34,7 +34,7 @@ describe("Product model", () => {
     riskWarningContent: null,
     riskWarningCountdown: null,
     riskWarningConfirmText: null,
-    pinnedAt: null,
+    sortOrder: 0,
     createdAt: new Date("2026-01-01"),
     updatedAt: new Date("2026-01-01"),
   };
@@ -168,7 +168,7 @@ describe("Tag model (many-to-many with Product)", () => {
       riskWarningContent: null,
       riskWarningCountdown: null,
       riskWarningConfirmText: null,
-      pinnedAt: null,
+      sortOrder: 0,
       createdAt: new Date(),
       updatedAt: new Date(),
       tags: [mockTag],
@@ -475,7 +475,7 @@ describe("Enum default values", () => {
       riskWarningContent: null,
       riskWarningCountdown: null,
       riskWarningConfirmText: null,
-      pinnedAt: null,
+      sortOrder: 0,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
