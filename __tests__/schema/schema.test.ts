@@ -476,6 +476,9 @@ describe("Enum default values", () => {
       riskWarningCountdown: null,
       riskWarningConfirmText: null,
       sortOrder: 0,
+      couponEnabled: false,
+      purchaseLimitEnabled: false,
+      purchaseLimitQuantity: 1,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
