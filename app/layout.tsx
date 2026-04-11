@@ -95,7 +95,7 @@ export default function RootLayout({
               >
                 <PromoCodeSync />
                 {children}
-                <Toaster />
+                <Toaster toastOptions={{ actionButtonStyle: { backgroundColor: "var(--primary)", color: "var(--primary-foreground)" } }} />
                 <AnalyticsClient />
                 <NetworkStatusBar />
                 <CustomerServiceFab />

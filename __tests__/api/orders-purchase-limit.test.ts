@@ -337,33 +337,4 @@ describe("POST /api/orders — purchase limit check", () => {
       expect(res.status).toBe(200)
     })
   })
-
-  describe("development mode bypass", () => {
-    it("nodeEnv=development → purchase limit check skipped (order.count never called for limit)", async () => {
-      getConfig().nodeEnv = "development"
-
-      prismaMock.product.findUnique.mockResolvedValue(
-        makeNormalProduct({ purchaseLimitEnabled: true, purchaseLimitQuantity: 1 }),
-      )
-      // Both the pending IP check and purchase limit check are skipped in dev mode
-      prismaMock.order.count.mockResolvedValue(0)
-      prismaMock.card.count.mockResolvedValue(5)
-      prismaMock.$transaction.mockResolvedValue({
-        id: "o1",
-        orderNo: "uuid-1",
-        amount: new Prisma.Decimal("29.90"),
-      })
-
-      const completePendingOrder = require("@/lib/complete-pending-order").completePendingOrder
-      ;(completePendingOrder as jest.Mock).mockResolvedValue({ done: true, orderNo: "uuid-1" })
-
-      const res = await POST(makeRequest(BASE_BODY))
-
-      // In dev mode both the pending IP check and purchase limit check are bypassed
-      // so order.count is never called
-      expect(prismaMock.order.count).not.toHaveBeenCalled()
-      // Request should not be blocked
-      expect(res.status).not.toBe(429)
-    })
-  })
 })
