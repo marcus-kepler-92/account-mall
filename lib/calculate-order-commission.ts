@@ -105,12 +105,12 @@ export async function createOrderCommissions(
 
   // Level-2 split
   const inviterId = distributor.inviterId ?? null
-  let inviter: { email: string; role: string; disabledAt: Date | null } | null = null
+  let inviter: { email: string | null; role: string; disabledAt: Date | null } | null = null
   if (inviterId) {
     inviter = await tx.user.findUnique({
       where: { id: inviterId },
       select: { email: true, role: true, disabledAt: true },
-    }) as { email: string; role: string; disabledAt: Date | null } | null
+    }) as { email: string | null; role: string; disabledAt: Date | null } | null
   }
 
   const config = getConfig()
@@ -120,7 +120,7 @@ export async function createOrderCommissions(
     inviter &&
     inviter.role === "DISTRIBUTOR" &&
     !inviter.disabledAt &&
-    orderEmailNorm !== inviter.email.trim().toLowerCase()
+    orderEmailNorm !== (inviter.email ?? "").trim().toLowerCase()
 
   if (shouldSplitLevel2) {
     const level2Amount = Math.round(totalCommission * level2Rate / 100 * 100) / 100
