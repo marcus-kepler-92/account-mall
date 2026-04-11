@@ -375,4 +375,32 @@ describe("POST /api/distributor/accept-invite", () => {
             expect.objectContaining({ where: expect.objectContaining({ email: expect.anything() }) })
         )
     })
+
+    it("normalizes uppercase username to lowercase before storing", async () => {
+        prismaMock.distributorInvitation.findUnique.mockResolvedValue(
+            makeInvitation({ email: null })
+        )
+        prismaMock.user.findUnique.mockResolvedValue(null)
+
+        let userCreateArgs: any
+        ;(prismaMock.$transaction as any).mockImplementation(async (fn: (tx: any) => Promise<void>) => {
+            const userCreateMock = jest.fn().mockResolvedValue({ id: "new_user" })
+            await fn({
+                ...prismaMock,
+                distributorInvitation: {
+                    findUnique: jest.fn().mockResolvedValue({ acceptedAt: null }),
+                    update: jest.fn().mockResolvedValue({}),
+                },
+                user: { create: userCreateMock },
+                account: { create: jest.fn().mockResolvedValue({}) },
+            })
+            userCreateArgs = userCreateMock.mock.calls[0][0]
+        })
+
+        const res = await AcceptInvitePost(
+            createRequest({ token: "valid-token", name: "Alice", username: "AliceTest_1", password: "password123" })
+        )
+        expect(res.status).toBe(200)
+        expect(userCreateArgs.data.username).toBe("alicetest_1")
+    })
 })
