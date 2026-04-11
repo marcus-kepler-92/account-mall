@@ -159,86 +159,71 @@ export function ProductsDataTable({ data, actions }: { data: ProductRow[]; actio
                     statusOptions={statusOptions}
                 />
                 <Separator />
-                <Table>
-                    <TableHeader>
-                        {table.getHeaderGroups().map((headerGroup) => (
-                            <TableRow key={headerGroup.id}>
-                                {headerGroup.headers.map((header) => (
-                                    <TableHead
-                                        key={header.id}
-                                        style={{ width: header.getSize() }}
-                                    >
-                                        {header.isPlaceholder
-                                            ? null
-                                            : flexRender(
-                                                  header.column.columnDef.header,
-                                                  header.getContext()
-                                              )}
-                                    </TableHead>
-                                ))}
-                            </TableRow>
-                        ))}
-                    </TableHeader>
-                    {mounted ? (
-                        // Client: wrap body in DnD context for drag-and-drop
-                        <DndContext
-                            sensors={sensors}
-                            collisionDetection={closestCenter}
-                            modifiers={[restrictToVerticalAxis]}
-                            onDragEnd={handleDragEnd}
+                {/* DndContext must be outside <table> — it renders a <div> for accessibility */}
+                <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    modifiers={[restrictToVerticalAxis]}
+                    onDragEnd={handleDragEnd}
+                >
+                    <Table>
+                        <TableHeader>
+                            {table.getHeaderGroups().map((headerGroup) => (
+                                <TableRow key={headerGroup.id}>
+                                    {headerGroup.headers.map((header) => (
+                                        <TableHead
+                                            key={header.id}
+                                            style={{ width: header.getSize() }}
+                                        >
+                                            {header.isPlaceholder
+                                                ? null
+                                                : flexRender(
+                                                      header.column.columnDef.header,
+                                                      header.getContext()
+                                                  )}
+                                        </TableHead>
+                                    ))}
+                                </TableRow>
+                            ))}
+                        </TableHeader>
+                        {/* SortableContext is context-only, safe inside <table> */}
+                        <SortableContext
+                            items={rowModel.rows.map((r) => r.id)}
+                            strategy={verticalListSortingStrategy}
                         >
-                            <SortableContext
-                                items={rowModel.rows.map((r) => r.id)}
-                                strategy={verticalListSortingStrategy}
-                            >
-                                <TableBody>
-                                    {rowModel.rows.length ? (
-                                        rowModel.rows.map((row) => (
+                            <TableBody>
+                                {rowModel.rows.length ? (
+                                    rowModel.rows.map((row) => (
+                                        mounted ? (
                                             <SortableRow
                                                 key={row.id}
                                                 row={row}
                                                 isFiltered={isFiltered}
                                             />
-                                        ))
-                                    ) : (
-                                        <TableRow>
-                                            <TableCell
-                                                colSpan={productsColumns.length}
-                                                className="h-24 text-center"
-                                            >
-                                                暂无商品
-                                            </TableCell>
-                                        </TableRow>
-                                    )}
-                                </TableBody>
-                            </SortableContext>
-                        </DndContext>
-                    ) : (
-                        // SSR: plain table body, no DnD
-                        <TableBody>
-                            {rowModel.rows.length ? (
-                                rowModel.rows.map((row) => (
-                                    <TableRow key={row.id}>
-                                        {row.getVisibleCells().map((cell) => (
-                                            <TableCell key={cell.id} style={{ width: cell.column.getSize() }}>
-                                                {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                            </TableCell>
-                                        ))}
+                                        ) : (
+                                            <TableRow key={row.id}>
+                                                {row.getVisibleCells().map((cell) => (
+                                                    <TableCell key={cell.id} style={{ width: cell.column.getSize() }}>
+                                                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                                    </TableCell>
+                                                ))}
+                                            </TableRow>
+                                        )
+                                    ))
+                                ) : (
+                                    <TableRow>
+                                        <TableCell
+                                            colSpan={productsColumns.length}
+                                            className="h-24 text-center"
+                                        >
+                                            暂无商品
+                                        </TableCell>
                                     </TableRow>
-                                ))
-                            ) : (
-                                <TableRow>
-                                    <TableCell
-                                        colSpan={productsColumns.length}
-                                        className="h-24 text-center"
-                                    >
-                                        暂无商品
-                                    </TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    )}
-                </Table>
+                                )}
+                            </TableBody>
+                        </SortableContext>
+                    </Table>
+                </DndContext>
                 <ClientDataTablePagination table={table} />
             </CardContent>
         </Card>
