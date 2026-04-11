@@ -116,7 +116,7 @@ export default async function AdminDistributorsPage({
                   }),
                   prisma.commission.groupBy({
                       by: ["distributorId"],
-                      where: { distributorId: { in: ids } },
+                      where: { distributorId: { in: ids }, status: "SETTLED" },
                       _sum: { amount: true },
                   }),
                   prisma.commission.groupBy({
@@ -194,12 +194,12 @@ export default async function AdminDistributorsPage({
         const [l1All, l2All] = await Promise.all([
             prisma.commission.groupBy({
                 by: ["distributorId"],
-                where: { distributorId: { in: ids }, level: 1 },
+                where: { distributorId: { in: ids }, level: 1, status: "SETTLED" },
                 _sum: { amount: true },
             }),
             prisma.commission.groupBy({
                 by: ["distributorId"],
-                where: { distributorId: { in: ids }, level: 2 },
+                where: { distributorId: { in: ids }, level: 2, status: "SETTLED" },
                 _sum: { amount: true },
             }),
         ])

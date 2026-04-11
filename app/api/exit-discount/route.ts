@@ -9,7 +9,7 @@ import * as z from "zod"
 
 const requestSchema = z.object({
     productId: z.string().min(1),
-    fingerprintHash: z.string().min(1),
+    fingerprintHash: z.string(),
 })
 
 const VISITOR_COOKIE = "__ed_vid"

@@ -27,25 +27,6 @@ function fireMouseLeave(clientY: number) {
     document.dispatchEvent(event)
 }
 
-/** Helper to simulate scroll to a given depth (0–1) */
-function fireScrollAtDepth(depth: number) {
-    const docHeight = 2000
-    const viewportHeight = 500
-    // Set up scrollHeight and innerHeight
-    Object.defineProperty(document.documentElement, "scrollHeight", {
-        writable: true,
-        value: docHeight + viewportHeight,
-    })
-    Object.defineProperty(window, "innerHeight", {
-        writable: true,
-        value: viewportHeight,
-    })
-    Object.defineProperty(window, "scrollY", {
-        writable: true,
-        value: Math.floor(depth * docHeight),
-    })
-    window.dispatchEvent(new Event("scroll"))
-}
 
 describe("useExitIntent", () => {
     const storageKey = "test-exit-intent"
@@ -155,40 +136,57 @@ describe("useExitIntent", () => {
             mockMatchMedia(true) // mobile
         })
 
-        it("triggers onTrigger when scroll depth exceeds mobileScrollDepth threshold", () => {
+        it("triggers onTrigger when popstate fires (back button / header back)", () => {
             const onTrigger = jest.fn()
+            const pushStateSpy = jest.spyOn(history, "pushState")
+
             renderHook(() =>
-                useExitIntent({
-                    storageKey,
-                    onTrigger,
-                    minTimeMs: 0,
-                    mobileScrollDepth: 0.4,
-                })
+                useExitIntent({ storageKey, onTrigger, minTimeMs: 0 })
+            )
+
+            // Sentinel should have been pushed on mount
+            expect(pushStateSpy).toHaveBeenCalledWith(
+                { __exitIntentGuard: true },
+                "",
+                window.location.href
             )
 
             act(() => {
-                fireScrollAtDepth(0.5) // 50% > 40%
+                window.dispatchEvent(new PopStateEvent("popstate", { state: null }))
             })
 
             expect(onTrigger).toHaveBeenCalledTimes(1)
         })
 
-        it("does not trigger when scroll depth is below mobileScrollDepth threshold", () => {
+        it("does not trigger popstate when disabled=true", () => {
             const onTrigger = jest.fn()
+
             renderHook(() =>
-                useExitIntent({
-                    storageKey,
-                    onTrigger,
-                    minTimeMs: 0,
-                    mobileScrollDepth: 0.4,
-                })
+                useExitIntent({ storageKey, onTrigger, minTimeMs: 0, disabled: true })
             )
 
             act(() => {
-                fireScrollAtDepth(0.2) // 20% < 40%
+                window.dispatchEvent(new PopStateEvent("popstate", { state: null }))
             })
 
             expect(onTrigger).not.toHaveBeenCalled()
+        })
+
+        it("does not trigger popstate twice in the same session", () => {
+            const onTrigger = jest.fn()
+
+            renderHook(() =>
+                useExitIntent({ storageKey, onTrigger, minTimeMs: 0 })
+            )
+
+            act(() => {
+                window.dispatchEvent(new PopStateEvent("popstate", { state: null }))
+            })
+            act(() => {
+                window.dispatchEvent(new PopStateEvent("popstate", { state: null }))
+            })
+
+            expect(onTrigger).toHaveBeenCalledTimes(1)
         })
     })
 })

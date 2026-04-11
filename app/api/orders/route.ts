@@ -56,11 +56,13 @@ async function createAutoFetchOrder(params: {
     price: number
     distributorId: string | null
     distributorDiscountPercent: number | null
+    exitDiscountPercent: number | null
+    exitDiscountMeta: string | null
     promoCode: string | null
     fingerprintHash: string | null
     paymentMethod: string
 }): Promise<NextResponse> {
-    const { productId, product, email, orderPassword, clientIp, distributorId, distributorDiscountPercent, promoCode, fingerprintHash, paymentMethod } = params
+    const { productId, product, email, orderPassword, clientIp, distributorId, distributorDiscountPercent, exitDiscountPercent, exitDiscountMeta, promoCode, fingerprintHash, paymentMethod } = params
     const sourceUrl = (product.sourceUrl?.trim() || config.autoFetchSourceUrls[0]?.trim()) ?? ""
     if (!sourceUrl) {
         return badRequest("该商品暂时无法领取，请联系客服。")
@@ -101,11 +103,18 @@ async function createAutoFetchOrder(params: {
     const cardContent = toCardContentJson(cardPayload)
     const passwordHash = await hashPassword(orderPassword)
 
-    // 计算实际金额（支持分销商折扣）
-    let amount = params.price
+    // 计算实际金额（promo + exit 折扣均参与）
+    const originalAmount = params.price
+    let amount = originalAmount
     if (distributorDiscountPercent != null) {
         amount = amount * (1 - distributorDiscountPercent / 100)
     }
+    if (exitDiscountPercent != null) {
+        amount = amount * (1 - exitDiscountPercent / 100)
+    }
+    const discountPercentApplied = amount < originalAmount
+        ? Math.round((1 - amount / originalAmount) * 10000) / 100
+        : null
     amount = Math.round(amount * 100) / 100
 
     // 计算有效期截止时间
@@ -187,7 +196,8 @@ async function createAutoFetchOrder(params: {
                         ...(distributorId && { distributorId }),
                         ...(promoCode && { promoCode }),
                         ...(fingerprintHash && { fingerprintHash }),
-                        ...(distributorDiscountPercent != null && { discountPercentApplied: distributorDiscountPercent }),
+                        ...(discountPercentApplied != null && { discountPercentApplied }),
+                        ...(exitDiscountMeta && { exitDiscountMeta }),
                         ...(channel && { paymentChannelId: channel.id }),
                     },
                 })
@@ -519,34 +529,7 @@ export async function POST(request: NextRequest) {
         return badRequest(`Quantity must be between 1 and ${maxQty}`)
     }
 
-    // ─── AUTO_FETCH：实时爬取，随机取一个账号，单次领取 ─────────────────────────
-    if (isAutoFetch) {
-        const autoFetchPrice = Number(product.price)
-        return createAutoFetchOrder({
-            productId,
-            product: productWithType,
-            email,
-            orderPassword,
-            clientIp,
-            price: autoFetchPrice,
-            distributorId,
-            distributorDiscountPercent,
-            promoCode: lookupCode,
-            fingerprintHash,
-            paymentMethod,
-        })
-    }
-
-    // ─── 普通商品：校验库存与金额 ─────────────────────────────────────────────
-    const unsoldCount = await prisma.card.count({
-        where: { productId, status: "UNSOLD" },
-    })
-
-    if (unsoldCount < quantity) {
-        return badRequest(`Insufficient stock. Available: ${unsoldCount}`)
-    }
-
-    // Exit intent 折扣：token 有效即解析，是否叠加视首单判断
+    // Exit intent 折扣：token 有效即解析，是否叠加视首单判断（AUTO_FETCH 和普通商品共用）
     let exitDiscountPercent: number | null = null
     let exitDiscountMeta: string | null = null
     let exitDiscountPayload: ExitDiscountPayload | null = null
@@ -565,26 +548,33 @@ export async function POST(request: NextRequest) {
         }
     }
 
-    // Stacking rule: promoCode + exit discount only allowed on user's first paid order.
-    // Identified by email OR fingerprint — whichever matches a prior COMPLETED paid order.
-    if (exitDiscountPercent != null && distributorDiscountPercent != null) {
-        const pastPaidOrder = await prisma.order.findFirst({
-            where: {
-                status: "COMPLETED",
-                amount: { gt: 0 },
-                OR: [
-                    { email },
-                    ...(fingerprintHash ? [{ fingerprintHash }] : []),
-                ],
-            },
-            select: { id: true },
+    // ─── AUTO_FETCH：实时爬取，随机取一个账号，单次领取 ─────────────────────────
+    if (isAutoFetch) {
+        const autoFetchPrice = Number(product.price)
+        return createAutoFetchOrder({
+            productId,
+            product: productWithType,
+            email,
+            orderPassword,
+            clientIp,
+            price: autoFetchPrice,
+            distributorId,
+            distributorDiscountPercent,
+            exitDiscountPercent,
+            exitDiscountMeta,
+            promoCode: lookupCode,
+            fingerprintHash,
+            paymentMethod,
         })
-        if (pastPaidOrder) {
-            // Not the first paid order: drop exit discount, keep promoCode only
-            exitDiscountPercent = null
-            exitDiscountPayload = null
-            exitDiscountMeta = null
-        }
+    }
+
+    // ─── 普通商品：校验库存与金额 ─────────────────────────────────────────────
+    const unsoldCount = await prisma.card.count({
+        where: { productId, status: "UNSOLD" },
+    })
+
+    if (unsoldCount < quantity) {
+        return badRequest(`Insufficient stock. Available: ${unsoldCount}`)
     }
 
     const originalAmount = Number(product.price) * quantity
