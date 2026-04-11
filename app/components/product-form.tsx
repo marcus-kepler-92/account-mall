@@ -17,6 +17,7 @@ import { ProductFormPricingFields } from "./product-form-pricing-fields"
 import { ProductFormTagSelect } from "./product-form-tag-select"
 import { ProductFormSettings } from "./product-form-settings"
 import { ProductFormRiskWarningFields } from "./product-form-risk-warning-fields"
+import { ProductFormPurchaseLimitFields } from "./product-form-purchase-limit-fields"
 
 type Tag = { id: string; name: string; slug: string }
 
@@ -41,6 +42,8 @@ type ProductData = {
     riskWarningContent?: string | null
     riskWarningCountdown?: number | null
     riskWarningConfirmText?: string | null
+    purchaseLimitEnabled?: boolean
+    purchaseLimitQuantity?: number
     tags: Tag[]
 }
 
@@ -81,6 +84,8 @@ export function ProductForm({
             riskWarningContent: product?.riskWarningContent ?? "",
             riskWarningCountdown: product?.riskWarningCountdown != null ? String(product.riskWarningCountdown) : "15",
             riskWarningConfirmText: product?.riskWarningConfirmText ?? "",
+            purchaseLimitEnabled: product?.purchaseLimitEnabled ?? false,
+            purchaseLimitQuantity: product?.purchaseLimitQuantity != null ? String(product.purchaseLimitQuantity) : "1",
         },
     })
 
@@ -119,6 +124,10 @@ export function ProductForm({
             riskWarningContent: data.riskWarningContent?.trim() || null,
             riskWarningCountdown: data.riskWarningCountdown && data.riskWarningCountdown !== "" ? parseInt(data.riskWarningCountdown, 10) : null,
             riskWarningConfirmText: data.riskWarningConfirmText?.trim() || null,
+            purchaseLimitEnabled: data.purchaseLimitEnabled ?? false,
+            purchaseLimitQuantity: data.purchaseLimitEnabled && data.purchaseLimitQuantity && data.purchaseLimitQuantity !== ""
+                ? parseInt(data.purchaseLimitQuantity, 10)
+                : 1,
         }
 
         try {
@@ -171,6 +180,7 @@ export function ProductForm({
                             />
                             <ProductFormPricingFields isAutoFetch={isAutoFetch} sourceUrlOptions={sourceUrlOptions} />
                             <ProductFormRiskWarningFields />
+                            <ProductFormPurchaseLimitFields />
                         </div>
 
                         <div className="min-w-0 space-y-6 order-first lg:order-0 lg:sticky lg:top-20 lg:self-start">
