@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import type { ColumnDef } from "@tanstack/react-table"
+import { GripVertical } from "lucide-react"
 import { formatCurrency } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { DataTableColumnHeader } from "@/app/admin/components"
@@ -14,7 +15,6 @@ export type ProductRow = {
     status: "ACTIVE" | "INACTIVE"
     productType: string
     price: number
-    pinnedAt: string | null
     tags: { id: string; name: string; slug: string }[]
     stock: number
 }
@@ -25,6 +25,18 @@ const statusMap: Record<ProductRow["status"], { label: string; variant: "default
 }
 
 export const productsColumns: ColumnDef<ProductRow>[] = [
+    {
+        id: "drag-handle",
+        header: () => null,
+        cell: () => (
+            <span className="drag-handle flex items-center justify-center cursor-grab text-muted-foreground">
+                <GripVertical className="size-4" />
+            </span>
+        ),
+        size: 40,
+        enableSorting: false,
+        enableHiding: false,
+    },
     {
         accessorKey: "name",
         header: ({ column }) => <DataTableColumnHeader column={column} title="名称" />,
@@ -37,11 +49,6 @@ export const productsColumns: ColumnDef<ProductRow>[] = [
                     >
                         {row.original.name}
                     </Link>
-                    {row.original.pinnedAt && (
-                        <Badge variant="secondary" className="text-xs">
-                            置顶
-                        </Badge>
-                    )}
                 </div>
                 <div className="text-xs text-muted-foreground mt-0.5">/{row.original.slug}</div>
             </div>
@@ -91,7 +98,6 @@ export const productsColumns: ColumnDef<ProductRow>[] = [
                     status={row.original.status}
                     productType={row.original.productType}
                     isFree={row.original.productType === "AUTO_FETCH" && row.original.price === 0}
-                    pinnedAt={row.original.pinnedAt}
                 />
             </div>
         ),

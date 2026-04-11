@@ -12,8 +12,6 @@ import {
     Archive,
     RotateCcw,
     ExternalLink,
-    Pin,
-    PinOff,
     Trash2,
     ShieldOff,
     Loader2,
@@ -45,7 +43,6 @@ type ProductRowActionsProps = {
     status: string
     productType: string
     isFree: boolean
-    pinnedAt: string | null
 }
 
 export function ProductRowActions({
@@ -55,17 +52,14 @@ export function ProductRowActions({
     status,
     productType,
     isFree,
-    pinnedAt,
 }: ProductRowActionsProps) {
     const router = useRouter()
     const [loading, setLoading] = useState(false)
-    const [pinLoading, setPinLoading] = useState(false)
     const [statusDialogOpen, setStatusDialogOpen] = useState(false)
     const [deleteOpen, setDeleteOpen] = useState(false)
     const [deleteLoading, setDeleteLoading] = useState(false)
     const [blacklistOpen, setBlacklistOpen] = useState(false)
     const isActive = status === "ACTIVE"
-    const isPinned = !!pinnedAt
     const isAutoFetch = productType === "AUTO_FETCH"
 
     const copyLink = async () => {
@@ -98,28 +92,6 @@ export function ProductRowActions({
             toast.error("操作失败")
         } finally {
             setLoading(false)
-        }
-    }
-
-    const handleTogglePin = async () => {
-        setPinLoading(true)
-        try {
-            const res = await fetch(`/api/products/${productId}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ pinned: !isPinned }),
-            })
-            if (res.ok) {
-                toast.success(isPinned ? "已取消置顶" : "已置顶")
-                router.refresh()
-            } else {
-                const data = await res.json().catch(() => ({}))
-                toast.error(data?.error ?? "操作失败")
-            }
-        } catch {
-            toast.error("操作失败")
-        } finally {
-            setPinLoading(false)
         }
     }
 
@@ -185,19 +157,6 @@ export function ProductRowActions({
                     <DropdownMenuItem onClick={copyLink}>
                         <Copy className="size-4" />
                         复制链接
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleTogglePin() }} disabled={pinLoading}>
-                        {isPinned ? (
-                            <>
-                                <PinOff className="size-4" />
-                                取消置顶
-                            </>
-                        ) : (
-                            <>
-                                <Pin className="size-4" />
-                                置顶
-                            </>
-                        )}
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem

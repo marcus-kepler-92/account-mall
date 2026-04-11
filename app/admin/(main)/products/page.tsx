@@ -14,10 +14,7 @@ export default async function AdminProductsPage() {
             include: {
                 tags: { select: { id: true, name: true, slug: true } },
             },
-            orderBy: [
-                { pinnedAt: { sort: "desc", nulls: "last" } },
-                { createdAt: "desc" },
-            ],
+            orderBy: [{ sortOrder: "asc" }],
         }),
         prisma.card.groupBy({
             by: ["productId"],
@@ -35,7 +32,6 @@ export default async function AdminProductsPage() {
         status: p.status,
         productType: p.productType,
         price: Number(p.price),
-        pinnedAt: p.pinnedAt?.toISOString() ?? null,
         tags: p.tags,
         stock: stockMap.get(p.id) ?? 0,
     }))
