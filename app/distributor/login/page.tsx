@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 export default function DistributorLoginPage() {
     const router = useRouter()
-    const [email, setEmail] = useState("")
+    const [account, setAccount] = useState("")
     const [password, setPassword] = useState("")
     const [showPassword, setShowPassword] = useState(false)
     const [loading, setLoading] = useState(false)
@@ -22,16 +22,31 @@ export default function DistributorLoginPage() {
         setLoading(true)
 
         try {
-            const { error: signInError } = await authClient.signIn.email({
-                email,
-                password,
-                fetchOptions: {
-                    onError: (ctx) => {
-                        toast.error(ctx.error.message)
-                    }
-                }
-            })
-            if (signInError) return
+            const isEmail = account.includes("@")
+
+            if (isEmail) {
+                const { error: signInError } = await authClient.signIn.email({
+                    email: account,
+                    password,
+                    fetchOptions: {
+                        onError: (ctx) => {
+                            toast.error(ctx.error.message)
+                        },
+                    },
+                })
+                if (signInError) return
+            } else {
+                const { error: signInError } = await authClient.signIn.username({
+                    username: account,
+                    password,
+                    fetchOptions: {
+                        onError: (ctx) => {
+                            toast.error(ctx.error.message)
+                        },
+                    },
+                })
+                if (signInError) return
+            }
 
             const { data: session } = await authClient.getSession()
             const role = (session?.user as { role?: string } | undefined)?.role
@@ -65,16 +80,16 @@ export default function DistributorLoginPage() {
                 <CardContent>
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <div className="space-y-2">
-                            <Label htmlFor="email">邮箱</Label>
+                            <Label htmlFor="account">账号</Label>
                             <Input
-                                id="email"
-                                type="email"
+                                id="account"
+                                type="text"
                                 inputMode="email"
-                                autoComplete="email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
+                                autoComplete="username email"
+                                value={account}
+                                onChange={(e) => setAccount(e.target.value)}
                                 required
-                                placeholder="your@email.com"
+                                placeholder="邮箱或用户名"
                                 className="min-h-11"
                             />
                         </div>
