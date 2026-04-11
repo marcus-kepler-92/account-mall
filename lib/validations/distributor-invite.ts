@@ -19,6 +19,7 @@ export const usernameSchema = z
     .max(30, "用户名不能超过 30 位")
     .regex(/^[a-zA-Z0-9_]+$/, "用户名只能包含字母、数字和下划线")
     .trim()
+    .transform((v) => v.toLowerCase())
 
 export const acceptNoEmailInviteSchema = acceptInviteSchema.extend({
     username: usernameSchema,

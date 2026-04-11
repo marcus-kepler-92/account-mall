@@ -35,5 +35,12 @@ export const auth = betterAuth({
     advanced: {
         useSecureCookies: config.nodeEnv === "production",
     },
-    plugins: [username(), nextCookies()],
+    plugins: [
+        username({
+            usernameValidator: (username) => {
+                return /^[a-z0-9_]+$/.test(username)
+            },
+        }),
+        nextCookies(),
+    ],
 });
