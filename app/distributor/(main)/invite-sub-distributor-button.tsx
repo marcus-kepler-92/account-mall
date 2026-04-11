@@ -41,6 +41,11 @@ export function InviteSubDistributorButton({
   const [linkOpen, setLinkOpen] = useState(false)
   const [loading, setLoading] = useState(false)
 
+  const handleEmailOpenChange = (open: boolean) => {
+    if (!open) form.reset()
+    setEmailOpen(open)
+  }
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: { email: "" },
@@ -79,12 +84,12 @@ export function InviteSubDistributorButton({
         <Link2 className="mr-2 size-4" />
         生成邀请链接
       </Button>
-      <Dialog open={emailOpen} onOpenChange={setEmailOpen}>
+      <Dialog open={emailOpen} onOpenChange={handleEmailOpenChange}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>邮箱邀请团队成员</DialogTitle>
             <DialogDescription>
-              输入对方邮箱发送邀请，对方加入后每笔成交，您持续获得团队销售分润。
+              输入对方邮箱发送邀请，对方注册后每笔成交，您持续获得其佣金的 {level2RatePercent}%。
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
@@ -106,7 +111,7 @@ export function InviteSubDistributorButton({
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setEmailOpen(false)}
+                  onClick={() => handleEmailOpenChange(false)}
                   disabled={loading}
                 >
                   取消
