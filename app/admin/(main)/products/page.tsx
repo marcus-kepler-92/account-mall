@@ -1,10 +1,16 @@
 import Link from "next/link"
+import dynamic from "next/dynamic"
 import { prisma } from "@/lib/prisma"
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
-import { ProductsDataTable } from "./products-data-table"
 import type { ProductRow } from "./products-columns"
 import { PageHeader } from "@/app/admin/components"
+
+// dnd-kit uses browser APIs — disable SSR to avoid hydration mismatch
+const ProductsDataTable = dynamic(
+    () => import("./products-data-table").then((m) => ({ default: m.ProductsDataTable })),
+    { ssr: false }
+)
 
 export const dynamic = "force-dynamic"
 
