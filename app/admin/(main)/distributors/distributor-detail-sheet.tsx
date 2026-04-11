@@ -124,7 +124,7 @@ export function DistributorDetailSheet({
                                 {disabled ? "已停用" : "启用"}
                             </Badge>
                         </SheetTitle>
-                        <p className="text-sm text-muted-foreground">{row.email}</p>
+                        <p className="text-sm text-muted-foreground">{row.email ?? row.username ?? "—"}</p>
                         {row.distributorCode && (
                             <div className="flex items-center gap-2">
                                 <code className="text-xs font-mono">{row.distributorCode}</code>

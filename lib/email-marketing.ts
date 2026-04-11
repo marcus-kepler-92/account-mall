@@ -38,5 +38,5 @@ export async function resolveRecipients(input: ResolveInput): Promise<string[]> 
     select: { email: true },
     distinct: ["email"],
   })
-  return rows.map((r) => r.email)
+  return rows.map((r) => r.email).filter((e): e is string => e !== null)
 }

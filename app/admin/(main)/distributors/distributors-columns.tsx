@@ -14,7 +14,8 @@ import { DistributorRowActions, BalanceTooltip, CommissionTooltip } from "./dist
 
 export type DistributorRow = {
     id: string
-    email: string
+    email: string | null
+    username: string | null
     name: string
     distributorCode: string | null
     discountCodeEnabled: boolean
@@ -53,7 +54,7 @@ export function DistributorIdentityCell({ row, onViewDetail }: { row: Distributo
                     {disabled ? "已停用" : "启用"}
                 </Badge>
             </div>
-            <div className="text-xs text-muted-foreground">{row.email}</div>
+            <div className="text-xs text-muted-foreground">{row.email ?? row.username ?? "—"}</div>
             {row.distributorCode && (
                 <code className="text-xs font-mono text-muted-foreground">{row.distributorCode}</code>
             )}

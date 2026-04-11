@@ -6,7 +6,8 @@ import { DataTableColumnHeader } from "@/app/admin/components/data-table-column-
 export type InviteeRow = {
     id: string
     name: string
-    email: string
+    email: string | null
+    username: string | null
     createdAt: string
     level2CommissionTotal: number
 }
@@ -26,7 +27,7 @@ export const inviteesColumns: ColumnDef<InviteeRow>[] = [
         header: "邮箱",
         cell: ({ row }) => (
             <span className="text-muted-foreground text-sm">
-                {row.original.email}
+                {row.original.email ?? row.original.username ?? "—"}
             </span>
         ),
     },

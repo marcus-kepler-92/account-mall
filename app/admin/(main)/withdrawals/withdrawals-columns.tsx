@@ -11,7 +11,7 @@ import { BalanceCell } from "./balance-cell"
 export type WithdrawalRow = {
     id: string
     distributorId: string
-    distributor: { id: string; email: string; name: string }
+    distributor: { id: string; email: string | null; username: string | null; name: string }
     amount: number
     feePercent: number
     feeAmount: number
@@ -45,7 +45,7 @@ export const withdrawalsColumns: ColumnDef<WithdrawalRow>[] = [
             <div className="flex flex-col">
                 <span className="font-medium">{row.original.distributor.name}</span>
                 <span className="text-xs text-muted-foreground">
-                    {row.original.distributor.email}
+                    {row.original.distributor.email ?? row.original.distributor.username ?? "—"}
                 </span>
             </div>
         ),
@@ -128,7 +128,7 @@ export const withdrawalsColumns: ColumnDef<WithdrawalRow>[] = [
                 feePercent={row.original.feePercent}
                 actualAmount={row.original.actualAmount}
                 distributorName={row.original.distributor.name}
-                distributorEmail={row.original.distributor.email}
+                distributorEmail={row.original.distributor.email ?? row.original.distributor.username ?? "—"}
                 balance={{
                     level1Settled: row.original.level1Settled,
                     level2Settled: row.original.level2Settled,

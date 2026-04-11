@@ -24,7 +24,7 @@ export default async function DistributorInviteesPage() {
 
   const invitees = await prisma.user.findMany({
     where: { inviterId: user.id },
-    select: { id: true, name: true, email: true, createdAt: true },
+    select: { id: true, name: true, email: true, username: true, createdAt: true },
     orderBy: { createdAt: "desc" },
   });
 
@@ -63,6 +63,7 @@ export default async function DistributorInviteesPage() {
     id: u.id,
     name: u.name,
     email: u.email,
+    username: u.username,
     createdAt: u.createdAt.toISOString(),
     level2CommissionTotal: level2Map.get(u.id) ?? 0,
   }));

@@ -48,6 +48,7 @@ export default async function AdminDistributorsPage({
         where.OR = [
             { name: { contains: term, mode: "insensitive" } },
             { email: { contains: term, mode: "insensitive" } },
+            { username: { contains: term, mode: "insensitive" } },
             { distributorCode: { contains: term, mode: "insensitive" } },
         ]
     }
@@ -67,6 +68,7 @@ export default async function AdminDistributorsPage({
             select: {
                 id: true,
                 email: true,
+                username: true,
                 name: true,
                 distributorCode: true,
                 discountCodeEnabled: true,
@@ -214,6 +216,7 @@ export default async function AdminDistributorsPage({
         return {
             id: d.id,
             email: d.email,
+            username: d.username,
             name: d.name,
             distributorCode: d.distributorCode,
             discountCodeEnabled: d.discountCodeEnabled,

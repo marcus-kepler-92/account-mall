@@ -46,7 +46,7 @@ export default async function AdminWithdrawalsPage({ searchParams }: { searchPar
             where,
             include: {
                 distributor: {
-                    select: { id: true, email: true, name: true },
+                    select: { id: true, email: true, username: true, name: true },
                 },
             },
             orderBy,

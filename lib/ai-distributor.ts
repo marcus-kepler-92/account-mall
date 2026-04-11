@@ -17,7 +17,7 @@ const promptConfig = {
 
 export interface DistributorContext {
     name: string
-    email: string
+    email: string | null
     distributorCode: string | null
     shareLink: string | null
     discountEnabled: boolean
@@ -205,7 +205,7 @@ export function buildSystemPrompt(
     const userSection = ctx
         ? `## 当前用户信息（已预加载，直接引用，无需调工具）
 - 姓名：${ctx.name}
-- 邮箱：${ctx.email}
+- 邮箱：${ctx.email ?? "（无邮箱账号）"}
 - 推广码（即优惠码）：${ctx.distributorCode ?? "未设置"}
 - 分享链接：${ctx.shareLink ?? "未设置"}
 - 折扣码功能：${ctx.discountEnabled ? "已启用" : "已禁用"}${ctx.discountPercent ? `，折扣比例 ${ctx.discountPercent}%` : ""}
