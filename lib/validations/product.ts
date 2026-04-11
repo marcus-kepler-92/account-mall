@@ -41,6 +41,8 @@ export const createProductSchema = z.object({
     riskWarningContent: z.string().max(10000).nullish(),
     riskWarningCountdown: z.number().int().min(5).max(60).nullish(),
     riskWarningConfirmText: z.string().max(50).nullish(),
+    purchaseLimitEnabled: z.boolean().optional(),
+    purchaseLimitQuantity: z.number().int().min(1).optional(),
 }).refine(
     (data) => data.productType !== "AUTO_FETCH" || (data.sourceUrl && data.sourceUrl !== ""),
     { message: "Auto-fetch product must have a source URL", path: ["sourceUrl"] }
@@ -84,6 +86,8 @@ export const updateProductSchema = z.object({
     riskWarningContent: z.string().max(10000).nullish(),
     riskWarningCountdown: z.number().int().min(5).max(60).nullish(),
     riskWarningConfirmText: z.string().max(50).nullish(),
+    purchaseLimitEnabled: z.boolean().optional(),
+    purchaseLimitQuantity: z.number().int().min(1).optional(),
 });
 
 export const createTagSchema = z.object({
@@ -124,6 +128,8 @@ export const productFormSchema = z
         riskWarningContent: z.string().max(10000).optional(),
         riskWarningCountdown: z.string().optional(),
         riskWarningConfirmText: z.string().max(50).optional(),
+        purchaseLimitEnabled: z.boolean().optional(),
+        purchaseLimitQuantity: z.string().optional(),
     })
     .superRefine((data, ctx) => {
         if (data.productType === "AUTO_FETCH") {

@@ -70,3 +70,44 @@ describe("updateProductSchema", () => {
         expect(result.success).toBe(true)
     })
 })
+
+describe("purchaseLimitEnabled / purchaseLimitQuantity", () => {
+  it("createProductSchema accepts purchaseLimitEnabled=true and quantity=2", () => {
+    const result = createProductSchema.safeParse({
+      name: "P",
+      slug: "p",
+      price: 10,
+      purchaseLimitEnabled: true,
+      purchaseLimitQuantity: 2,
+    })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.purchaseLimitEnabled).toBe(true)
+      expect(result.data.purchaseLimitQuantity).toBe(2)
+    }
+  })
+
+  it("createProductSchema rejects purchaseLimitQuantity=0", () => {
+    const result = createProductSchema.safeParse({
+      name: "P",
+      slug: "p",
+      price: 10,
+      purchaseLimitEnabled: true,
+      purchaseLimitQuantity: 0,
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it("productFormSchema accepts purchaseLimitQuantity as string", () => {
+    const result = productFormSchema.safeParse({
+      name: "P",
+      slug: "p",
+      price: "10",
+      maxQuantity: "5",
+      isActive: true,
+      purchaseLimitEnabled: true,
+      purchaseLimitQuantity: "3",
+    })
+    expect(result.success).toBe(true)
+  })
+})
