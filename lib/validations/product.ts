@@ -79,7 +79,6 @@ export const updateProductSchema = z.object({
     allowAccountSwitch: z.boolean().optional(),
     accountSwitchLimit: z.number().int().min(1).max(100).optional(),
     tagIds: z.array(z.string()).optional(),
-    pinned: z.boolean().optional(),
     couponEnabled: z.boolean().optional(),
     riskWarningEnabled: z.boolean().optional(),
     riskWarningTitle: z.string().max(100).nullish(),
