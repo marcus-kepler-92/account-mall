@@ -21,6 +21,7 @@ import { createOrderSuccessToken } from "@/lib/order-success-token"
 import { completePendingOrder } from "@/lib/complete-pending-order"
 import { selectPaymentChannel } from "@/lib/payment-channel"
 import { unauthorized, validationError, badRequest, invalidJsonBody, notFound, internalServerError } from "@/lib/api-response"
+import { checkPurchaseLimit } from "@/lib/purchase-limit"
 
 /**
  * Generate a unique order number using UUID v4.
@@ -493,6 +494,22 @@ export async function POST(request: NextRequest) {
     // 仅拦截手动填写的优惠码；推广码（cookie）不受此限制
     if (couponCode && !product.couponEnabled) {
         return badRequest("该商品不支持使用优惠码")
+    }
+
+    if (product.purchaseLimitEnabled && config.nodeEnv !== "development") {
+        const limitResult = await checkPurchaseLimit({
+            productId,
+            email,
+            fingerprintHash,
+            clientIp,
+            limitQuantity: product.purchaseLimitQuantity,
+        })
+        if (limitResult.blocked) {
+            return NextResponse.json(
+                { error: limitResult.message, ...(limitResult.orderNo ? { orderNo: limitResult.orderNo } : {}) },
+                { status: 429 },
+            )
+        }
     }
 
     const productWithType = product as unknown as ProductForAutoFetch
