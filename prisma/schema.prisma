@@ -137,8 +137,8 @@ model Product {
   riskWarningConfirmText String?   @db.VarChar(50)
   purchaseLimitEnabled  Boolean @default(false)
   purchaseLimitQuantity Int     @default(1)
-  pinnedAt         DateTime?
   createdAt        DateTime      @default(now())
+  sortOrder        Int           @default(0)
   updatedAt        DateTime      @updatedAt
   cards                Card[]
   orders               Order[]
@@ -146,6 +146,8 @@ model Product {
   restockSubscriptions RestockSubscription[]
   exitDiscountUsages   ExitDiscountUsage[]
   accountBlacklist     AccountBlacklist[]
+
+  @@index([sortOrder])
 }
 
 model Tag {
