@@ -59,17 +59,14 @@ export async function GET(request: NextRequest) {
         };
     }
 
-    // Order: pinned first, then by sort option
-    const sortOrder =
+    const orderBy =
         sort === "price-asc"
-            ? { price: "asc" as const }
+            ? [{ price: "asc" as const }]
             : sort === "price-desc"
-              ? { price: "desc" as const }
-              : { createdAt: "desc" as const };
-    const orderBy = [
-        { pinnedAt: { sort: "desc" as const, nulls: "last" as const } },
-        sortOrder,
-    ];
+              ? [{ price: "desc" as const }]
+              : sort === "newest"
+                ? [{ createdAt: "desc" as const }]
+                : [{ sortOrder: "asc" as const }]
 
     const [products, total] = await Promise.all([
         prisma.product.findMany({
@@ -160,8 +157,14 @@ export async function POST(request: NextRequest) {
     const finalMaxQuantity = isAutoFetch ? config.autoFetchMaxQuantityPerOrder : (maxQuantity ?? 10);
     const finalSourceUrl = sourceUrl?.trim() || null;
 
+    const maxSortOrder = await prisma.product.aggregate({
+        _max: { sortOrder: true },
+    })
+    const nextSortOrder = (maxSortOrder._max.sortOrder ?? -1) + 1
+
     const product = await prisma.product.create({
         data: {
+            sortOrder: nextSortOrder,
             name,
             slug,
             description: description ?? null,

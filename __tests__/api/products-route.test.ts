@@ -189,6 +189,19 @@ describe("GET /api/products", () => {
             })
         )
     })
+
+    it("uses sortOrder ASC as default sort", async () => {
+        prismaMock.product.findMany.mockResolvedValueOnce([])
+        prismaMock.product.count.mockResolvedValueOnce(0)
+
+        await GET(createUrlRequest("http://localhost/api/products"))
+
+        expect(prismaMock.product.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                orderBy: [{ sortOrder: "asc" }],
+            })
+        )
+    })
 })
 
 describe("POST /api/products", () => {
@@ -270,6 +283,7 @@ describe("POST /api/products", () => {
     it("creates product without tags when tagIds empty", async () => {
         adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
         prismaMock.product.findUnique.mockResolvedValueOnce(null)
+        prismaMock.product.aggregate.mockResolvedValueOnce({ _max: { sortOrder: 4 } } as any)
         prismaMock.product.create.mockResolvedValueOnce({
             id: "p1",
             name: "No Tags",
@@ -302,6 +316,7 @@ describe("POST /api/products", () => {
     it("creates product and returns 201 with tag relation", async () => {
         adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
         prismaMock.product.findUnique.mockResolvedValueOnce(null)
+        prismaMock.product.aggregate.mockResolvedValueOnce({ _max: { sortOrder: null } } as any)
         const created = {
             id: "prod_new",
             name: "New Product",
