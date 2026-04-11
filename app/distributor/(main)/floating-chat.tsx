@@ -6,9 +6,9 @@ import { DefaultChatTransport } from "ai"
 import { MessageCircle, X, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Card, CardContent } from "@/components/ui/card"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { MarkdownView } from "@/app/components/markdown-view"
+import { cn } from "@/lib/utils"
 import type { UIMessage } from "ai"
 
 function stripToolCallArtifacts(text: string): string {
@@ -139,6 +139,17 @@ export function FloatingChat() {
     const [input, setInput] = useState("")
     const scrollRef = useRef<HTMLDivElement>(null)
 
+    // Chat panel drag state: null = use default CSS position (bottom-24 right-6)
+    const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
+    const cardRef = useRef<HTMLDivElement>(null)
+    const dragOrigin = useRef<{ px: number; py: number; cx: number; cy: number } | null>(null)
+
+    // Trigger button drag state
+    const [btnPos, setBtnPos] = useState<{ x: number; y: number } | null>(null)
+    const btnRef = useRef<HTMLDivElement>(null)
+    const btnDragOrigin = useRef<{ px: number; py: number; cx: number; cy: number } | null>(null)
+    const btnDragged = useRef(false)
+
     const { messages, sendMessage, status, error } = useChat({
         transport: new DefaultChatTransport({ api: "/api/distributor/ai-chat" }),
     })
@@ -158,6 +169,61 @@ export function FloatingChat() {
         }
     }, [messages, status])
 
+    // Reset position when panel is closed
+    useEffect(() => {
+        if (!open) setPos(null)
+    }, [open])
+
+    const handleDragStart = (e: React.PointerEvent<HTMLDivElement>) => {
+        if (!cardRef.current) return
+        const rect = cardRef.current.getBoundingClientRect()
+        dragOrigin.current = { px: e.clientX, py: e.clientY, cx: rect.left, cy: rect.top }
+        e.currentTarget.setPointerCapture(e.pointerId)
+    }
+
+    const handleDragMove = (e: React.PointerEvent<HTMLDivElement>) => {
+        if (!dragOrigin.current || !cardRef.current) return
+        const dx = e.clientX - dragOrigin.current.px
+        const dy = e.clientY - dragOrigin.current.py
+        const { width, height } = cardRef.current.getBoundingClientRect()
+        const x = Math.max(0, Math.min(window.innerWidth - width, dragOrigin.current.cx + dx))
+        const y = Math.max(0, Math.min(window.innerHeight - height, dragOrigin.current.cy + dy))
+        setPos({ x, y })
+    }
+
+    const handleDragEnd = () => {
+        dragOrigin.current = null
+    }
+
+    const handleBtnDragStart = (e: React.PointerEvent<HTMLDivElement>) => {
+        if (!btnRef.current) return
+        const rect = btnRef.current.getBoundingClientRect()
+        btnDragOrigin.current = { px: e.clientX, py: e.clientY, cx: rect.left, cy: rect.top }
+        btnDragged.current = false
+        e.currentTarget.setPointerCapture(e.pointerId)
+    }
+
+    const handleBtnDragMove = (e: React.PointerEvent<HTMLDivElement>) => {
+        if (!btnDragOrigin.current || !btnRef.current) return
+        const dx = e.clientX - btnDragOrigin.current.px
+        const dy = e.clientY - btnDragOrigin.current.py
+        if (!btnDragged.current && Math.hypot(dx, dy) < 5) return
+        btnDragged.current = true
+        const { width, height } = btnRef.current.getBoundingClientRect()
+        // On mobile: keep above the bottom nav (64px) + safe-area-inset-bottom
+        const safeAreaBottom = isMobile
+            ? 64 + (parseInt(getComputedStyle(document.documentElement).getPropertyValue("--sab") || "0", 10) || 0)
+            : 0
+        const x = Math.max(0, Math.min(window.innerWidth - width, btnDragOrigin.current.cx + dx))
+        const y = Math.max(0, Math.min(window.innerHeight - height - safeAreaBottom, btnDragOrigin.current.cy + dy))
+        setBtnPos({ x, y })
+    }
+
+    const handleBtnDragEnd = () => {
+        if (!btnDragged.current) setOpen(true)
+        btnDragOrigin.current = null
+    }
+
     const handleSend = () => {
         if (!input.trim() || status !== "ready") return
         sendMessage({ text: input })
@@ -168,36 +234,58 @@ export function FloatingChat() {
 
     return (
         <>
-            {/* Desktop: floating card panel — shown above trigger */}
+            {/* Desktop: floating card panel — draggable */}
             {!isMobile && open && (
-                <Card className="fixed bottom-24 right-6 z-50 w-110 h-150 min-w-72 min-h-80 max-w-[90vw] max-h-[80vh] flex flex-col shadow-xl py-0 resize overflow-hidden">
-                    <div className="flex flex-row items-center justify-between py-3 px-4 border-b shrink-0">
+                <div
+                    ref={cardRef}
+                    className={cn(
+                        "fixed z-50 w-110 h-150 min-w-72 min-h-80 max-w-[90vw] max-h-[80vh] flex flex-col shadow-xl rounded-xl border bg-card text-card-foreground resize overflow-hidden",
+                        !pos && "bottom-24 right-6"
+                    )}
+                    style={pos ? { left: pos.x, top: pos.y } : undefined}
+                >
+                    <div
+                        className="flex flex-row items-center justify-between py-3 px-4 border-b shrink-0 cursor-grab active:cursor-grabbing select-none"
+                        onPointerDown={handleDragStart}
+                        onPointerMove={handleDragMove}
+                        onPointerUp={handleDragEnd}
+                    >
                         <span className="font-semibold text-sm">AI 助手</span>
                         <Button
                             variant="ghost"
                             size="icon"
                             className="size-7"
                             onClick={() => setOpen(false)}
+                            onPointerDown={(e) => e.stopPropagation()}
                             aria-label="关闭"
                         >
                             <X className="size-4" />
                         </Button>
                     </div>
-                    <CardContent className="flex-1 p-0 min-h-0">
+                    <div className="flex-1 p-0 min-h-0">
                         <ChatBody {...chatBodyProps} />
-                    </CardContent>
-                </Card>
+                    </div>
+                </div>
             )}
 
-            {/* Floating trigger button — only show when panel is closed */}
+            {/* Floating trigger button — draggable; bottom-20 on mobile to clear the 64px nav bar */}
             {!open && (
-                <Button
-                    className="fixed bottom-6 right-6 z-50 size-14 rounded-full shadow-lg"
-                    onClick={() => setOpen(true)}
+                <div
+                    ref={btnRef}
+                    className={cn(
+                        "fixed z-50 size-14 cursor-grab active:cursor-grabbing touch-none",
+                        !btnPos && "bottom-20 right-6 md:bottom-6"
+                    )}
+                    style={btnPos ? { left: btnPos.x, top: btnPos.y } : undefined}
+                    onPointerDown={handleBtnDragStart}
+                    onPointerMove={handleBtnDragMove}
+                    onPointerUp={handleBtnDragEnd}
                     aria-label="打开 AI 助手"
                 >
-                    <MessageCircle className="size-6" />
-                </Button>
+                    <Button className="size-14 rounded-full shadow-lg pointer-events-none" tabIndex={-1}>
+                        <MessageCircle className="size-6" />
+                    </Button>
+                </div>
             )}
 
             {/* Mobile: bottom sheet */}

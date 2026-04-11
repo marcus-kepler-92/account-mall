@@ -1,4 +1,9 @@
 @import "tailwindcss";
+
+/* Expose safe-area-inset-bottom as a JS-readable CSS variable */
+:root {
+  --sab: env(safe-area-inset-bottom, 0px);
+}
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @plugin "@tailwindcss/typography";

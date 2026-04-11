@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
     useReactTable,
@@ -39,10 +39,13 @@ export function DistributorWithdrawalsDataTable({
 }: DistributorWithdrawalsDataTableProps) {
     const router = useRouter()
     const searchParams = useSearchParams()
-    const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
-        if (typeof window === "undefined") return {} as VisibilityState
-        return window.innerWidth < 768 ? { processedAt: false, note: false } : {} as VisibilityState
-    })
+    const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
+
+    useEffect(() => {
+        if (window.innerWidth < 768) {
+            setColumnVisibility({ processedAt: false, note: false })
+        }
+    }, [])
 
     const table = useReactTable({
         data,
