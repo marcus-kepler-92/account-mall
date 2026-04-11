@@ -39,6 +39,10 @@ jest.mock("better-auth/next-js", () => ({
   nextCookies: jest.fn(() => ({})),
 }));
 
+jest.mock("better-auth/plugins", () => ({
+  username: jest.fn(() => ({})),
+}));
+
 describe("Auth configuration", () => {
   beforeEach(() => {
     jest.clearAllMocks();

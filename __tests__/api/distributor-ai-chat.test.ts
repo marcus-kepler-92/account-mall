@@ -23,6 +23,8 @@ jest.mock("@/lib/config", () => ({
 
 jest.mock("@/lib/ai-distributor", () => ({
     __esModule: true,
+    fetchDistributorContext: jest.fn().mockResolvedValue({}),
+    fetchPlatformContext: jest.fn().mockResolvedValue({}),
     buildSystemPrompt: jest.fn().mockReturnValue("system prompt"),
     buildTools: jest.fn().mockReturnValue({}),
 }))
@@ -39,7 +41,7 @@ jest.mock("ai", () => ({
 
 jest.mock("@ai-sdk/openai", () => ({
     __esModule: true,
-    createOpenAI: jest.fn().mockReturnValue(jest.fn()),
+    createOpenAI: jest.fn().mockReturnValue({ chat: jest.fn().mockReturnValue("mock-model") }),
 }))
 
 import { getDistributorSession } from "@/lib/auth-guard"
