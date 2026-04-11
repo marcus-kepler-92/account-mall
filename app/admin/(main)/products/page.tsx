@@ -2,7 +2,7 @@ import Link from "next/link"
 import { prisma } from "@/lib/prisma"
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
-import { ProductsDataTable } from "./products-data-table"
+import { ProductsTableWrapper } from "./products-table-wrapper"
 import type { ProductRow } from "./products-columns"
 import { PageHeader } from "@/app/admin/components"
 
@@ -39,7 +39,7 @@ export default async function AdminProductsPage() {
     return (
         <div className="space-y-6">
             <PageHeader title="商品管理" description="管理数字商品和价格" />
-            <ProductsDataTable
+            <ProductsTableWrapper
                 data={data}
                 actions={
                     <Button asChild size="sm">

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, type ReactNode } from "react"
+import { useState, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
@@ -83,10 +83,7 @@ const statusOptions = [
 
 export function ProductsDataTable({ data, actions }: { data: ProductRow[]; actions?: ReactNode }) {
     const router = useRouter()
-    const [mounted, setMounted] = useState(false)
     const [rows, setRows] = useState<ProductRow[]>(data)
-
-    useEffect(() => { setMounted(true) }, [])
     const [sorting, setSorting] = useState<SortingState>([])
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
@@ -194,21 +191,11 @@ export function ProductsDataTable({ data, actions }: { data: ProductRow[]; actio
                             <TableBody>
                                 {rowModel.rows.length ? (
                                     rowModel.rows.map((row) => (
-                                        mounted ? (
-                                            <SortableRow
-                                                key={row.id}
-                                                row={row}
-                                                isFiltered={isFiltered}
-                                            />
-                                        ) : (
-                                            <TableRow key={row.id}>
-                                                {row.getVisibleCells().map((cell) => (
-                                                    <TableCell key={cell.id} style={{ width: cell.column.getSize() }}>
-                                                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                                    </TableCell>
-                                                ))}
-                                            </TableRow>
-                                        )
+                                        <SortableRow
+                                            key={row.id}
+                                            row={row}
+                                            isFiltered={isFiltered}
+                                        />
                                     ))
                                 ) : (
                                     <TableRow>
