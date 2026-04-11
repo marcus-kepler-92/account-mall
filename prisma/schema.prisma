@@ -135,6 +135,8 @@ model Product {
   riskWarningContent     String?   @db.Text
   riskWarningCountdown   Int?
   riskWarningConfirmText String?   @db.VarChar(50)
+  purchaseLimitEnabled  Boolean @default(false)
+  purchaseLimitQuantity Int     @default(1)
   pinnedAt         DateTime?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
