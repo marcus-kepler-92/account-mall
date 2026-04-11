@@ -12,7 +12,7 @@ const config = {
     "^@/(.*)$": "<rootDir>/$1",
   },
   testMatch: ["**/__tests__/**/*.(test|spec).[jt]s?(x)"],
-  testPathIgnorePatterns: ["/node_modules/", "/.worktrees/"],
+  testPathIgnorePatterns: ["/node_modules/"],
   transformIgnorePatterns: ["node_modules/(?!(nuqs)/)"],
   clearMocks: true,
 };

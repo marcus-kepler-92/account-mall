@@ -115,7 +115,7 @@ export async function fetchPlatformContext(): Promise<PlatformContext> {
         }),
         prisma.product.findMany({
             where: { status: "ACTIVE" },
-            orderBy: [{ pinnedAt: "desc" }, { createdAt: "desc" }],
+            orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
             take: 30,
             select: { name: true, price: true, summary: true, slug: true },
         }),

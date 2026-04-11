@@ -114,7 +114,7 @@ const BASE_NORMAL_PRODUCT = {
     riskWarningContent: null,
     riskWarningCountdown: null,
     riskWarningConfirmText: null,
-    pinnedAt: null,
+    sortOrder: 0,
     createdAt: new Date(),
     updatedAt: new Date(),
 }

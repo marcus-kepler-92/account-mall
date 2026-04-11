@@ -290,7 +290,7 @@ describe("Security: Injection and malicious input", () => {
             riskWarningContent: null,
             riskWarningCountdown: null,
             riskWarningConfirmText: null,
-            pinnedAt: null,
+            sortOrder: 0,
             createdAt: new Date(),
             updatedAt: new Date(),
         })
@@ -398,7 +398,7 @@ describe("Security: Mass assignment and privilege", () => {
             riskWarningContent: null,
             riskWarningCountdown: null,
             riskWarningConfirmText: null,
-            pinnedAt: null,
+            sortOrder: 0,
             createdAt: new Date(),
             updatedAt: new Date(),
         })
