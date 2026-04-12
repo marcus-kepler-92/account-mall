@@ -70,3 +70,4 @@ automation/error_logs/*
 .cursor
 .claude
 .worktrees/
+.superpowers/
