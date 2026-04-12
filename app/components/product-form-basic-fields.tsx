@@ -14,8 +14,9 @@ import {
     FormLabel,
     FormMessage,
 } from "@/components/ui/form"
-import { Loader2, Upload, Trash2 } from "lucide-react"
+import { ImageIcon, Loader2, Upload, Trash2 } from "lucide-react"
 import type { ProductFormSchema } from "@/lib/validations/product"
+import { ImagePickerDialog } from "@/app/admin/components/image-picker-dialog"
 
 export function ProductFormBasicFields({
     isEditing,
@@ -26,6 +27,7 @@ export function ProductFormBasicFields({
 }) {
     const { control, setValue } = useFormContext<ProductFormSchema>()
     const [imageUploading, setImageUploading] = useState(false)
+    const [pickerOpen, setPickerOpen] = useState(false)
 
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
@@ -42,6 +44,7 @@ export function ProductFormBasicFields({
         try {
             const formData = new FormData()
             formData.append("file", file)
+            formData.append("pathPrefix", "products")
             const res = await fetch("/api/upload/image", {
                 method: "POST",
                 body: formData,
@@ -113,40 +116,82 @@ export function ProductFormBasicFields({
                             <FormLabel>商品图片</FormLabel>
                             <div className="space-y-2">
                                 {field.value ? (
-                                    <div className="relative inline-block">
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img
-                                            src={field.value}
-                                            alt="商品图片预览"
-                                            className="size-32 sm:size-50 rounded-md border object-cover"
-                                        />
+                                    <>
+                                        <div className="relative inline-block">
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img
+                                                src={field.value}
+                                                alt="商品图片预览"
+                                                className="size-32 sm:size-50 rounded-md border object-cover"
+                                            />
+                                            <Button
+                                                type="button"
+                                                variant="destructive"
+                                                size="icon"
+                                                className="absolute -right-2 -top-2 size-6"
+                                                onClick={() => field.onChange("")}
+                                            >
+                                                <Trash2 className="size-3" />
+                                            </Button>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <label htmlFor="image-upload">
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    disabled={imageUploading}
+                                                    asChild
+                                                >
+                                                    <span>
+                                                        {imageUploading ? (
+                                                            <Loader2 className="size-4 animate-spin" />
+                                                        ) : (
+                                                            <Upload className="size-4" />
+                                                        )}
+                                                        <span className="ml-1.5">重新上传</span>
+                                                    </span>
+                                                </Button>
+                                            </label>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => setPickerOpen(true)}
+                                            >
+                                                <ImageIcon className="size-4" />
+                                                <span className="ml-1.5">从图库选择</span>
+                                            </Button>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <label
+                                            htmlFor="image-upload"
+                                            className={`flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed p-6 transition-colors hover:border-foreground/30 hover:bg-accent/50 ${imageUploading ? "pointer-events-none opacity-60" : ""}`}
+                                        >
+                                            {imageUploading ? (
+                                                <Loader2 className="mb-2 size-6 animate-spin text-muted-foreground" />
+                                            ) : (
+                                                <Upload className="mb-2 size-6 text-muted-foreground" />
+                                            )}
+                                            <span className="text-sm text-muted-foreground">
+                                                {imageUploading ? "上传中…" : "点击上传图片"}
+                                            </span>
+                                            <span className="mt-1 text-xs text-muted-foreground">
+                                                支持 JPG、PNG、GIF，最大 2MB
+                                            </span>
+                                        </label>
                                         <Button
                                             type="button"
-                                            variant="destructive"
-                                            size="icon"
-                                            className="absolute -right-2 -top-2 size-6"
-                                            onClick={() => field.onChange("")}
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setPickerOpen(true)}
                                         >
-                                            <Trash2 className="size-3" />
+                                            <ImageIcon className="size-4" />
+                                            <span className="ml-1.5">从图库选择</span>
                                         </Button>
-                                    </div>
-                                ) : (
-                                    <label
-                                        htmlFor="image-upload"
-                                        className={`flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed p-6 transition-colors hover:border-foreground/30 hover:bg-accent/50 ${imageUploading ? "pointer-events-none opacity-60" : ""}`}
-                                    >
-                                        {imageUploading ? (
-                                            <Loader2 className="mb-2 size-6 animate-spin text-muted-foreground" />
-                                        ) : (
-                                            <Upload className="mb-2 size-6 text-muted-foreground" />
-                                        )}
-                                        <span className="text-sm text-muted-foreground">
-                                            {imageUploading ? "上传中…" : "点击上传图片"}
-                                        </span>
-                                        <span className="mt-1 text-xs text-muted-foreground">
-                                            支持 JPG、PNG、GIF，最大 2MB
-                                        </span>
-                                    </label>
+                                    </>
                                 )}
                                 <input
                                     id="image-upload"
@@ -162,6 +207,12 @@ export function ProductFormBasicFields({
                     )}
                 />
             </CardContent>
+
+            <ImagePickerDialog
+                open={pickerOpen}
+                onOpenChange={setPickerOpen}
+                onSelect={(url) => setValue("image", url)}
+            />
         </Card>
     )
 }
