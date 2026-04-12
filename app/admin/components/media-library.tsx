@@ -87,6 +87,7 @@ export function MediaLibrary(props: MediaLibraryProps) {
   const [prefix, setPrefix] = useState<Prefix>("products")
   const [blobs, setBlobs] = useState<BlobItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [appending, setAppending] = useState(false)
   const [nextCursor, setNextCursor] = useState<string | undefined>()
 
   // Manage-only state
@@ -103,7 +104,8 @@ export function MediaLibrary(props: MediaLibraryProps) {
 
   const fetchList = useCallback(
     async (cursor?: string, append = false) => {
-      setLoading(true)
+      if (append) setAppending(true)
+      else setLoading(true)
       try {
         const params = new URLSearchParams({ prefix, limit: "20" })
         if (cursor) params.set("cursor", cursor)
@@ -118,7 +120,8 @@ export function MediaLibrary(props: MediaLibraryProps) {
         setBlobs((prev) => (append ? [...prev, ...data.blobs] : data.blobs))
         setNextCursor(data.nextCursor)
       } finally {
-        setLoading(false)
+        if (append) setAppending(false)
+        else setLoading(false)
       }
     },
     [prefix]
@@ -132,7 +135,7 @@ export function MediaLibrary(props: MediaLibraryProps) {
   }, [fetchList])
 
   const loadMore = () => {
-    if (nextCursor && !loading) fetchList(nextCursor, true)
+    if (nextCursor && !loading && !appending) fetchList(nextCursor, true)
   }
 
   const copyUrl = (url: string) => {
@@ -493,8 +496,8 @@ export function MediaLibrary(props: MediaLibraryProps) {
               : gridContent}
         {nextCursor && !loading && (
           <div className="flex justify-center pt-4">
-            <Button variant="outline" onClick={loadMore} disabled={loading}>
-              加载更多
+            <Button variant="outline" onClick={loadMore} disabled={appending}>
+              {appending ? <Loader2 className="size-4 animate-spin" /> : "加载更多"}
             </Button>
           </div>
         )}
