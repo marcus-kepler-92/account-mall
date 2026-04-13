@@ -9,7 +9,7 @@ import { PageHeader } from "@/app/admin/components"
 export const dynamic = "force-dynamic"
 
 export default async function AdminProductsPage() {
-    const [products, stockCounts] = await Promise.all([
+    const [products, stockCounts, salesCounts] = await Promise.all([
         prisma.product.findMany({
             include: {
                 tags: { select: { id: true, name: true, slug: true } },
@@ -21,9 +21,15 @@ export default async function AdminProductsPage() {
             where: { status: "UNSOLD" },
             _count: { id: true },
         }),
+        prisma.order.groupBy({
+            by: ["productId"],
+            where: { status: "COMPLETED" },
+            _sum: { quantity: true },
+        }),
     ])
 
     const stockMap = new Map(stockCounts.map((s) => [s.productId, s._count.id]))
+    const salesMap = new Map(salesCounts.map((s) => [s.productId, s._sum.quantity ?? 0]))
 
     const data: ProductRow[] = products.map((p) => ({
         id: p.id,
@@ -34,6 +40,7 @@ export default async function AdminProductsPage() {
         price: Number(p.price),
         tags: p.tags,
         stock: stockMap.get(p.id) ?? 0,
+        sales: salesMap.get(p.id) ?? 0,
     }))
 
     return (

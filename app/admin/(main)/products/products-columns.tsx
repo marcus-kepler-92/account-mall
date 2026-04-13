@@ -17,6 +17,7 @@ export type ProductRow = {
     price: number
     tags: { id: string; name: string; slug: string }[]
     stock: number
+    sales: number
 }
 
 const statusMap: Record<ProductRow["status"], { label: string; variant: "default" | "secondary" }> = {
@@ -62,6 +63,10 @@ export const productsColumns: ColumnDef<ProductRow>[] = [
     {
         accessorKey: "stock",
         header: ({ column }) => <DataTableColumnHeader column={column} title="库存" />,
+    },
+    {
+        accessorKey: "sales",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="销量" />,
     },
     {
         accessorKey: "status",
