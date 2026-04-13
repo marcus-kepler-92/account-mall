@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useEffect, useState } from "react"
 import {
     LayoutDashboard,
     Package,
@@ -32,6 +33,7 @@ import {
     SidebarGroupLabel,
     SidebarHeader,
     SidebarMenu,
+    SidebarMenuBadge,
     SidebarMenuButton,
     SidebarMenuItem,
     SidebarRail,
@@ -113,6 +115,14 @@ export function AdminSidebar() {
     useTheme()
     const siteName = useSiteName()
     const adminPanelLabel = useAdminPanelLabel()
+    const [pendingWithdrawals, setPendingWithdrawals] = useState(0)
+
+    useEffect(() => {
+        fetch("/api/admin/withdrawals/count")
+            .then((r) => r.json())
+            .then((data) => setPendingWithdrawals(data.pending ?? 0))
+            .catch(() => {})
+    }, [])
 
     const handleSignOut = async () => {
         await authClient.signOut({
@@ -161,6 +171,9 @@ export function AdminSidebar() {
                                             <span>{item.title}</span>
                                         </Link>
                                     </SidebarMenuButton>
+                                    {item.href === "/admin/withdrawals" && pendingWithdrawals > 0 && (
+                                        <SidebarMenuBadge>{pendingWithdrawals}</SidebarMenuBadge>
+                                    )}
                                 </SidebarMenuItem>
                             ))}
                         </SidebarMenu>
