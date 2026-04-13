@@ -255,6 +255,22 @@ app/admin/(main)/{resource}/
 - 服务端分页页面：`DataTableToolbar` + `DataTableFacetedFilter` + `DataTablePagination`（均从 `@/app/admin/components` 导入）
 - 客户端过滤页面：`DataTable` + `DataTableViewOptions`（可手工搭配 Input + Badge 筛选）
 - 批量操作用 `DataTableSelectionBar`
+- 服务端分页时 `DataTablePagination` 从 `useSearchParams()` 读 page/pageSize，**不**从 `table.getState().pagination` 读；`useReactTable` 设 `manualPagination: true` 但不传 `pagination` state
+
+**Next 16 `searchParams` 是 Promise**：RSC `page.tsx` 接收的 `searchParams` 类型为 `Promise<{...}>`，必须先 `await` 再解析：
+```typescript
+export default async function Page({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
+  const params = await searchParams
+  const filters = parseFilters(params)
+  // ...
+}
+```
+
+**批量操作 API 约定**：
+- 路由：`POST /api/{resource}/batch`
+- Body：`{ action: "DELETE" | "DISABLE" | "ENABLE", ids: string[] }`
+- 响应：`{ success: number, skipped?: number, errors?: string[] }`
+- 按业务规则限制允许的状态（如只有 UNSOLD 的卡密可删除）
 
 **代码风格**：
 - 不用分号（ASI）
