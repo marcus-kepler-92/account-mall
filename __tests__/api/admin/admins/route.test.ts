@@ -70,7 +70,8 @@ describe("POST /api/admin/admins", () => {
 
   it("creates user and account, returns generated password", async () => {
     prismaMock.user.findUnique.mockResolvedValue(null)
-    prismaMock.$transaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(prismaMock.$transaction as any).mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
       fn(prismaMock)
     )
     prismaMock.user.create.mockResolvedValue({ ...mockAdmin, id: "new-1" } as any)
