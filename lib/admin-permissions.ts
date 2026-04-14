@@ -29,6 +29,9 @@ export function resolvePermissions(adminRole: string | null) {
 
   return {
     isSuperAdmin: adminRole === null,
+    // Unknown roles (config === null but adminRole !== null) default to full access:
+    // allowedMenus = null means no menu restriction; canReassignDistributor = true.
+    // isSuperAdmin stays false to distinguish from actual super admins (adminRole === null).
     allowedMenus: config ? [...config.allowedMenus] as string[] : null,
     canReassignDistributor: config
       ? !config.disabledFeatures.includes("order:reassign-distributor")
