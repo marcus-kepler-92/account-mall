@@ -61,13 +61,21 @@ describe("PATCH /api/admin/admins/[id]", () => {
 
   it("resetPassword returns new password", async () => {
     prismaMock.user.findUnique.mockResolvedValue({ id: "admin-2", role: "ADMIN" } as any)
-    prismaMock.account.updateMany.mockResolvedValue({ count: 1 } as any)
-    prismaMock.user.update.mockResolvedValue({ id: "admin-2" } as any)
+    prismaMock.$transaction.mockResolvedValue([{ count: 1 }, { id: "admin-2" }] as any)
+
     const res = await PATCH(makeReq({ action: "resetPassword" }), makeContext())
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.password).toBeDefined()
     expect(body.password.length).toBeGreaterThanOrEqual(16)
+  })
+
+  it("resetPassword returns 404 when admin has no credential account", async () => {
+    prismaMock.user.findUnique.mockResolvedValue({ id: "admin-2", role: "ADMIN" } as any)
+    prismaMock.$transaction.mockResolvedValue([{ count: 0 }, {}] as any)
+
+    const res = await PATCH(makeReq({ action: "resetPassword" }), makeContext())
+    expect(res.status).toBe(404)
   })
 })
 

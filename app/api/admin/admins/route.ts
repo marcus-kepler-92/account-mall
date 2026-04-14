@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
-import { randomBytes } from "crypto"
 import { hashPassword } from "better-auth/crypto"
 import { prisma } from "@/lib/prisma"
 import { getSuperAdminSession } from "@/lib/auth-guard"
-import { unauthorized, badRequest, conflict, internalServerError, invalidJsonBody, validationError } from "@/lib/api-response"
+import { unauthorized, conflict, invalidJsonBody, validationError } from "@/lib/api-response"
 import { ADMIN_ROLE_CONFIG, type AdminSubRole } from "@/lib/admin-permissions"
+import { generatePassword } from "@/lib/password-utils"
 
 const VALID_SUB_ROLES = Object.keys(ADMIN_ROLE_CONFIG) as AdminSubRole[]
 
@@ -14,12 +14,6 @@ const createSchema = z.object({
   name: z.string().min(1).max(100),
   adminRole: z.enum(VALID_SUB_ROLES as [AdminSubRole, ...AdminSubRole[]]).nullable(),
 })
-
-function generatePassword(length = 16): string {
-  const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789"
-  const bytes = randomBytes(length)
-  return Array.from(bytes).map(b => chars[b % chars.length]).join("")
-}
 
 export async function GET() {
   const session = await getSuperAdminSession()
@@ -53,8 +47,8 @@ export async function POST(request: NextRequest) {
   const hashedPwd = await hashPassword(password)
   const now = new Date()
 
-  try {
-    const user = await prisma.user.create({
+  const user = await prisma.$transaction(async (tx) => {
+    const u = await tx.user.create({
       data: {
         email,
         name,
@@ -66,28 +60,26 @@ export async function POST(request: NextRequest) {
         updatedAt: now,
       },
     })
-
-    await prisma.account.create({
+    await tx.account.create({
       data: {
-        userId: user.id,
-        accountId: user.id,
+        userId: u.id,
+        accountId: u.id,
         providerId: "credential",
         password: hashedPwd,
         createdAt: now,
         updatedAt: now,
       },
     })
+    return u
+  })
 
-    return NextResponse.json(
-      {
-        user: { id: user.id, email: user.email, name: user.name, adminRole: user.adminRole, createdAt: user.createdAt },
-        password,
-      },
-      { status: 201 }
-    )
-  } catch {
-    return internalServerError()
-  }
+  return NextResponse.json(
+    {
+      user: { id: user.id, email: user.email, name: user.name, adminRole: user.adminRole, createdAt: user.createdAt },
+      password,
+    },
+    { status: 201 }
+  )
 }
 
 export const runtime = "nodejs"
