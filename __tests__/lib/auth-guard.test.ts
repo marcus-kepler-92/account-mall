@@ -15,7 +15,7 @@ jest.mock("@/lib/prisma", () => {
     return { __esModule: true, prisma: prismaMock }
 })
 
-import { getDistributorSession, getAdminSession } from "@/lib/auth-guard"
+import { getDistributorSession, getAdminSession, getSessionForAdminArea, getSuperAdminSession } from "@/lib/auth-guard"
 import { prismaMock } from "../../__mocks__/prisma"
 
 describe("getDistributorSession", () => {
@@ -88,4 +88,64 @@ describe("getAdminSession", () => {
         prismaMock.user.findUnique.mockResolvedValue({ role: "ADMIN" } as any)
         expect(await getAdminSession()).toEqual(session)
     })
+})
+
+describe("getSessionForAdminArea", () => {
+  beforeEach(() => {
+    mockGetSession.mockReset()
+    prismaMock.user.findUnique.mockReset()
+  })
+
+  it("returns null when no session", async () => {
+    mockGetSession.mockResolvedValue(null)
+    expect(await getSessionForAdminArea()).toBeNull()
+  })
+
+  it("returns role, adminRole, and mustChangePassword from DB", async () => {
+    const session = { user: { id: "a1", email: "a@b.com", name: "A" } }
+    mockGetSession.mockResolvedValue(session)
+    prismaMock.user.findUnique.mockResolvedValue({
+      role: "ADMIN",
+      adminRole: "SYSTEM_OPS",
+      mustChangePassword: true,
+    } as any)
+
+    const result = await getSessionForAdminArea()
+    expect(result).not.toBeNull()
+    expect(result!.role).toBe("ADMIN")
+    expect(result!.adminRole).toBe("SYSTEM_OPS")
+    expect(result!.mustChangePassword).toBe(true)
+  })
+})
+
+describe("getSuperAdminSession", () => {
+  beforeEach(() => {
+    mockGetSession.mockReset()
+    prismaMock.user.findUnique.mockReset()
+  })
+
+  it("returns null when not authenticated", async () => {
+    mockGetSession.mockResolvedValue(null)
+    expect(await getSuperAdminSession()).toBeNull()
+  })
+
+  it("returns null when role is not ADMIN", async () => {
+    mockGetSession.mockResolvedValue({ user: { id: "u1" } })
+    prismaMock.user.findUnique.mockResolvedValue({ role: "DISTRIBUTOR", adminRole: null, mustChangePassword: false } as any)
+    expect(await getSuperAdminSession()).toBeNull()
+  })
+
+  it("returns null when user is a sub-role admin (adminRole !== null)", async () => {
+    const session = { user: { id: "a1" } }
+    mockGetSession.mockResolvedValue(session)
+    prismaMock.user.findUnique.mockResolvedValue({ role: "ADMIN", adminRole: "SYSTEM_OPS", mustChangePassword: false } as any)
+    expect(await getSuperAdminSession()).toBeNull()
+  })
+
+  it("returns session when user is super admin (ADMIN + adminRole null)", async () => {
+    const session = { user: { id: "a1" } }
+    mockGetSession.mockResolvedValue(session)
+    prismaMock.user.findUnique.mockResolvedValue({ role: "ADMIN", adminRole: null, mustChangePassword: false } as any)
+    expect(await getSuperAdminSession()).toEqual(session)
+  })
 })
