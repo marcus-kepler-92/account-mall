@@ -47,6 +47,7 @@ interface OrdersDataTableProps {
         CLOSED: number;
     };
     distributors: DistributorOption[];
+    canReassignDistributor: boolean;
 }
 
 const statusOptions = [
@@ -55,7 +56,7 @@ const statusOptions = [
     { label: "已关闭", value: "CLOSED" },
 ];
 
-export function OrdersDataTable({ data, total, statusCounts, distributors }: OrdersDataTableProps) {
+export function OrdersDataTable({ data, total, statusCounts, distributors, canReassignDistributor }: OrdersDataTableProps) {
     const router = useRouter();
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
@@ -70,7 +71,7 @@ export function OrdersDataTable({ data, total, statusCounts, distributors }: Ord
     )
     const sorting: SortingState = parseSortingState(sortState.sort, sortState.sortDir, SORT_DEFAULTS)
 
-    const columns = useMemo(() => createOrdersColumns(distributors), [distributors]);
+    const columns = useMemo(() => createOrdersColumns(distributors, canReassignDistributor), [distributors, canReassignDistributor]);
 
     const table = useReactTable({
         data,
