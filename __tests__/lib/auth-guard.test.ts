@@ -76,7 +76,7 @@ describe("getAdminSession", () => {
         mockGetSession.mockResolvedValue({
             user: { id: "u1", email: "a@b.com", name: "A", role: "DISTRIBUTOR" },
         })
-        prismaMock.user.findUnique.mockResolvedValue({ role: "DISTRIBUTOR" } as any)
+        prismaMock.user.findUnique.mockResolvedValue({ role: "DISTRIBUTOR", adminRole: null, mustChangePassword: false } as any)
         expect(await getAdminSession()).toBeNull()
     })
 
@@ -85,7 +85,14 @@ describe("getAdminSession", () => {
             user: { id: "admin_1", email: "a@b.com", name: "Admin", role: "ADMIN" },
         }
         mockGetSession.mockResolvedValue(session)
-        prismaMock.user.findUnique.mockResolvedValue({ role: "ADMIN" } as any)
+        prismaMock.user.findUnique.mockResolvedValue({ role: "ADMIN", adminRole: null, mustChangePassword: false } as any)
+        expect(await getAdminSession()).toEqual(session)
+    })
+
+    it("returns session when user is ADMIN with sub-role", async () => {
+        const session = { user: { id: "sub_1", email: "s@b.com", name: "Sub", role: "ADMIN" } }
+        mockGetSession.mockResolvedValue(session)
+        prismaMock.user.findUnique.mockResolvedValue({ role: "ADMIN", adminRole: "SYSTEM_OPS", mustChangePassword: false } as any)
         expect(await getAdminSession()).toEqual(session)
     })
 })
@@ -98,6 +105,12 @@ describe("getSessionForAdminArea", () => {
 
   it("returns null when no session", async () => {
     mockGetSession.mockResolvedValue(null)
+    expect(await getSessionForAdminArea()).toBeNull()
+  })
+
+  it("returns null when dbUser not found", async () => {
+    mockGetSession.mockResolvedValue({ user: { id: "ghost" } })
+    prismaMock.user.findUnique.mockResolvedValue(null)
     expect(await getSessionForAdminArea()).toBeNull()
   })
 
@@ -115,6 +128,10 @@ describe("getSessionForAdminArea", () => {
     expect(result!.role).toBe("ADMIN")
     expect(result!.adminRole).toBe("SYSTEM_OPS")
     expect(result!.mustChangePassword).toBe(true)
+    expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
+      where: { id: "a1" },
+      select: { role: true, adminRole: true, mustChangePassword: true },
+    })
   })
 })
 
