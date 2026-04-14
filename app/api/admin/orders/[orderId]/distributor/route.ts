@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { prisma } from "@/lib/prisma"
-import { getAdminSession } from "@/lib/auth-guard"
+import { getSuperAdminSession } from "@/lib/auth-guard"
 import {
   unauthorized,
   notFound,
@@ -20,7 +20,7 @@ const schema = z.object({
 type RouteContext = { params: Promise<{ orderId: string }> }
 
 export async function PATCH(request: NextRequest, context: RouteContext) {
-  const session = await getAdminSession()
+  const session = await getSuperAdminSession()
   if (!session) return unauthorized()
 
   const { orderId } = await context.params

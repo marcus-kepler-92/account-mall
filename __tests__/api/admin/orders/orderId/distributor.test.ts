@@ -1,10 +1,10 @@
 import { PATCH } from "@/app/api/admin/orders/[orderId]/distributor/route"
 import { prismaMock } from "../../../../../__mocks__/prisma"
-import { getAdminSession } from "@/lib/auth-guard"
+import { getSuperAdminSession } from "@/lib/auth-guard"
 import * as commissionsModule from "@/lib/calculate-order-commission"
 import { NextRequest } from "next/server"
 
-jest.mock("@/lib/auth-guard", () => ({ getAdminSession: jest.fn() }))
+jest.mock("@/lib/auth-guard", () => ({ getSuperAdminSession: jest.fn() }))
 jest.mock("@/lib/calculate-order-commission", () => ({
   createOrderCommissions: jest.fn(),
   // Use the real toNumber — it's pure and has no side-effects
@@ -42,7 +42,7 @@ function makeContext(orderId = "order-1") {
 
 beforeEach(() => {
   jest.clearAllMocks()
-  ;(getAdminSession as jest.Mock).mockResolvedValue(mockSession)
+  ;(getSuperAdminSession as jest.Mock).mockResolvedValue(mockSession)
   prismaMock.order.findUnique.mockResolvedValue(mockCompletedOrder)
   prismaMock.commission.count.mockResolvedValue(0)  // no WITHDRAWN commissions by default
   prismaMock.commission.findMany.mockResolvedValue([])
@@ -57,7 +57,7 @@ beforeEach(() => {
 
 describe("PATCH /api/admin/orders/[orderId]/distributor", () => {
   it("returns 401 when not admin", async () => {
-    ;(getAdminSession as jest.Mock).mockResolvedValue(null)
+    ;(getSuperAdminSession as jest.Mock).mockResolvedValue(null)
     const res = await PATCH(makeRequest({ distributorId: "dist-1" }), makeContext())
     expect(res.status).toBe(401)
   })
