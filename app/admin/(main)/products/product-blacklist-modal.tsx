@@ -59,7 +59,7 @@ export function ProductBlacklistModal({ productId, productName, open, onOpenChan
             const res = await fetch(`/api/admin/products/${productId}/blacklist`, { method: "POST" })
             if (!res.ok) { toast.error("清理失败"); return }
             const data = await res.json() as { removed: number }
-            toast.success(`已清理 ${data.removed} 条过期记录`)
+            toast.success(`已清理 ${data.removed} 条无效记录`)
             await fetchBlacklist()
         } catch {
             toast.error("网络异常")
@@ -136,7 +136,7 @@ export function ProductBlacklistModal({ productId, productName, open, onOpenChan
                             ) : (
                                 <Clock className="size-3.5" />
                             )}
-                            清理过期
+                            清理无效账号
                         </Button>
                         <Button
                             variant="outline"
