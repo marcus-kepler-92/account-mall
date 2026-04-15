@@ -14,9 +14,10 @@ jest.mock("@/lib/prisma", () => {
 jest.mock("@/lib/auth-guard", () => ({
   __esModule: true,
   getAdminSession: jest.fn(),
+  getSuperAdminSession: jest.fn(),
 }));
 
-import { getAdminSession } from "@/lib/auth-guard";
+import { getAdminSession, getSuperAdminSession } from "@/lib/auth-guard";
 
 type RouteContext = { params: Promise<{ productId: string }> };
 
@@ -299,9 +300,11 @@ describe("PUT /api/products/[productId]", () => {
 
 describe("DELETE /api/products/[productId]", () => {
   const adminSessionMock = getAdminSession as jest.Mock;
+  const superAdminSessionMock = getSuperAdminSession as jest.Mock;
 
   beforeEach(() => {
     adminSessionMock.mockReset();
+    superAdminSessionMock.mockReset();
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -356,7 +359,7 @@ describe("DELETE /api/products/[productId]", () => {
 
   describe("permanent=true (hard delete)", () => {
     it("returns 400 when product is ACTIVE", async () => {
-      adminSessionMock.mockResolvedValueOnce({ id: "admin_1" });
+      superAdminSessionMock.mockResolvedValueOnce({ id: "admin_1" });
       prismaMock.product.findUnique.mockResolvedValueOnce({
         id: "prod_1",
         status: "ACTIVE",
@@ -375,7 +378,7 @@ describe("DELETE /api/products/[productId]", () => {
     });
 
     it("returns 400 when product has orders", async () => {
-      adminSessionMock.mockResolvedValueOnce({ id: "admin_1" });
+      superAdminSessionMock.mockResolvedValueOnce({ id: "admin_1" });
       prismaMock.product.findUnique.mockResolvedValueOnce({
         id: "prod_1",
         status: "INACTIVE",
@@ -397,7 +400,7 @@ describe("DELETE /api/products/[productId]", () => {
     });
 
     it("hard-deletes product and related data when INACTIVE and no orders", async () => {
-      adminSessionMock.mockResolvedValueOnce({ id: "admin_1" });
+      superAdminSessionMock.mockResolvedValueOnce({ id: "admin_1" });
       prismaMock.product.findUnique.mockResolvedValueOnce({
         id: "prod_1",
         status: "INACTIVE",

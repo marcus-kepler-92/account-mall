@@ -13,9 +13,10 @@ jest.mock("@/lib/prisma", () => {
 jest.mock("@/lib/auth-guard", () => ({
     __esModule: true,
     getAdminSession: jest.fn(),
+    getSuperAdminSession: jest.fn(),
 }));
 
-import { getAdminSession } from "@/lib/auth-guard";
+import { getAdminSession, getSuperAdminSession } from "@/lib/auth-guard";
 
 function createRequest(body: Record<string, unknown>): NextRequest {
     return new Request("http://x", {
@@ -27,9 +28,13 @@ function createRequest(body: Record<string, unknown>): NextRequest {
 
 describe("POST /api/cards/batch", () => {
     const adminSessionMock = getAdminSession as jest.Mock;
+    const superAdminSessionMock = getSuperAdminSession as jest.Mock;
 
     beforeEach(() => {
         adminSessionMock.mockReset();
+        superAdminSessionMock.mockReset();
+        // Default: super admin access for DELETE tests
+        superAdminSessionMock.mockResolvedValue({ id: "admin_1" });
         prismaMock.card.findMany.mockReset();
         prismaMock.card.deleteMany.mockReset();
         prismaMock.card.updateMany.mockReset();

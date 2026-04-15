@@ -11,6 +11,10 @@ jest.mock(
     () => ({ ProductsTableWrapper: () => null }),
 )
 jest.mock("@/app/admin/components", () => ({ PageHeader: () => null }))
+jest.mock("@/lib/admin-permissions", () => ({
+    __esModule: true,
+    getAdminPermissions: jest.fn().mockResolvedValue({ isSuperAdmin: true }),
+}))
 
 import AdminProductsPage from "@/app/admin/(main)/products/page"
 

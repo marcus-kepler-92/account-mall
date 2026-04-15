@@ -14,9 +14,10 @@ jest.mock("@/lib/prisma", () => {
 jest.mock("@/lib/auth-guard", () => ({
     __esModule: true,
     getAdminSession: jest.fn(),
+    getSuperAdminSession: jest.fn(),
 }))
 
-import { getAdminSession } from "@/lib/auth-guard"
+import { getAdminSession, getSuperAdminSession } from "@/lib/auth-guard"
 
 function createUrlRequest(url: string): NextRequest {
     return { url } as unknown as NextRequest
@@ -205,14 +206,14 @@ describe("GET /api/products", () => {
 })
 
 describe("POST /api/products", () => {
-    const adminSessionMock = getAdminSession as jest.Mock
+    const superAdminSessionMock = getSuperAdminSession as jest.Mock
 
     beforeEach(() => {
-        adminSessionMock.mockReset()
+        superAdminSessionMock.mockReset()
     })
 
     it("returns 401 when not authenticated", async () => {
-        adminSessionMock.mockResolvedValueOnce(null)
+        superAdminSessionMock.mockResolvedValueOnce(null)
 
         const res = await POST(
             createJsonRequest({
@@ -228,7 +229,7 @@ describe("POST /api/products", () => {
     })
 
     it("returns 400 when body is invalid JSON", async () => {
-        adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
+        superAdminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
         const req = {
             json: async () => {
                 throw new Error("bad json")
@@ -243,7 +244,7 @@ describe("POST /api/products", () => {
     })
 
     it("returns 400 when validation fails (missing name)", async () => {
-        adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
+        superAdminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
 
         const res = await POST(
             createJsonRequest({
@@ -259,7 +260,7 @@ describe("POST /api/products", () => {
     })
 
     it("returns 409 when slug already exists", async () => {
-        adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
+        superAdminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
         prismaMock.product.findUnique.mockResolvedValueOnce({
             id: "existing",
             slug: "test",
@@ -281,7 +282,7 @@ describe("POST /api/products", () => {
     })
 
     it("creates product without tags when tagIds empty", async () => {
-        adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
+        superAdminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
         prismaMock.product.findUnique.mockResolvedValueOnce(null)
         prismaMock.product.aggregate.mockResolvedValueOnce({ _max: { sortOrder: 4 } } as any)
         prismaMock.product.create.mockResolvedValueOnce({
@@ -314,7 +315,7 @@ describe("POST /api/products", () => {
     })
 
     it("creates product and returns 201 with tag relation", async () => {
-        adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
+        superAdminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
         prismaMock.product.findUnique.mockResolvedValueOnce(null)
         prismaMock.product.aggregate.mockResolvedValueOnce({ _max: { sortOrder: null } } as any)
         const created = {
