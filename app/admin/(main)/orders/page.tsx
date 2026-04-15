@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma"
+import { getAdminPermissions } from "@/lib/admin-permissions"
 import { parseServerSort } from "@/lib/table-sort"
 import { formatCurrency } from "@/lib/utils"
 import { Clock, CheckCircle2, XCircle, DollarSign } from "lucide-react"
@@ -91,6 +92,9 @@ export default async function AdminOrdersPage({
         }
         where.createdAt = createdAt
     }
+
+    const perms = await getAdminPermissions()
+    const canReassignDistributor = perms?.canReassignDistributor ?? false
 
     const [orders, total, statusCounts, revenueAgg, distributors] = await Promise.all([
         prisma.order.findMany({
@@ -232,6 +236,7 @@ export default async function AdminOrdersPage({
                     name: d.name ?? "",
                     distributorCode: d.distributorCode,
                 }))}
+                canReassignDistributor={canReassignDistributor}
             />
         </div>
     )

@@ -32,6 +32,7 @@ interface OrderDistributorCellProps {
   orderStatus: "PENDING" | "COMPLETED" | "CLOSED"
   distributor: { id: string; name: string; distributorCode: string | null } | null
   distributors: DistributorOption[]
+  readOnly?: boolean
 }
 
 type Step = "select" | "confirm"
@@ -41,6 +42,7 @@ export function OrderDistributorCell({
   orderStatus,
   distributor,
   distributors,
+  readOnly = false,
 }: OrderDistributorCellProps) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -56,7 +58,7 @@ export function OrderDistributorCell({
     }
   }
 
-  if (orderStatus !== "COMPLETED") {
+  if (orderStatus !== "COMPLETED" || readOnly) {
     return distributor ? (
       <div className="flex flex-col text-xs">
         <span>{distributor.name}</span>

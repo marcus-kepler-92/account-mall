@@ -19,6 +19,7 @@ import {
     FlaskConical,
     Mail,
     Landmark,
+    ShieldCheck,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { authClient } from "@/lib/auth-client"
@@ -40,76 +41,32 @@ import {
 } from "@/components/ui/sidebar"
 import { useSiteName, useAdminPanelLabel } from "@/app/components/site-name-provider"
 
-// Navigation items for the admin panel
-const navItems = [
-    {
-        title: "仪表盘",
-        href: "/admin/dashboard",
-        icon: LayoutDashboard,
-    },
-    {
-        title: "商品管理",
-        href: "/admin/products",
-        icon: Package,
-    },
-    {
-        title: "订单管理",
-        href: "/admin/orders",
-        icon: ShoppingCart,
-    },
-    {
-        title: "卡密管理",
-        href: "/admin/cards",
-        icon: CreditCard,
-    },
-    {
-        title: "公告管理",
-        href: "/admin/announcements",
-        icon: Megaphone,
-    },
-    {
-        title: "分销指南",
-        href: "/admin/guides",
-        icon: BookOpen,
-    },
-    {
-        title: "分销员管理",
-        href: "/admin/distributors",
-        icon: Users,
-    },
-    {
-        title: "阶梯佣金配置",
-        href: "/admin/commission-tiers",
-        icon: Layers,
-    },
-    {
-        title: "提现管理",
-        href: "/admin/withdrawals",
-        icon: Wallet,
-    },
-    {
-        title: "收款渠道",
-        href: "/admin/payment-channels",
-        icon: Landmark,
-    },
-    {
-        title: "文件管理",
-        href: "/admin/files",
-        icon: FolderOpen,
-    },
-    {
-        title: "自动获取验证",
-        href: "/admin/auto-fetch",
-        icon: FlaskConical,
-    },
-    {
-        title: "邮件营销",
-        href: "/admin/email-marketing",
-        icon: Mail,
-    },
+const allNavItems = [
+    { title: "仪表盘", href: "/admin/dashboard", icon: LayoutDashboard },
+    { title: "商品管理", href: "/admin/products", icon: Package },
+    { title: "订单管理", href: "/admin/orders", icon: ShoppingCart },
+    { title: "卡密管理", href: "/admin/cards", icon: CreditCard },
+    { title: "公告管理", href: "/admin/announcements", icon: Megaphone },
+    { title: "分销指南", href: "/admin/guides", icon: BookOpen },
+    { title: "分销员管理", href: "/admin/distributors", icon: Users },
+    { title: "阶梯佣金配置", href: "/admin/commission-tiers", icon: Layers },
+    { title: "提现管理", href: "/admin/withdrawals", icon: Wallet },
+    { title: "收款渠道", href: "/admin/payment-channels", icon: Landmark },
+    { title: "文件管理", href: "/admin/files", icon: FolderOpen },
+    { title: "自动获取验证", href: "/admin/auto-fetch", icon: FlaskConical },
+    { title: "邮件营销", href: "/admin/email-marketing", icon: Mail },
 ]
 
-export function AdminSidebar() {
+const superAdminOnlyItems = [
+    { title: "管理员管理", href: "/admin/admins", icon: ShieldCheck },
+]
+
+interface AdminSidebarProps {
+    allowedMenus: string[] | null
+    isSuperAdmin: boolean
+}
+
+export function AdminSidebar({ allowedMenus, isSuperAdmin }: AdminSidebarProps) {
     const pathname = usePathname()
     const router = useRouter()
     useTheme()
@@ -133,6 +90,11 @@ export function AdminSidebar() {
             },
         })
     }
+
+    const navItems = [
+        ...allNavItems.filter(item => !allowedMenus || allowedMenus.includes(item.href)),
+        ...(isSuperAdmin ? superAdminOnlyItems : []),
+    ]
 
     return (
         <Sidebar collapsible="icon">

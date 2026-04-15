@@ -42,7 +42,7 @@ const paymentMethodLabel: Record<string, string> = {
     qqpay: "QQ钱包",
 }
 
-export function createOrdersColumns(distributors: DistributorOption[]): ColumnDef<OrderRow>[] {
+export function createOrdersColumns(distributors: DistributorOption[], canReassignDistributor: boolean): ColumnDef<OrderRow>[] {
     return [
     {
         id: "select",
@@ -99,6 +99,7 @@ export function createOrdersColumns(distributors: DistributorOption[]): ColumnDe
                 orderStatus={row.original.status}
                 distributor={row.original.distributor}
                 distributors={distributors}
+                readOnly={!canReassignDistributor}
             />
         ),
         enableSorting: false,
