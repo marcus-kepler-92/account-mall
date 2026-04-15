@@ -10,6 +10,7 @@ export const ADMIN_ROLE_CONFIG = {
       "/admin/guides",
       "/admin/files",
       "/admin/auto-fetch",
+      "/admin/cards",
     ] as const,
     disabledFeatures: ["order:reassign-distributor"] as const,
   },
