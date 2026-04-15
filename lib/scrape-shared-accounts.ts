@@ -385,7 +385,7 @@ async function executeVoidloginsStrategy(code: string, password: string): Promis
         })
 
         if (!res.ok) {
-            console.warn(`[voidlogins] HTTP ${res.status} from ${voidloginsBaseUrl}`)
+            console.warn(`[voidlogins] HTTP ${res.status} from ${appleHostingBaseUrl}`)
             return []
         }
 
