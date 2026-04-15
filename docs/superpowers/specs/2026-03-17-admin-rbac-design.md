@@ -45,7 +45,8 @@ export const ADMIN_ROLE_CONFIG = {
       "/admin/files",
       "/admin/auto-fetch",
     ],
-    disabledFeatures: new Set(["order:reassign-distributor"]),
+    // Use array (not Set) for compatibility with `as const`
+    disabledFeatures: ["order:reassign-distributor"] as const,
   },
 } as const
 
@@ -63,7 +64,8 @@ export const getAdminPermissions = cache(async () => {
     isSuperAdmin,
     // null = no restriction (super admin sees all menus)
     allowedMenus: config?.allowedMenus ?? null,
-    canReassignDistributor: !config?.disabledFeatures.has("order:reassign-distributor"),
+    canReassignDistributor: !config?.disabledFeatures.includes("order:reassign-distributor"),
+    mustChangePassword: result?.mustChangePassword ?? false,
   }
 })
 ```
@@ -148,9 +150,10 @@ All endpoints: verify caller is authenticated + `adminRole === null` (super admi
 
 **Enforcement**: In `app/admin/(main)/layout.tsx`, after session check:
 ```ts
-const dbUser = await prisma.user.findUnique({ where: { id: userId }, select: { mustChangePassword: true } })
-if (dbUser?.mustChangePassword) redirect("/admin/change-password")
+const { mustChangePassword } = await getAdminPermissions()
+if (mustChangePassword) redirect("/admin/change-password")
 ```
+No extra DB query — `getAdminPermissions()` is already called for sidebar and is `cache()`-memoized.
 
 Also in `app/admin/login/page.tsx` (post-login redirect): already handled by layout guard above.
 
@@ -170,10 +173,10 @@ app/admin/(main)/admins/
 app/admin/change-password/
   page.tsx
   change-password-form.tsx
-api/admin/admins/
+app/api/admin/admins/
   route.ts              (GET, POST)
   [id]/route.ts         (PATCH, DELETE)
-api/admin/change-password/
+app/api/admin/change-password/
   route.ts              (POST)
 ```
 
