@@ -95,6 +95,13 @@ describe("getAdminSession", () => {
         prismaMock.user.findUnique.mockResolvedValue({ role: "ADMIN", adminRole: "SYSTEM_OPS", mustChangePassword: false } as any)
         expect(await getAdminSession()).toEqual(session)
     })
+
+    it("returns null when mustChangePassword is true", async () => {
+        const session = { user: { id: "admin_2", email: "b@b.com", name: "Admin2", role: "ADMIN" } }
+        mockGetSession.mockResolvedValue(session)
+        prismaMock.user.findUnique.mockResolvedValue({ role: "ADMIN", adminRole: null, mustChangePassword: true } as any)
+        expect(await getAdminSession()).toBeNull()
+    })
 })
 
 describe("getSessionForAdminArea", () => {

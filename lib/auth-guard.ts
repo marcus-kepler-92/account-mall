@@ -27,11 +27,13 @@ export async function getSessionForAdminArea() {
 }
 
 /**
- * Returns the session only if authenticated and role === 'ADMIN' (any sub-role).
+ * Returns the session only if authenticated, role === 'ADMIN', and mustChangePassword is false.
+ * Returns null when mustChangePassword is true to force the admin to change their password first.
  */
 export async function getAdminSession() {
     const result = await getSessionForAdminArea()
     if (!result || result.role !== "ADMIN") return null
+    if (result.mustChangePassword) return null
     return result.session
 }
 

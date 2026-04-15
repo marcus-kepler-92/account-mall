@@ -61,7 +61,14 @@ describe("PATCH /api/admin/admins/[id]", () => {
 
   it("resetPassword returns new password", async () => {
     prismaMock.user.findUnique.mockResolvedValue({ id: "admin-2", role: "ADMIN" } as any)
-    prismaMock.$transaction.mockResolvedValue([{ count: 1 }, { id: "admin-2" }] as any)
+    // Interactive transaction: callback receives a mini-tx object
+    ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: (tx: any) => Promise<unknown>) => {
+      const tx = {
+        account: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+        user: { update: jest.fn().mockResolvedValue({ id: "admin-2" }) },
+      }
+      return fn(tx)
+    })
 
     const res = await PATCH(makeReq({ action: "resetPassword" }), makeContext())
     expect(res.status).toBe(200)
@@ -72,10 +79,31 @@ describe("PATCH /api/admin/admins/[id]", () => {
 
   it("resetPassword returns 404 when admin has no credential account", async () => {
     prismaMock.user.findUnique.mockResolvedValue({ id: "admin-2", role: "ADMIN" } as any)
-    prismaMock.$transaction.mockResolvedValue([{ count: 0 }, {}] as any)
+    ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: (tx: any) => Promise<unknown>) => {
+      const tx = {
+        account: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+        user: { update: jest.fn() },
+      }
+      return fn(tx)
+    })
 
     const res = await PATCH(makeReq({ action: "resetPassword" }), makeContext())
     expect(res.status).toBe(404)
+  })
+
+  it("updateRole returns 400 when demoting the last super admin", async () => {
+    prismaMock.user.findUnique.mockResolvedValue({ id: "admin-2", role: "ADMIN", adminRole: null } as any)
+    prismaMock.user.count.mockResolvedValue(1)
+    const res = await PATCH(makeReq({ action: "updateRole", adminRole: "SYSTEM_OPS" }), makeContext())
+    expect(res.status).toBe(400)
+  })
+
+  it("updateRole allows demotion when multiple super admins exist", async () => {
+    prismaMock.user.findUnique.mockResolvedValue({ id: "admin-2", role: "ADMIN", adminRole: null } as any)
+    prismaMock.user.count.mockResolvedValue(2)
+    prismaMock.user.update.mockResolvedValue({ id: "admin-2", adminRole: "SYSTEM_OPS" } as any)
+    const res = await PATCH(makeReq({ action: "updateRole", adminRole: "SYSTEM_OPS" }), makeContext())
+    expect(res.status).toBe(200)
   })
 })
 
@@ -102,7 +130,22 @@ describe("DELETE /api/admin/admins/[id]", () => {
   })
 
   it("deletes the admin user", async () => {
-    prismaMock.user.findUnique.mockResolvedValue({ id: "admin-2", role: "ADMIN" } as any)
+    prismaMock.user.findUnique.mockResolvedValue({ id: "admin-2", role: "ADMIN", adminRole: "SYSTEM_OPS" } as any)
+    prismaMock.user.delete.mockResolvedValue({ id: "admin-2" } as any)
+    const res = await DELETE(makeDeleteReq(), makeContext())
+    expect(res.status).toBe(200)
+  })
+
+  it("returns 400 when deleting the last super admin", async () => {
+    prismaMock.user.findUnique.mockResolvedValue({ id: "admin-2", role: "ADMIN", adminRole: null } as any)
+    prismaMock.user.count.mockResolvedValue(1)
+    const res = await DELETE(makeDeleteReq(), makeContext())
+    expect(res.status).toBe(400)
+  })
+
+  it("allows deleting a super admin when multiple super admins exist", async () => {
+    prismaMock.user.findUnique.mockResolvedValue({ id: "admin-2", role: "ADMIN", adminRole: null } as any)
+    prismaMock.user.count.mockResolvedValue(2)
     prismaMock.user.delete.mockResolvedValue({ id: "admin-2" } as any)
     const res = await DELETE(makeDeleteReq(), makeContext())
     expect(res.status).toBe(200)

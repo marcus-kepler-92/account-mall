@@ -3,7 +3,7 @@ import { z } from "zod"
 import { hashPassword } from "better-auth/crypto"
 import { prisma } from "@/lib/prisma"
 import { getSuperAdminSession } from "@/lib/auth-guard"
-import { unauthorized, badRequest, notFound, invalidJsonBody, validationError } from "@/lib/api-response"
+import { unauthorized, badRequest, notFound, invalidJsonBody, validationError, internalServerError } from "@/lib/api-response"
 import { ADMIN_ROLE_CONFIG, type AdminSubRole } from "@/lib/admin-permissions"
 import { generatePassword } from "@/lib/password-utils"
 
@@ -37,8 +37,14 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   if (parsed.data.action === "updateRole") {
     if (id === callerId) return badRequest("不能修改自己的角色")
 
-    const target = await prisma.user.findUnique({ where: { id }, select: { id: true, role: true } })
+    const target = await prisma.user.findUnique({ where: { id }, select: { id: true, role: true, adminRole: true } })
     if (!target || target.role !== "ADMIN") return notFound("管理员不存在")
+
+    // Guard: prevent demoting the last super admin
+    if (parsed.data.adminRole !== null && target.adminRole === null) {
+      const superAdminCount = await prisma.user.count({ where: { role: "ADMIN", adminRole: null } })
+      if (superAdminCount <= 1) return badRequest("不能降级最后一个超级管理员")
+    }
 
     const updated = await prisma.user.update({
       where: { id },
@@ -55,17 +61,24 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   const password = generatePassword()
   const hashedPwd = await hashPassword(password)
 
-  const [accountResult] = await prisma.$transaction([
-    prisma.account.updateMany({
-      where: { userId: id, providerId: "credential" },
-      data: { password: hashedPwd },
-    }),
-    prisma.user.update({
-      where: { id },
-      data: { mustChangePassword: true },
-    }),
-  ])
-  if (accountResult.count === 0) return notFound("该管理员没有密码凭证")
+  try {
+    await prisma.$transaction(async (tx) => {
+      const result = await tx.account.updateMany({
+        where: { userId: id, providerId: "credential" },
+        data: { password: hashedPwd },
+      })
+      if (result.count === 0) throw new Error("NO_CREDENTIAL_ACCOUNT")
+      await tx.user.update({
+        where: { id },
+        data: { mustChangePassword: true },
+      })
+    })
+  } catch (err) {
+    if (err instanceof Error && err.message === "NO_CREDENTIAL_ACCOUNT") {
+      return notFound("该管理员没有密码凭证")
+    }
+    return internalServerError()
+  }
   return NextResponse.json({ password })
 }
 
@@ -78,8 +91,14 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
 
   if (id === callerId) return badRequest("不能删除自己的账号")
 
-  const target = await prisma.user.findUnique({ where: { id }, select: { id: true, role: true } })
+  const target = await prisma.user.findUnique({ where: { id }, select: { id: true, role: true, adminRole: true } })
   if (!target || target.role !== "ADMIN") return notFound("管理员不存在")
+
+  // Guard: prevent deleting the last super admin
+  if (target.adminRole === null) {
+    const superAdminCount = await prisma.user.count({ where: { role: "ADMIN", adminRole: null } })
+    if (superAdminCount <= 1) return badRequest("不能删除最后一个超级管理员")
+  }
 
   await prisma.user.delete({ where: { id } })
   return NextResponse.json({ ok: true })
