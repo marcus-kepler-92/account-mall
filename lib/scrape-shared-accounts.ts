@@ -7,6 +7,8 @@
 
 import * as cheerio from "cheerio"
 import { config } from "@/lib/config"
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
+import { VOIDLOGINS_SCHEME, parseVoidloginsSourceUrl } from "@/lib/utils"
 
 /** Only accept accounts with this status; accounts with any other explicit status are rejected. */
 const ALLOWED_STATUS = "正常"
@@ -23,8 +25,8 @@ export interface SharedAccount {
     status: string
     /** Last check timestamp, e.g. "2026-03-01 15:39:23" */
     lastCheckedAt?: string
-    /** Install status, if present on the page */
-    installStatus?: string
+    /** Admin remark from the source platform (e.g. voidlogins frontend_remark) */
+    remark?: string
 }
 
 // ---------------------------------------------------------------------------
@@ -107,8 +109,6 @@ function tryExtractCard($: cheerio.CheerioAPI, el: any, seen: Set<string>): Shar
     if (!isAllowedStatus(status)) return null
 
     const lastCheckedAt = extractGroup(text, LAST_CHECKED_RE)?.trim() ?? undefined
-    const installStatus = extractGroup(text, INSTALL_STATUS_RE) ?? undefined
-
     // --- Account ---
     // 1. Cloudflare XOR-encoded email (data-cfemail attribute); validate result looks like an email
     let account = ""
@@ -156,7 +156,7 @@ function tryExtractCard($: cheerio.CheerioAPI, el: any, seen: Set<string>): Shar
     if (seen.has(account)) return null
 
     seen.add(account)
-    return { account, password, region, status: status || ALLOWED_STATUS, lastCheckedAt, installStatus }
+    return { account, password, region, status: status || ALLOWED_STATUS, lastCheckedAt }
 }
 
 // ---------------------------------------------------------------------------
@@ -192,7 +192,6 @@ function parseAccountsFromHtml(html: string): SharedAccount[] {
                 region,
                 status: status || ALLOWED_STATUS,
                 lastCheckedAt: extractGroup(text, LAST_CHECKED_RE)?.trim() ?? undefined,
-                installStatus: extractGroup(text, INSTALL_STATUS_RE) ?? undefined,
             })
         }
     })
@@ -222,8 +221,7 @@ function parseAccountsFromHtml(html: string): SharedAccount[] {
                     region,
                     status: status || ALLOWED_STATUS,
                     lastCheckedAt: extractGroup(text, LAST_CHECKED_RE)?.trim() ?? undefined,
-                    installStatus: extractGroup(text, INSTALL_STATUS_RE) ?? undefined,
-                })
+                    })
             }
         })
         if (results.length > 0) return results
@@ -244,12 +242,55 @@ function parseAccountsFromHtml(html: string): SharedAccount[] {
                 region,
                 status: ALLOWED_STATUS,
                 lastCheckedAt: extractGroup(text, LAST_CHECKED_RE)?.trim() ?? undefined,
-                installStatus: extractGroup(text, INSTALL_STATUS_RE) ?? undefined,
             })
         }
     }
 
     return results
+}
+
+// ---------------------------------------------------------------------------
+// Voidlogins API
+// ---------------------------------------------------------------------------
+
+interface VoidloginsResponse {
+    code: number
+    status: boolean
+    msg: string
+    accounts: {
+        id: number
+        username: string
+        password: string
+        status: boolean
+        region_display?: string
+        frontend_remark?: string
+        message?: string
+        last_check?: string
+        last_check_success?: number
+        check_interval?: number
+    }[]
+}
+
+// ---------------------------------------------------------------------------
+// Fetch strategies — each fetches raw data and normalises to SharedAccount[]
+// ---------------------------------------------------------------------------
+
+/**
+ * Strategy discriminated union.
+ * Add new kinds here as new AUTO_FETCH source types are introduced.
+ */
+type FetchStrategy =
+    | { kind: "scrape"; urls: string[] }
+    | { kind: "voidlogins"; code: string; password: string }
+
+/** Resolve a stored sourceUrl into the appropriate fetch strategy. */
+function resolveStrategy(sourceUrl: string): FetchStrategy | null {
+    const trimmed = sourceUrl.trim()
+    const voidlogins = parseVoidloginsSourceUrl(trimmed)
+    if (voidlogins) return { kind: "voidlogins", code: voidlogins.code, password: voidlogins.password }
+    const urls = trimmed.split(",").map((u) => u.trim()).filter((u) => u.startsWith("http"))
+    if (urls.length === 0) return null
+    return { kind: "scrape", urls }
 }
 
 // ---------------------------------------------------------------------------
@@ -260,7 +301,7 @@ function parseAccountsFromHtml(html: string): SharedAccount[] {
 const scrapeCache = new Map<string, { data: SharedAccount[]; expiresAt: number }>()
 
 /**
- * Fetch sourceUrl and parse all valid shared accounts.
+ * Fetch sourceUrl and parse all valid shared accounts (HTML scraping).
  * Results are cached for config.autoFetchScrapeCacheTtlMs; empty results are not cached
  * so the next request retries immediately.
  */
@@ -272,19 +313,15 @@ export async function scrapeSharedAccounts(sourceUrl: string): Promise<SharedAcc
     const cached = scrapeCache.get(url)
     if (cached && cached.expiresAt > now) return cached.data
 
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), config.autoFetchScrapeTimeoutMs)
-
     try {
-        const res = await fetch(url, {
-            signal: controller.signal,
+        const res = await fetchWithTimeout(url, {
+            timeoutMs: config.autoFetchScrapeTimeoutMs,
             headers: {
                 "User-Agent": config.autoFetchScrapeUserAgent ?? DEFAULT_USER_AGENT,
                 Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
                 "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
             },
         })
-        clearTimeout(timeoutId)
 
         if (!res.ok) {
             console.warn(`[scrape] HTTP ${res.status} from ${url}`)
@@ -298,20 +335,14 @@ export async function scrapeSharedAccounts(sourceUrl: string): Promise<SharedAcc
         }
         return data
     } catch (err) {
-        clearTimeout(timeoutId)
         console.warn("[scrape] fetch failed:", err instanceof Error ? err.message : err)
         return []
     }
 }
 
-/**
- * Fetch and merge accounts from multiple comma-separated URLs, deduplicating by account.
- */
-export async function scrapeMultipleUrls(sourceUrl: string): Promise<SharedAccount[]> {
-    const urls = sourceUrl.split(",").map((u) => u.trim()).filter((u) => u.startsWith("http"))
-    if (urls.length === 0) return []
+/** Execute the scrape strategy: fetch one or more HTML sources and merge results. */
+async function executeScrapeStrategy(urls: string[]): Promise<SharedAccount[]> {
     if (urls.length === 1) return scrapeSharedAccounts(urls[0])
-
     const lists = await Promise.all(urls.map((u) => scrapeSharedAccounts(u)))
     const seen = new Set<string>()
     const merged: SharedAccount[] = []
@@ -324,4 +355,86 @@ export async function scrapeMultipleUrls(sourceUrl: string): Promise<SharedAccou
         }
     }
     return merged
+}
+
+/** Base URL for the apple hosting API, normalised once at module load. */
+const appleHostingBaseUrl = config.appleHostingUrl.replace(/\/$/, "")
+
+/** Execute the voidlogins strategy: call the apple.voidlogins.com JSON API. */
+async function executeVoidloginsStrategy(code: string, password: string): Promise<SharedAccount[]> {
+    const encodedCode = encodeURIComponent(code)
+    const encodedPassword = password ? encodeURIComponent(password) : ""
+    const cacheKey = encodedPassword
+        ? `${VOIDLOGINS_SCHEME}${encodedCode}/${encodedPassword}`
+        : `${VOIDLOGINS_SCHEME}${encodedCode}`
+
+    const now = Date.now()
+    const cached = scrapeCache.get(cacheKey)
+    if (cached && cached.expiresAt > now) return cached.data
+
+    const apiPath = encodedPassword
+        ? `/shareapi/${encodedCode}/${encodedPassword}`
+        : `/shareapi/${encodedCode}`
+    const url = `${appleHostingBaseUrl}${apiPath}`
+    console.log(`[voidlogins] fetching ${url}`)
+
+    try {
+        const res = await fetchWithTimeout(url, {
+            timeoutMs: config.autoFetchScrapeTimeoutMs,
+            headers: { Accept: "application/json" },
+        })
+
+        if (!res.ok) {
+            console.warn(`[voidlogins] HTTP ${res.status} from ${voidloginsBaseUrl}`)
+            return []
+        }
+
+        const json = await res.json() as VoidloginsResponse
+        if (!json.status || !Array.isArray(json.accounts)) {
+            console.warn(`[voidlogins] API error: ${json.msg}`)
+            return []
+        }
+
+        const seen = new Set<string>()
+        const data: SharedAccount[] = []
+        for (const acc of json.accounts) {
+            if (!acc.username || !acc.password) continue
+            if (!acc.status) continue
+            if (seen.has(acc.username)) continue
+            seen.add(acc.username)
+            data.push({
+                account: acc.username,
+                password: acc.password,
+                region: acc.region_display || "未知",
+                status: ALLOWED_STATUS,
+                ...(acc.last_check && { lastCheckedAt: acc.last_check }),
+                ...(acc.frontend_remark && { remark: acc.frontend_remark }),
+            })
+        }
+        console.log(`[voidlogins] got ${data.length} accounts`)
+        if (data.length > 0) {
+            scrapeCache.set(cacheKey, { data, expiresAt: now + config.autoFetchScrapeCacheTtlMs })
+        }
+        return data
+    } catch (err) {
+        console.warn("[voidlogins] fetch failed:", err instanceof Error ? err.message : err)
+        return []
+    }
+}
+
+/**
+ * Resolve the source URL to a fetch strategy, execute it, and return normalised SharedAccount[].
+ * Supported sourceUrl formats:
+ * - `voidlogins://CODE` or `voidlogins://CODE/PASSWORD` → voidlogins JSON API
+ * - Comma-separated HTTP URLs → HTML scraping
+ */
+export async function scrapeMultipleUrls(sourceUrl: string): Promise<SharedAccount[]> {
+    const strategy = resolveStrategy(sourceUrl)
+    if (!strategy) return []
+    switch (strategy.kind) {
+        case "voidlogins":
+            return executeVoidloginsStrategy(strategy.code, strategy.password)
+        case "scrape":
+            return executeScrapeStrategy(strategy.urls)
+    }
 }

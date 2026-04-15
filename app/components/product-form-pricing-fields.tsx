@@ -31,6 +31,8 @@ export function ProductFormPricingFields({
 }) {
     const { control, watch } = useFormContext<ProductFormSchema>()
     const allowAccountSwitch = watch("allowAccountSwitch") ?? true
+    const autoFetchType = watch("autoFetchType") ?? "scrape"
+    const isVoidlogins = isAutoFetch && autoFetchType === "voidlogins"
     const [sourceUrlOpen, setSourceUrlOpen] = useState(false)
 
     return (
@@ -113,6 +115,34 @@ export function ProductFormPricingFields({
                         <>
                             <FormField
                                 control={control}
+                                name="autoFetchType"
+                                render={({ field }) => (
+                                    <FormItem className="space-y-2">
+                                        <FormLabel>获取方式</FormLabel>
+                                        <FormControl>
+                                            <RadioGroup
+                                                value={field.value}
+                                                onValueChange={field.onChange}
+                                                className="flex gap-4"
+                                            >
+                                                <label className="flex items-center gap-2 cursor-pointer">
+                                                    <RadioGroupItem value="scrape" />
+                                                    <span className="text-sm">爬取来源 URL</span>
+                                                </label>
+                                                <label className="flex items-center gap-2 cursor-pointer">
+                                                    <RadioGroupItem value="voidlogins" />
+                                                    <span className="text-sm">苹果管理平台</span>
+                                                </label>
+                                            </RadioGroup>
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            {!isVoidlogins && (
+                            <FormField
+                                control={control}
                                 name="sourceUrl"
                                 render={({ field }) => {
                                     const selected = (field.value ?? "")
@@ -180,6 +210,40 @@ export function ProductFormPricingFields({
                                     )
                                 }}
                             />
+                            )}
+
+                            {isVoidlogins && (
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <FormField
+                                    control={control}
+                                    name="voidloginsCode"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>
+                                                分享页代码 <span className="text-destructive">*</span>
+                                            </FormLabel>
+                                            <FormControl>
+                                                <Input placeholder="请输入分享页代码" {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <FormField
+                                    control={control}
+                                    name="voidloginsPassword"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>访问密码</FormLabel>
+                                            <FormControl>
+                                                <Input placeholder="无密码可留空" {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            </div>
+                            )}
                             <FormField
                                 control={control}
                                 name="validityHours"

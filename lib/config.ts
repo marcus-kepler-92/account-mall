@@ -131,6 +131,8 @@ const envSchema = z
             .default(false),
     /** 阿里云千问 API Key，AI 客服功能必填 */
     qwenApiKey: z.string().optional(),
+    /** AUTO_FETCH：苹果账号管理平台基础 URL（voidlogins 类型商品使用） */
+    appleHostingUrl: z.string().default("https://apple.voidlogins.com"),
   })
   .transform((data) => {
     const urlFromEnv = data.databaseUrl?.trim();
@@ -269,6 +271,7 @@ function getEnvInput() {
     exitDiscountTtlMs: e.EXIT_DISCOUNT_TTL_MS,
     orderCompletionEmailEnabled: e.ORDER_COMPLETION_EMAIL_ENABLED,
     qwenApiKey: e.QWEN_API_KEY,
+    appleHostingUrl: e.APPLE_HOSTING_URL,
   };
 }
 

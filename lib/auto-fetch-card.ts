@@ -14,7 +14,6 @@ export interface AutoFetchCardPayload {
     password: string
     region: string
     lastCheckedAt?: string
-    installStatus?: string
     /** 生日，如 1/1/2000、1998-01-08 */
     birthday?: string
     /** 密保答案 1（如朋友答案） */
@@ -35,7 +34,6 @@ export function sharedAccountToCardPayload(account: SharedAccount): AutoFetchCar
         password: account.password,
         region: account.region,
         ...(account.lastCheckedAt && { lastCheckedAt: account.lastCheckedAt }),
-        ...(account.installStatus && { installStatus: account.installStatus }),
     }
 }
 
@@ -69,7 +67,6 @@ export function parseAutoFetchCardContent(content: string): AutoFetchCardPayload
                 password: string
                 region?: string
                 lastCheckedAt?: string
-                installStatus?: string
                 birthday?: string
                 securityAnswerFriend?: string
                 securityAnswerWork?: string
@@ -80,7 +77,6 @@ export function parseAutoFetchCardContent(content: string): AutoFetchCardPayload
                 password: p.password,
                 region: p.region ?? "未知",
                 ...(p.lastCheckedAt && { lastCheckedAt: p.lastCheckedAt }),
-                ...(p.installStatus && { installStatus: p.installStatus }),
                 ...(p.birthday && { birthday: p.birthday }),
                 ...(p.securityAnswerFriend && { securityAnswerFriend: p.securityAnswerFriend }),
                 ...(p.securityAnswerWork && { securityAnswerWork: p.securityAnswerWork }),

@@ -192,12 +192,6 @@ function AutoFetchCardRow({
                         <span className="text-sm text-muted-foreground tabular-nums">{card.lastCheckedAt}</span>
                     </div>
                 )}
-                {card.installStatus && card.installStatus !== "" && (
-                    <div className="flex items-center justify-between gap-4 px-4 py-3">
-                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">装好状态</span>
-                        <span className="text-sm text-foreground">{card.installStatus}</span>
-                    </div>
-                )}
             </div>
             <div className="flex gap-2.5 px-4 py-3 rounded-b-lg bg-amber-500/5 border-t border-amber-500/10 text-xs text-muted-foreground">
                 <Info className="size-4 shrink-0 text-amber-600 dark:text-amber-500 mt-0.5" aria-hidden />

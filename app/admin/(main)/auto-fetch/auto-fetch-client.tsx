@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react"
 import { toast } from "sonner"
+import { parseVoidloginsSourceUrl } from "@/lib/utils"
 import { FlaskConical, Loader2, Copy, Check, AlertCircle, Search, Ban, Undo2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -242,7 +243,10 @@ export function AutoFetchClient({ products }: Props) {
                         </div>
 
                         <p className="text-xs text-muted-foreground font-mono break-all">
-                            来源：{meta.sourceUrl}
+                            {(() => {
+                                const v = parseVoidloginsSourceUrl(meta.sourceUrl)
+                                return v ? `来源：苹果管理平台 (${v.code})` : `来源：${meta.sourceUrl}`
+                            })()}
                         </p>
                     </div>
                 )}

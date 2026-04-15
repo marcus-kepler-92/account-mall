@@ -94,7 +94,7 @@ export const createTagSchema = z.object({
 });
 
 // Form schema for product form (handles string inputs from form fields)
-// AUTO_FETCH 时 sourceUrl 必填，price/maxQuantity 由表单设置
+// AUTO_FETCH 时 sourceUrl/voidloginsCode+voidloginsPassword 必填，price/maxQuantity 由表单设置
 export const productFormSchema = z
     .object({
         name: z.string().min(1, "请输入商品名称").max(200, "商品名称过长"),
@@ -116,7 +116,13 @@ export const productFormSchema = z
         ),
         isActive: z.boolean(),
         productType: z.enum(["NORMAL", "AUTO_FETCH"]).optional(),
+        /** Sub-type for AUTO_FETCH: HTML scraping vs voidlogins API */
+        autoFetchType: z.enum(["scrape", "voidlogins"]).optional(),
         sourceUrl: z.string().optional(),
+        /** Voidlogins access code (AUTO_FETCH + voidlogins type only) */
+        voidloginsCode: z.string().optional(),
+        /** Voidlogins access password (AUTO_FETCH + voidlogins type only) */
+        voidloginsPassword: z.string().optional(),
         validityHours: z.string().optional(),
         allowAccountSwitch: z.boolean().optional(),
         accountSwitchLimit: z.string().optional(),
@@ -132,8 +138,15 @@ export const productFormSchema = z
     })
     .superRefine((data, ctx) => {
         if (data.productType === "AUTO_FETCH") {
-            if (!data.sourceUrl || data.sourceUrl.trim() === "")
-                ctx.addIssue({ code: "custom", message: "AUTO_FETCH 商品必须填写来源 URL", path: ["sourceUrl"] })
+            const fetchType = data.autoFetchType ?? "scrape"
+            if (fetchType === "voidlogins") {
+                if (!data.voidloginsCode?.trim())
+                    ctx.addIssue({ code: "custom", message: "请填写分享页代码", path: ["voidloginsCode"] })
+                // voidloginsPassword is optional
+            } else {
+                if (!data.sourceUrl || data.sourceUrl.trim() === "")
+                    ctx.addIssue({ code: "custom", message: "AUTO_FETCH 商品必须填写来源 URL", path: ["sourceUrl"] })
+            }
         } else {
             if (!data.price || data.price === "")
                 ctx.addIssue({ code: "custom", message: "请输入价格", path: ["price"] })

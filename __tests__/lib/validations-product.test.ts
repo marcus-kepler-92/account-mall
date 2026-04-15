@@ -71,6 +71,55 @@ describe("updateProductSchema", () => {
     })
 })
 
+describe("productFormSchema — AUTO_FETCH voidlogins branch", () => {
+    const base = {
+        name: "T", slug: "t", price: "", maxQuantity: "", isActive: true,
+        productType: "AUTO_FETCH" as const,
+    }
+
+    it("accepts voidlogins type with code only", () => {
+        const r = productFormSchema.safeParse({ ...base, autoFetchType: "voidlogins", voidloginsCode: "ABC" })
+        expect(r.success).toBe(true)
+    })
+
+    it("accepts voidlogins type with code and password", () => {
+        const r = productFormSchema.safeParse({ ...base, autoFetchType: "voidlogins", voidloginsCode: "ABC", voidloginsPassword: "pass" })
+        expect(r.success).toBe(true)
+    })
+
+    it("password is optional — empty string accepted", () => {
+        const r = productFormSchema.safeParse({ ...base, autoFetchType: "voidlogins", voidloginsCode: "ABC", voidloginsPassword: "" })
+        expect(r.success).toBe(true)
+    })
+
+    it("rejects voidlogins type when code is missing", () => {
+        const r = productFormSchema.safeParse({ ...base, autoFetchType: "voidlogins", voidloginsCode: "" })
+        expect(r.success).toBe(false)
+        if (!r.success) expect(r.error.issues.map((i) => i.path[0])).toContain("voidloginsCode")
+    })
+
+    it("rejects voidlogins type when code is whitespace only", () => {
+        const r = productFormSchema.safeParse({ ...base, autoFetchType: "voidlogins", voidloginsCode: "   " })
+        expect(r.success).toBe(false)
+    })
+
+    it("scrape type requires sourceUrl", () => {
+        const r = productFormSchema.safeParse({ ...base, autoFetchType: "scrape", sourceUrl: "" })
+        expect(r.success).toBe(false)
+        if (!r.success) expect(r.error.issues.map((i) => i.path[0])).toContain("sourceUrl")
+    })
+
+    it("defaults to scrape behaviour when autoFetchType omitted", () => {
+        const r = productFormSchema.safeParse({ ...base, sourceUrl: "" })
+        expect(r.success).toBe(false)
+    })
+
+    it("scrape type with valid sourceUrl passes", () => {
+        const r = productFormSchema.safeParse({ ...base, autoFetchType: "scrape", sourceUrl: "https://example.com/share" })
+        expect(r.success).toBe(true)
+    })
+})
+
 describe("purchaseLimitEnabled / purchaseLimitQuantity", () => {
   it("createProductSchema accepts purchaseLimitEnabled=true and quantity=2", () => {
     const result = createProductSchema.safeParse({

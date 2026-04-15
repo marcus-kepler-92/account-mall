@@ -73,6 +73,33 @@ export function formatCurrency(amount: number): string {
   return `¥${amount.toFixed(2)}`
 }
 
+export const VOIDLOGINS_SCHEME = "voidlogins://"
+
+/**
+ * Parse a voidlogins sourceUrl into { code, password }.
+ * Accepts `voidlogins://CODE` (no password) or `voidlogins://CODE/PASSWORD`.
+ * Returns null if the string does not start with the voidlogins scheme or has no code.
+ */
+export function parseVoidloginsSourceUrl(url: string): { code: string; password: string } | null {
+  if (!url.startsWith(VOIDLOGINS_SCHEME)) return null
+  const rest = url.slice(VOIDLOGINS_SCHEME.length)
+  const slash = rest.indexOf("/")
+  const code = slash < 0 ? decodeURIComponent(rest) : decodeURIComponent(rest.slice(0, slash))
+  if (!code) return null
+  const password = slash >= 0 ? decodeURIComponent(rest.slice(slash + 1)) : ""
+  return { code, password }
+}
+
+/**
+ * Build a voidlogins sourceUrl from code and optional password.
+ * e.g. buildVoidloginsSourceUrl("ABC", "pw") → "voidlogins://ABC/pw"
+ */
+export function buildVoidloginsSourceUrl(code: string, password?: string): string {
+  const encodedCode = encodeURIComponent(code)
+  if (!password) return `${VOIDLOGINS_SCHEME}${encodedCode}`
+  return `${VOIDLOGINS_SCHEME}${encodedCode}/${encodeURIComponent(password)}`
+}
+
 /**
  * 格式化为短日期时间（不含年份），如 "01/15 14:30"
  * 服务端/客户端均可用，始终使用 Asia/Hong_Kong 时区。

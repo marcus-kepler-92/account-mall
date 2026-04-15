@@ -43,7 +43,7 @@ interface LookupResponsePending extends LookupResponseBase {
     expiresAt?: string;
 }
 
-/** 卡密：普通为 content；AUTO_FETCH 为 content(JSON) + account/password/region/lastCheckedAt/installStatus */
+/** 卡密：普通为 content；AUTO_FETCH 为 content(JSON) + account/password/region/lastCheckedAt */
 interface LookupResponseCompleted extends LookupResponseBase {
     cards: Array<
         | { content: string }
@@ -53,7 +53,6 @@ interface LookupResponseCompleted extends LookupResponseBase {
               password: string;
               region: string;
               lastCheckedAt?: string;
-              installStatus?: string;
           }
     >;
     successToken?: string;

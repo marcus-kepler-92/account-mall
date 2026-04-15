@@ -185,12 +185,6 @@ function AutoFetchCardBlock({
                     <span className="text-sm text-muted-foreground tabular-nums break-words">{card.lastCheckedAt}</span>
                 </div>
             )}
-            {card.installStatus != null && card.installStatus !== "" && (
-                <div className="flex items-center justify-between gap-4 px-4 py-3">
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">装好状态</span>
-                    <span className="text-sm text-foreground break-words">{card.installStatus}</span>
-                </div>
-            )}
         </div>
     )
 }

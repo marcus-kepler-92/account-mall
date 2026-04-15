@@ -7,7 +7,7 @@ import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Form } from "@/components/ui/form"
-import { generateSlug } from "@/lib/utils"
+import { generateSlug, parseVoidloginsSourceUrl, buildVoidloginsSourceUrl } from "@/lib/utils"
 import { applyFieldErrors } from "@/lib/form-utils"
 import { productFormSchema, type ProductFormSchema } from "@/lib/validations/product"
 import { Loader2, ArrowLeft } from "lucide-react"
@@ -60,6 +60,8 @@ export function ProductForm({
     const isEditing = !!product
     const [slugManuallyEdited, setSlugManuallyEdited] = useState(false)
 
+    const parsedVoidlogins = parseVoidloginsSourceUrl(product?.sourceUrl ?? "")
+
     const form = useForm<ProductFormSchema>({
         resolver: zodResolver(productFormSchema),
         mode: "onTouched",
@@ -73,7 +75,10 @@ export function ProductForm({
             maxQuantity: product ? String(product.maxQuantity) : "10",
             isActive: product ? product.status === "ACTIVE" : true,
             productType: product?.productType ?? "NORMAL",
-            sourceUrl: product?.sourceUrl ?? "",
+            autoFetchType: parsedVoidlogins ? "voidlogins" : "scrape",
+            sourceUrl: parsedVoidlogins ? "" : (product?.sourceUrl ?? ""),
+            voidloginsCode: parsedVoidlogins?.code ?? "",
+            voidloginsPassword: parsedVoidlogins?.password ?? "",
             validityHours: product?.validityHours ? String(product.validityHours) : "",
             allowAccountSwitch: product?.allowAccountSwitch ?? true,
             accountSwitchLimit: product?.accountSwitchLimit != null ? String(product.accountSwitchLimit) : "1",
@@ -101,6 +106,18 @@ export function ProductForm({
     }, [name, slugManuallyEdited, isEditing, setValue])
 
     const onSubmit = async (data: ProductFormSchema) => {
+        let finalSourceUrl: string | null = null
+        if (isAutoFetch) {
+            if (data.autoFetchType === "voidlogins") {
+                finalSourceUrl = buildVoidloginsSourceUrl(
+                    data.voidloginsCode?.trim() ?? "",
+                    data.voidloginsPassword?.trim() || undefined,
+                )
+            } else {
+                finalSourceUrl = data.sourceUrl?.trim() || null
+            }
+        }
+
         const body = {
             name: data.name.trim(),
             slug: data.slug.trim(),
@@ -111,7 +128,7 @@ export function ProductForm({
             maxQuantity: isAutoFetch ? 1 : (data.maxQuantity === "" ? 10 : parseInt(data.maxQuantity, 10)),
             status: data.isActive ? "ACTIVE" : "INACTIVE",
             productType: data.productType ?? "NORMAL",
-            sourceUrl: data.sourceUrl?.trim() || null,
+            sourceUrl: finalSourceUrl,
             validityHours: data.validityHours && data.validityHours !== "" ? parseInt(data.validityHours, 10) : null,
             ...(isAutoFetch && {
                 allowAccountSwitch: data.allowAccountSwitch ?? true,

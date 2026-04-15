@@ -71,11 +71,11 @@ async function createAutoFetchOrder(params: {
     const isFreeAutoFetch = params.price === 0
 
     if (config.nodeEnv === "development") {
-        console.log("[AUTO_FETCH] 即将爬取 sourceUrl:", sourceUrl)
+        console.log("[AUTO_FETCH] sourceUrl:", sourceUrl)
     }
     const scrapedList = await scrapeMultipleUrls(sourceUrl)
     if (config.nodeEnv === "development") {
-        console.log("[AUTO_FETCH] 爬取结果数量:", scrapedList.length)
+        console.log("[AUTO_FETCH] fetched accounts:", scrapedList.length)
         if (scrapedList.length > 0) {
             console.log("[AUTO_FETCH] 第一条账号:", JSON.stringify(scrapedList[0]))
         }
