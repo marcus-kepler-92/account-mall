@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAdminSession } from "@/lib/auth-guard";
+import { getAdminSession, getSuperAdminSession } from "@/lib/auth-guard";
 import { unauthorized, invalidJsonBody, validationError } from "@/lib/api-response";
 import { batchOrderActionSchema } from "@/lib/validations/order";
 
@@ -30,6 +30,11 @@ export async function POST(request: NextRequest) {
     }
 
     const { action, orderIds } = parsed.data;
+
+    if (action === "DELETE") {
+        const superSession = await getSuperAdminSession();
+        if (!superSession) return unauthorized();
+    }
 
     const orders = await prisma.order.findMany({
         where: { id: { in: orderIds } },

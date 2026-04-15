@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAdminSession } from "@/lib/auth-guard";
+import { getAdminSession, getSuperAdminSession } from "@/lib/auth-guard";
 import { updateProductSchema } from "@/lib/validations/product";
 import { config } from "@/lib/config";
 import { notFound, unauthorized, invalidJsonBody, validationError, conflict, badRequest } from "@/lib/api-response";
@@ -167,14 +167,17 @@ export async function DELETE(
     request: NextRequest,
     context: RouteContext
 ) {
-    const session = await getAdminSession();
-    if (!session) {
-        return unauthorized();
-    }
-
     const { productId } = await context.params;
     const { searchParams } = new URL(request.url);
     const permanent = searchParams.get("permanent") === "true";
+
+    if (permanent) {
+        const superSession = await getSuperAdminSession();
+        if (!superSession) return unauthorized();
+    } else {
+        const session = await getAdminSession();
+        if (!session) return unauthorized();
+    }
 
     const existing = await prisma.product.findUnique({
         where: { id: productId },

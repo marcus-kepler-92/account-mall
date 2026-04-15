@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAdminSession } from "@/lib/auth-guard";
+import { getAdminSession, getSuperAdminSession } from "@/lib/auth-guard";
 import { unauthorized, invalidJsonBody, validationError } from "@/lib/api-response";
 import { batchCardActionSchema } from "@/lib/validations/card";
 
@@ -31,6 +31,11 @@ export async function POST(request: NextRequest) {
     }
 
     const { action, cardIds } = parsed.data;
+
+    if (action === "DELETE") {
+        const superSession = await getSuperAdminSession();
+        if (!superSession) return unauthorized();
+    }
 
     const cards = await prisma.card.findMany({
         where: { id: { in: cardIds } },

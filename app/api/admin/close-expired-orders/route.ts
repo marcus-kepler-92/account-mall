@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getAdminSession } from "@/lib/auth-guard"
+import { getSuperAdminSession } from "@/lib/auth-guard"
 import { closeExpiredOrders } from "@/lib/close-expired-orders"
 import { unauthorized } from "@/lib/api-response"
 
@@ -9,7 +9,7 @@ import { unauthorized } from "@/lib/api-response"
  * Secured by admin session cookie.
  */
 export async function POST() {
-    const session = await getAdminSession()
+    const session = await getSuperAdminSession()
     if (!session) {
         return unauthorized()
     }

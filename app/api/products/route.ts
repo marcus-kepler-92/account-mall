@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAdminSession } from "@/lib/auth-guard";
+import { getAdminSession, getSuperAdminSession } from "@/lib/auth-guard";
 import { createProductSchema } from "@/lib/validations/product";
 import { config } from "@/lib/config";
 import { unauthorized, invalidJsonBody, validationError, conflict } from "@/lib/api-response";
@@ -124,7 +124,7 @@ export async function GET(request: NextRequest) {
  * Admin only: create a new product
  */
 export async function POST(request: NextRequest) {
-    const session = await getAdminSession();
+    const session = await getSuperAdminSession();
     if (!session) {
         return unauthorized();
     }
