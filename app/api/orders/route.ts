@@ -537,15 +537,22 @@ export async function POST(request: NextRequest) {
     if (exitDiscountToken && config.exitDiscountSecret) {
         const verifyResult = verifyExitDiscountToken(exitDiscountToken, config.exitDiscountSecret)
         if (verifyResult.valid && verifyResult.payload.productId === productId) {
-            exitDiscountPayload = verifyResult.payload
-            exitDiscountPercent = verifyResult.payload.discountPercent
-            exitDiscountMeta = JSON.stringify({
-                productId: verifyResult.payload.productId,
-                visitorId: verifyResult.payload.visitorId,
-                fingerprintHash: verifyResult.payload.fingerprintHash,
-                ip: verifyResult.payload.ip,
-                discountPercent: verifyResult.payload.discountPercent,
+            // Exit discount is first-order only: skip if the email already has a completed order
+            const priorOrder = await prisma.order.findFirst({
+                where: { email: email.trim().toLowerCase(), status: "COMPLETED" },
+                select: { id: true },
             })
+            if (!priorOrder) {
+                exitDiscountPayload = verifyResult.payload
+                exitDiscountPercent = verifyResult.payload.discountPercent
+                exitDiscountMeta = JSON.stringify({
+                    productId: verifyResult.payload.productId,
+                    visitorId: verifyResult.payload.visitorId,
+                    fingerprintHash: verifyResult.payload.fingerprintHash,
+                    ip: verifyResult.payload.ip,
+                    discountPercent: verifyResult.payload.discountPercent,
+                })
+            }
         }
     }
 
