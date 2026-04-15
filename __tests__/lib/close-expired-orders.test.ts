@@ -32,7 +32,7 @@ describe("closeExpiredOrders", () => {
     it("returns { closed: 0, total: 0 } when no expired orders", async () => {
         prismaMock.order.findMany.mockResolvedValue([] as any)
         const result = await closeExpiredOrders()
-        expect(result).toEqual({ closed: 0, total: 0 })
+        expect(result).toEqual({ closed: 0, total: 0, failedOrderNos: [] })
         expect(prismaMock.$transaction).not.toHaveBeenCalled()
     })
 

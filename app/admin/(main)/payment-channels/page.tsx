@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma"
-import { formatCurrency } from "@/lib/utils"
+import { formatCurrency, getHKTYearBounds } from "@/lib/utils"
 import { Wallet, TrendingUp, LayoutGrid } from "lucide-react"
 import { PaymentChannelsDataTable } from "./payment-channels-data-table"
 import type { ChannelRow } from "./payment-channels-columns"
@@ -7,18 +7,13 @@ import { PageHeader, StatCard } from "@/app/admin/components"
 
 export const dynamic = "force-dynamic"
 
-function getYearBounds() {
-    const year = new Date().getFullYear()
-    return { start: new Date(year, 0, 1), end: new Date(year + 1, 0, 1) }
-}
-
 export default async function AdminPaymentChannelsPage() {
     const channels = await prisma.paymentChannel.findMany({
         orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     })
 
     const channelIds = channels.map((c) => c.id)
-    const { start, end } = getYearBounds()
+    const { start, end } = getHKTYearBounds()
 
     const [yearIncomeRows, totalIncomeRows, withdrawalRows] =
         channelIds.length > 0

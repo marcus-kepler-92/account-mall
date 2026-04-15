@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { ArrowLeft } from "lucide-react"
-import { formatCurrency } from "@/lib/utils"
+import { formatCurrency, getHKTYearBounds } from "@/lib/utils"
 import { PageHeader } from "@/app/admin/components"
 import { WithdrawalDataTable } from "./withdrawal-data-table"
 import { BackfillButton } from "./backfill-button"
@@ -28,9 +28,7 @@ export default async function PaymentChannelDetailPage({ params }: Props) {
     const channel = await prisma.paymentChannel.findUnique({ where: { id } })
     if (!channel) notFound()
 
-    const year = new Date().getFullYear()
-    const yearStart = new Date(year, 0, 1)
-    const yearEnd = new Date(year + 1, 0, 1)
+    const { start: yearStart, end: yearEnd } = getHKTYearBounds()
 
     const [yearIncomeAgg, totalIncomeAgg, totalWithdrawnAgg, withdrawals, pendingBackfillCount] = await Promise.all([
         prisma.order.aggregate({

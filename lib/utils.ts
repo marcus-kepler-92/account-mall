@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { toZonedTime, fromZonedTime } from "date-fns-tz"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -20,11 +21,34 @@ export function generateSlug(name: string): string {
 }
 
 const DATE_LOCALE = "zh-CN"
-const DATE_TIMEZONE = "Asia/Shanghai"
+const DATE_TIMEZONE = "Asia/Hong_Kong"
+
+/**
+ * Returns the start of the given date's day in HKT (UTC+8), as a UTC Date.
+ * @example getHKTDayStart(new Date('2025-01-15T01:00:00Z')) // → 2025-01-14T16:00:00.000Z (HKT Jan 15 00:00)
+ */
+export function getHKTDayStart(date: Date): Date {
+  const zoned = toZonedTime(date, DATE_TIMEZONE)
+  zoned.setHours(0, 0, 0, 0)
+  return fromZonedTime(zoned, DATE_TIMEZONE)
+}
+
+/**
+ * Returns { start, end } representing [Jan 1 00:00, Jan 1 00:00 next year)
+ * in HKT, as UTC Dates.
+ */
+export function getHKTYearBounds(): { start: Date; end: Date } {
+  const nowHK = toZonedTime(new Date(), DATE_TIMEZONE)
+  const year = nowHK.getFullYear()
+  return {
+    start: fromZonedTime(new Date(year, 0, 1, 0, 0, 0, 0), DATE_TIMEZONE),
+    end: fromZonedTime(new Date(year + 1, 0, 1, 0, 0, 0, 0), DATE_TIMEZONE),
+  }
+}
 
 /**
  * 格式化为完整日期时间，如 "2025/01/15 14:30:00"
- * 服务端/客户端均可用，始终使用 Asia/Shanghai 时区。
+ * 服务端/客户端均可用，始终使用 Asia/Hong_Kong 时区。
  */
 export function formatDateTime(date: Date | string | null | undefined): string {
   if (!date) return "—"
@@ -51,7 +75,7 @@ export function formatCurrency(amount: number): string {
 
 /**
  * 格式化为短日期时间（不含年份），如 "01/15 14:30"
- * 服务端/客户端均可用，始终使用 Asia/Shanghai 时区。
+ * 服务端/客户端均可用，始终使用 Asia/Hong_Kong 时区。
  */
 export function formatDateTimeShort(date: Date | string | null | undefined): string {
   if (!date) return "—"

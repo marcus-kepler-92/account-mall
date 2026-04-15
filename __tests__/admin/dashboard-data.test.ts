@@ -411,7 +411,7 @@ describe("dashboard-data", () => {
         expect.objectContaining({
           take: 10,
           orderBy: { createdAt: "desc" },
-          include: { product: { select: { id: true, name: true } } },
+          select: expect.objectContaining({ product: { select: { id: true, name: true } } }),
         }),
       );
     });

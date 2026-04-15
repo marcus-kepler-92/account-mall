@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma"
+import { getHKTDayStart } from "@/lib/utils"
 import {
     type DashboardKpis,
     type DashboardTrendPoint,
@@ -13,10 +14,10 @@ import { getDaysForTrend } from "./dashboard-utils"
 import { ADMIN_DASHBOARD_RECENT_ORDERS_LIMIT, ADMIN_DASHBOARD_TOP_PRODUCTS_LIMIT } from "@/app/admin/constants"
 import type { OrderStatus } from "@prisma/client"
 
+// "This period" = rolling 7-day window ending today (HKT). "Last period" = the 7 days before that.
 function getWeekBounds(now: Date) {
-    const startOfThisPeriod = new Date(now)
-    startOfThisPeriod.setDate(now.getDate() - 7)
-    startOfThisPeriod.setHours(0, 0, 0, 0)
+    const startOfThisPeriod = getHKTDayStart(new Date(now))
+    startOfThisPeriod.setDate(startOfThisPeriod.getDate() - 7)
     const startOfLastPeriod = new Date(startOfThisPeriod)
     startOfLastPeriod.setDate(startOfLastPeriod.getDate() - 7)
     return { startOfThisPeriod, startOfLastPeriod }
@@ -28,9 +29,6 @@ function getWeekBounds(now: Date) {
 export async function getDashboardKpis(): Promise<DashboardKpis> {
     const now = new Date()
     const { startOfThisPeriod, startOfLastPeriod } = getWeekBounds(now)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const db = prisma as any
-
     const [
         totalRevenueResult,
         lastPeriodRevenueResult,
@@ -95,7 +93,7 @@ export async function getDashboardKpis(): Promise<DashboardKpis> {
             _sum: { amount: true },
         }),
         // 已打款提现的手续费收入
-        db.withdrawal.aggregate({
+        (prisma as any).withdrawal.aggregate({
             where: { status: "PAID" },
             _sum: { feeAmount: true },
         }),
@@ -107,7 +105,7 @@ export async function getDashboardKpis(): Promise<DashboardKpis> {
             },
             _sum: { amount: true },
         }),
-        db.withdrawal.aggregate({
+        (prisma as any).withdrawal.aggregate({
             where: {
                 status: "PAID",
                 processedAt: { gte: startOfLastPeriod, lt: startOfThisPeriod },
@@ -122,7 +120,7 @@ export async function getDashboardKpis(): Promise<DashboardKpis> {
             },
             _sum: { amount: true },
         }),
-        db.withdrawal.aggregate({
+        (prisma as any).withdrawal.aggregate({
             where: {
                 status: "PAID",
                 processedAt: { gte: startOfThisPeriod },
@@ -216,12 +214,10 @@ export async function getDashboardKpis(): Promise<DashboardKpis> {
  */
 export async function getDashboardTrend(days: number): Promise<DashboardTrendPoint[]> {
     const now = new Date()
-    const start = new Date(now)
-    start.setDate(now.getDate() - days)
-    start.setHours(0, 0, 0, 0)
+    const todayStart = getHKTDayStart(now)
+    const start = new Date(todayStart)
+    start.setDate(todayStart.getDate() - days)
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const db = prisma as any
     type AmountGroupRow = { createdAt: Date; _sum: { amount: unknown } }
     type FeeGroupRow = { processedAt: Date | null; _sum: { feeAmount?: unknown } }
 
@@ -233,12 +229,12 @@ export async function getDashboardTrend(days: number): Promise<DashboardTrendPoi
             _sum: { amount: true },
             _count: { id: true },
         }),
-        db.commission.groupBy({
+        (prisma as any).commission.groupBy({
             by: ["createdAt"],
             where: { createdAt: { gte: start }, status: "SETTLED" },
             _sum: { amount: true },
         }),
-        db.withdrawal.groupBy({
+        (prisma as any).withdrawal.groupBy({
             by: ["processedAt"],
             where: { processedAt: { gte: start }, status: "PAID" },
             _sum: { feeAmount: true },
@@ -364,7 +360,14 @@ export async function getRecentOrders(limit: number = ADMIN_DASHBOARD_RECENT_ORD
     return prisma.order.findMany({
         take: limit,
         orderBy: { createdAt: "desc" },
-        include: {
+        select: {
+            id: true,
+            orderNo: true,
+            email: true,
+            amount: true,
+            status: true,
+            createdAt: true,
+            productNameSnapshot: true,
             product: { select: { id: true, name: true } },
         },
     })

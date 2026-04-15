@@ -68,7 +68,7 @@ export function OrderTroubleshootSection({
     const handleRefresh = useCallback(async () => {
         setRefreshLoading(true)
         try {
-            const res = await fetch(`/api/orders/${encodeURIComponent(orderNo)}/refresh`, {
+            const res = await fetch(`/api/orders/${orderNo}/refresh`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ token }),
@@ -95,7 +95,7 @@ export function OrderTroubleshootSection({
     const handleSwitch = useCallback(async () => {
         setSwitchLoading(true)
         try {
-            const res = await fetch(`/api/orders/${encodeURIComponent(orderNo)}/switch-account`, {
+            const res = await fetch(`/api/orders/${orderNo}/switch-account`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ token }),
@@ -137,7 +137,7 @@ export function OrderTroubleshootSection({
                         {lastRefreshedAt && (
                             <span className="ml-auto flex items-center gap-1 text-green-600 dark:text-green-500">
                                 <CheckCircle2 className="size-3" />
-                                已于 {new Date(lastRefreshedAt).toLocaleTimeString("zh-CN")} 更新
+                                已于 {new Date(lastRefreshedAt).toLocaleTimeString("zh-CN", { timeZone: "Asia/Hong_Kong" })} 更新
                             </span>
                         )}
                     </div>

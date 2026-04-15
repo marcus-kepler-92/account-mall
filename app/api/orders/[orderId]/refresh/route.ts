@@ -94,6 +94,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
                 productId: order.product.id,
                 OR: [
                     { reason: MANUAL_BLACKLIST_REASON },
+                    // createdAt > (now - expiryHours) means the entry is still within its validity window
                     { createdAt: { gt: new Date(Date.now() - config.blacklistExpiryHours * 60 * 60 * 1000) } },
                 ],
             },

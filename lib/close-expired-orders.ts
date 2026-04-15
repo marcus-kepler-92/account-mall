@@ -7,6 +7,7 @@ const PENDING_ORDER_CLOSE_GRACE_MS = 2 * 60 * 1000 // 2 minutes
 export interface CloseExpiredOrdersResult {
     closed: number
     total: number
+    failedOrderNos: string[]
 }
 
 /**
@@ -25,6 +26,7 @@ export async function closeExpiredOrders(): Promise<CloseExpiredOrdersResult> {
         },
         select: {
             id: true,
+            orderNo: true,
             product: {
                 select: { productType: true },
             },
@@ -32,10 +34,11 @@ export async function closeExpiredOrders(): Promise<CloseExpiredOrdersResult> {
     })
 
     if (expired.length === 0) {
-        return { closed: 0, total: 0 }
+        return { closed: 0, total: 0, failedOrderNos: [] }
     }
 
     let closed = 0
+    const failedOrderNos: string[] = []
     for (const order of expired) {
         try {
             const isAutoFetch = order.product?.productType === "AUTO_FETCH"
@@ -59,9 +62,10 @@ export async function closeExpiredOrders(): Promise<CloseExpiredOrdersResult> {
             })
             closed++
         } catch (err) {
-            console.error("[close-expired-orders] Failed to close order", order.id, err)
+            console.error("[close-expired-orders] Failed to close order", order.orderNo ?? order.id, err)
+            failedOrderNos.push(order.orderNo ?? order.id)
         }
     }
 
-    return { closed, total: expired.length }
+    return { closed, total: expired.length, failedOrderNos }
 }

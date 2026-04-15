@@ -3,11 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getAdminSession } from "@/lib/auth-guard"
 import { unauthorized, invalidJsonBody, validationError } from "@/lib/api-response"
 import { createPaymentChannelSchema } from "@/lib/validations/payment-channel"
-
-function getYearBounds() {
-    const year = new Date().getFullYear()
-    return { start: new Date(year, 0, 1), end: new Date(year + 1, 0, 1) }
-}
+import { getHKTYearBounds } from "@/lib/utils"
 
 export async function GET() {
     const session = await getAdminSession()
@@ -22,7 +18,7 @@ export async function GET() {
     }
 
     const channelIds = channels.map((c) => c.id)
-    const { start, end } = getYearBounds()
+    const { start, end } = getHKTYearBounds()
 
     const [yearIncomeRows, totalIncomeRows, withdrawalRows] = await Promise.all([
         prisma.order.groupBy({

@@ -194,6 +194,15 @@ export async function PATCH(
             at: new Date().toISOString(),
         })
     }
+    if (nextStatus === "CLOSED") {
+        console.warn("[admin/order-closed]", {
+            orderId,
+            orderNo: updated.orderNo,
+            adminUserId: session.user?.id,
+            adminUserEmail: session.user?.email,
+            at: new Date().toISOString(),
+        })
+    }
 
     return NextResponse.json(mapOrderToResponse(updated))
 }
@@ -227,6 +236,9 @@ export async function DELETE(
             }
 
             // We choose to soft-close the order instead of hard-deleting it.
+            if (existing.status === "COMPLETED") {
+                throw new Error("CANNOT_CLOSE_COMPLETED_ORDER")
+            }
             if (existing.status !== "CLOSED") {
                 await tx.order.update({
                     where: { id: existing.id },
@@ -252,6 +264,9 @@ export async function DELETE(
     } catch (error) {
         if (error instanceof Error && error.message === "ORDER_NOT_FOUND") {
             return notFound("Order not found")
+        }
+        if (error instanceof Error && error.message === "CANNOT_CLOSE_COMPLETED_ORDER") {
+            return conflict("Cannot close a completed order")
         }
 
         return internalServerError()

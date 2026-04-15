@@ -104,18 +104,19 @@ async function createAutoFetchOrder(params: {
     const passwordHash = await hashPassword(orderPassword)
 
     // 计算实际金额（promo + exit 折扣均参与）
+    // Distributor discount applied first, exit-intent discount second (multiplicative)
     const originalAmount = params.price
     let amount = originalAmount
     if (distributorDiscountPercent != null) {
-        amount = amount * (1 - distributorDiscountPercent / 100)
+        amount = Math.round(amount * (1 - distributorDiscountPercent / 100) * 100) / 100
     }
     if (exitDiscountPercent != null) {
-        amount = amount * (1 - exitDiscountPercent / 100)
+        amount = Math.round(amount * (1 - exitDiscountPercent / 100) * 100) / 100
     }
+    if (amount < 0.01) amount = 0.01
     const discountPercentApplied = amount < originalAmount
         ? Math.round((1 - amount / originalAmount) * 10000) / 100
         : null
-    amount = Math.round(amount * 100) / 100
 
     // 计算有效期截止时间
     const validityHours = product.validityHours ?? DEFAULT_VALIDITY_HOURS

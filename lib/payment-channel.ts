@@ -1,13 +1,6 @@
 import { prisma } from "@/lib/prisma"
+import { getHKTYearBounds } from "@/lib/utils"
 import type { PaymentChannel } from "@prisma/client"
-
-function getYearBounds(): { start: Date; end: Date } {
-    const year = new Date().getFullYear()
-    return {
-        start: new Date(year, 0, 1),
-        end: new Date(year + 1, 0, 1),
-    }
-}
 
 export async function selectPaymentChannel(type: string): Promise<PaymentChannel | null> {
     const channels = await prisma.paymentChannel.findMany({
@@ -17,7 +10,7 @@ export async function selectPaymentChannel(type: string): Promise<PaymentChannel
 
     if (channels.length === 0) return null
 
-    const { start, end } = getYearBounds()
+    const { start, end } = getHKTYearBounds()
 
     const incomeRows = await prisma.order.groupBy({
         by: ["paymentChannelId"],

@@ -111,6 +111,7 @@ export async function POST(request: NextRequest) {
     })
 
     const feePercent = config.withdrawalFeePercent
+    // feeAmount = amount × feePercent/100, rounded to 2 decimal places; both are immutable after creation
     const feeAmount = Math.round(amount * feePercent) / 100
 
     let withdrawal: { id: string; amount: { toNumber?: () => number }; feePercent: unknown; feeAmount: unknown; status: string; receiptImageUrl: string | null; createdAt: Date }
