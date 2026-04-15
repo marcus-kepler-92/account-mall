@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
-import { ADMIN_ROLE_CONFIG, type AdminSubRole } from "@/lib/admin-permissions"
+import { ADMIN_ROLE_CONFIG, type AdminSubRole } from "@/lib/admin-role-config"
 import type { AdminRow } from "./admins-columns"
 
 interface AdminsRowActionsProps {

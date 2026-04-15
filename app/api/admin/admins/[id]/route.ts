@@ -4,7 +4,7 @@ import { hashPassword } from "better-auth/crypto"
 import { prisma } from "@/lib/prisma"
 import { getSuperAdminSession } from "@/lib/auth-guard"
 import { unauthorized, badRequest, notFound, invalidJsonBody, validationError, internalServerError } from "@/lib/api-response"
-import { ADMIN_ROLE_CONFIG, type AdminSubRole } from "@/lib/admin-permissions"
+import { ADMIN_ROLE_CONFIG, type AdminSubRole } from "@/lib/admin-role-config"
 import { generatePassword } from "@/lib/password-utils"
 
 const VALID_SUB_ROLES = Object.keys(ADMIN_ROLE_CONFIG) as AdminSubRole[]

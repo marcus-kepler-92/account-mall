@@ -3,7 +3,7 @@
 import type { ColumnDef } from "@tanstack/react-table"
 import { formatDateTime } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
-import { ADMIN_ROLE_CONFIG } from "@/lib/admin-permissions"
+import { ADMIN_ROLE_CONFIG } from "@/lib/admin-role-config"
 import { AdminsRowActions } from "./admins-row-actions"
 
 export type AdminRow = {

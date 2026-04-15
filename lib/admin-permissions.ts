@@ -1,43 +1,9 @@
 import { cache } from "react"
 import { getSessionForAdminArea } from "@/lib/auth-guard"
+import { resolvePermissions } from "@/lib/admin-role-config"
 
-export const ADMIN_ROLE_CONFIG = {
-  SYSTEM_OPS: {
-    label: "系统运维管理员",
-    allowedMenus: [
-      "/admin/products",
-      "/admin/orders",
-      "/admin/announcements",
-      "/admin/guides",
-      "/admin/files",
-      "/admin/auto-fetch",
-    ] as const,
-    disabledFeatures: ["order:reassign-distributor"] as const,
-  },
-} satisfies Record<string, {
-  label: string
-  allowedMenus: readonly string[]
-  disabledFeatures: readonly string[]
-}>
-
-export type AdminSubRole = keyof typeof ADMIN_ROLE_CONFIG
-
-export function resolvePermissions(adminRole: string | null) {
-  const config = adminRole && adminRole in ADMIN_ROLE_CONFIG
-    ? ADMIN_ROLE_CONFIG[adminRole as AdminSubRole]
-    : null
-
-  return {
-    isSuperAdmin: adminRole === null,
-    // Unknown roles (config === null but adminRole !== null) default to full access:
-    // allowedMenus = null means no menu restriction; canReassignDistributor = true.
-    // isSuperAdmin stays false to distinguish from actual super admins (adminRole === null).
-    allowedMenus: config ? [...config.allowedMenus] as string[] : null,
-    canReassignDistributor: config
-      ? !config.disabledFeatures.includes("order:reassign-distributor")
-      : true,
-  }
-}
+export { ADMIN_ROLE_CONFIG, resolvePermissions } from "@/lib/admin-role-config"
+export type { AdminSubRole } from "@/lib/admin-role-config"
 
 export const getAdminPermissions = cache(async () => {
   const result = await getSessionForAdminArea()

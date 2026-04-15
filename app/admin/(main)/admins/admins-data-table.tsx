@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/dialog"
 import { DataTable, PageHeader } from "@/app/admin/components"
 import { adminsColumns, type AdminRow } from "./admins-columns"
-import { ADMIN_ROLE_CONFIG, type AdminSubRole } from "@/lib/admin-permissions"
+import { ADMIN_ROLE_CONFIG, type AdminSubRole } from "@/lib/admin-role-config"
 
 interface AdminsDataTableProps {
   data: AdminRow[]
