@@ -87,7 +87,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
 
 /**
  * POST /api/admin/products/[productId]/blacklist
- * Admin: purge auto-blacklist entries older than BLACKLIST_EXPIRY_HOURS.
+ * Admin: purge auto-blacklist entries that are expired OR currently available on source.
  * Manual entries (reason = "管理员手动拉黑") are never purged.
  */
 export async function POST(_request: NextRequest, context: RouteContext) {
@@ -98,16 +98,39 @@ export async function POST(_request: NextRequest, context: RouteContext) {
 
     const product = await prisma.product.findUnique({
         where: { id: productId },
-        select: { id: true },
+        select: { id: true, sourceUrl: true },
     })
     if (!product) return notFound("商品不存在")
+
+    // Scrape current available accounts from source URL
+    const sourceUrl = (product.sourceUrl?.trim() || config.autoFetchSourceUrls[0]?.trim()) ?? ""
+    let availableAccounts: string[] = []
+    if (sourceUrl) {
+        try {
+            const scraped = await scrapeMultipleUrls(sourceUrl)
+            availableAccounts = scraped.map((a) => a.account)
+        } catch {
+            // Scrape failure is non-fatal: fall back to expiry-only cleanup
+        }
+    }
 
     const expiryDate = new Date(Date.now() - config.blacklistExpiryHours * 60 * 60 * 1000)
     const { count } = await prisma.accountBlacklist.deleteMany({
         where: {
             productId,
-            OR: [{ reason: null }, { reason: { not: MANUAL_BLACKLIST_REASON } }],
-            createdAt: { lt: expiryDate },
+            AND: [
+                // Never purge manually blacklisted entries
+                { OR: [{ reason: null }, { reason: { not: MANUAL_BLACKLIST_REASON } }] },
+                // Remove if expired OR currently available on source
+                {
+                    OR: [
+                        { createdAt: { lt: expiryDate } },
+                        ...(availableAccounts.length > 0
+                            ? [{ account: { in: availableAccounts } }]
+                            : []),
+                    ],
+                },
+            ],
         },
     })
 
