@@ -54,8 +54,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
 
 /**
  * DELETE /api/admin/products/[productId]/blacklist
- * Admin: remove an entry from the account blacklist.
- * Body: { id: string }
+ * Admin: remove a single entry ({ id: string }) or clear all entries ({ all: true }).
  */
 export async function DELETE(request: NextRequest, context: RouteContext) {
     const session = await getAdminSession()
@@ -63,11 +62,16 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
 
     const { productId } = await context.params
 
-    let body: { id?: string }
+    let body: { id?: string; all?: boolean }
     try {
         body = await request.json()
     } catch {
         return invalidJsonBody()
+    }
+
+    if (body.all) {
+        const { count } = await prisma.accountBlacklist.deleteMany({ where: { productId } })
+        return NextResponse.json({ removed: count })
     }
 
     const { id } = body

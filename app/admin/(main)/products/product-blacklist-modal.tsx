@@ -8,6 +8,17 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Copy, Check, Trash2, Loader2, ShieldOff, RefreshCw, Clock } from "lucide-react"
@@ -35,6 +46,7 @@ export function ProductBlacklistModal({ productId, productName, open, onOpenChan
     const [expiryHours, setExpiryHours] = useState<number>(12)
     const [loading, setLoading] = useState(false)
     const [purging, setPurging] = useState(false)
+    const [clearing, setClearing] = useState(false)
     const [removingId, setRemovingId] = useState<string | null>(null)
     const [copiedId, setCopiedId] = useState<string | null>(null)
 
@@ -65,6 +77,25 @@ export function ProductBlacklistModal({ productId, productName, open, onOpenChan
             toast.error("网络异常")
         } finally {
             setPurging(false)
+        }
+    }
+
+    const handleClearAll = async () => {
+        setClearing(true)
+        try {
+            const res = await fetch(`/api/admin/products/${productId}/blacklist`, {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ all: true }),
+            })
+            if (!res.ok) { toast.error("清空失败"); return }
+            const data = await res.json() as { removed: number }
+            toast.success(`已清空 ${data.removed} 条黑名单记录`)
+            setEntries([])
+        } catch {
+            toast.error("网络异常")
+        } finally {
+            setClearing(false)
         }
     }
 
@@ -124,6 +155,40 @@ export function ProductBlacklistModal({ productId, productName, open, onOpenChan
                         {loading ? "加载中…" : `共 ${entries.length} 条`}
                     </span>
                     <div className="flex items-center gap-2">
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={loading || clearing || entries.length === 0}
+                                    className="gap-1.5 text-destructive hover:text-destructive"
+                                >
+                                    {clearing ? (
+                                        <Loader2 className="size-3.5 animate-spin" />
+                                    ) : (
+                                        <Trash2 className="size-3.5" />
+                                    )}
+                                    清空
+                                </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>确认清空黑名单？</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        将删除全部 {entries.length} 条黑名单记录（包括手动拉黑）。此操作不可撤销。
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>取消</AlertDialogCancel>
+                                    <AlertDialogAction
+                                        onClick={handleClearAll}
+                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    >
+                                        确认清空
+                                    </AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
                         <Button
                             variant="outline"
                             size="sm"
