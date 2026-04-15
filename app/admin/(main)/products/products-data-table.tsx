@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, type ReactNode } from "react"
+import { useState, useMemo, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
@@ -42,7 +42,7 @@ import {
     TableRow,
 } from "@/components/ui/table"
 import { ClientDataTableToolbar, ClientDataTablePagination } from "@/app/admin/components"
-import { productsColumns, type ProductRow } from "./products-columns"
+import { createProductsColumns, type ProductRow } from "./products-columns"
 
 function SortableRow({ row, isFiltered }: { row: Row<ProductRow>; isFiltered: boolean }) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
@@ -81,12 +81,14 @@ const statusOptions = [
     { label: "下架", value: "INACTIVE" },
 ]
 
-export function ProductsDataTable({ data, actions }: { data: ProductRow[]; actions?: ReactNode }) {
+export function ProductsDataTable({ data, actions, isSuperAdmin = false }: { data: ProductRow[]; actions?: ReactNode; isSuperAdmin?: boolean }) {
     const router = useRouter()
     const [rows, setRows] = useState<ProductRow[]>(data)
     const [sorting, setSorting] = useState<SortingState>([])
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
+
+    const columns = useMemo(() => createProductsColumns(isSuperAdmin), [isSuperAdmin])
 
     const isFiltered =
         columnFilters.length > 0 &&
@@ -94,7 +96,7 @@ export function ProductsDataTable({ data, actions }: { data: ProductRow[]; actio
 
     const table = useReactTable({
         data: rows,
-        columns: productsColumns,
+        columns,
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
@@ -200,7 +202,7 @@ export function ProductsDataTable({ data, actions }: { data: ProductRow[]; actio
                                 ) : (
                                     <TableRow>
                                         <TableCell
-                                            colSpan={productsColumns.length}
+                                            colSpan={columns.length}
                                             className="h-24 text-center"
                                         >
                                             暂无商品

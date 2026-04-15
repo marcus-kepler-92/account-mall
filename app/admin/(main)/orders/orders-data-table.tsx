@@ -48,6 +48,7 @@ interface OrdersDataTableProps {
     };
     distributors: DistributorOption[];
     canReassignDistributor: boolean;
+    isSuperAdmin?: boolean;
 }
 
 const statusOptions = [
@@ -56,7 +57,7 @@ const statusOptions = [
     { label: "已关闭", value: "CLOSED" },
 ];
 
-export function OrdersDataTable({ data, total, statusCounts, distributors, canReassignDistributor }: OrdersDataTableProps) {
+export function OrdersDataTable({ data, total, statusCounts, distributors, canReassignDistributor, isSuperAdmin = false }: OrdersDataTableProps) {
     const router = useRouter();
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
@@ -165,19 +166,21 @@ export function OrdersDataTable({ data, total, statusCounts, distributors, canRe
             <CardHeader className="pb-4">
                 <div className="flex items-center justify-between">
                     <CardTitle className="text-base">订单列表</CardTitle>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleCloseExpired}
-                        disabled={closeExpiredLoading}
-                    >
-                        {closeExpiredLoading ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                            <TimerOff className="mr-2 h-4 w-4" />
-                        )}
-                        关闭过期订单
-                    </Button>
+                    {isSuperAdmin && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleCloseExpired}
+                            disabled={closeExpiredLoading}
+                        >
+                            {closeExpiredLoading ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                                <TimerOff className="mr-2 h-4 w-4" />
+                            )}
+                            关闭过期订单
+                        </Button>
+                    )}
                 </div>
             </CardHeader>
             <CardContent className="space-y-4 pt-0">
@@ -201,7 +204,7 @@ export function OrdersDataTable({ data, total, statusCounts, distributors, canRe
                             批量关闭 ({pendingSelected.length})
                         </Button>
                     )}
-                    {canBatchDelete && (
+                    {canBatchDelete && isSuperAdmin && (
                         <Button
                             variant="outline"
                             size="sm"

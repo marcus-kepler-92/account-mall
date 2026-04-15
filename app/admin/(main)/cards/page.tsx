@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { getAdminPermissions } from "@/lib/admin-permissions";
 import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -41,6 +42,8 @@ export default async function AdminCardsPage({
     searchParams: SearchParams;
 }) {
     const rawParams = await searchParams;
+    const perms = await getAdminPermissions();
+    const isSuperAdmin = perms?.isSuperAdmin ?? false;
     const filters = parseCardFilters(rawParams as CardFiltersInput);
     const { orderBy } = parseServerSort(
         rawParams.sort ?? null,
@@ -212,6 +215,7 @@ export default async function AdminCardsPage({
                     total={total}
                     statusCounts={stats}
                     actions={<CardsHeaderActions />}
+                    isSuperAdmin={isSuperAdmin}
                 />
             ) : (
                 <Card>

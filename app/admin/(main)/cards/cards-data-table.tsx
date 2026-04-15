@@ -47,6 +47,7 @@ interface CardsDataTableProps {
         DISABLED: number;
     };
     actions?: ReactNode;
+    isSuperAdmin?: boolean;
 }
 
 const statusOptions = [
@@ -58,7 +59,7 @@ const statusOptions = [
 
 const SORT_DEFAULTS = { sort: "createdAt", sortDir: "desc" } as const;
 
-export function CardsDataTable({ data, total, statusCounts, actions }: CardsDataTableProps) {
+export function CardsDataTable({ data, total, statusCounts, actions, isSuperAdmin = false }: CardsDataTableProps) {
     const router = useRouter();
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
@@ -178,7 +179,7 @@ export function CardsDataTable({ data, total, statusCounts, actions }: CardsData
                             批量启用 ({disabledSelected.length})
                         </Button>
                     )}
-                    {canBatchDelete && (
+                    {canBatchDelete && isSuperAdmin && (
                         <Button
                             variant="outline"
                             size="sm"

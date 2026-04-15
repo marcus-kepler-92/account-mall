@@ -12,9 +12,11 @@ const ProductsDataTable = dynamic(
 export function ProductsTableWrapper({
     data,
     actions,
+    isSuperAdmin = false,
 }: {
     data: ProductRow[]
     actions?: ReactNode
+    isSuperAdmin?: boolean
 }) {
-    return <ProductsDataTable data={data} actions={actions} />
+    return <ProductsDataTable data={data} actions={actions} isSuperAdmin={isSuperAdmin} />
 }

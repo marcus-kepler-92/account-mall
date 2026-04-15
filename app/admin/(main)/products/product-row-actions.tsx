@@ -43,6 +43,7 @@ type ProductRowActionsProps = {
     status: string
     productType: string
     isFree: boolean
+    isSuperAdmin?: boolean
 }
 
 export function ProductRowActions({
@@ -52,6 +53,7 @@ export function ProductRowActions({
     status,
     productType,
     isFree,
+    isSuperAdmin = false,
 }: ProductRowActionsProps) {
     const router = useRouter()
     const [loading, setLoading] = useState(false)
@@ -175,7 +177,7 @@ export function ProductRowActions({
                             </>
                         )}
                     </DropdownMenuItem>
-                    {!isActive && (
+                    {!isActive && isSuperAdmin && (
                         <DropdownMenuItem
                             onSelect={(e) => { e.preventDefault(); setDeleteOpen(true) }}
                             className="text-destructive focus:text-destructive"

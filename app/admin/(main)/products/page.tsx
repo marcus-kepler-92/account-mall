@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { prisma } from "@/lib/prisma"
+import { getAdminPermissions } from "@/lib/admin-permissions"
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
 import { ProductsTableWrapper } from "./products-table-wrapper"
@@ -9,6 +10,9 @@ import { PageHeader } from "@/app/admin/components"
 export const dynamic = "force-dynamic"
 
 export default async function AdminProductsPage() {
+    const perms = await getAdminPermissions()
+    const isSuperAdmin = perms?.isSuperAdmin ?? false
+
     const [products, stockCounts, salesCounts] = await Promise.all([
         prisma.product.findMany({
             include: {
@@ -48,14 +52,15 @@ export default async function AdminProductsPage() {
             <PageHeader title="商品管理" description="管理数字商品和价格" />
             <ProductsTableWrapper
                 data={data}
-                actions={
+                isSuperAdmin={isSuperAdmin}
+                actions={isSuperAdmin ? (
                     <Button asChild size="sm">
                         <Link href="/admin/products/new">
                             <Plus className="size-4" />
                             添加商品
                         </Link>
                     </Button>
-                }
+                ) : undefined}
             />
         </div>
     )

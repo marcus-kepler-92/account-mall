@@ -95,6 +95,7 @@ export default async function AdminOrdersPage({
 
     const perms = await getAdminPermissions()
     const canReassignDistributor = perms?.canReassignDistributor ?? false
+    const isSuperAdmin = perms?.isSuperAdmin ?? false
 
     const [orders, total, statusCounts, revenueAgg, distributors] = await Promise.all([
         prisma.order.findMany({
@@ -237,6 +238,7 @@ export default async function AdminOrdersPage({
                     distributorCode: d.distributorCode,
                 }))}
                 canReassignDistributor={canReassignDistributor}
+                isSuperAdmin={isSuperAdmin}
             />
         </div>
     )

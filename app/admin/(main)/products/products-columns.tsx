@@ -25,7 +25,8 @@ const statusMap: Record<ProductRow["status"], { label: string; variant: "default
     INACTIVE: { label: "下架", variant: "secondary" },
 }
 
-export const productsColumns: ColumnDef<ProductRow>[] = [
+export function createProductsColumns(isSuperAdmin: boolean): ColumnDef<ProductRow>[] {
+return [
     {
         id: "drag-handle",
         header: () => null,
@@ -103,8 +104,10 @@ export const productsColumns: ColumnDef<ProductRow>[] = [
                     status={row.original.status}
                     productType={row.original.productType}
                     isFree={row.original.productType === "AUTO_FETCH" && row.original.price === 0}
+                    isSuperAdmin={isSuperAdmin}
                 />
             </div>
         ),
     },
 ]
+}
