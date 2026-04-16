@@ -39,6 +39,18 @@ describe("GET /api/admin/sales-report", () => {
     expect(res.status).toBe(400)
   })
 
+  it("returns 400 when from is an invalid calendar date", async () => {
+    ;(getAdminSession as jest.Mock).mockResolvedValue(mockSession)
+    const res = await GET(makeRequest({ from: "2025-02-30", to: "2025-03-01" }))
+    expect(res.status).toBe(400)
+  })
+
+  it("returns 400 when to is an invalid calendar date", async () => {
+    ;(getAdminSession as jest.Mock).mockResolvedValue(mockSession)
+    const res = await GET(makeRequest({ from: "2025-03-01", to: "2025-13-01" }))
+    expect(res.status).toBe(400)
+  })
+
   it("returns empty data when no orders in range", async () => {
     ;(getAdminSession as jest.Mock).mockResolvedValue(mockSession)
     prismaMock.order.findMany.mockResolvedValue([])
