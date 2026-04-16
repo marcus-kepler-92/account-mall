@@ -113,9 +113,9 @@ export function DashboardSalesPanel() {
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Summary KPI row */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {isLoading ? (
-              Array.from({ length: 4 }).map((_, i) => (
+              Array.from({ length: 3 }).map((_, i) => (
                 <Skeleton key={i} className="h-16 rounded-lg" />
               ))
             ) : (
@@ -123,10 +123,6 @@ export function DashboardSalesPanel() {
                 <div className="rounded-lg border bg-card p-3">
                   <p className="text-xs text-muted-foreground">总订单</p>
                   <p className="mt-1 text-xl font-bold">{summary?.orderCount ?? 0}</p>
-                </div>
-                <div className="rounded-lg border bg-card p-3">
-                  <p className="text-xs text-muted-foreground">总销量（卡密）</p>
-                  <p className="mt-1 text-xl font-bold">{summary?.totalQuantity ?? 0}</p>
                 </div>
                 <div className="rounded-lg border bg-card p-3">
                   <p className="text-xs text-muted-foreground">总营收</p>
