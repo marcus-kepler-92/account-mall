@@ -1,104 +1,27 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { getAdminSession, getSuperAdminSession } from "@/lib/auth-guard";
-import { unauthorized, invalidJsonBody, validationError } from "@/lib/api-response";
-import { batchCardActionSchema } from "@/lib/validations/card";
+// app/api/cards/batch/route.ts
+import { NextRequest, NextResponse } from "next/server"
+import { getAdminSession, getSuperAdminSession } from "@/lib/auth-guard"
+import { unauthorized, invalidJsonBody, validationError } from "@/lib/api-response"
+import { batchCardActionSchema, batchCardAction } from "@/lib/domains/cards"
 
-/**
- * POST /api/cards/batch
- * Admin only: batch delete/disable/enable cards.
- * - DELETE: only UNSOLD cards can be deleted
- * - DISABLE: only UNSOLD cards can be disabled
- * - ENABLE: only DISABLED cards can be enabled
- * Returns { success, skipped } counts.
- */
 export async function POST(request: NextRequest) {
-    const session = await getAdminSession();
-    if (!session) {
-        return unauthorized();
-    }
+  const session = await getAdminSession()
+  if (!session) return unauthorized()
 
-    let body: unknown;
-    try {
-        body = await request.json();
-    } catch {
-        return invalidJsonBody();
-    }
+  let body: unknown
+  try { body = await request.json() } catch { return invalidJsonBody() }
 
-    const parsed = batchCardActionSchema.safeParse(body);
-    if (!parsed.success) {
-        return validationError(parsed.error.flatten());
-    }
+  const parsed = batchCardActionSchema.safeParse(body)
+  if (!parsed.success) return validationError(parsed.error.flatten())
 
-    const { action, cardIds } = parsed.data;
+  // DELETE requires super admin — auth check stays in route handler
+  if (parsed.data.action === "DELETE") {
+    const superSession = await getSuperAdminSession()
+    if (!superSession) return unauthorized()
+  }
 
-    if (action === "DELETE") {
-        const superSession = await getSuperAdminSession();
-        if (!superSession) return unauthorized();
-    }
-
-    const cards = await prisma.card.findMany({
-        where: { id: { in: cardIds } },
-        select: { id: true, status: true },
-    });
-
-    const cardMap = new Map(cards.map((c) => [c.id, c.status]));
-
-    let success = 0;
-    let skipped = 0;
-
-    const idsToProcess: string[] = [];
-
-    for (const id of cardIds) {
-        const status = cardMap.get(id);
-        if (!status) {
-            skipped++;
-            continue;
-        }
-
-        if (action === "DELETE") {
-            if (status === "UNSOLD") {
-                idsToProcess.push(id);
-            } else {
-                skipped++;
-            }
-        } else if (action === "DISABLE") {
-            if (status === "UNSOLD") {
-                idsToProcess.push(id);
-            } else {
-                skipped++;
-            }
-        } else if (action === "ENABLE") {
-            if (status === "DISABLED") {
-                idsToProcess.push(id);
-            } else {
-                skipped++;
-            }
-        }
-    }
-
-    if (idsToProcess.length > 0) {
-        if (action === "DELETE") {
-            const result = await prisma.card.deleteMany({
-                where: { id: { in: idsToProcess } },
-            });
-            success = result.count;
-        } else if (action === "DISABLE") {
-            const result = await prisma.card.updateMany({
-                where: { id: { in: idsToProcess } },
-                data: { status: "DISABLED" },
-            });
-            success = result.count;
-        } else if (action === "ENABLE") {
-            const result = await prisma.card.updateMany({
-                where: { id: { in: idsToProcess } },
-                data: { status: "UNSOLD" },
-            });
-            success = result.count;
-        }
-    }
-
-    return NextResponse.json({ success, skipped });
+  const result = await batchCardAction(parsed.data)
+  return NextResponse.json(result)
 }
 
-export const runtime = "nodejs";
+export const runtime = "nodejs"
