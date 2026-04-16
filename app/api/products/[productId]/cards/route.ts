@@ -1,147 +1,58 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { getAdminSession } from "@/lib/auth-guard";
-import { bulkImportCardsSchema } from "@/lib/validations/card";
-import { notifyRestockSubscribers } from "@/lib/restock-notify";
-import { unauthorized, notFound, invalidJsonBody, validationError, badRequest } from "@/lib/api-response";
+// app/api/products/[productId]/cards/route.ts
+import { NextRequest, NextResponse } from "next/server"
+import { prisma } from "@/lib/prisma"
+import { getAdminSession } from "@/lib/auth-guard"
+import { unauthorized, notFound, invalidJsonBody, validationError, badRequest } from "@/lib/api-response"
+import { bulkImportCardsSchema, bulkImportCards, getCardsByProduct, AutoFetchProductError } from "@/lib/domains/cards"
 
-type RouteContext = {
-    params: Promise<{ productId: string }>;
-};
+type RouteContext = { params: Promise<{ productId: string }> }
 
-/**
- * GET /api/products/[productId]/cards
- * Admin only: list all cards for a product, optionally filter by status
- */
+const VALID_STATUSES = ["UNSOLD", "RESERVED", "SOLD", "DISABLED"] as const
+type CardStatus = (typeof VALID_STATUSES)[number]
+
 export async function GET(request: NextRequest, context: RouteContext) {
-    const session = await getAdminSession();
-    if (!session) {
-        return unauthorized();
-    }
+  const session = await getAdminSession()
+  if (!session) return unauthorized()
 
-    const { productId } = await context.params;
-    const { searchParams } = new URL(request.url);
-    const status = searchParams.get("status"); // UNSOLD | RESERVED | SOLD | null (all)
+  const { productId } = await context.params
 
-    const product = await prisma.product.findUnique({
-        where: { id: productId },
-        select: { id: true },
-    });
-    if (!product) {
-        return notFound("Product not found");
-    }
+  const product = await prisma.product.findUnique({ where: { id: productId }, select: { id: true } })
+  if (!product) return notFound("Product not found")
 
-    const where: { productId: string; status?: "UNSOLD" | "RESERVED" | "SOLD" | "DISABLED" } = {
-        productId,
-    };
-    if (status === "UNSOLD" || status === "RESERVED" || status === "SOLD" || status === "DISABLED") {
-        where.status = status;
-    }
+  const { searchParams } = new URL(request.url)
+  const rawStatus = searchParams.get("status")
+  const status = VALID_STATUSES.includes(rawStatus as CardStatus) ? (rawStatus as CardStatus) : null
 
-    const [cards, counts] = await Promise.all([
-        prisma.card.findMany({
-            where,
-            include: {
-                order: { select: { orderNo: true } },
-            },
-            orderBy: [{ status: "asc" }, { createdAt: "desc" }],
-        }),
-        prisma.card.groupBy({
-            by: ["status"],
-            where: { productId },
-            _count: { id: true },
-        }),
-    ]);
-
-    const stats = {
-        UNSOLD: counts.find((c) => c.status === "UNSOLD")?._count.id ?? 0,
-        RESERVED: counts.find((c) => c.status === "RESERVED")?._count.id ?? 0,
-        SOLD: counts.find((c) => c.status === "SOLD")?._count.id ?? 0,
-        DISABLED: counts.find((c) => c.status === "DISABLED")?._count.id ?? 0,
-    };
-
-    const serialized = cards.map((c) => ({
-        id: c.id,
-        content: c.content,
-        status: c.status,
-        orderNo: c.order?.orderNo ?? null,
-        createdAt: c.createdAt.toISOString(),
-    }));
-
-    return NextResponse.json({ cards: serialized, stats });
+  const data = await getCardsByProduct(productId, status)
+  return NextResponse.json(data)
 }
 
-/**
- * POST /api/products/[productId]/cards
- * Admin only: bulk import cards
- */
 export async function POST(request: NextRequest, context: RouteContext) {
-    const session = await getAdminSession();
-    if (!session) {
-        return unauthorized();
-    }
+  const session = await getAdminSession()
+  if (!session) return unauthorized()
 
-    const { productId } = await context.params;
+  const { productId } = await context.params
 
-    const product = await prisma.product.findUnique({
-        where: { id: productId },
-        select: { id: true, productType: true },
-    });
-    if (!product) {
-        return notFound("Product not found");
-    }
-    if (product.productType === "AUTO_FETCH") {
-        return badRequest("自动获取类型的商品不支持手动导入卡密");
-    }
+  const product = await prisma.product.findUnique({
+    where: { id: productId },
+    select: { id: true, name: true, slug: true, price: true, productType: true },
+  })
+  if (!product) return notFound("Product not found")
 
-    let body: unknown;
-    try {
-        body = await request.json();
-    } catch {
-        return invalidJsonBody();
-    }
+  let body: unknown
+  try { body = await request.json() } catch { return invalidJsonBody() }
 
-    const parsed = bulkImportCardsSchema.safeParse(body);
-    if (!parsed.success) {
-        return validationError(parsed.error.flatten());
-    }
+  const parsed = bulkImportCardsSchema.safeParse(body)
+  if (!parsed.success) return validationError(parsed.error.flatten())
 
-    const contents = [...new Set(parsed.data.contents.map((c) => c.trim()).filter(Boolean))];
-    if (contents.length === 0) {
-        return badRequest("No valid card contents to import");
-    }
-
-    const oldUnsoldCount = await prisma.card.count({
-        where: { productId, status: "UNSOLD" },
-    });
-
-    const { count } = await prisma.card.createMany({
-        data: contents.map((content) => ({
-            productId,
-            content,
-            status: "UNSOLD",
-        })),
-    });
-
-    if (oldUnsoldCount === 0 && count > 0) {
-        const productWithDetails = await prisma.product.findUnique({
-            where: { id: productId },
-            select: { id: true, name: true, slug: true, price: true },
-        });
-        if (productWithDetails) {
-            console.log("[restock-notify] Triggering async (0 -> stock), productId:", productId);
-            notifyRestockSubscribers({
-                id: productWithDetails.id,
-                name: productWithDetails.name,
-                slug: productWithDetails.slug,
-                price: Number(productWithDetails.price),
-            }).catch((err) => {
-                console.error("[restock-notify] Failed to send restock emails", { productId, error: err });
-            });
-        }
-    }
-
-    return NextResponse.json({ imported: count, total: contents.length }, { status: 201 });
+  try {
+    const result = await bulkImportCards(productId, { ...product, price: Number(product.price) }, parsed.data)
+    return NextResponse.json(result, { status: 201 })
+  } catch (e) {
+    if (e instanceof AutoFetchProductError) return badRequest("自动获取类型的商品不支持手动导入卡密")
+    if (e instanceof Error && e.message === "No valid card contents to import") return badRequest(e.message)
+    throw e
+  }
 }
 
-export const runtime = "nodejs";
+export const runtime = "nodejs"
