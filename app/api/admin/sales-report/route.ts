@@ -23,23 +23,23 @@ function parseHKTRange(
 }
 
 export type SalesReportProduct = {
-  productId: string
-  productName: string
-  quantity: number
-  avgPrice: number
-  revenue: number
-  commission: number
-  profit: number
+    productId: string
+    productName: string
+    quantity: number
+    avgPrice: number
+    revenue: number
+    commission: number
+    profit: number
 }
 
 export type SalesReportResponse = {
-  summary: {
-    orderCount: number
-    totalQuantity: number
-    revenue: number
-    profit: number
-  }
-  products: SalesReportProduct[]
+    summary: {
+        orderCount: number
+        totalQuantity: number
+        revenue: number
+        profit: number
+    }
+    products: SalesReportProduct[]
 }
 
 export async function GET(request: Request): Promise<NextResponse> {
