@@ -71,3 +71,4 @@ automation/error_logs/*
 .claude
 .worktrees/
 .superpowers/
+.worktrees/
