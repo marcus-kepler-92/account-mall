@@ -32,6 +32,7 @@ import {
     DashboardOrderStatusChart,
     DashboardTopProductsChart,
 } from "./dashboard-charts"
+import { DashboardSalesPanel } from "./dashboard-sales-panel"
 import { config } from "@/lib/config"
 import { PageHeader } from "@/app/admin/components"
 
@@ -104,6 +105,8 @@ export default async function AdminDashboardPage() {
     return (
         <div className="space-y-6">
             <PageHeader title="概览" description={`欢迎使用 ${config.siteName} ${config.adminPanelLabel}`} />
+
+            <DashboardSalesPanel />
 
             {/* 第一层：财务核心 */}
             <section className="min-w-0" aria-label="财务核心指标">
