@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
+import { toZonedTime } from "date-fns-tz"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,30 +10,28 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { formatCurrency } from "@/lib/utils"
 import type { SalesReportResponse } from "@/app/api/admin/sales-report/route"
 
+const HKT_TZ = "Asia/Hong_Kong"
+
 // en-CA locale produces ISO YYYY-MM-DD format
 function todayHKT(): string {
-  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Hong_Kong" })
+  return new Date().toLocaleDateString("en-CA", { timeZone: HKT_TZ })
 }
 
 function offsetDaysHKT(days: number): string {
   const d = new Date()
   d.setTime(d.getTime() + days * 24 * 60 * 60 * 1000)
-  return d.toLocaleDateString("en-CA", { timeZone: "Asia/Hong_Kong" })
+  return d.toLocaleDateString("en-CA", { timeZone: HKT_TZ })
 }
 
 function mondayOfCurrentWeekHKT(): string {
-  const nowHKT = new Date(
-    new Date().toLocaleString("en-US", { timeZone: "Asia/Hong_Kong" })
-  )
+  const nowHKT = toZonedTime(new Date(), HKT_TZ)
   const day = nowHKT.getDay() // 0=Sun,1=Mon,...
   const diff = day === 0 ? -6 : 1 - day
   return offsetDaysHKT(diff)
 }
 
 function firstDayOfMonthHKT(): string {
-  const nowHKT = new Date(
-    new Date().toLocaleString("en-US", { timeZone: "Asia/Hong_Kong" })
-  )
+  const nowHKT = toZonedTime(new Date(), HKT_TZ)
   const y = nowHKT.getFullYear()
   const m = String(nowHKT.getMonth() + 1).padStart(2, "0")
   return `${y}-${m}-01`
@@ -130,7 +129,7 @@ export function DashboardSalesPanel() {
                 </div>
                 <div className="rounded-lg border bg-card p-3">
                   <p className="text-xs text-muted-foreground">总销量（卡密）</p>
-                  <p className="mt-1 text-xl font-bold">{totalQuantity}</p>
+                  <p className="mt-1 text-xl font-bold">{summary?.totalQuantity ?? 0}</p>
                 </div>
                 <div className="rounded-lg border bg-card p-3">
                   <p className="text-xs text-muted-foreground">总营收</p>
