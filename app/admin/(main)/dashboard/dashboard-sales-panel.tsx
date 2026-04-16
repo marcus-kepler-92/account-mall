@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { toZonedTime } from "date-fns-tz"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -24,17 +23,15 @@ function offsetDaysHKT(days: number): string {
 }
 
 function mondayOfCurrentWeekHKT(): string {
-  const nowHKT = toZonedTime(new Date(), HKT_TZ)
-  const day = nowHKT.getDay() // 0=Sun,1=Mon,...
+  const today = todayHKT() // "YYYY-MM-DD" in HKT — timezone-safe via Intl
+  const [y, m, d] = today.split("-").map(Number)
+  const day = new Date(y, m - 1, d).getDay() // day-of-week for a known date is timezone-independent
   const diff = day === 0 ? -6 : 1 - day
   return offsetDaysHKT(diff)
 }
 
 function firstDayOfMonthHKT(): string {
-  const nowHKT = toZonedTime(new Date(), HKT_TZ)
-  const y = nowHKT.getFullYear()
-  const m = String(nowHKT.getMonth() + 1).padStart(2, "0")
-  return `${y}-${m}-01`
+  return todayHKT().slice(0, 8) + "01" // "YYYY-MM-01"
 }
 
 async function fetchSalesReport(from: string, to: string): Promise<SalesReportResponse> {
