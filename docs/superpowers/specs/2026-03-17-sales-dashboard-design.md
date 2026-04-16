@@ -46,7 +46,7 @@
 | 总订单数 | count(COMPLETED orders in range) |
 | 总营收 | sum(order.amount) |
 | 总利润 | 总营收 - 总已结算佣金 |
-| 客单价 | 总营收 / 总订单数（无订单时显示 —） |
+| 总销量 | sum(order.quantity)（卖出的卡密总数） |
 
 > 注：此看板仅统计 `status = COMPLETED` 的订单（已付款，`paidAt` 落在区间内）。
 
@@ -87,7 +87,7 @@ type SalesReportResponse = {
     orderCount: number
     revenue: number
     profit: number
-    completedCount: number
+    totalQuantity: number
   }
   products: Array<{
     productId: string
