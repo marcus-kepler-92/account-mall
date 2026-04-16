@@ -4,11 +4,11 @@ import { prisma } from "@/lib/prisma"
 import { getAdminSession } from "@/lib/auth-guard"
 import { unauthorized, notFound, invalidJsonBody, validationError, badRequest } from "@/lib/api-response"
 import { bulkImportCardsSchema, bulkImportCards, getCardsByProduct, AutoFetchProductError } from "@/lib/domains/cards"
+import type { CardStatus } from "@/lib/domains/cards"
 
 type RouteContext = { params: Promise<{ productId: string }> }
 
 const VALID_STATUSES = ["UNSOLD", "RESERVED", "SOLD", "DISABLED"] as const
-type CardStatus = (typeof VALID_STATUSES)[number]
 
 export async function GET(request: NextRequest, context: RouteContext) {
   const session = await getAdminSession()
