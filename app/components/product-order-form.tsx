@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
+import Link from "next/link"
 import { useRequest } from "ahooks"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -444,6 +445,13 @@ export function ProductOrderForm({
                                         : "售罄"}
                         </Button>
                     </div>
+                    <p className="text-center text-xs text-muted-foreground">
+                        下单即表示您同意{" "}
+                        <Link href="/terms" target="_blank" className="underline underline-offset-2 hover:text-foreground transition-colors">用户协议</Link>
+                        、<Link href="/privacy" target="_blank" className="underline underline-offset-2 hover:text-foreground transition-colors">隐私政策</Link>
+                        {" "}及{" "}
+                        <Link href="/refund" target="_blank" className="underline underline-offset-2 hover:text-foreground transition-colors">售后政策</Link>
+                    </p>
                 </form>
             </Form>
         </div>
