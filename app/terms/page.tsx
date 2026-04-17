@@ -9,8 +9,8 @@ export const metadata: Metadata = {
 }
 
 const EFFECTIVE_DATE = "2026年3月17日"
-const businessName = config.businessName || "【经营者名称】"
-const contactEmail = config.contactEmail || "【联系邮箱】"
+const businessName = config.businessName || "本平台"
+const contactEmail = config.contactEmail || null
 
 export default function TermsPage() {
     return (
@@ -90,7 +90,7 @@ export default function TermsPage() {
                         </p>
 
                         <h2>十、联系方式</h2>
-                        <p>如对本协议有疑问，请联系：{contactEmail}</p>
+                        <p>如对本协议有疑问，请{contactEmail ? `联系：${contactEmail}` : "通过在线客服联系我们"}。</p>
                     </article>
                 </div>
             </main>

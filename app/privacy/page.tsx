@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 }
 
 const EFFECTIVE_DATE = "2026年3月17日"
-const contactEmail = config.contactEmail || "【联系邮箱】"
+const contactEmail = config.contactEmail || null
 
 export default function PrivacyPage() {
     return (
@@ -59,7 +59,7 @@ export default function PrivacyPage() {
                         <h2>五、用户权利</h2>
                         <p>
                             您有权要求查阅、更正或删除您的个人信息。
-                            请发送邮件至 {contactEmail} 提出请求，我们将在 15 个工作日内回复。
+                            请{contactEmail ? `发送邮件至 ${contactEmail}` : "通过在线客服"}提出请求，我们将在 15 个工作日内回复。
                         </p>
 
                         <h2>六、Cookie</h2>
@@ -74,7 +74,7 @@ export default function PrivacyPage() {
                         </p>
 
                         <h2>八、联系我们</h2>
-                        <p>如对本政策有疑问，请联系：{contactEmail}</p>
+                        <p>如对本政策有疑问，请{contactEmail ? `联系：${contactEmail}` : "通过在线客服联系我们"}。</p>
                     </article>
                 </div>
             </main>
