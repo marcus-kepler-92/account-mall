@@ -1,11 +1,10 @@
 import type { Metadata } from "next"
-import Link from "next/link"
 import { Suspense } from "react"
-import { Zap } from "lucide-react"
 import { prisma } from "@/lib/prisma"
 import { ProductCatalog } from "@/app/components/product-catalog"
 import { ProductCardSkeleton } from "@/app/components/product-card"
 import { SiteHeader } from "@/app/components/site-header"
+import { SiteFooter } from "@/app/components/site-footer"
 import { AnnouncementsBlock } from "./announcements-block"
 import { config } from "@/lib/config"
 import { DEFAULT_SEO_TITLE, DEFAULT_SEO_DESCRIPTION, KEYWORDS_META } from "@/lib/seo-keywords"
@@ -74,29 +73,7 @@ export default async function HomePage() {
                 </div>
             </main>
 
-            {/* Footer */}
-            <footer className="border-t">
-                <div className="mx-auto max-w-6xl px-4 py-8">
-                    <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
-                        <div className="flex flex-wrap items-center justify-center gap-4 sm:justify-start">
-                            <div className="flex items-center gap-2">
-                                <div className="flex size-6 items-center justify-center rounded-md bg-primary">
-                                    <Zap className="size-3 text-primary-foreground" />
-                                </div>
-                                <span className="text-sm font-medium">{config.siteName}</span>
-                            </div>
-                            <nav className="flex gap-4 text-sm text-muted-foreground">
-                                <Link href="/orders/lookup" className="hover:text-foreground transition-colors">
-                                    订单查询
-                                </Link>
-                            </nav>
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                            &copy; {new Date().getFullYear()} {config.siteName} 版权所有
-                        </p>
-                    </div>
-                </div>
-            </footer>
+            <SiteFooter />
         </div>
     )
 }

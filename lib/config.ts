@@ -135,6 +135,14 @@ const envSchema = z
     qwenApiKey: z.string().optional(),
     /** AUTO_FETCH：苹果账号管理平台基础 URL（voidlogins 类型商品使用） */
     appleHostingUrl: z.string().default("https://apple.voidlogins.com"),
+    /** 支付订单描述（传给支付接口的 subject/name 字段），合规用途，不暴露具体商品名 */
+    paymentSubjectLabel: z.string().default("信息技术服务费"),
+    /** 合规页脚：经营者名称，留空则不展示 */
+    businessName: z.string().default(""),
+    /** 合规页脚：统一社会信用代码，留空则不展示 */
+    businessLicenseNo: z.string().default(""),
+    /** 合规页脚：对外联系邮箱，留空则不展示 */
+    contactEmail: z.string().default(""),
   })
   .transform((data) => {
     const urlFromEnv = data.databaseUrl?.trim();
@@ -274,6 +282,10 @@ function getEnvInput() {
     orderCompletionEmailEnabled: e.ORDER_COMPLETION_EMAIL_ENABLED,
     qwenApiKey: e.QWEN_API_KEY,
     appleHostingUrl: e.APPLE_HOSTING_URL,
+    paymentSubjectLabel: e.PAYMENT_SUBJECT_LABEL,
+    businessName: e.BUSINESS_NAME,
+    businessLicenseNo: e.BUSINESS_LICENSE_NO,
+    contactEmail: e.CONTACT_EMAIL,
   };
 }
 

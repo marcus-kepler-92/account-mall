@@ -1,5 +1,6 @@
 import { getAlipayPagePayUrl, getAlipayWapPayUrl } from "@/lib/alipay"
 import { isYipayConfigured, getYipayPagePayUrl, type YipayChannelConfig } from "@/lib/yipay"
+import { config } from "@/lib/config"
 
 export type ClientType = "pc" | "wap"
 
@@ -19,7 +20,9 @@ export interface GetPaymentUrlParams {
  * 未配置支付或生成失败时返回 null。
  */
 export function getPaymentUrlForOrder(params: GetPaymentUrlParams): string | null {
-    const { orderNo, totalAmount, subject, clientType = "pc", paymentMethod = "alipay", channel } = params
+    const { orderNo, totalAmount, clientType = "pc", paymentMethod = "alipay", channel } = params
+    // Always use the compliance label as the payment subject, never expose product names
+    const subject = config.paymentSubjectLabel
     const useYipay = channel != null || isYipayConfigured()
     return useYipay
         ? getYipayPagePayUrl({
