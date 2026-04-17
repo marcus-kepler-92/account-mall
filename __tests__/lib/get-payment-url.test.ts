@@ -4,6 +4,12 @@
 
 import { getPaymentUrlForOrder } from "@/lib/get-payment-url"
 
+const COMPLIANCE_SUBJECT = "信息技术服务费"
+
+jest.mock("@/lib/config", () => ({
+    config: { paymentSubjectLabel: "信息技术服务费" },
+}))
+
 jest.mock("@/lib/yipay", () => ({
     isYipayConfigured: jest.fn(),
     getYipayPagePayUrl: jest.fn().mockReturnValue("https://yipay.example/pay"),
@@ -34,7 +40,7 @@ describe("getPaymentUrlForOrder", () => {
         expect(yipay.getYipayPagePayUrl).toHaveBeenCalledWith({
             orderNo: baseParams.orderNo,
             totalAmount: baseParams.totalAmount,
-            subject: baseParams.subject,
+            subject: COMPLIANCE_SUBJECT,
             type: "alipay",
         })
     })
@@ -49,7 +55,7 @@ describe("getPaymentUrlForOrder", () => {
         expect(alipay.getAlipayPagePayUrl).toHaveBeenCalledWith({
             orderNo: baseParams.orderNo,
             totalAmount: baseParams.totalAmount,
-            subject: baseParams.subject,
+            subject: COMPLIANCE_SUBJECT,
         })
     })
 
@@ -63,7 +69,7 @@ describe("getPaymentUrlForOrder", () => {
         expect(alipay.getAlipayWapPayUrl).toHaveBeenCalledWith({
             orderNo: baseParams.orderNo,
             totalAmount: baseParams.totalAmount,
-            subject: baseParams.subject,
+            subject: COMPLIANCE_SUBJECT,
         })
     })
 
@@ -101,7 +107,7 @@ describe("getPaymentUrlForOrder", () => {
         expect(yipay.getYipayPagePayUrl).toHaveBeenCalledWith({
             orderNo: baseParams.orderNo,
             totalAmount: baseParams.totalAmount,
-            subject: baseParams.subject,
+            subject: COMPLIANCE_SUBJECT,
             type: "wxpay",
         })
     })
