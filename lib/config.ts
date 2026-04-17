@@ -18,13 +18,13 @@ const envSchema = z
     siteDescription: z
       .string()
       .default(
-        "提供苹果ID购买服务，支持美区/港区/台区/韩区独享成品号，手工注册账号可改密可绑定邮箱。已购小火箭Shadowrocket账号即买即用，已激活iCloud账号支持全功能，24小时自动发货，一号一密独享安全稳定。",
+        "提供苹果ID购买服务，支持美区/港区/台区/韩区独享及共享空白账号。已购小火箭Shadowrocket账号登录App Store即可直接下载，24小时自动发货，安全稳定，即买即用。",
       ),
-    siteTagline: z.string().default("苹果ID购买，小火箭成品号即买即发"),
+    siteTagline: z.string().default("苹果ID购买，小火箭空白号即买即发"),
     siteSubtitle: z
       .string()
       .default(
-        "美区/港区/台区/韩区独享成品号，手工注册可改密，支持已购小火箭Shadowrocket账号，24小时自动发货。",
+        "美区/港区/台区/韩区独享及共享空白账号，已购小火箭Shadowrocket，24小时自动发货。",
       ),
     siteKeywords: z.string().optional(),
     adminPanelLabel: z.string().default("管理后台"),

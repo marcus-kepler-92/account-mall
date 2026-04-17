@@ -69,13 +69,13 @@ const META_KW_LIST = [
 
 export const KEYWORDS_META = META_KW_LIST.join(",")
 
-/** 默认 SEO 标题（约 50–60 字，核心词靠前，差异化竞品：加入小火箭/成品号/台区/可改密） */
+/** 默认 SEO 标题（约 50–60 字，核心词靠前，差异化竞品：加入小火箭/台区/韩区/独享共享） */
 export const DEFAULT_SEO_TITLE =
-  "苹果ID购买 | 小火箭/成品号·美区港区台区Apple ID·独享可改密自动发货"
+  "苹果ID购买 | 小火箭美区港区台区Apple ID·独享共享空白号自动发货"
 
-/** 默认 SEO 描述（约 150 字，自然融入小火箭/Shadowrocket/台区/韩区/成品号/手工注册/已激活iCloud） */
+/** 默认 SEO 描述（约 150 字，融入小火箭/Shadowrocket/台区/韩区/独享共享/空白号） */
 export const DEFAULT_SEO_DESCRIPTION =
-  "提供苹果ID购买服务，支持美区/港区/台区/韩区独享成品号，手工注册账号可改密可绑定邮箱。已购小火箭Shadowrocket账号即买即用，已激活iCloud账号支持全功能，24小时自动发货，一号一密独享安全稳定。"
+  "提供苹果ID购买服务，支持美区/港区/台区/韩区独享及共享空白账号。已购小火箭Shadowrocket账号登录App Store即可直接下载，24小时自动发货，安全稳定，即买即用。"
 
 // --- 兼容旧引用（若有）---
 /** @deprecated 使用 P0_CORE / P1_HIGH / P2_MEDIUM 代替 */
