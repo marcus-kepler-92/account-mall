@@ -74,7 +74,7 @@ describe("POST /api/tags", () => {
     it("returns 401 when not authenticated", async () => {
         adminSessionMock.mockResolvedValueOnce(null)
 
-        const res = await POST(createJsonRequest({ name: "New Tag" }))
+        const res = await POST(createJsonRequest({ name: "New Tag", slug: "new-tag" }))
         const data = await res.json()
 
         expect(res.status).toBe(401)
@@ -96,10 +96,30 @@ describe("POST /api/tags", () => {
         expect(data).toEqual({ error: "Invalid JSON body" })
     })
 
-    it("returns 400 when validation fails (missing name)", async () => {
+    it("returns 400 when name is missing", async () => {
         adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
 
-        const res = await POST(createJsonRequest({}))
+        const res = await POST(createJsonRequest({ slug: "some-slug" }))
+        const data = await res.json()
+
+        expect(res.status).toBe(400)
+        expect(data.error).toBe("Validation failed")
+    })
+
+    it("returns 400 when slug is missing", async () => {
+        adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
+
+        const res = await POST(createJsonRequest({ name: "网飞会员" }))
+        const data = await res.json()
+
+        expect(res.status).toBe(400)
+        expect(data.error).toBe("Validation failed")
+    })
+
+    it("returns 400 when slug has invalid format", async () => {
+        adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
+
+        const res = await POST(createJsonRequest({ name: "Test", slug: "Invalid Slug!" }))
         const data = await res.json()
 
         expect(res.status).toBe(400)
@@ -114,36 +134,56 @@ describe("POST /api/tags", () => {
             slug: "game",
         } as any)
 
-        const res = await POST(createJsonRequest({ name: "Game" }))
+        const res = await POST(createJsonRequest({ name: "Game", slug: "game" }))
         const data = await res.json()
 
         expect(res.status).toBe(409)
-        expect(data).toEqual({
-            error: "A tag with this name already exists",
-        })
+        expect(data).toEqual({ error: "A tag with this name already exists" })
     })
 
-    it("creates tag and returns 201", async () => {
+    it("returns 409 when slug conflicts with existing tag", async () => {
+        adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
+        prismaMock.tag.findFirst.mockResolvedValueOnce({
+            id: "existing",
+            name: "Games",
+            slug: "game",
+        } as any)
+
+        const res = await POST(createJsonRequest({ name: "Game", slug: "game" }))
+        const data = await res.json()
+
+        expect(res.status).toBe(409)
+    })
+
+    it("creates ASCII-named tag with provided slug", async () => {
         adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
         prismaMock.tag.findFirst.mockResolvedValueOnce(null)
-        const created = {
-            id: "tag_new",
-            name: "New Tag",
-            slug: "new-tag",
-        }
+        const created = { id: "tag_new", name: "New Tag", slug: "new-tag" }
         prismaMock.tag.create.mockResolvedValueOnce(created as any)
 
-        const res = await POST(createJsonRequest({ name: "New Tag" }))
+        const res = await POST(createJsonRequest({ name: "New Tag", slug: "new-tag" }))
         const data = await res.json()
 
         expect(res.status).toBe(201)
-        expect(data).toMatchObject({
-            id: "tag_new",
-            name: "New Tag",
-            slug: "new-tag",
-        })
+        expect(data).toMatchObject({ id: "tag_new", name: "New Tag", slug: "new-tag" })
         expect(prismaMock.tag.create).toHaveBeenCalledWith({
             data: { name: "New Tag", slug: "new-tag" },
+        })
+    })
+
+    it("creates Chinese-named tag with manually provided slug", async () => {
+        adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
+        prismaMock.tag.findFirst.mockResolvedValueOnce(null)
+        const created = { id: "tag_cn", name: "网飞会员", slug: "netflix-vip" }
+        prismaMock.tag.create.mockResolvedValueOnce(created as any)
+
+        const res = await POST(createJsonRequest({ name: "网飞会员", slug: "netflix-vip" }))
+        const data = await res.json()
+
+        expect(res.status).toBe(201)
+        expect(data).toMatchObject({ name: "网飞会员", slug: "netflix-vip" })
+        expect(prismaMock.tag.create).toHaveBeenCalledWith({
+            data: { name: "网飞会员", slug: "netflix-vip" },
         })
     })
 })

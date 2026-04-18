@@ -3,7 +3,6 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getAdminSession } from "@/lib/auth-guard";
 import { createTagSchema } from "@/lib/validations/product";
-import { generateSlug } from "@/lib/utils";
 import { unauthorized, invalidJsonBody, validationError, conflict } from "@/lib/api-response";
 
 /**
@@ -53,8 +52,7 @@ export async function POST(request: NextRequest) {
         return validationError(parsed.error.flatten());
     }
 
-    const { name } = parsed.data;
-    const slug = generateSlug(name);
+    const { name, slug } = parsed.data;
 
     // Check uniqueness
     const existing = await prisma.tag.findFirst({

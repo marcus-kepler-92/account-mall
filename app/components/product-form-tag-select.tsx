@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useFormContext } from "react-hook-form"
 import { toast } from "sonner"
 import { Input } from "@/components/ui/input"
@@ -21,6 +21,7 @@ import {
 import { buttonVariants } from "@/components/ui/button"
 import { Loader2, Plus, X, Trash2 } from "lucide-react"
 import type { ProductFormSchema } from "@/lib/validations/product"
+import { generateSlug } from "@/lib/utils"
 
 type Tag = { id: string; name: string; slug: string }
 
@@ -30,7 +31,15 @@ export function ProductFormTagSelect({ initialTags }: { initialTags: Tag[] }) {
 
     const [tags, setTags] = useState<Tag[]>(initialTags)
     const [newTagName, setNewTagName] = useState("")
+    const [newTagSlug, setNewTagSlug] = useState("")
+    const [slugManuallyEdited, setSlugManuallyEdited] = useState(false)
     const [creatingTag, setCreatingTag] = useState(false)
+
+    useEffect(() => {
+        if (!slugManuallyEdited) {
+            setNewTagSlug(generateSlug(newTagName))
+        }
+    }, [newTagName, slugManuallyEdited])
     const [deletingTagId, setDeletingTagId] = useState<string | null>(null)
     const [confirmDeleteTagId, setConfirmDeleteTagId] = useState<string | null>(null)
 
@@ -61,13 +70,13 @@ export function ProductFormTagSelect({ initialTags }: { initialTags: Tag[] }) {
     }
 
     const handleCreateTag = async () => {
-        if (!newTagName.trim()) return
+        if (!newTagName.trim() || !newTagSlug.trim()) return
         setCreatingTag(true)
         try {
             const res = await fetch("/api/tags", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ name: newTagName.trim() }),
+                body: JSON.stringify({ name: newTagName.trim(), slug: newTagSlug.trim() }),
             })
             if (!res.ok) {
                 const data = await res.json()
@@ -78,6 +87,8 @@ export function ProductFormTagSelect({ initialTags }: { initialTags: Tag[] }) {
             setTags((prev) => [...prev, tag])
             setValue("tagIds", [...tagIds, tag.id])
             setNewTagName("")
+            setNewTagSlug("")
+            setSlugManuallyEdited(false)
         } catch {
             toast.error("创建标签失败")
         } finally {
@@ -181,11 +192,11 @@ export function ProductFormTagSelect({ initialTags }: { initialTags: Tag[] }) {
                         </div>
                     )}
 
-                    <div className="flex items-center gap-2 pt-2 border-t">
+                    <div className="space-y-2 pt-2 border-t">
                         <Input
                             value={newTagName}
                             onChange={(e) => setNewTagName(e.target.value)}
-                            placeholder="新建标签..."
+                            placeholder="标签名称..."
                             className="h-8 text-sm"
                             onKeyDown={(e) => {
                                 if (e.key === "Enter") {
@@ -194,19 +205,36 @@ export function ProductFormTagSelect({ initialTags }: { initialTags: Tag[] }) {
                                 }
                             }}
                         />
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={handleCreateTag}
-                            disabled={creatingTag || !newTagName.trim()}
-                        >
-                            {creatingTag ? (
-                                <Loader2 className="size-3 animate-spin" />
-                            ) : (
-                                <Plus className="size-3" />
-                            )}
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            <Input
+                                value={newTagSlug}
+                                onChange={(e) => {
+                                    setNewTagSlug(e.target.value)
+                                    setSlugManuallyEdited(true)
+                                }}
+                                placeholder="标识符 (如: netflix-vip)"
+                                className="h-8 text-sm font-mono"
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                        e.preventDefault()
+                                        handleCreateTag()
+                                    }
+                                }}
+                            />
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={handleCreateTag}
+                                disabled={creatingTag || !newTagName.trim() || !newTagSlug.trim()}
+                            >
+                                {creatingTag ? (
+                                    <Loader2 className="size-3 animate-spin" />
+                                ) : (
+                                    <Plus className="size-3" />
+                                )}
+                            </Button>
+                        </div>
                     </div>
                 </CardContent>
             </Card>

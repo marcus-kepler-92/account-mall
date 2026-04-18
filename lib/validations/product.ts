@@ -91,6 +91,11 @@ export const updateProductSchema = z.object({
 
 export const createTagSchema = z.object({
     name: z.string().min(1, "Tag name is required").max(50, "Tag name is too long"),
+    slug: z
+        .string()
+        .min(1, "请输入标识符")
+        .max(100)
+        .regex(slugRegex, "仅支持小写字母、数字和连字符"),
 });
 
 // Form schema for product form (handles string inputs from form fields)
