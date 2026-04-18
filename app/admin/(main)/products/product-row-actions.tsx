@@ -9,6 +9,7 @@ import {
     Pencil,
     CreditCard,
     Copy,
+    CopyPlus,
     Archive,
     RotateCcw,
     ExternalLink,
@@ -57,12 +58,31 @@ export function ProductRowActions({
 }: ProductRowActionsProps) {
     const router = useRouter()
     const [loading, setLoading] = useState(false)
+    const [duplicateLoading, setDuplicateLoading] = useState(false)
     const [statusDialogOpen, setStatusDialogOpen] = useState(false)
     const [deleteOpen, setDeleteOpen] = useState(false)
     const [deleteLoading, setDeleteLoading] = useState(false)
     const [blacklistOpen, setBlacklistOpen] = useState(false)
     const isActive = status === "ACTIVE"
     const isAutoFetch = productType === "AUTO_FETCH"
+
+    const handleDuplicate = async () => {
+        setDuplicateLoading(true)
+        try {
+            const res = await fetch(`/api/products/${productId}/duplicate`, { method: "POST" })
+            if (res.ok) {
+                toast.success("商品已复制")
+                router.refresh()
+            } else {
+                const data = await res.json().catch(() => ({}))
+                toast.error(data?.error ?? "复制失败")
+            }
+        } catch {
+            toast.error("复制失败")
+        } finally {
+            setDuplicateLoading(false)
+        }
+    }
 
     const copyLink = async () => {
         const url = `${window.location.origin}/products/${productId}-${slug}`
@@ -159,6 +179,13 @@ export function ProductRowActions({
                     <DropdownMenuItem onClick={copyLink}>
                         <Copy className="size-4" />
                         复制链接
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleDuplicate} disabled={duplicateLoading}>
+                        {duplicateLoading
+                            ? <Loader2 className="size-4 animate-spin" />
+                            : <CopyPlus className="size-4" />
+                        }
+                        复制商品
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem

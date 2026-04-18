@@ -83,7 +83,8 @@ const statusOptions = [
 
 export function ProductsDataTable({ data, actions, isSuperAdmin = false }: { data: ProductRow[]; actions?: ReactNode; isSuperAdmin?: boolean }) {
     const router = useRouter()
-    const [rows, setRows] = useState<ProductRow[]>(data)
+    const [dragRows, setDragRows] = useState<ProductRow[] | null>(null)
+    const rows = dragRows ?? data
     const [sorting, setSorting] = useState<SortingState>([])
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
@@ -119,7 +120,7 @@ export function ProductsDataTable({ data, actions, isSuperAdmin = false }: { dat
         const newIndex = rows.findIndex((r) => r.id === over.id)
         const reordered = arrayMove(rows, oldIndex, newIndex)
 
-        setRows(reordered)
+        setDragRows(reordered)
 
         // Sends full dataset — safe because products use client-side pagination (small count).
         // If server-side pagination is ever added, this needs to send only the visible page items
@@ -130,11 +131,12 @@ export function ProductsDataTable({ data, actions, isSuperAdmin = false }: { dat
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ ids: reordered.map((r) => r.id) }),
             })
-            if (!res.ok) {
-                throw new Error("reorder failed")
-            }
+            if (!res.ok) throw new Error("reorder failed")
+            setDragRows(null)
+            router.refresh()
         } catch {
             toast.error("排序保存失败，已恢复原顺序")
+            setDragRows(null)
             router.refresh()
         }
     }
