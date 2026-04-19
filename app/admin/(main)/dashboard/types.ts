@@ -1,88 +1,39 @@
 import type { OrderStatus } from "@prisma/client"
 
-/** 订单状态到中文文案 */
 export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
-    PENDING: "待支付",
-    COMPLETED: "已完成",
-    CLOSED: "已关闭",
+  PENDING: "待支付",
+  COMPLETED: "已完成",
+  CLOSED: "已关闭",
 }
 
-/** Dashboard 时间范围（趋势图） */
 export const DASHBOARD_TREND_DAYS = [7, 30] as const
 export type DashboardTrendDays = (typeof DASHBOARD_TREND_DAYS)[number]
 
-/** 库存低阈值，低于此值在仪表盘高亮 */
 export const LOW_STOCK_THRESHOLD = 3
 
-/** 趋势图单日数据点 */
 export type DashboardTrendPoint = {
-    date: string
-    订单: number
-    营收: number
-    净收入: number
+  date: string
+  订单: number
+  营收: number
+  净收入: number
 }
 
-/** 商品表现（营收或订单数） */
 export type TopProductRow = {
-    productId: string
-    productName: string
-    revenue: number
-    orderCount: number
+  productId: string
+  productName: string
+  revenue: number
+  orderCount: number
 }
 
-/** 库存预警行 */
 export type InventoryRow = {
-    productId: string
-    productName: string
-    unsoldCount: number
-    isLowStock: boolean
+  productId: string
+  productName: string
+  unsoldCount: number
+  isLowStock: boolean
 }
 
-/** 待补货提醒行 */
 export type RestockPendingRow = {
-    productId: string
-    productName: string
-    pendingCount: number
-}
-
-/** 订单状态分布（饼图） */
-export type OrderStatusCount = {
-    status: string
-    label: string
-    count: number
-}
-
-/** KPI 汇总（订单与库存 + 业务概览） */
-export type DashboardKpis = {
-    totalRevenue: number
-    revenueTrend: number
-    orderCount: number
-    orderTrend: number
-    completedCount: number
-    pendingCount: number
-    closedCount: number
-    completionRate: number
-    aov: number
-    unsoldCardCount: number
-    restockPendingCount: number
-    /** 在售商品数（ACTIVE） */
-    activeProductCount: number
-    /** 分销员总数 */
-    distributorCount: number
-    /** 待处理提现笔数 */
-    pendingWithdrawalCount: number
-    /** 待处理提现总金额 */
-    pendingWithdrawalAmount: number
-    /** 待结算佣金总金额 */
-    pendingCommissionAmount: number
-    /** 已结算佣金总额（L1 + L2） */
-    totalCommission: number
-    /** 提现手续费收入（PAID 状态的 feeAmount 之和） */
-    totalWithdrawalFee: number
-    /** 平台净收入 = 营收 - 佣金 + 手续费 */
-    netIncome: number
-    /** 净利率（%），营收为 0 时为 0 */
-    netMarginPercent: number
-    /** 净收入周环比（%） */
-    netIncomeTrend: number
+  productId: string
+  productName: string
+  pendingCount: number
 }

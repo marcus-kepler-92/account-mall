@@ -1,420 +1,183 @@
 import { prisma } from "@/lib/prisma"
 import { getHKTDayStart } from "@/lib/utils"
 import {
-    type DashboardKpis,
-    type DashboardTrendPoint,
-    type TopProductRow,
-    type InventoryRow,
-    type RestockPendingRow,
-    type OrderStatusCount,
-    LOW_STOCK_THRESHOLD,
-    ORDER_STATUS_LABEL,
+  type DashboardTrendPoint,
+  type TopProductRow,
+  type InventoryRow,
+  type RestockPendingRow,
 } from "./types"
 import { getDaysForTrend } from "./dashboard-utils"
 import { ADMIN_DASHBOARD_RECENT_ORDERS_LIMIT, ADMIN_DASHBOARD_TOP_PRODUCTS_LIMIT } from "@/app/admin/constants"
-import type { OrderStatus } from "@prisma/client"
-
-// "This period" = rolling 7-day window ending today (HKT). "Last period" = the 7 days before that.
-function getWeekBounds(now: Date) {
-    const startOfThisPeriod = getHKTDayStart(new Date(now))
-    startOfThisPeriod.setDate(startOfThisPeriod.getDate() - 7)
-    const startOfLastPeriod = new Date(startOfThisPeriod)
-    startOfLastPeriod.setDate(startOfLastPeriod.getDate() - 7)
-    return { startOfThisPeriod, startOfLastPeriod }
-}
 
 /**
- * 核心 KPI：总营收、环比、订单数、环比、完成率、AOV、卡密库存、待补货数量
- */
-export async function getDashboardKpis(): Promise<DashboardKpis> {
-    const now = new Date()
-    const { startOfThisPeriod, startOfLastPeriod } = getWeekBounds(now)
-    const [
-        totalRevenueResult,
-        lastPeriodRevenueResult,
-        orderCount,
-        lastPeriodOrderCount,
-        thisPeriodOrderCount,
-        orderCountByStatus,
-        unsoldCardCount,
-        restockPendingCount,
-        activeProductCount,
-        distributorCount,
-        pendingWithdrawalAgg,
-        pendingCommissionSum,
-        settledCommissionSum,
-        paidWithdrawalFeeSum,
-        lastPeriodSettledCommissionSum,
-        lastPeriodWithdrawalFeeSum,
-        thisPeriodSettledCommissionSum,
-        thisPeriodWithdrawalFeeSum,
-    ] = await Promise.all([
-        prisma.order.aggregate({
-            where: { status: "COMPLETED" },
-            _sum: { amount: true },
-            _count: { id: true },
-        }),
-        prisma.order.aggregate({
-            where: {
-                status: "COMPLETED",
-                paidAt: { gte: startOfLastPeriod, lt: startOfThisPeriod },
-            },
-            _sum: { amount: true },
-        }),
-        prisma.order.count(),
-        prisma.order.count({
-            where: {
-                createdAt: { gte: startOfLastPeriod, lt: startOfThisPeriod },
-            },
-        }),
-        prisma.order.count({
-            where: { createdAt: { gte: startOfThisPeriod } },
-        }),
-        prisma.order.groupBy({
-            by: ["status"],
-            _count: { id: true },
-        }),
-        prisma.card.count({ where: { status: "UNSOLD" } }),
-        prisma.restockSubscription.count({ where: { status: "PENDING" } }),
-        prisma.product.count({ where: { status: "ACTIVE" } }),
-        prisma.user.count({ where: { role: "DISTRIBUTOR" } }),
-        prisma.withdrawal.aggregate({
-            where: { status: "PENDING" },
-            _count: { id: true },
-            _sum: { amount: true },
-        }),
-        prisma.commission.aggregate({
-            where: { status: "PENDING" },
-            _sum: { amount: true },
-        }),
-        // 利润相关：累计已结算佣金
-        prisma.commission.aggregate({
-            where: { status: "SETTLED" },
-            _sum: { amount: true },
-        }),
-        // 已打款提现的手续费收入
-        (prisma as any).withdrawal.aggregate({
-            where: { status: "PAID" },
-            _sum: { feeAmount: true },
-        }),
-        // 上周：佣金+手续费（用于净收入环比）
-        prisma.commission.aggregate({
-            where: {
-                status: "SETTLED",
-                createdAt: { gte: startOfLastPeriod, lt: startOfThisPeriod },
-            },
-            _sum: { amount: true },
-        }),
-        (prisma as any).withdrawal.aggregate({
-            where: {
-                status: "PAID",
-                processedAt: { gte: startOfLastPeriod, lt: startOfThisPeriod },
-            },
-            _sum: { feeAmount: true },
-        }),
-        // 本周：佣金+手续费
-        prisma.commission.aggregate({
-            where: {
-                status: "SETTLED",
-                createdAt: { gte: startOfThisPeriod },
-            },
-            _sum: { amount: true },
-        }),
-        (prisma as any).withdrawal.aggregate({
-            where: {
-                status: "PAID",
-                processedAt: { gte: startOfThisPeriod },
-            },
-            _sum: { feeAmount: true },
-        }),
-    ])
-
-    const totalRevenue = Number(totalRevenueResult._sum.amount ?? 0)
-    const completedCount = totalRevenueResult._count.id
-    const lastPeriodRevenue = Number(lastPeriodRevenueResult._sum.amount ?? 0)
-    const revenueTrend =
-        lastPeriodRevenue > 0
-            ? ((totalRevenue - lastPeriodRevenue) / lastPeriodRevenue) * 100
-            : totalRevenue > 0
-              ? 100
-              : 0
-    const orderTrend =
-        lastPeriodOrderCount > 0
-            ? ((thisPeriodOrderCount - lastPeriodOrderCount) / lastPeriodOrderCount) * 100
-            : thisPeriodOrderCount > 0
-              ? 100
-              : 0
-
-    const statusMap = new Map<OrderStatus, number>()
-    for (const row of orderCountByStatus) {
-        statusMap.set(row.status, row._count.id)
-    }
-    const pendingCount = statusMap.get("PENDING") ?? 0
-    const closedCount = statusMap.get("CLOSED") ?? 0
-    const completionRate = orderCount > 0 ? (completedCount / orderCount) * 100 : 0
-    const aov = completedCount > 0 ? totalRevenue / completedCount : 0
-
-    // 利润指标
-    const totalCommission = Number(settledCommissionSum._sum.amount ?? 0)
-    const totalWithdrawalFee = Number(paidWithdrawalFeeSum._sum.feeAmount ?? 0)
-    const netIncome = totalRevenue - totalCommission + totalWithdrawalFee
-    const netMarginPercent = totalRevenue > 0 ? (netIncome / totalRevenue) * 100 : 0
-
-    // 净收入环比
-    const lastPeriodNetIncome =
-        lastPeriodRevenue -
-        Number(lastPeriodSettledCommissionSum._sum.amount ?? 0) +
-        Number(lastPeriodWithdrawalFeeSum._sum.feeAmount ?? 0)
-    const thisPeriodRevenue = Number(
-        (
-            await prisma.order.aggregate({
-                where: { status: "COMPLETED", paidAt: { gte: startOfThisPeriod } },
-                _sum: { amount: true },
-            })
-        )._sum.amount ?? 0,
-    )
-    const thisPeriodNetIncome =
-        thisPeriodRevenue -
-        Number(thisPeriodSettledCommissionSum._sum.amount ?? 0) +
-        Number(thisPeriodWithdrawalFeeSum._sum.feeAmount ?? 0)
-    const netIncomeTrend =
-        lastPeriodNetIncome > 0
-            ? ((thisPeriodNetIncome - lastPeriodNetIncome) / lastPeriodNetIncome) * 100
-            : thisPeriodNetIncome > 0
-              ? 100
-              : 0
-
-    return {
-        totalRevenue,
-        revenueTrend,
-        orderCount,
-        orderTrend,
-        completedCount,
-        pendingCount,
-        closedCount,
-        completionRate,
-        aov,
-        unsoldCardCount,
-        restockPendingCount,
-        activeProductCount,
-        distributorCount,
-        pendingWithdrawalCount: pendingWithdrawalAgg._count.id,
-        pendingWithdrawalAmount: Number(pendingWithdrawalAgg._sum.amount ?? 0),
-        pendingCommissionAmount: Number(pendingCommissionSum._sum.amount ?? 0),
-        totalCommission,
-        totalWithdrawalFee,
-        netIncome,
-        netMarginPercent,
-        netIncomeTrend,
-    }
-}
-
-/**
- * 按日聚合的订单数、营收、净收入（用于趋势图）
+ * Daily aggregated order count, revenue, net income (for trend chart)
  */
 export async function getDashboardTrend(days: number): Promise<DashboardTrendPoint[]> {
-    const now = new Date()
-    const todayStart = getHKTDayStart(now)
-    const start = new Date(todayStart)
-    start.setDate(todayStart.getDate() - days)
+  const now = new Date()
+  const todayStart = getHKTDayStart(now)
+  const start = new Date(todayStart)
+  start.setDate(todayStart.getDate() - days)
 
-    type AmountGroupRow = { createdAt: Date; _sum: { amount: unknown } }
-    type FeeGroupRow = { processedAt: Date | null; _sum: { feeAmount?: unknown } }
+  type AmountGroupRow = { createdAt: Date; _sum: { amount: unknown } }
+  type FeeGroupRow = { processedAt: Date | null; _sum: { feeAmount?: unknown } }
 
-    const dayList = getDaysForTrend(days)
-    const [chartRaw, commissionRaw, withdrawalFeeRaw] = await Promise.all([
-        prisma.order.groupBy({
-            by: ["createdAt"],
-            where: { createdAt: { gte: start }, status: "COMPLETED" },
-            _sum: { amount: true },
-            _count: { id: true },
-        }),
-        (prisma as any).commission.groupBy({
-            by: ["createdAt"],
-            where: { createdAt: { gte: start }, status: "SETTLED" },
-            _sum: { amount: true },
-        }),
-        (prisma as any).withdrawal.groupBy({
-            by: ["processedAt"],
-            where: { processedAt: { gte: start }, status: "PAID" },
-            _sum: { feeAmount: true },
-        }),
-    ])
+  const dayList = getDaysForTrend(days)
+  const [chartRaw, commissionRaw, withdrawalFeeRaw] = await Promise.all([
+    prisma.order.groupBy({
+      by: ["createdAt"],
+      where: { createdAt: { gte: start }, status: "COMPLETED" },
+      _sum: { amount: true },
+      _count: { id: true },
+    }),
+    (prisma as any).commission.groupBy({
+      by: ["createdAt"],
+      where: { createdAt: { gte: start }, status: "SETTLED" },
+      _sum: { amount: true },
+    }),
+    (prisma as any).withdrawal.groupBy({
+      by: ["processedAt"],
+      where: { processedAt: { gte: start }, status: "PAID" },
+      _sum: { feeAmount: true },
+    }),
+  ])
 
-    return dayList.map((d) => {
-        const next = new Date(d)
-        next.setDate(next.getDate() + 1)
-        const inDay = chartRaw.filter((r) => r.createdAt >= d && r.createdAt < next)
-        const dayRevenue = inDay.reduce((s: number, r) => s + Number(r._sum?.amount ?? 0), 0)
-        const dayOrders = inDay.reduce((s: number, r) => s + r._count.id, 0)
-        const dayCommission = commissionRaw
-            .filter((r: AmountGroupRow) => r.createdAt >= d && r.createdAt < next)
-            .reduce((s: number, r: AmountGroupRow) => s + Number(r._sum.amount ?? 0), 0)
-        const dayFee = withdrawalFeeRaw
-            .filter((r: FeeGroupRow) => r.processedAt && r.processedAt >= d && r.processedAt < next)
-            .reduce((s: number, r: FeeGroupRow) => s + Number(r._sum.feeAmount ?? 0), 0)
-        const dayNetIncome = Math.round((dayRevenue - dayCommission + dayFee) * 100) / 100
-        return {
-            date: d.toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" }),
-            订单: dayOrders,
-            营收: dayRevenue,
-            净收入: dayNetIncome,
-        }
-    })
+  return dayList.map((d) => {
+    const next = new Date(d)
+    next.setDate(next.getDate() + 1)
+    const inDay = chartRaw.filter((r) => r.createdAt >= d && r.createdAt < next)
+    const dayRevenue = inDay.reduce((s: number, r) => s + Number(r._sum?.amount ?? 0), 0)
+    const dayOrders = inDay.reduce((s: number, r) => s + r._count.id, 0)
+    const dayCommission = commissionRaw
+      .filter((r: AmountGroupRow) => r.createdAt >= d && r.createdAt < next)
+      .reduce((s: number, r: AmountGroupRow) => s + Number(r._sum.amount ?? 0), 0)
+    const dayFee = withdrawalFeeRaw
+      .filter((r: FeeGroupRow) => r.processedAt && r.processedAt >= d && r.processedAt < next)
+      .reduce((s: number, r: FeeGroupRow) => s + Number(r._sum.feeAmount ?? 0), 0)
+    const dayNetIncome = Math.round((dayRevenue - dayCommission + dayFee) * 100) / 100
+    return {
+      date: d.toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" }),
+      订单: dayOrders,
+      营收: dayRevenue,
+      净收入: dayNetIncome,
+    }
+  })
 }
 
 /**
- * 订单状态分布（饼图）
- */
-export async function getOrderStatusDistribution(): Promise<OrderStatusCount[]> {
-    const rows = await prisma.order.groupBy({
-        by: ["status"],
-        _count: { id: true },
-    })
-    const statusOrder: OrderStatus[] = ["COMPLETED", "PENDING", "CLOSED"]
-    return statusOrder.map((status) => ({
-        status,
-        label: ORDER_STATUS_LABEL[status],
-        count: rows.find((r) => r.status === status)?._count.id ?? 0,
-    }))
-}
-
-/**
- * 按营收排序的商品 Top N（商品名 + 营收 + 订单数）
+ * Top N products by revenue
  */
 export async function getTopProductsByRevenue(
-    limit: number = ADMIN_DASHBOARD_TOP_PRODUCTS_LIMIT
+  limit: number = ADMIN_DASHBOARD_TOP_PRODUCTS_LIMIT
 ): Promise<TopProductRow[]> {
-    const [byProduct, products] = await Promise.all([
-        prisma.order.groupBy({
-            by: ["productId"],
-            where: { status: "COMPLETED" },
-            _sum: { amount: true },
-            _count: { id: true },
-        }),
-        prisma.product.findMany({
-            select: { id: true, name: true },
-        }),
-    ])
-    const nameMap = new Map(products.map((p) => [p.id, p.name]))
-    return byProduct
-        .map((r) => ({
-            productId: r.productId,
-            productName: nameMap.get(r.productId) ?? "",
-            revenue: Number(r._sum.amount ?? 0),
-            orderCount: r._count.id,
-        }))
-        .sort((a, b) => b.revenue - a.revenue)
-        .slice(0, limit)
+  const [byProduct, products] = await Promise.all([
+    prisma.order.groupBy({
+      by: ["productId"],
+      where: { status: "COMPLETED" },
+      _sum: { amount: true },
+      _count: { id: true },
+    }),
+    prisma.product.findMany({
+      select: { id: true, name: true },
+    }),
+  ])
+  const nameMap = new Map(products.map((p) => [p.id, p.name]))
+  return byProduct
+    .map((r) => ({
+      productId: r.productId,
+      productName: nameMap.get(r.productId) ?? "",
+      revenue: Number(r._sum.amount ?? 0),
+      orderCount: r._count.id,
+    }))
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, limit)
 }
 
 /**
- * 各商品 UNSOLD 卡密数量，用于库存预警
+ * UNSOLD card count per product, for inventory alerts
  */
 export async function getInventoryByProduct(): Promise<InventoryRow[]> {
-    const [byProduct, products] = await Promise.all([
-        prisma.card.groupBy({
-            by: ["productId"],
-            where: { status: "UNSOLD" },
-            _count: { id: true },
-        }),
-        prisma.product.findMany({
-            select: { id: true, name: true },
-        }),
-    ])
-    const nameMap = new Map(products.map((p) => [p.id, p.name]))
-    return byProduct.map((r) => ({
-        productId: r.productId,
-        productName: nameMap.get(r.productId) ?? "",
-        unsoldCount: r._count.id,
-        isLowStock: r._count.id < LOW_STOCK_THRESHOLD,
-    }))
+  const [byProduct, products] = await Promise.all([
+    prisma.card.groupBy({
+      by: ["productId"],
+      where: { status: "UNSOLD" },
+      _count: { id: true },
+    }),
+    prisma.product.findMany({
+      select: { id: true, name: true },
+    }),
+  ])
+  const nameMap = new Map(products.map((p) => [p.id, p.name]))
+  return byProduct.map((r) => ({
+    productId: r.productId,
+    productName: nameMap.get(r.productId) ?? "",
+    unsoldCount: r._count.id,
+    isLowStock: r._count.id < 3,
+  }))
 }
 
 /**
- * 待通知的补货提醒数量（按商品）
+ * Pending restock subscription count per product
  */
 export async function getRestockPending(): Promise<RestockPendingRow[]> {
-    const [byProduct, products] = await Promise.all([
-        prisma.restockSubscription.groupBy({
-            by: ["productId"],
-            where: { status: "PENDING" },
-            _count: { id: true },
-        }),
-        prisma.product.findMany({
-            select: { id: true, name: true },
-        }),
-    ])
-    const nameMap = new Map(products.map((p) => [p.id, p.name]))
-    return byProduct.map((r) => ({
-        productId: r.productId,
-        productName: nameMap.get(r.productId) ?? "",
-        pendingCount: r._count.id,
-    }))
+  const [byProduct, products] = await Promise.all([
+    prisma.restockSubscription.groupBy({
+      by: ["productId"],
+      where: { status: "PENDING" },
+      _count: { id: true },
+    }),
+    prisma.product.findMany({
+      select: { id: true, name: true },
+    }),
+  ])
+  const nameMap = new Map(products.map((p) => [p.id, p.name]))
+  return byProduct.map((r) => ({
+    productId: r.productId,
+    productName: nameMap.get(r.productId) ?? "",
+    pendingCount: r._count.id,
+  }))
 }
 
 /**
- * 最近订单列表
+ * Recent orders list
  */
 export async function getRecentOrders(limit: number = ADMIN_DASHBOARD_RECENT_ORDERS_LIMIT) {
-    return prisma.order.findMany({
-        take: limit,
-        orderBy: { createdAt: "desc" },
-        select: {
-            id: true,
-            orderNo: true,
-            email: true,
-            amount: true,
-            status: true,
-            createdAt: true,
-            productNameSnapshot: true,
-            product: { select: { id: true, name: true } },
-        },
-    })
+  return prisma.order.findMany({
+    take: limit,
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      orderNo: true,
+      email: true,
+      amount: true,
+      status: true,
+      createdAt: true,
+      productNameSnapshot: true,
+      product: { select: { id: true, name: true } },
+    },
+  })
 }
 
 export type DashboardData = {
-    kpis: DashboardKpis
-    trend7: DashboardTrendPoint[]
-    trend30: DashboardTrendPoint[]
-    orderStatusDistribution: OrderStatusCount[]
-    topProducts: TopProductRow[]
-    inventory: InventoryRow[]
-    restockPending: RestockPendingRow[]
-    recentOrders: Awaited<ReturnType<typeof getRecentOrders>>
+  trend7: DashboardTrendPoint[]
+  trend30: DashboardTrendPoint[]
+  topProducts: TopProductRow[]
+  inventory: InventoryRow[]
+  restockPending: RestockPendingRow[]
+  recentOrders: Awaited<ReturnType<typeof getRecentOrders>>
 }
 
 /**
- * 一次性拉取仪表盘所需全部数据（并行请求）
+ * Fetch all dashboard data in parallel
  */
 export async function getDashboardData(): Promise<DashboardData> {
-    const [
-        kpis,
-        trend7,
-        trend30,
-        orderStatusDistribution,
-        topProducts,
-        inventory,
-        restockPending,
-        recentOrders,
-    ] = await Promise.all([
-        getDashboardKpis(),
-        getDashboardTrend(7),
-        getDashboardTrend(30),
-        getOrderStatusDistribution(),
-        getTopProductsByRevenue(),
-        getInventoryByProduct(),
-        getRestockPending(),
-        getRecentOrders(),
+  const [trend7, trend30, topProducts, inventory, restockPending, recentOrders] =
+    await Promise.all([
+      getDashboardTrend(7),
+      getDashboardTrend(30),
+      getTopProductsByRevenue(),
+      getInventoryByProduct(),
+      getRestockPending(),
+      getRecentOrders(),
     ])
-    return {
-        kpis,
-        trend7,
-        trend30,
-        orderStatusDistribution,
-        topProducts,
-        inventory,
-        restockPending,
-        recentOrders,
-    }
+  return { trend7, trend30, topProducts, inventory, restockPending, recentOrders }
 }
