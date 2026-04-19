@@ -75,6 +75,8 @@ export async function GET(request: Request): Promise<NextResponse> {
       _sum: { amount: true },
     }),
     prisma.user.count({ where: { role: "DISTRIBUTOR" } }),
+    // monthlySettledCommission is always current-month MTD, not bounded by the from/to range
+    // (this is a current-state KPI card, not a range-specific metric)
     prisma.commission.aggregate({
       where: { status: "SETTLED", createdAt: { gte: firstDayOfMonthUTC } },
       _sum: { amount: true },
