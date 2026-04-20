@@ -148,6 +148,7 @@ model Product {
   restockSubscriptions RestockSubscription[]
   exitDiscountUsages   ExitDiscountUsage[]
   accountBlacklist     AccountBlacklist[]
+  cardFormats          ProductCardFormat[]
 
   @@index([sortOrder])
 }
@@ -177,6 +178,19 @@ model Card {
 
   @@index([productId, status])
   @@index([orderId])
+}
+
+model ProductCardFormat {
+  id        String   @id @default(cuid())
+  productId String
+  name      String
+  template  String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, sortOrder])
 }
 
 model Order {
