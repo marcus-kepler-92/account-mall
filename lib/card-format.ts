@@ -38,7 +38,7 @@ const PAYLOAD_DISPLAY_LABELS: [string, string][] = [
 ]
 
 // Guard: only apply heuristic when content contains recognizable label prefixes
-const LABEL_PATTERN = /账号|密码|password|account/i
+const LABEL_PATTERN = /账号|密码|密保|生日|password|account|birthday|security/i
 
 /**
  * Resolve card content to labeled fields using three-tier logic:

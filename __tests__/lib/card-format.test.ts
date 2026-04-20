@@ -100,4 +100,11 @@ describe("resolveCardFields", () => {
     const result = resolveCardFields("part1----part2----part3", twoFieldFormat)
     expect(result).toEqual<ResolvedCard>({ type: "plain", content: "part1----part2----part3" })
   })
+
+  it("falls back to plain text when heuristic fires but yields fewer than 2 fields", () => {
+    // "生日" triggers LABEL_PATTERN but parseCardContentWithDelimiter won't produce 2+ display fields
+    // from a single-field-like string, so it should fall through to plain text
+    const result = resolveCardFields("生日1990-01-01", [])
+    expect(result).toEqual<ResolvedCard>({ type: "plain", content: "生日1990-01-01" })
+  })
 })
