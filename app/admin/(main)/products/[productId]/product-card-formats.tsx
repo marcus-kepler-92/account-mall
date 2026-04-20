@@ -100,7 +100,8 @@ export function ProductCardFormats({ productId, initialFormats }: ProductCardFor
       if (editingFormat) {
         setFormats((prev) => prev.map((f) => (f.id === editingFormat.id ? { ...f, ...data } : f)))
       } else {
-        setFormats((prev) => [...prev, json as CardFormat])
+        const created = json as { id: string; name: string; template: string; sortOrder: number }
+        setFormats((prev) => [...prev, { id: created.id, name: created.name, template: created.template, sortOrder: created.sortOrder }])
       }
       router.refresh()
     } catch {
