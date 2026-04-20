@@ -159,7 +159,7 @@ export default async function OrderSuccessPage({ params, searchParams }: PagePro
                                 </p>
                                 <p className="mt-2 flex items-center gap-2">
                                     <Mail className="size-4 shrink-0" />
-                                    卡密已发送至下单邮箱，请查收备份
+                                    卡密已发送至下单邮箱，请查收备份(不一定收到，可前往订单查询中查看)
                                 </p>
                             </div>
                         </CardContent>
