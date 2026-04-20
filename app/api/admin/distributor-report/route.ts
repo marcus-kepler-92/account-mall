@@ -19,6 +19,7 @@ export type DistributorReportResponse = {
     pendingCommissionAmount: number
     monthlySettledCommission: number
     distributorCount: number
+    newDistributorCount: number
   }
   leaderboard: Array<{
     distributorId: string
@@ -27,6 +28,14 @@ export type DistributorReportResponse = {
     revenue: number
     orderCount: number
     pendingCommission: number
+  }>
+  newDistributors: Array<{
+    id: string
+    name: string | null
+    email: string
+    inviterName: string | null
+    inviterEmail: string | null
+    createdAt: string
   }>
 }
 
@@ -64,6 +73,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     distributorCount,
     monthlySettledCommissionAgg,
     ordersByDistributor,
+    newDistributorRows,
   ] = await Promise.all([
     prisma.withdrawal.aggregate({
       where: { status: "PENDING" },
@@ -90,6 +100,17 @@ export async function GET(request: Request): Promise<NextResponse> {
       },
       _sum: { amount: true },
       _count: { id: true },
+    }),
+    prisma.user.findMany({
+      where: { role: "DISTRIBUTOR", createdAt: { gte: startUTC, lt: endUTC } },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        createdAt: true,
+        inviter: { select: { name: true, email: true } },
+      },
+      orderBy: { createdAt: "desc" },
     }),
   ])
 
@@ -136,7 +157,16 @@ export async function GET(request: Request): Promise<NextResponse> {
       pendingCommissionAmount: Number(pendingCommissionAgg._sum.amount ?? 0),
       monthlySettledCommission: Number(monthlySettledCommissionAgg._sum.amount ?? 0),
       distributorCount,
+      newDistributorCount: newDistributorRows.length,
     },
     leaderboard,
+    newDistributors: newDistributorRows.map((u) => ({
+      id: u.id,
+      name: u.name,
+      email: u.email ?? "",
+      inviterName: u.inviter?.name ?? null,
+      inviterEmail: u.inviter?.email ?? null,
+      createdAt: u.createdAt.toISOString(),
+    })),
   })
 }

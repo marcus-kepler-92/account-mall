@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { formatCurrency } from "@/lib/utils"
-import { Wallet, TrendingDown, BadgeDollarSign, Users } from "lucide-react"
+import { Wallet, TrendingDown, BadgeDollarSign, Users, UserPlus } from "lucide-react"
 import type { DistributorReportResponse } from "@/app/api/admin/distributor-report/route"
 
 const HKT_TZ = "Asia/Hong_Kong"
@@ -34,9 +34,9 @@ async function fetchDistributorReport(from: string, to: string): Promise<Distrib
 
 export function DashboardDistributorPanel() {
   const today = todayHKT()
-  const [from, setFrom] = useState(offsetDaysHKT(-6))
+  const [from, setFrom] = useState(today)
   const [to, setTo] = useState(today)
-  const [selectedPreset, setSelectedPreset] = useState<string>("近7天")
+  const [selectedPreset, setSelectedPreset] = useState<string>("今日")
 
   const { data, isLoading, isError } = useQuery<DistributorReportResponse>({
     queryKey: ["distributor-report", from, to],
@@ -46,6 +46,7 @@ export function DashboardDistributorPanel() {
 
   const summary = data?.summary
   const leaderboard = data?.leaderboard ?? []
+  const newDistributors = data?.newDistributors ?? []
 
   const presets = [
     { label: "今日", from: today, to: today },
@@ -178,6 +179,62 @@ export function DashboardDistributorPanel() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {/* New distributors in range */}
+          {!isError && (
+            <div>
+              <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                <UserPlus className="size-3" />
+                新增分销员
+                {!isLoading && (
+                  <span className="font-normal">（{summary?.newDistributorCount ?? 0} 人）</span>
+                )}
+              </p>
+              {isLoading ? (
+                <Skeleton className="h-20 w-full rounded-lg" />
+              ) : newDistributors.length === 0 ? (
+                <p className="py-4 text-center text-sm text-muted-foreground">该时段暂无新增分销员</p>
+              ) : (
+                <div className="overflow-x-auto rounded-md border">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/50 text-xs text-muted-foreground">
+                        <th className="px-3 py-2 text-left font-medium">分销员</th>
+                        <th className="px-3 py-2 text-left font-medium">来自</th>
+                        <th className="px-3 py-2 text-right font-medium">注册时间</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {newDistributors.map((d) => (
+                        <tr key={d.id} className="border-b last:border-0">
+                          <td className="px-3 py-2">
+                            <span className="font-medium">{d.name ?? d.email}</span>
+                            {d.name && (
+                              <span className="ml-1 text-xs text-muted-foreground">{d.email}</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-muted-foreground">
+                            {d.inviterName ?? d.inviterEmail ?? (
+                              <span className="italic">直接注册</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-right text-xs text-muted-foreground">
+                            {new Date(d.createdAt).toLocaleString("zh-CN", {
+                              timeZone: "Asia/Hong_Kong",
+                              month: "numeric",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
         </CardContent>
