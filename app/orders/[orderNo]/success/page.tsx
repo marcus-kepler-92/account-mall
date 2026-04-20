@@ -9,6 +9,7 @@ import { SiteHeader } from "@/app/components/site-header"
 import { OrderSuccessCopySection } from "./order-success-copy-section"
 import { OrderSuccessSyncHistory } from "./order-success-sync-history"
 import { OrderSuccessAutoFetchSection } from "./order-success-auto-fetch-section"
+import { resolveCardFields } from "@/lib/card-format"
 
 type PageProps = {
     params: Promise<{ orderNo: string }>
@@ -60,6 +61,10 @@ export default async function OrderSuccessPage({ params, searchParams }: PagePro
                     productType: true,
                     allowAccountSwitch: true,
                     accountSwitchLimit: true,
+                    cardFormats: {
+                        orderBy: { sortOrder: "asc" },
+                        select: { template: true },
+                    },
                 },
             },
             cards: {
@@ -96,6 +101,8 @@ export default async function OrderSuccessPage({ params, searchParams }: PagePro
     }
 
     const cards = order.cards.map((c) => c.content)
+    const cardFormats = order.product?.cardFormats ?? []
+    const resolvedCards = order.cards.map((c) => resolveCardFields(c.content, cardFormats))
     const productName = order.productNameSnapshot ?? order.product?.name ?? "商品"
     const isAutoFetch = order.product?.productType === "AUTO_FETCH"
     const expiresAt = order.expiresAt ? order.expiresAt.toISOString() : null
@@ -143,7 +150,7 @@ export default async function OrderSuccessPage({ params, searchParams }: PagePro
                                     remainingSwitches={canSwitch ? remainingSwitches : 0}
                                 />
                             ) : (
-                                <OrderSuccessCopySection cards={cards} />
+                                <OrderSuccessCopySection cards={resolvedCards} />
                             )}
                             <div className="rounded-lg border bg-muted/50 p-3 text-sm text-muted-foreground">
                                 <p className="flex items-center gap-2">

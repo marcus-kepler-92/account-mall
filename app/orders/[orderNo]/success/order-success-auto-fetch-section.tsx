@@ -5,6 +5,7 @@ import { OrderSuccessCopySection } from "./order-success-copy-section"
 import { OrderTroubleshootSection } from "./order-troubleshoot-section"
 import type { AutoFetchCardPayload } from "@/lib/auto-fetch-card"
 import { toCardContentJson } from "@/lib/auto-fetch-card"
+import { resolveCardFields } from "@/lib/card-format"
 
 type Props = {
     orderNo: string
@@ -29,7 +30,7 @@ export function OrderSuccessAutoFetchSection({ orderNo, expiresAt, initialCards,
 
     return (
         <>
-            <OrderSuccessCopySection cards={cards} isAutoFetch />
+            <OrderSuccessCopySection cards={cards.map((c) => resolveCardFields(c, []))} />
             <OrderTroubleshootSection
                 orderNo={orderNo}
                 expiresAt={expiresAt}
