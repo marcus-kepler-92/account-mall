@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useQuery } from "@tanstack/react-query"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { formatCurrency } from "@/lib/utils"
 import { TrendingDown, BadgeDollarSign, Users, UserPlus } from "lucide-react"
@@ -80,6 +81,32 @@ export function DashboardDistributorPanel() {
                   {preset.label}
                 </Button>
               ))}
+              <Input
+                type="date"
+                value={from}
+                max={to}
+                className="h-7 w-36 text-xs"
+                onChange={(e) => {
+                  if (e.target.value <= to) {
+                    setFrom(e.target.value)
+                    setSelectedPreset("")
+                  }
+                }}
+              />
+              <span className="text-xs text-muted-foreground">至</span>
+              <Input
+                type="date"
+                value={to}
+                min={from}
+                max={today}
+                className="h-7 w-36 text-xs"
+                onChange={(e) => {
+                  if (e.target.value >= from) {
+                    setTo(e.target.value)
+                    setSelectedPreset("")
+                  }
+                }}
+              />
             </div>
           </div>
         </CardHeader>
