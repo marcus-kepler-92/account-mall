@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { config } from "@/lib/config"
 import { ProductForm } from "@/app/components/product-form"
 import { DeactivateProductButton } from "./product-actions"
+import { ProductCardFormats } from "./product-card-formats"
 
 export const dynamic = "force-dynamic"
 
@@ -19,6 +20,10 @@ export default async function AdminEditProductPage({ params }: PageProps) {
             include: {
                 tags: {
                     select: { id: true, name: true, slug: true },
+                },
+                cardFormats: {
+                    orderBy: { sortOrder: "asc" },
+                    select: { id: true, name: true, template: true, sortOrder: true },
                 },
             },
         }),
@@ -42,6 +47,15 @@ export default async function AdminEditProductPage({ params }: PageProps) {
                 allTags={tags}
                 sourceUrlOptions={config.autoFetchSourceUrls}
             />
+
+            {product.productType !== "AUTO_FETCH" && (
+                <div className="rounded-lg border p-4">
+                    <ProductCardFormats
+                        productId={product.id}
+                        initialFormats={product.cardFormats}
+                    />
+                </div>
+            )}
 
             {/* Danger zone */}
             <div className="rounded-lg border border-destructive/20 p-4">
