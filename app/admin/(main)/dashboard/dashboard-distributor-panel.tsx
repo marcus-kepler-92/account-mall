@@ -34,9 +34,9 @@ async function fetchDistributorReport(from: string, to: string): Promise<Distrib
 
 export function DashboardDistributorPanel() {
   const today = todayHKT()
-  const defaultFrom = offsetDaysHKT(-6)
-  const [from, setFrom] = useState(defaultFrom)
+  const [from, setFrom] = useState(offsetDaysHKT(-6))
   const [to, setTo] = useState(today)
+  const [selectedPreset, setSelectedPreset] = useState<string>("近7天")
 
   const { data, isLoading, isError } = useQuery<DistributorReportResponse>({
     queryKey: ["distributor-report", from, to],
@@ -48,6 +48,7 @@ export function DashboardDistributorPanel() {
   const leaderboard = data?.leaderboard ?? []
 
   const presets = [
+    { label: "今日", from: today, to: today },
     { label: "近7天", from: offsetDaysHKT(-6), to: today },
     { label: "近30天", from: offsetDaysHKT(-29), to: today },
     { label: "本月", from: firstDayOfMonthHKT(), to: today },
@@ -66,12 +67,13 @@ export function DashboardDistributorPanel() {
               {presets.map((preset) => (
                 <Button
                   key={preset.label}
-                  variant={from === preset.from && to === preset.to ? "default" : "outline"}
+                  variant={selectedPreset === preset.label ? "default" : "outline"}
                   size="sm"
                   className="h-7 text-xs"
                   onClick={() => {
                     setFrom(preset.from)
                     setTo(preset.to)
+                    setSelectedPreset(preset.label)
                   }}
                 >
                   {preset.label}
