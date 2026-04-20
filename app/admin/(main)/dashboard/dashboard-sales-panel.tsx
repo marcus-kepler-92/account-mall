@@ -44,6 +44,7 @@ export function DashboardSalesPanel() {
   const today = todayHKT()
   const [from, setFrom] = useState(today)
   const [to, setTo] = useState(today)
+  const [selectedPreset, setSelectedPreset] = useState<string>("今日")
 
   const { data, isLoading, isError } = useQuery<SalesReportResponse>({
     queryKey: ["sales-report", from, to],
@@ -77,12 +78,13 @@ export function DashboardSalesPanel() {
               ].map((preset) => (
                 <Button
                   key={preset.label}
-                  variant={from === preset.from && to === preset.to ? "default" : "outline"}
+                  variant={selectedPreset === preset.label ? "default" : "outline"}
                   size="sm"
                   className="h-7 text-xs"
                   onClick={() => {
                     setFrom(preset.from)
                     setTo(preset.to)
+                    setSelectedPreset(preset.label)
                   }}
                 >
                   {preset.label}
@@ -94,7 +96,10 @@ export function DashboardSalesPanel() {
                 max={to}
                 className="h-7 w-36 text-xs"
                 onChange={(e) => {
-                  if (e.target.value <= to) setFrom(e.target.value)
+                  if (e.target.value <= to) {
+                    setFrom(e.target.value)
+                    setSelectedPreset("")
+                  }
                 }}
               />
               <span className="text-xs text-muted-foreground">至</span>
@@ -105,7 +110,10 @@ export function DashboardSalesPanel() {
                 max={today}
                 className="h-7 w-36 text-xs"
                 onChange={(e) => {
-                  if (e.target.value >= from) setTo(e.target.value)
+                  if (e.target.value >= from) {
+                    setTo(e.target.value)
+                    setSelectedPreset("")
+                  }
                 }}
               />
             </div>
