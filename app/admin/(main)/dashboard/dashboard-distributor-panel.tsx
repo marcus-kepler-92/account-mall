@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { formatCurrency } from "@/lib/utils"
-import { Wallet, TrendingDown, BadgeDollarSign, Users, UserPlus } from "lucide-react"
+import { TrendingDown, BadgeDollarSign, Users, UserPlus } from "lucide-react"
 import type { DistributorReportResponse } from "@/app/api/admin/distributor-report/route"
 
 const HKT_TZ = "Asia/Hong_Kong"
@@ -85,26 +85,13 @@ export function DashboardDistributorPanel() {
         </CardHeader>
         <CardContent className="space-y-4">
           {/* KPI row — always reflects current state, not time-range */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {isLoading ? (
-              Array.from({ length: 4 }).map((_, i) => (
+              Array.from({ length: 3 }).map((_, i) => (
                 <Skeleton key={i} className="h-16 rounded-lg" />
               ))
             ) : (
               <>
-                <Link href="/admin/withdrawals?status=PENDING" className="block h-full">
-                  <div className="h-full cursor-pointer rounded-lg border bg-card p-3 transition-colors hover:bg-accent/50">
-                    <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <Wallet className="size-3" /> 待处理提现
-                    </p>
-                    <p className="mt-1 text-lg font-bold">
-                      {summary?.pendingWithdrawalCount ?? 0} 笔
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatCurrency(summary?.pendingWithdrawalAmount ?? 0)}
-                    </p>
-                  </div>
-                </Link>
                 <Link href="/admin/distributors" className="block h-full">
                   <div className="h-full cursor-pointer rounded-lg border bg-card p-3 transition-colors hover:bg-accent/50">
                     <p className="flex items-center gap-1 text-xs text-muted-foreground">

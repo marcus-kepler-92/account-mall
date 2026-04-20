@@ -14,8 +14,6 @@ function isValidCalendarDate(y: number, m: number, d: number): boolean {
 
 export type DistributorReportResponse = {
   summary: {
-    pendingWithdrawalCount: number
-    pendingWithdrawalAmount: number
     pendingCommissionAmount: number
     monthlySettledCommission: number
     distributorCount: number
@@ -68,18 +66,12 @@ export async function GET(request: Request): Promise<NextResponse> {
   const firstDayOfMonthUTC = fromZonedTime(new Date(ny, nm - 1, 1, 0, 0, 0, 0), HKT)
 
   const [
-    pendingWithdrawalAgg,
     pendingCommissionAgg,
     distributorCount,
     monthlySettledCommissionAgg,
     ordersByDistributor,
     newDistributorRows,
   ] = await Promise.all([
-    prisma.withdrawal.aggregate({
-      where: { status: "PENDING" },
-      _count: { id: true },
-      _sum: { amount: true },
-    }),
     prisma.commission.aggregate({
       where: { status: "PENDING" },
       _sum: { amount: true },
@@ -152,8 +144,6 @@ export async function GET(request: Request): Promise<NextResponse> {
 
   return NextResponse.json<DistributorReportResponse>({
     summary: {
-      pendingWithdrawalCount: pendingWithdrawalAgg._count.id,
-      pendingWithdrawalAmount: Number(pendingWithdrawalAgg._sum.amount ?? 0),
       pendingCommissionAmount: Number(pendingCommissionAgg._sum.amount ?? 0),
       monthlySettledCommission: Number(monthlySettledCommissionAgg._sum.amount ?? 0),
       distributorCount,
