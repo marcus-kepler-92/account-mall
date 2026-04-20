@@ -32,8 +32,6 @@ const formSchema = z.object({
 interface InviteDistributorDialogProps {
     open: boolean
     onOpenChange: (open: boolean) => void
-    /** When set, the invite is sent on behalf of this distributor (from admin row action) */
-    invitedByDistributorId?: string
 }
 
 export function InviteDistributorDialog({

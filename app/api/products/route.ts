@@ -141,7 +141,7 @@ export async function POST(request: NextRequest) {
         return validationError(parsed.error.flatten());
     }
 
-    const { name, slug, description, summary, image, price, maxQuantity, status, tagIds, productType, sourceUrl, validityHours, allowAccountSwitch, accountSwitchLimit, riskWarningEnabled, riskWarningTitle, riskWarningContent, riskWarningCountdown, riskWarningConfirmText, purchaseLimitEnabled, purchaseLimitQuantity } =
+    const { name, slug, description, summary, image, price, maxQuantity, status, tagIds, productType, sourceUrl, validityHours, allowAccountSwitch, accountSwitchLimit, couponEnabled, riskWarningEnabled, riskWarningTitle, riskWarningContent, riskWarningCountdown, riskWarningConfirmText, purchaseLimitEnabled, purchaseLimitQuantity } =
         parsed.data;
 
     // Check slug uniqueness
@@ -183,6 +183,7 @@ export async function POST(request: NextRequest) {
             riskWarningContent: riskWarningContent ?? null,
             riskWarningCountdown: riskWarningCountdown ?? null,
             riskWarningConfirmText: riskWarningConfirmText ?? null,
+            couponEnabled: couponEnabled ?? false,
             purchaseLimitEnabled: purchaseLimitEnabled ?? false,
             purchaseLimitQuantity: purchaseLimitQuantity ?? 1,
             tags:

@@ -123,33 +123,38 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const newContent = toCardContentJson(newPayload)
     const now = new Date()
 
-    await prisma.$transaction([
-        // 将旧账号加入黑名单
-        ...(currentAccount
-            ? [
-                  prisma.accountBlacklist.upsert({
-                      where: { productId_account: { productId: order.product.id, account: currentAccount } },
-                      create: {
-                          productId: order.product.id,
-                          account: currentAccount,
-                          reason: "用户标记不可用",
-                          orderId: order.id,
-                      },
-                      update: {},
-                  }),
-              ]
-            : []),
-        // 更新卡密内容
-        prisma.card.update({
-            where: { id: card.id },
-            data: { content: newContent, lastRefreshedAt: now },
-        }),
-        // 递增换号计数
-        prisma.order.update({
-            where: { id: order.id },
-            data: { switchAccountCount: { increment: 1 } },
-        }),
-    ])
+    try {
+        await prisma.$transaction([
+            // 将旧账号加入黑名单
+            ...(currentAccount
+                ? [
+                      prisma.accountBlacklist.upsert({
+                          where: { productId_account: { productId: order.product.id, account: currentAccount } },
+                          create: {
+                              productId: order.product.id,
+                              account: currentAccount,
+                              reason: "用户标记不可用",
+                              orderId: order.id,
+                          },
+                          update: {},
+                      }),
+                  ]
+                : []),
+            // 更新卡密内容
+            prisma.card.update({
+                where: { id: card.id },
+                data: { content: newContent, lastRefreshedAt: now },
+            }),
+            // 递增换号计数
+            prisma.order.update({
+                where: { id: order.id },
+                data: { switchAccountCount: { increment: 1 } },
+            }),
+        ])
+    } catch (err) {
+        console.error("[switch-account] transaction failed", err)
+        return NextResponse.json({ error: "换号失败，请稍后重试" }, { status: 500 })
+    }
 
     return NextResponse.json({ switched: true, payload: newPayload })
 }

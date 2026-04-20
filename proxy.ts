@@ -183,8 +183,8 @@ export async function proxy(request: NextRequest) {
                         );
                     }
                 }
-            } catch {
-                // Fall through to allow access to login page
+            } catch (err) {
+                console.warn("[proxy] session fetch failed for login redirect", err)
             }
         }
         return NextResponse.next();

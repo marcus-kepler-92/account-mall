@@ -64,8 +64,8 @@ export function AddTierDialog() {
                 }),
             })
             if (!res.ok) {
-                const err = await res.json()
-                toast.error(err.error || "添加失败")
+                const err = await res.json().catch(() => ({}))
+                toast.error(err?.error || "添加失败")
                 return
             }
             toast.success("已添加")
