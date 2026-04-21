@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
 import { getAdminSession } from "@/lib/auth-guard"
 import { unauthorized } from "@/lib/api-response"
+import { countPendingWithdrawals } from "@/lib/domains/distributors"
 
 export async function GET() {
-    const session = await getAdminSession()
-    if (!session) return unauthorized()
-
-    const pending = await prisma.withdrawal.count({ where: { status: "PENDING" } })
-    return NextResponse.json({ pending })
+  const session = await getAdminSession()
+  if (!session) return unauthorized()
+  const pending = await countPendingWithdrawals()
+  return NextResponse.json({ pending })
 }
+
+export const runtime = "nodejs"

@@ -1,73 +1,31 @@
 import { NextRequest, NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
 import { getAdminSession } from "@/lib/auth-guard"
-import { unauthorized, invalidJsonBody, notFound } from "@/lib/api-response"
-import { z } from "zod"
-
-const updateWithdrawalSchema = z.object({
-    status: z.enum(["PAID", "REJECTED"]),
-    note: z.string().optional(),
-})
+import { unauthorized, invalidJsonBody, notFound, badRequest } from "@/lib/api-response"
+import {
+  updateWithdrawalSchema,
+  processWithdrawal,
+  WithdrawalNotFoundError,
+  WithdrawalNotPendingError,
+} from "@/lib/domains/distributors"
 
 type RouteContext = { params: Promise<{ id: string }> }
 
 export async function PATCH(request: NextRequest, context: RouteContext) {
-    const session = await getAdminSession()
-    if (!session) return unauthorized()
-
-    const { id } = await context.params
-
-    let body: unknown
-    try {
-        body = await request.json()
-    } catch {
-        return invalidJsonBody()
-    }
-
-    const parsed = updateWithdrawalSchema.safeParse(body)
-    if (!parsed.success) {
-        return NextResponse.json(
-            { error: parsed.error.flatten() },
-            { status: 400 }
-        )
-    }
-
-    const existing = await prisma.withdrawal.findUnique({ where: { id } })
-    if (!existing) return notFound("Withdrawal not found")
-    if (existing.status !== "PENDING") {
-        return NextResponse.json(
-            { error: "Only PENDING withdrawals can be updated" },
-            { status: 400 }
-        )
-    }
-
-    const withdrawal = await prisma.withdrawal.update({
-        where: { id },
-        data: {
-            status: parsed.data.status,
-            ...(parsed.data.note !== undefined && { note: parsed.data.note }),
-            processedAt: new Date(),
-        },
-        include: {
-            distributor: {
-                select: { id: true, email: true, name: true },
-            },
-        },
-    })
-
-    const feeAmount = Number(withdrawal.feeAmount ?? 0)
-    return NextResponse.json({
-        id: withdrawal.id,
-        distributorId: withdrawal.distributorId,
-        distributor: withdrawal.distributor,
-        amount: Number(withdrawal.amount),
-        feePercent: Number(withdrawal.feePercent ?? 0),
-        feeAmount,
-        actualAmount: Math.round((Number(withdrawal.amount) - feeAmount) * 100) / 100,
-        status: withdrawal.status,
-        note: withdrawal.note,
-        processedAt: withdrawal.processedAt,
-        createdAt: withdrawal.createdAt,
-        updatedAt: withdrawal.updatedAt,
-    })
+  const session = await getAdminSession()
+  if (!session) return unauthorized()
+  const { id } = await context.params
+  let body: unknown
+  try { body = await request.json() } catch { return invalidJsonBody() }
+  const parsed = updateWithdrawalSchema.safeParse(body)
+  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
+  try {
+    const withdrawal = await processWithdrawal(id, parsed.data)
+    return NextResponse.json(withdrawal)
+  } catch (e) {
+    if (e instanceof WithdrawalNotFoundError) return notFound(e.message)
+    if (e instanceof WithdrawalNotPendingError) return badRequest(e.message)
+    throw e
+  }
 }
+
+export const runtime = "nodejs"
