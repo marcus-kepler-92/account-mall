@@ -1,19 +1,16 @@
 import { PATCH } from "@/app/api/admin/orders/[orderId]/distributor/route"
-import { prismaMock } from "../../../../../__mocks__/prisma"
 import { getSuperAdminSession } from "@/lib/auth-guard"
-import * as commissionsModule from "@/lib/calculate-order-commission"
+import * as distributorsModule from "@/lib/domains/distributors"
 import { NextRequest } from "next/server"
 
 jest.mock("@/lib/auth-guard", () => ({ getSuperAdminSession: jest.fn() }))
-jest.mock("@/lib/calculate-order-commission", () => ({
-  createOrderCommissions: jest.fn(),
-  // Use the real toNumber — it's pure and has no side-effects
-  toNumber: jest.requireActual("@/lib/calculate-order-commission").toNumber,
+jest.mock("@/lib/domains/distributors", () => ({
+  reassignDistributorSchema: jest.requireActual("@/lib/domains/distributors").reassignDistributorSchema,
+  reassignOrderDistributor: jest.fn(),
+  CommissionWithdrawnError: jest.requireActual("@/lib/domains/distributors").CommissionWithdrawnError,
+  PendingWithdrawalBlocksReassignError: jest.requireActual("@/lib/domains/distributors").PendingWithdrawalBlocksReassignError,
+  CommissionAlreadyPaidOutError: jest.requireActual("@/lib/domains/distributors").CommissionAlreadyPaidOutError,
 }))
-jest.mock("@/lib/prisma", () => {
-  const { prismaMock } = require("../../../../../__mocks__/prisma")
-  return { __esModule: true, prisma: prismaMock }
-})
 
 const mockSession = { user: { id: "admin-1" } }
 
@@ -43,16 +40,7 @@ function makeContext(orderId = "order-1") {
 beforeEach(() => {
   jest.clearAllMocks()
   ;(getSuperAdminSession as jest.Mock).mockResolvedValue(mockSession)
-  prismaMock.order.findUnique.mockResolvedValue(mockCompletedOrder)
-  prismaMock.commission.count.mockResolvedValue(0)  // no WITHDRAWN commissions by default
-  prismaMock.commission.findMany.mockResolvedValue([])
-  prismaMock.user.findUnique.mockResolvedValue({ id: "dist-1", role: "DISTRIBUTOR" })
-  prismaMock.$transaction.mockImplementation((fn: (tx: unknown) => Promise<unknown>) =>
-    fn(prismaMock)
-  )
-  prismaMock.commission.updateMany.mockResolvedValue({ count: 0 })
-  prismaMock.order.update.mockResolvedValue({ ...mockCompletedOrder, distributorId: "dist-1" })
-  ;(commissionsModule.createOrderCommissions as jest.Mock).mockResolvedValue(undefined)
+  ;(distributorsModule.reassignOrderDistributor as jest.Mock).mockResolvedValue(undefined)
 })
 
 describe("PATCH /api/admin/orders/[orderId]/distributor", () => {
@@ -63,13 +51,13 @@ describe("PATCH /api/admin/orders/[orderId]/distributor", () => {
   })
 
   it("returns 404 when order not found", async () => {
-    prismaMock.order.findUnique.mockResolvedValue(null)
+    ;(distributorsModule.reassignOrderDistributor as jest.Mock).mockRejectedValue(new Error("ORDER_NOT_FOUND"))
     const res = await PATCH(makeRequest({ distributorId: "dist-1" }), makeContext())
     expect(res.status).toBe(404)
   })
 
   it("returns 400 when order is not COMPLETED", async () => {
-    prismaMock.order.findUnique.mockResolvedValue({ ...mockCompletedOrder, status: "PENDING" })
+    ;(distributorsModule.reassignOrderDistributor as jest.Mock).mockRejectedValue(new Error("ORDER_NOT_COMPLETED"))
     const res = await PATCH(makeRequest({ distributorId: "dist-1" }), makeContext())
     expect(res.status).toBe(400)
     const data = await res.json()
@@ -77,19 +65,19 @@ describe("PATCH /api/admin/orders/[orderId]/distributor", () => {
   })
 
   it("returns 400 when distributorId references non-DISTRIBUTOR user", async () => {
-    prismaMock.user.findUnique.mockResolvedValue({ id: "dist-1", role: "ADMIN" })
+    ;(distributorsModule.reassignOrderDistributor as jest.Mock).mockRejectedValue(new Error("INVALID_DISTRIBUTOR"))
     const res = await PATCH(makeRequest({ distributorId: "dist-1" }), makeContext())
     expect(res.status).toBe(400)
   })
 
   it("returns 400 when distributorId references non-existent user", async () => {
-    prismaMock.user.findUnique.mockResolvedValue(null)
+    ;(distributorsModule.reassignOrderDistributor as jest.Mock).mockRejectedValue(new Error("INVALID_DISTRIBUTOR"))
     const res = await PATCH(makeRequest({ distributorId: "ghost-user" }), makeContext())
     expect(res.status).toBe(400)
   })
 
   it("returns 409 when order has WITHDRAWN commissions", async () => {
-    prismaMock.commission.count.mockResolvedValue(1)
+    ;(distributorsModule.reassignOrderDistributor as jest.Mock).mockRejectedValue(new distributorsModule.CommissionWithdrawnError("此订单佣金已提现，无法修改分销归属"))
     const res = await PATCH(makeRequest({ distributorId: "dist-1" }), makeContext())
     expect(res.status).toBe(409)
     const data = await res.json()
@@ -97,10 +85,7 @@ describe("PATCH /api/admin/orders/[orderId]/distributor", () => {
   })
 
   it("returns 409 when affected distributor has PENDING withdrawal", async () => {
-    prismaMock.commission.findMany.mockResolvedValue([
-      { id: "c-1", distributorId: "old-dist", amount: "50", status: "SETTLED" },
-    ])
-    prismaMock.withdrawal.count.mockResolvedValue(1)
+    ;(distributorsModule.reassignOrderDistributor as jest.Mock).mockRejectedValue(new distributorsModule.PendingWithdrawalBlocksReassignError("分销员存在待处理提现申请，无法修改分销归属"))
     const res = await PATCH(makeRequest({ distributorId: null }), makeContext())
     expect(res.status).toBe(409)
     const data = await res.json()
@@ -108,65 +93,23 @@ describe("PATCH /api/admin/orders/[orderId]/distributor", () => {
   })
 
   it("returns 409 when cancelling commission would make balance negative", async () => {
-    prismaMock.commission.findMany.mockResolvedValue([
-      { id: "c-1", distributorId: "old-dist", amount: "100", status: "SETTLED" },
-    ])
-    prismaMock.withdrawal.count.mockResolvedValue(0)
-    // settled=100, commission_to_cancel=100, paid=80 → 100-100-80 = -80 < 0
-    prismaMock.commission.aggregate.mockResolvedValue({ _sum: { amount: "100" } })
-    prismaMock.withdrawal.aggregate.mockResolvedValue({ _sum: { amount: "80" } })  // PAID
+    ;(distributorsModule.reassignOrderDistributor as jest.Mock).mockRejectedValue(new distributorsModule.CommissionAlreadyPaidOutError("此订单佣金已被提现消耗，无法修改分销归属"))
     const res = await PATCH(makeRequest({ distributorId: null }), makeContext())
     expect(res.status).toBe(409)
     const data = await res.json()
     expect(data.error).toMatch(/提现/)
   })
 
-  it("skips createOrderCommissions when order has no paidAt", async () => {
-    prismaMock.order.findUnique.mockResolvedValue({ ...mockCompletedOrder, paidAt: null })
+  it("allows reassigning distributor when checks pass", async () => {
     const res = await PATCH(makeRequest({ distributorId: "dist-1" }), makeContext())
     expect(res.status).toBe(200)
-    expect(commissionsModule.createOrderCommissions).not.toHaveBeenCalled()
+    expect(distributorsModule.reassignOrderDistributor).toHaveBeenCalledWith("order-1", "dist-1")
   })
 
-  it("checks PENDING withdrawal and balance for each affected distributor", async () => {
-    // level-1 → dist-a, level-2 → dist-b, each with a SETTLED commission
-    prismaMock.commission.findMany.mockResolvedValue([
-      { id: "c-1", distributorId: "dist-a", amount: "80", status: "SETTLED" },
-      { id: "c-2", distributorId: "dist-b", amount: "20", status: "SETTLED" },
-    ])
-    // no PENDING withdrawals for either
-    prismaMock.withdrawal.count.mockResolvedValue(0)
-    // both have enough settled balance to absorb the cancellation
-    prismaMock.commission.aggregate.mockResolvedValue({ _sum: { amount: "200" } })
-    prismaMock.withdrawal.aggregate.mockResolvedValue({ _sum: { amount: "0" } })
-    const res = await PATCH(makeRequest({ distributorId: "dist-1" }), makeContext())
-    expect(res.status).toBe(200)
-    // withdrawal.count called once per distinct distributorId
-    expect(prismaMock.withdrawal.count).toHaveBeenCalledTimes(2)
-  })
-
-  it("cancels existing commissions and assigns new distributor in transaction", async () => {
-    const res = await PATCH(makeRequest({ distributorId: "dist-1" }), makeContext())
-    expect(res.status).toBe(200)
-    expect(prismaMock.commission.updateMany).toHaveBeenCalledWith({
-      where: { orderId: "order-1", status: { in: ["SETTLED", "PENDING"] } },
-      data: { status: "CANCELLED" },
-    })
-    expect(prismaMock.order.update).toHaveBeenCalledWith({
-      where: { id: "order-1" },
-      data: { distributorId: "dist-1" },
-    })
-    expect(commissionsModule.createOrderCommissions).toHaveBeenCalled()
-  })
-
-  it("clears distributor and cancels commissions when distributorId is null", async () => {
+  it("allows clearing distributor when checks pass", async () => {
     const res = await PATCH(makeRequest({ distributorId: null }), makeContext())
     expect(res.status).toBe(200)
-    expect(prismaMock.order.update).toHaveBeenCalledWith({
-      where: { id: "order-1" },
-      data: { distributorId: null },
-    })
-    expect(commissionsModule.createOrderCommissions).not.toHaveBeenCalled()
+    expect(distributorsModule.reassignOrderDistributor).toHaveBeenCalledWith("order-1", null)
   })
 
   it("returns 400 for invalid body schema (non-string distributorId)", async () => {
@@ -174,8 +117,8 @@ describe("PATCH /api/admin/orders/[orderId]/distributor", () => {
     expect(res.status).toBe(400)
   })
 
-  it("returns 500 when transaction throws", async () => {
-    prismaMock.$transaction.mockRejectedValue(new Error("DB error"))
+  it("returns 500 when service throws unknown error", async () => {
+    ;(distributorsModule.reassignOrderDistributor as jest.Mock).mockRejectedValue(new Error("DB error"))
     const res = await PATCH(makeRequest({ distributorId: null }), makeContext())
     expect(res.status).toBe(500)
   })

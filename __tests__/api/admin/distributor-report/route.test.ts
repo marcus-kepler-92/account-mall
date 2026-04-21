@@ -1,9 +1,10 @@
-import { prismaMock } from "@/__mocks__/prisma"
-
-jest.mock("@/lib/prisma", () => ({ prisma: prismaMock }))
 jest.mock("@/lib/auth-guard", () => ({ getAdminSession: jest.fn() }))
+jest.mock("@/lib/domains/distributors", () => ({
+  getDistributorReport: jest.fn(),
+}))
 
 import { getAdminSession } from "@/lib/auth-guard"
+import * as distributorsModule from "@/lib/domains/distributors"
 import { GET } from "@/app/api/admin/distributor-report/route"
 
 const mockSession = { user: { id: "u1", email: "admin@test.com" } }
@@ -14,16 +15,9 @@ function makeRequest(params: Record<string, string> = {}) {
   return new Request(url)
 }
 
-const zeroWithdrawalAgg = {
-  _count: { id: 0 },
-  _sum: { amount: null },
-  _avg: null, _min: null, _max: null,
-} as any
-const zeroCommissionAgg = {
-  _sum: { amount: null },
-  _count: { id: 0 },
-  _avg: null, _min: null, _max: null,
-} as any
+beforeEach(() => {
+  jest.clearAllMocks()
+})
 
 describe("GET /api/admin/distributor-report", () => {
   it("returns 401 when not authenticated", async () => {
@@ -58,58 +52,60 @@ describe("GET /api/admin/distributor-report", () => {
 
   it("returns empty leaderboard when no distributor orders", async () => {
     ;(getAdminSession as jest.Mock).mockResolvedValue(mockSession)
-    prismaMock.withdrawal.aggregate.mockResolvedValueOnce(zeroWithdrawalAgg)
-    prismaMock.commission.aggregate
-      .mockResolvedValueOnce(zeroCommissionAgg)   // pendingCommissionAmount
-      .mockResolvedValueOnce(zeroCommissionAgg)   // monthlySettledCommission
-    prismaMock.user.count.mockResolvedValueOnce(5)
-    prismaMock.order.groupBy.mockResolvedValueOnce([])
+    ;(distributorsModule.getDistributorReport as jest.Mock).mockResolvedValue({
+      summary: {
+        pendingCommissionAmount: 0,
+        settledCommission: 0,
+        distributorCount: 5,
+        newDistributorCount: 0,
+      },
+      leaderboard: [],
+      newDistributors: [],
+    })
 
     const res = await GET(makeRequest({ from: "2026-03-01", to: "2026-03-17" }))
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.summary.distributorCount).toBe(5)
-    expect(body.summary.pendingWithdrawalCount).toBe(0)
     expect(body.leaderboard).toEqual([])
   })
 
   it("returns leaderboard sorted by revenue with pending commission", async () => {
     ;(getAdminSession as jest.Mock).mockResolvedValue(mockSession)
-    prismaMock.withdrawal.aggregate.mockResolvedValueOnce({
-      _count: { id: 2 },
-      _sum: { amount: "500.00" },
-      _avg: null, _min: null, _max: null,
-    } as any)
-    prismaMock.commission.aggregate
-      .mockResolvedValueOnce({
-        _sum: { amount: "300.00" },
-        _count: { id: 0 }, _avg: null, _min: null, _max: null,
-      } as any)  // pendingCommissionAmount
-      .mockResolvedValueOnce({
-        _sum: { amount: "150.00" },
-        _count: { id: 0 }, _avg: null, _min: null, _max: null,
-      } as any)  // monthlySettledCommission
-    prismaMock.user.count.mockResolvedValueOnce(3)
-    prismaMock.order.groupBy.mockResolvedValueOnce([
-      { distributorId: "d1", _sum: { amount: "2000.00" }, _count: { id: 10 } } as any,
-      { distributorId: "d2", _sum: { amount: "800.00" }, _count: { id: 4 } } as any,
-    ])
-    prismaMock.user.findMany.mockResolvedValueOnce([
-      { id: "d1", name: "Alice", email: "alice@test.com" } as any,
-      { id: "d2", name: null, email: "bob@test.com" } as any,
-    ])
-    prismaMock.commission.groupBy.mockResolvedValueOnce([
-      { distributorId: "d1", _sum: { amount: "60.00" } } as any,
-    ])
+    ;(distributorsModule.getDistributorReport as jest.Mock).mockResolvedValue({
+      summary: {
+        pendingCommissionAmount: 300,
+        settledCommission: 150,
+        distributorCount: 3,
+        newDistributorCount: 0,
+      },
+      leaderboard: [
+        {
+          distributorId: "d1",
+          name: "Alice",
+          email: "alice@test.com",
+          revenue: 2000,
+          orderCount: 10,
+          pendingCommission: 60,
+        },
+        {
+          distributorId: "d2",
+          name: null,
+          email: "bob@test.com",
+          revenue: 800,
+          orderCount: 4,
+          pendingCommission: 0,
+        },
+      ],
+      newDistributors: [],
+    })
 
     const res = await GET(makeRequest({ from: "2026-03-01", to: "2026-03-17" }))
     expect(res.status).toBe(200)
     const body = await res.json()
 
-    expect(body.summary.pendingWithdrawalCount).toBe(2)
-    expect(body.summary.pendingWithdrawalAmount).toBe(500)
     expect(body.summary.pendingCommissionAmount).toBe(300)
-    expect(body.summary.monthlySettledCommission).toBe(150)
+    expect(body.summary.settledCommission).toBe(150)
     expect(body.summary.distributorCount).toBe(3)
 
     expect(body.leaderboard).toHaveLength(2)
