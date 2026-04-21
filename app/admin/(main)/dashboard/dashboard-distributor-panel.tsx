@@ -37,7 +37,6 @@ export function DashboardDistributorPanel() {
   const today = todayHKT()
   const [from, setFrom] = useState(today)
   const [to, setTo] = useState(today)
-  const [selectedPreset, setSelectedPreset] = useState<string>("今日")
 
   const { data, isLoading, isError } = useQuery<DistributorReportResponse>({
     queryKey: ["distributor-report", from, to],
@@ -55,6 +54,7 @@ export function DashboardDistributorPanel() {
     { label: "近30天", from: offsetDaysHKT(-29), to: today },
     { label: "本月", from: firstDayOfMonthHKT(), to: today },
   ]
+  const selectedPreset = presets.find((p) => p.from === from && p.to === to)?.label ?? ""
 
   return (
     <section aria-label="分销员看板">
@@ -75,7 +75,6 @@ export function DashboardDistributorPanel() {
                   onClick={() => {
                     setFrom(preset.from)
                     setTo(preset.to)
-                    setSelectedPreset(preset.label)
                   }}
                 >
                   {preset.label}
@@ -89,7 +88,6 @@ export function DashboardDistributorPanel() {
                 onChange={(e) => {
                   if (e.target.value <= to) {
                     setFrom(e.target.value)
-                    setSelectedPreset("")
                   }
                 }}
               />
@@ -103,7 +101,6 @@ export function DashboardDistributorPanel() {
                 onChange={(e) => {
                   if (e.target.value >= from) {
                     setTo(e.target.value)
-                    setSelectedPreset("")
                   }
                 }}
               />

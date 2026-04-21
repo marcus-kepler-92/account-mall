@@ -44,7 +44,14 @@ export function DashboardSalesPanel() {
   const today = todayHKT()
   const [from, setFrom] = useState(today)
   const [to, setTo] = useState(today)
-  const [selectedPreset, setSelectedPreset] = useState<string>("今日")
+
+  const presets = [
+    { label: "今日", from: today, to: today },
+    { label: "昨日", from: offsetDaysHKT(-1), to: offsetDaysHKT(-1) },
+    { label: "本周", from: mondayOfCurrentWeekHKT(), to: today },
+    { label: "本月", from: firstDayOfMonthHKT(), to: today },
+  ]
+  const selectedPreset = presets.find((p) => p.from === from && p.to === to)?.label ?? ""
 
   const { data, isLoading, isError } = useQuery<SalesReportResponse>({
     queryKey: ["sales-report", from, to],
@@ -70,12 +77,7 @@ export function DashboardSalesPanel() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <CardTitle className="text-base sm:text-lg">按商品销售明细</CardTitle>
             <div className="flex flex-wrap items-center gap-2">
-              {[
-                { label: "今日", from: today, to: today },
-                { label: "昨日", from: offsetDaysHKT(-1), to: offsetDaysHKT(-1) },
-                { label: "本周", from: mondayOfCurrentWeekHKT(), to: today },
-                { label: "本月", from: firstDayOfMonthHKT(), to: today },
-              ].map((preset) => (
+              {presets.map((preset) => (
                 <Button
                   key={preset.label}
                   variant={selectedPreset === preset.label ? "default" : "outline"}
@@ -84,7 +86,6 @@ export function DashboardSalesPanel() {
                   onClick={() => {
                     setFrom(preset.from)
                     setTo(preset.to)
-                    setSelectedPreset(preset.label)
                   }}
                 >
                   {preset.label}
@@ -98,7 +99,6 @@ export function DashboardSalesPanel() {
                 onChange={(e) => {
                   if (e.target.value <= to) {
                     setFrom(e.target.value)
-                    setSelectedPreset("")
                   }
                 }}
               />
@@ -112,7 +112,6 @@ export function DashboardSalesPanel() {
                 onChange={(e) => {
                   if (e.target.value >= from) {
                     setTo(e.target.value)
-                    setSelectedPreset("")
                   }
                 }}
               />
