@@ -193,6 +193,20 @@ export class EmailAlreadyRegisteredError extends Error {
   }
 }
 
+export class UsernameRequiredError extends Error {
+  constructor() {
+    super("用户名不能为空")
+    this.name = "UsernameRequiredError"
+  }
+}
+
+export class InviteTokenConcurrentAcceptError extends Error {
+  constructor() {
+    super("此邀请链接已被并发使用")
+    this.name = "InviteTokenConcurrentAcceptError"
+  }
+}
+
 export class InviterCodeInvalidError extends Error {
   constructor() {
     super("邀请码无效或邀请人已停用")

@@ -1,12 +1,6 @@
 import { Resend } from "resend";
 import { config } from "@/lib/config";
 
-const resend = config.resendApiKey
-    ? new Resend(config.resendApiKey)
-    : null;
-
-const FROM_EMAIL = config.emailFrom;
-
 export type SendMailOptions = {
     to: string | string[];
     subject: string;
@@ -33,6 +27,9 @@ export async function sendMail({
         console.log("[email] Development: skip send", { to: toList, subject });
         return { success: true };
     }
+
+    const resend = config.resendApiKey ? new Resend(config.resendApiKey) : null;
+    const FROM_EMAIL = config.emailFrom;
 
     if (!resend) {
         console.warn("[email] RESEND_API_KEY not set, skipping send", {

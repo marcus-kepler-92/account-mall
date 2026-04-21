@@ -85,4 +85,6 @@ export {
   CommissionWithdrawnError,
   PendingWithdrawalBlocksReassignError,
   CommissionAlreadyPaidOutError,
+  UsernameRequiredError,
+  InviteTokenConcurrentAcceptError,
 } from "./types"

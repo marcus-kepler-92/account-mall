@@ -20,3 +20,8 @@ jest.mock("@/lib/config", () => {
     }
     return { config: mock, getConfig: () => mock }
 })
+
+// Mock better-auth/crypto to avoid ESM import issues in tests
+jest.mock("better-auth/crypto", () => ({
+    hashPassword: jest.fn().mockResolvedValue("hashed"),
+}))

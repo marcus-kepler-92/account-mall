@@ -12,22 +12,23 @@ jest.mock("@/lib/auth-guard", () => ({
     getDistributorSession: jest.fn(),
 }))
 
-jest.mock("@/lib/send-distributor-invitation", () => ({
-    sendDistributorInvitation: jest.fn(),
-}))
+jest.mock("@/lib/domains/distributors", () => {
+    const { distributorInviteSchema } = jest.requireActual("@/lib/domains/distributors/validators")
+    return {
+        distributorInviteSchema,
+        sendInvite: jest.fn(),
+        createNoEmailInviteLink: jest.fn(),
+    }
+})
 
 jest.mock("@/lib/rate-limit", () => ({
     checkDistributorInviteRateLimit: jest.fn().mockResolvedValue(null),
 }))
 
-jest.mock("@/lib/create-no-email-invite-link", () => ({
-    createNoEmailInviteLink: jest.fn(),
-}))
-
 const getDistributorSession = require("@/lib/auth-guard").getDistributorSession as jest.Mock
-const sendDistributorInvitation = require("@/lib/send-distributor-invitation").sendDistributorInvitation as jest.Mock
+const sendInvite = require("@/lib/domains/distributors").sendInvite as jest.Mock
 const checkDistributorInviteRateLimit = require("@/lib/rate-limit").checkDistributorInviteRateLimit as jest.Mock
-const createNoEmailInviteLink = require("@/lib/create-no-email-invite-link").createNoEmailInviteLink as jest.Mock
+const createNoEmailInviteLink = require("@/lib/domains/distributors").createNoEmailInviteLink as jest.Mock
 
 function createRequest(body: unknown): NextRequest {
     return {
@@ -38,7 +39,7 @@ function createRequest(body: unknown): NextRequest {
 describe("POST /api/distributor/invite", () => {
     beforeEach(() => {
         getDistributorSession.mockReset()
-        sendDistributorInvitation.mockReset()
+        sendInvite.mockReset()
         createNoEmailInviteLink.mockReset()
     })
 
@@ -46,7 +47,7 @@ describe("POST /api/distributor/invite", () => {
         getDistributorSession.mockResolvedValue(null)
         const res = await DistInvitePost(createRequest({ email: "new@example.com" }))
         expect(res.status).toBe(401)
-        expect(sendDistributorInvitation).not.toHaveBeenCalled()
+        expect(sendInvite).not.toHaveBeenCalled()
     })
 
     it("returns 401 when distributor is disabled", async () => {
@@ -55,31 +56,31 @@ describe("POST /api/distributor/invite", () => {
         })
         const res = await DistInvitePost(createRequest({ email: "new@example.com" }))
         expect(res.status).toBe(401)
-        expect(sendDistributorInvitation).not.toHaveBeenCalled()
+        expect(sendInvite).not.toHaveBeenCalled()
     })
 
     it("returns 400 when email is invalid", async () => {
         getDistributorSession.mockResolvedValue({ user: { id: "dist_1", name: "Dist" } })
         const res = await DistInvitePost(createRequest({ email: "bad-email" }))
         expect(res.status).toBe(400)
-        expect(sendDistributorInvitation).not.toHaveBeenCalled()
+        expect(sendInvite).not.toHaveBeenCalled()
     })
 
     it("returns 400 when email already registered", async () => {
         getDistributorSession.mockResolvedValue({ user: { id: "dist_1", name: "Dist" } })
-        sendDistributorInvitation.mockResolvedValue({ success: false, reason: "already_registered" })
+        sendInvite.mockResolvedValue({ success: false, reason: "already_registered" })
 
         const res = await DistInvitePost(createRequest({ email: "existing@example.com" }))
         expect(res.status).toBe(400)
     })
 
-    it("returns 200 and calls sendDistributorInvitation with distributor ID as inviterId", async () => {
+    it("returns 200 and calls sendInvite with distributor ID as inviterId", async () => {
         getDistributorSession.mockResolvedValue({ user: { id: "dist_1", name: "Distributor A" } })
-        sendDistributorInvitation.mockResolvedValue({ success: true })
+        sendInvite.mockResolvedValue({ success: true })
 
         const res = await DistInvitePost(createRequest({ email: "newmember@example.com" }))
         expect(res.status).toBe(200)
-        expect(sendDistributorInvitation).toHaveBeenCalledWith(
+        expect(sendInvite).toHaveBeenCalledWith(
             expect.objectContaining({
                 email: "newmember@example.com",
                 inviterId: "dist_1",
@@ -90,11 +91,11 @@ describe("POST /api/distributor/invite", () => {
 
     it("allows same email to be invited by multiple people (no duplicate check)", async () => {
         getDistributorSession.mockResolvedValue({ user: { id: "dist_1", name: "Dist" } })
-        sendDistributorInvitation.mockResolvedValue({ success: true })
+        sendInvite.mockResolvedValue({ success: true })
 
         const res = await DistInvitePost(createRequest({ email: "shared@example.com" }))
         expect(res.status).toBe(200)
-        expect(sendDistributorInvitation).toHaveBeenCalledTimes(1)
+        expect(sendInvite).toHaveBeenCalledTimes(1)
     })
 
     it("returns 429 when rate limited", async () => {
@@ -104,12 +105,12 @@ describe("POST /api/distributor/invite", () => {
         )
         const res = await DistInvitePost(createRequest({ email: "new@example.com" }))
         expect(res.status).toBe(429)
-        expect(sendDistributorInvitation).not.toHaveBeenCalled()
+        expect(sendInvite).not.toHaveBeenCalled()
     })
 
     it("returns 400 when email send fails (send_failed)", async () => {
         getDistributorSession.mockResolvedValue({ user: { id: "dist_1", name: "Dist" } })
-        sendDistributorInvitation.mockResolvedValue({ success: false, reason: "send_failed" })
+        sendInvite.mockResolvedValue({ success: false, reason: "send_failed" })
 
         const res = await DistInvitePost(createRequest({ email: "new@example.com" }))
         expect(res.status).toBe(400)
@@ -119,7 +120,7 @@ describe("POST /api/distributor/invite", () => {
 
     it("returns 400 when distributor invites their own registered email", async () => {
         getDistributorSession.mockResolvedValue({ user: { id: "dist_1", name: "Dist" } })
-        sendDistributorInvitation.mockResolvedValue({ success: false, reason: "already_registered" })
+        sendInvite.mockResolvedValue({ success: false, reason: "already_registered" })
 
         const res = await DistInvitePost(createRequest({ email: "dist1@example.com" }))
         expect(res.status).toBe(400)
@@ -143,7 +144,7 @@ describe("POST /api/distributor/invite", () => {
         expect(res.status).toBe(200)
         const body = await res.json()
         expect(body.link).toBe("https://example.com/distributor/accept-invite?token=abc")
-        expect(sendDistributorInvitation).not.toHaveBeenCalled()
+        expect(sendInvite).not.toHaveBeenCalled()
         expect(createNoEmailInviteLink).toHaveBeenCalledWith({ inviterId: "dist_1" })
     })
 

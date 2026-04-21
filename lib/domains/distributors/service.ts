@@ -39,6 +39,8 @@ import {
   CommissionWithdrawnError,
   PendingWithdrawalBlocksReassignError,
   CommissionAlreadyPaidOutError,
+  UsernameRequiredError,
+  InviteTokenConcurrentAcceptError,
 } from "./types"
 import type { UpdateDistributorInput, CreateTierInput, UpdateTierInput, UpdateWithdrawalInput, AcceptInviteInput } from "./validators"
 
@@ -251,7 +253,7 @@ export async function acceptInvite(token: string, data: AcceptInviteInput & { us
   const isNoEmail = invitation.email === null
 
   if (isNoEmail) {
-    if (!data.username) throw new InviteTokenNotFoundError()
+    if (!data.username) throw new UsernameRequiredError()
     const existingByUsername = await repo.findUserByUsername(data.username)
     if (existingByUsername) throw new UsernameConflictError()
   } else {
@@ -270,7 +272,7 @@ export async function acceptInvite(token: string, data: AcceptInviteInput & { us
       where: { token },
       select: { acceptedAt: true },
     })
-    if (inv?.acceptedAt) throw new InviteTokenUsedError()
+    if (inv?.acceptedAt) throw new InviteTokenConcurrentAcceptError()
 
     const user = await repo.createDistributorUser(
       {

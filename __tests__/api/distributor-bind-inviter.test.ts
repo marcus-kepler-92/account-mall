@@ -80,7 +80,7 @@ describe("POST /api/distributor/bind-inviter", () => {
         const res = await BindInviterPost(createRequest({ inviteCode: "PROMO1" }))
         expect(res.status).toBe(200)
         const data = await res.json()
-        expect(data).toEqual({ ok: true })
+        expect(data).toEqual({ success: true })
         expect(prismaMock.user.findFirst).toHaveBeenCalledWith({
             where: {
                 distributorCode: "PROMO1",
