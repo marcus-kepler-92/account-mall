@@ -108,7 +108,6 @@ export function DashboardDistributorPanel() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* KPI row — always reflects current state, not time-range */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {isLoading ? (
               Array.from({ length: 3 }).map((_, i) => (
@@ -129,10 +128,10 @@ export function DashboardDistributorPanel() {
                 <Link href="/admin/distributors" className="block h-full">
                   <div className="h-full cursor-pointer rounded-lg border bg-card p-3 transition-colors hover:bg-accent/50">
                     <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <BadgeDollarSign className="size-3" /> 本月已结佣金
+                      <BadgeDollarSign className="size-3" /> 已结佣金
                     </p>
                     <p className="mt-1 text-lg font-bold">
-                      {formatCurrency(summary?.monthlySettledCommission ?? 0)}
+                      {formatCurrency(summary?.settledCommission ?? 0)}
                     </p>
                   </div>
                 </Link>

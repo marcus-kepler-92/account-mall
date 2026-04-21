@@ -15,7 +15,7 @@ function isValidCalendarDate(y: number, m: number, d: number): boolean {
 export type DistributorReportResponse = {
   summary: {
     pendingCommissionAmount: number
-    monthlySettledCommission: number
+    settledCommission: number
     distributorCount: number
     newDistributorCount: number
   }
@@ -61,26 +61,20 @@ export async function GET(request: Request): Promise<NextResponse> {
   const startUTC = fromZonedTime(new Date(fy, fm - 1, fd, 0, 0, 0, 0), HKT)
   const endUTC = fromZonedTime(new Date(ty, tm - 1, td + 1, 0, 0, 0, 0), HKT)
 
-  const nowHKTStr = new Date().toLocaleDateString("en-CA", { timeZone: HKT })
-  const [ny, nm] = nowHKTStr.split("-").map(Number)
-  const firstDayOfMonthUTC = fromZonedTime(new Date(ny, nm - 1, 1, 0, 0, 0, 0), HKT)
-
   const [
     pendingCommissionAgg,
     distributorCount,
-    monthlySettledCommissionAgg,
+    settledCommissionAgg,
     ordersByDistributor,
     newDistributorRows,
   ] = await Promise.all([
     prisma.commission.aggregate({
-      where: { status: "PENDING" },
+      where: { status: "PENDING", createdAt: { gte: startUTC, lt: endUTC } },
       _sum: { amount: true },
     }),
     prisma.user.count({ where: { role: "DISTRIBUTOR" } }),
-    // monthlySettledCommission is always current-month MTD, not bounded by the from/to range
-    // (this is a current-state KPI card, not a range-specific metric)
     prisma.commission.aggregate({
-      where: { status: "SETTLED", createdAt: { gte: firstDayOfMonthUTC } },
+      where: { status: "SETTLED", createdAt: { gte: startUTC, lt: endUTC } },
       _sum: { amount: true },
     }),
     prisma.order.groupBy({
@@ -145,7 +139,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   return NextResponse.json<DistributorReportResponse>({
     summary: {
       pendingCommissionAmount: Number(pendingCommissionAgg._sum.amount ?? 0),
-      monthlySettledCommission: Number(monthlySettledCommissionAgg._sum.amount ?? 0),
+      settledCommission: Number(settledCommissionAgg._sum.amount ?? 0),
       distributorCount,
       newDistributorCount: newDistributorRows.length,
     },
