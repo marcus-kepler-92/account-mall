@@ -12,17 +12,17 @@ jest.mock("@/lib/auth-guard", () => ({
     getAdminSession: jest.fn(),
 }))
 
-jest.mock("@/lib/send-distributor-invitation", () => ({
-    sendDistributorInvitation: jest.fn(),
-}))
-
-jest.mock("@/lib/create-no-email-invite-link", () => ({
+jest.mock("@/lib/domains/distributors", () => ({
+    sendInvite: jest.fn(),
     createNoEmailInviteLink: jest.fn(),
+    distributorInviteSchema: require("zod").z.object({
+        email: require("zod").z.string().email(),
+    }),
 }))
 
 const getAdminSession = require("@/lib/auth-guard").getAdminSession as jest.Mock
-const sendDistributorInvitation = require("@/lib/send-distributor-invitation").sendDistributorInvitation as jest.Mock
-const createNoEmailInviteLink = require("@/lib/create-no-email-invite-link").createNoEmailInviteLink as jest.Mock
+const sendInvite = require("@/lib/domains/distributors").sendInvite as jest.Mock
+const createNoEmailInviteLink = require("@/lib/domains/distributors").createNoEmailInviteLink as jest.Mock
 
 function createRequest(body: unknown): NextRequest {
     return {
@@ -33,7 +33,7 @@ function createRequest(body: unknown): NextRequest {
 describe("POST /api/admin/distributors/invite", () => {
     beforeEach(() => {
         getAdminSession.mockReset()
-        sendDistributorInvitation.mockReset()
+        sendInvite.mockReset()
         createNoEmailInviteLink.mockReset()
     })
 
@@ -41,14 +41,14 @@ describe("POST /api/admin/distributors/invite", () => {
         getAdminSession.mockResolvedValue(null)
         const res = await AdminInvitePost(createRequest({ email: "new@example.com" }))
         expect(res.status).toBe(401)
-        expect(sendDistributorInvitation).not.toHaveBeenCalled()
+        expect(sendInvite).not.toHaveBeenCalled()
     })
 
     it("returns 400 when email is invalid", async () => {
         getAdminSession.mockResolvedValue({ user: { id: "admin_1", name: "Admin" } })
         const res = await AdminInvitePost(createRequest({ email: "not-an-email" }))
         expect(res.status).toBe(400)
-        expect(sendDistributorInvitation).not.toHaveBeenCalled()
+        expect(sendInvite).not.toHaveBeenCalled()
     })
 
     it("returns 400 when body is invalid JSON", async () => {
@@ -60,7 +60,7 @@ describe("POST /api/admin/distributors/invite", () => {
 
     it("returns 400 when email is already registered", async () => {
         getAdminSession.mockResolvedValue({ user: { id: "admin_1", name: "Admin" } })
-        sendDistributorInvitation.mockResolvedValue({ success: false, reason: "already_registered" })
+        sendInvite.mockResolvedValue({ success: false, reason: "already_registered" })
 
         const res = await AdminInvitePost(createRequest({ email: "existing@example.com" }))
         expect(res.status).toBe(400)
@@ -68,13 +68,13 @@ describe("POST /api/admin/distributors/invite", () => {
         expect(body.error).toMatch(/已注册/)
     })
 
-    it("returns 200 and calls sendDistributorInvitation with admin ID as inviterId", async () => {
+    it("returns 200 and calls sendInvite with admin ID as inviterId", async () => {
         getAdminSession.mockResolvedValue({ user: { id: "admin_1", name: "Admin" } })
-        sendDistributorInvitation.mockResolvedValue({ success: true })
+        sendInvite.mockResolvedValue({ success: true })
 
         const res = await AdminInvitePost(createRequest({ email: "new@example.com" }))
         expect(res.status).toBe(200)
-        expect(sendDistributorInvitation).toHaveBeenCalledWith(
+        expect(sendInvite).toHaveBeenCalledWith(
             expect.objectContaining({
                 email: "new@example.com",
                 inviterId: "admin_1",
@@ -85,17 +85,17 @@ describe("POST /api/admin/distributors/invite", () => {
 
     it("normalizes email to lowercase", async () => {
         getAdminSession.mockResolvedValue({ user: { id: "admin_1", name: "Admin" } })
-        sendDistributorInvitation.mockResolvedValue({ success: true })
+        sendInvite.mockResolvedValue({ success: true })
 
         await AdminInvitePost(createRequest({ email: "New@EXAMPLE.COM" }))
-        expect(sendDistributorInvitation).toHaveBeenCalledWith(
+        expect(sendInvite).toHaveBeenCalledWith(
             expect.objectContaining({ email: "new@example.com" })
         )
     })
 
     it("returns 400 when email send fails (send_failed)", async () => {
         getAdminSession.mockResolvedValue({ user: { id: "admin_1", name: "Admin" } })
-        sendDistributorInvitation.mockResolvedValue({ success: false, reason: "send_failed" })
+        sendInvite.mockResolvedValue({ success: false, reason: "send_failed" })
 
         const res = await AdminInvitePost(createRequest({ email: "new@example.com" }))
         expect(res.status).toBe(400)
@@ -112,7 +112,7 @@ describe("POST /api/admin/distributors/invite", () => {
         expect(res.status).toBe(200)
         const body = await res.json()
         expect(body.link).toBe("https://example.com/distributor/accept-invite?token=abc")
-        expect(sendDistributorInvitation).not.toHaveBeenCalled()
+        expect(sendInvite).not.toHaveBeenCalled()
         expect(createNoEmailInviteLink).toHaveBeenCalledWith({ inviterId: "admin_1" })
     })
 
@@ -121,5 +121,16 @@ describe("POST /api/admin/distributors/invite", () => {
         const res = await AdminInvitePost(createRequest({}))
         expect(res.status).toBe(401)
         expect(createNoEmailInviteLink).not.toHaveBeenCalled()
+    })
+
+    it("calls sendInvite with lowercase email", async () => {
+        getAdminSession.mockResolvedValue({ user: { id: "admin_1", name: "Admin" } })
+        sendInvite.mockResolvedValue({ success: true })
+
+        const res = await AdminInvitePost(createRequest({ email: "Test@Example.COM" }))
+        expect(res.status).toBe(200)
+        expect(sendInvite).toHaveBeenCalledWith(
+            expect.objectContaining({ email: "test@example.com" })
+        )
     })
 })

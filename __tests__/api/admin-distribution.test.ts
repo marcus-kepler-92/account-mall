@@ -27,8 +27,50 @@ jest.mock("@/lib/auth-guard", () => ({
   getAdminSession: jest.fn(),
 }));
 
+jest.mock("@/lib/domains/distributors", () => {
+  // Define error classes inside the mock factory
+  class DistributorNotFoundError extends Error {
+    constructor(message: string) {
+      super(message);
+      this.name = "DistributorNotFoundError";
+    }
+  }
+
+  class DistributorNotDisabledError extends Error {
+    constructor(message: string) {
+      super(message);
+      this.name = "DistributorNotDisabledError";
+    }
+  }
+
+  class DistributorHasAssociationsError extends Error {
+    constructor(message: string) {
+      super(message);
+      this.name = "DistributorHasAssociationsError";
+    }
+  }
+
+  return {
+    ...jest.requireActual("@/lib/domains/distributors"),
+    listDistributors: jest.fn(),
+    updateDistributor: jest.fn(),
+    deleteDistributor: jest.fn(),
+    DistributorNotFoundError,
+    DistributorNotDisabledError,
+    DistributorHasAssociationsError,
+  };
+});
+
 const getAdminSession = require("@/lib/auth-guard")
   .getAdminSession as jest.Mock;
+
+const mockDistributorModule = require("@/lib/domains/distributors");
+const listDistributors = mockDistributorModule.listDistributors;
+const updateDistributor = mockDistributorModule.updateDistributor;
+const deleteDistributor = mockDistributorModule.deleteDistributor;
+const DistributorNotFoundError = mockDistributorModule.DistributorNotFoundError;
+const DistributorNotDisabledError = mockDistributorModule.DistributorNotDisabledError;
+const DistributorHasAssociationsError = mockDistributorModule.DistributorHasAssociationsError;
 
 function withSession() {
   getAdminSession.mockResolvedValue({ user: { id: "admin_1" } });
@@ -283,7 +325,10 @@ describe("DELETE /api/admin/commission-tiers/[id]", () => {
 });
 
 describe("GET /api/admin/distributors", () => {
-  beforeEach(() => getAdminSession.mockReset());
+  beforeEach(() => {
+    getAdminSession.mockReset();
+    listDistributors.mockReset();
+  });
 
   it("returns 401 when no session", async () => {
     getAdminSession.mockResolvedValue(null);
@@ -293,7 +338,7 @@ describe("GET /api/admin/distributors", () => {
 
   it("returns 200 with distributors and stats", async () => {
     withSession();
-    prismaMock.user.findMany.mockResolvedValue([
+    const mockDistributors = [
       {
         id: "dist_1",
         email: "d@x.com",
@@ -303,16 +348,13 @@ describe("GET /api/admin/distributors", () => {
         discountPercent: 5,
         disabledAt: null,
         createdAt: new Date(),
-        _count: { ordersAsDistributor: 5 },
+        orderCount: 5,
+        completedOrderCount: 3,
+        totalCommission: 100,
+        withdrawableBalance: 60,
       },
-    ] as never);
-    prismaMock.order.count.mockResolvedValue(3);
-    prismaMock.commission.aggregate
-      .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal("100") }, _avg: null, _min: null, _max: null, _count: { id: 0 } } as any)
-      .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal("80") }, _avg: null, _min: null, _max: null, _count: { id: 0 } } as any);
-    prismaMock.withdrawal.aggregate
-      .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal("20") }, _avg: null, _min: null, _max: null, _count: { id: 0 } } as any)
-      .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal("0") }, _avg: null, _min: null, _max: null, _count: { id: 0 } } as any);
+    ];
+    listDistributors.mockResolvedValue(mockDistributors);
 
     const res = await DistributorsGet();
     const data = await res.json();
@@ -329,18 +371,17 @@ describe("GET /api/admin/distributors", () => {
       totalCommission: 100,
       withdrawableBalance: 60,
     });
-    expect(prismaMock.user.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { role: "DISTRIBUTOR" },
-      }),
-    );
+    expect(listDistributors).toHaveBeenCalled();
   });
 });
 
 describe("PATCH /api/admin/distributors/[id]", () => {
   const context = { params: Promise.resolve({ id: "dist_1" }) };
 
-  beforeEach(() => getAdminSession.mockReset());
+  beforeEach(() => {
+    getAdminSession.mockReset();
+    updateDistributor.mockReset();
+  });
 
   it("returns 401 when no session", async () => {
     getAdminSession.mockResolvedValue(null);
@@ -351,9 +392,9 @@ describe("PATCH /api/admin/distributors/[id]", () => {
     expect(res.status).toBe(401);
   });
 
-  it("returns 404 when user is not distributor or does not exist", async () => {
+  it("returns 404 when distributor not found", async () => {
     withSession();
-    prismaMock.user.findFirst.mockResolvedValue(null);
+    updateDistributor.mockRejectedValue(new DistributorNotFoundError("not found"));
     const req = {
       json: async () => ({ disabled: true }),
     } as unknown as NextRequest;
@@ -363,11 +404,7 @@ describe("PATCH /api/admin/distributors/[id]", () => {
 
   it("returns 200 and sets disabledAt when disabled: true", async () => {
     withSession();
-    prismaMock.user.findFirst.mockResolvedValue({
-      id: "dist_1",
-      role: "DISTRIBUTOR",
-    } as never);
-    prismaMock.user.update.mockResolvedValue({
+    const mockUser = {
       id: "dist_1",
       email: "d@x.com",
       name: "D",
@@ -375,7 +412,8 @@ describe("PATCH /api/admin/distributors/[id]", () => {
       discountCodeEnabled: false,
       discountPercent: null,
       disabledAt: new Date(),
-    } as never);
+    };
+    updateDistributor.mockResolvedValue(mockUser);
     const req = {
       json: async () => ({ disabled: true }),
     } as unknown as NextRequest;
@@ -383,20 +421,12 @@ describe("PATCH /api/admin/distributors/[id]", () => {
     const data = await res.json();
     expect(res.status).toBe(200);
     expect(data.disabledAt).toBeDefined();
-    expect(prismaMock.user.update).toHaveBeenCalledWith({
-      where: { id: "dist_1" },
-      data: expect.objectContaining({ disabledAt: expect.any(Date) }),
-      select: expect.any(Object),
-    });
+    expect(updateDistributor).toHaveBeenCalledWith("dist_1", { disabled: true });
   });
 
   it("returns 200 and clears disabledAt when disabled: false", async () => {
     withSession();
-    prismaMock.user.findFirst.mockResolvedValue({
-      id: "dist_1",
-      role: "DISTRIBUTOR",
-    } as never);
-    prismaMock.user.update.mockResolvedValue({
+    const mockUser = {
       id: "dist_1",
       email: "d@x.com",
       name: "D",
@@ -404,26 +434,19 @@ describe("PATCH /api/admin/distributors/[id]", () => {
       discountCodeEnabled: false,
       discountPercent: null,
       disabledAt: null,
-    } as never);
+    };
+    updateDistributor.mockResolvedValue(mockUser);
     const req = {
       json: async () => ({ disabled: false }),
     } as unknown as NextRequest;
     const res = await DistributorPatch(req, context);
     expect(res.status).toBe(200);
-    expect(prismaMock.user.update).toHaveBeenCalledWith({
-      where: { id: "dist_1" },
-      data: expect.objectContaining({ disabledAt: null }),
-      select: expect.any(Object),
-    });
+    expect(updateDistributor).toHaveBeenCalledWith("dist_1", { disabled: false });
   });
 
   it("returns 200 and updates discountCodeEnabled and discountPercent", async () => {
     withSession();
-    prismaMock.user.findFirst.mockResolvedValue({
-      id: "dist_1",
-      role: "DISTRIBUTOR",
-    } as never);
-    prismaMock.user.update.mockResolvedValue({
+    const mockUser = {
       id: "dist_1",
       email: "d@x.com",
       name: "D",
@@ -431,7 +454,8 @@ describe("PATCH /api/admin/distributors/[id]", () => {
       discountCodeEnabled: true,
       discountPercent: 5,
       disabledAt: null,
-    } as never);
+    };
+    updateDistributor.mockResolvedValue(mockUser);
     const req = {
       json: async () => ({ discountCodeEnabled: true, discountPercent: 5 }),
     } as unknown as NextRequest;
@@ -440,22 +464,11 @@ describe("PATCH /api/admin/distributors/[id]", () => {
     expect(res.status).toBe(200);
     expect(data.discountCodeEnabled).toBe(true);
     expect(data.discountPercent).toBe(5);
-    expect(prismaMock.user.update).toHaveBeenCalledWith({
-      where: { id: "dist_1" },
-      data: expect.objectContaining({
-        discountCodeEnabled: true,
-        discountPercent: 5,
-      }),
-      select: expect.any(Object),
-    });
+    expect(updateDistributor).toHaveBeenCalledWith("dist_1", { discountCodeEnabled: true, discountPercent: 5 });
   });
 
   it("returns 400 when discountPercent is greater than 100", async () => {
     withSession();
-    prismaMock.user.findFirst.mockResolvedValue({
-      id: "dist_1",
-      role: "DISTRIBUTOR",
-    } as never);
     const req = {
       json: async () => ({ discountCodeEnabled: true, discountPercent: 101 }),
     } as unknown as NextRequest;
@@ -467,10 +480,6 @@ describe("PATCH /api/admin/distributors/[id]", () => {
 
   it("returns 400 when discountPercent is negative", async () => {
     withSession();
-    prismaMock.user.findFirst.mockResolvedValue({
-      id: "dist_1",
-      role: "DISTRIBUTOR",
-    } as never);
     const req = {
       json: async () => ({ discountCodeEnabled: true, discountPercent: -1 }),
     } as unknown as NextRequest;
@@ -482,10 +491,6 @@ describe("PATCH /api/admin/distributors/[id]", () => {
 
   it("returns 400 when discountPercent is not a number", async () => {
     withSession();
-    prismaMock.user.findFirst.mockResolvedValue({
-      id: "dist_1",
-      role: "DISTRIBUTOR",
-    } as never);
     const req = {
       json: async () => ({ discountCodeEnabled: true, discountPercent: "10" }),
     } as unknown as NextRequest;
@@ -499,7 +504,10 @@ describe("PATCH /api/admin/distributors/[id]", () => {
 describe("DELETE /api/admin/distributors/[id]", () => {
   const context = { params: Promise.resolve({ id: "dist_1" }) };
 
-  beforeEach(() => getAdminSession.mockReset());
+  beforeEach(() => {
+    getAdminSession.mockReset();
+    deleteDistributor.mockReset();
+  });
 
   it("returns 401 when no session", async () => {
     getAdminSession.mockResolvedValue(null);
@@ -509,110 +517,37 @@ describe("DELETE /api/admin/distributors/[id]", () => {
 
   it("returns 404 when distributor does not exist", async () => {
     withSession();
-    prismaMock.user.findFirst.mockResolvedValue(null);
+    deleteDistributor.mockRejectedValue(new DistributorNotFoundError("not found"));
     const res = await DistributorDelete({} as NextRequest, context);
     expect(res.status).toBe(404);
   });
 
   it("returns 400 when distributor is not disabled", async () => {
     withSession();
-    prismaMock.user.findFirst.mockResolvedValue({
-      id: "dist_1",
-      disabledAt: null,
-    } as never);
+    deleteDistributor.mockRejectedValue(new DistributorNotDisabledError("not disabled"));
     const res = await DistributorDelete({} as NextRequest, context);
     const data = await res.json();
     expect(res.status).toBe(400);
-    expect(data.error).toMatch(/停用/);
-    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    expect(data.error).toBeDefined();
   });
 
-  it("returns 400 when distributor has orders", async () => {
+  it("returns 400 when distributor has associations", async () => {
     withSession();
-    prismaMock.user.findFirst.mockResolvedValue({
-      id: "dist_1",
-      disabledAt: new Date(),
-    } as never);
-    prismaMock.order.count.mockResolvedValue(1);
-    prismaMock.commission.count.mockResolvedValue(0);
-    prismaMock.withdrawal.count.mockResolvedValue(0);
-    prismaMock.user.count.mockResolvedValue(0);
+    deleteDistributor.mockRejectedValue(new DistributorHasAssociationsError("has associations"));
     const res = await DistributorDelete({} as NextRequest, context);
     const data = await res.json();
     expect(res.status).toBe(400);
-    expect(data.error).toMatch(/订单/);
-    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    expect(data.error).toBeDefined();
   });
 
-  it("returns 400 when distributor has commissions", async () => {
+  it("returns 200 when deletion succeeds", async () => {
     withSession();
-    prismaMock.user.findFirst.mockResolvedValue({
-      id: "dist_1",
-      disabledAt: new Date(),
-    } as never);
-    prismaMock.order.count.mockResolvedValue(0);
-    prismaMock.commission.count.mockResolvedValue(2);
-    prismaMock.withdrawal.count.mockResolvedValue(0);
-    prismaMock.user.count.mockResolvedValue(0);
-    const res = await DistributorDelete({} as NextRequest, context);
-    const data = await res.json();
-    expect(res.status).toBe(400);
-    expect(data.error).toMatch(/佣金/);
-    expect(prismaMock.$transaction).not.toHaveBeenCalled();
-  });
-
-  it("returns 400 when distributor has withdrawals", async () => {
-    withSession();
-    prismaMock.user.findFirst.mockResolvedValue({
-      id: "dist_1",
-      disabledAt: new Date(),
-    } as never);
-    prismaMock.order.count.mockResolvedValue(0);
-    prismaMock.commission.count.mockResolvedValue(0);
-    prismaMock.withdrawal.count.mockResolvedValue(1);
-    prismaMock.user.count.mockResolvedValue(0);
-    const res = await DistributorDelete({} as NextRequest, context);
-    const data = await res.json();
-    expect(res.status).toBe(400);
-    expect(data.error).toMatch(/提现/);
-    expect(prismaMock.$transaction).not.toHaveBeenCalled();
-  });
-
-  it("returns 400 when distributor has invitees", async () => {
-    withSession();
-    prismaMock.user.findFirst.mockResolvedValue({
-      id: "dist_1",
-      disabledAt: new Date(),
-    } as never);
-    prismaMock.order.count.mockResolvedValue(0);
-    prismaMock.commission.count.mockResolvedValue(0);
-    prismaMock.withdrawal.count.mockResolvedValue(0);
-    prismaMock.user.count.mockResolvedValue(3);
-    const res = await DistributorDelete({} as NextRequest, context);
-    const data = await res.json();
-    expect(res.status).toBe(400);
-    expect(data.error).toMatch(/下线/);
-    expect(prismaMock.$transaction).not.toHaveBeenCalled();
-  });
-
-  it("returns 200 and runs transaction when all checks pass", async () => {
-    withSession();
-    prismaMock.user.findFirst.mockResolvedValue({
-      id: "dist_1",
-      disabledAt: new Date(),
-    } as never);
-    prismaMock.order.count.mockResolvedValue(0);
-    prismaMock.commission.count.mockResolvedValue(0);
-    prismaMock.withdrawal.count.mockResolvedValue(0);
-    prismaMock.user.count.mockResolvedValue(0);
-    prismaMock.distributorInvitation.deleteMany.mockResolvedValue({ count: 0 });
-    prismaMock.user.delete.mockResolvedValue({} as never);
-    prismaMock.$transaction.mockResolvedValue([{ count: 0 }, {}]);
+    deleteDistributor.mockResolvedValue(undefined);
     const res = await DistributorDelete({} as NextRequest, context);
     const data = await res.json();
     expect(res.status).toBe(200);
     expect(data.success).toBe(true);
-    expect(prismaMock.$transaction).toHaveBeenCalled();
+    expect(deleteDistributor).toHaveBeenCalledWith("dist_1");
   });
 });
 
