@@ -357,11 +357,9 @@ async function executeScrapeStrategy(urls: string[]): Promise<SharedAccount[]> {
     return merged
 }
 
-/** Base URL for the apple hosting API, normalised once at module load. */
-const appleHostingBaseUrl = config.appleHostingUrl.replace(/\/$/, "")
-
 /** Execute the voidlogins strategy: call the apple.voidlogins.com JSON API. */
 async function executeVoidloginsStrategy(code: string, password: string): Promise<SharedAccount[]> {
+    const appleHostingBaseUrl = config.appleHostingUrl.replace(/\/$/, "")
     const encodedCode = encodeURIComponent(code)
     const encodedPassword = password ? encodeURIComponent(password) : ""
     const cacheKey = encodedPassword
