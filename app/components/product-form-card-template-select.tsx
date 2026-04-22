@@ -61,7 +61,7 @@ export function ProductFormCardTemplateSelect({
         <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
           <Command>
             <CommandInput placeholder="搜索模版..." />
-            <CommandList>
+            <CommandList className="max-h-[50vh]">
               <CommandEmpty>无匹配模版</CommandEmpty>
               <CommandGroup>
                 {initialTemplates.map((t) => {
@@ -71,6 +71,7 @@ export function ProductFormCardTemplateSelect({
                       key={t.id}
                       value={t.name}
                       onSelect={() => toggleTemplate(t.id)}
+                      className="py-2.5"
                     >
                       <Check className={cn("size-4 shrink-0", isSelected ? "opacity-100" : "opacity-0")} />
                       <div className="flex-1 min-w-0">
@@ -93,7 +94,7 @@ export function ProductFormCardTemplateSelect({
               {t.name}
               <button
                 type="button"
-                className="ml-0.5 rounded-full p-0.5 hover:bg-muted-foreground/20"
+                className="ml-0.5 flex items-center justify-center rounded-full min-w-[20px] min-h-[20px] hover:bg-muted-foreground/20"
                 onClick={() => toggleTemplate(t.id)}
                 aria-label="移除模版"
               >
