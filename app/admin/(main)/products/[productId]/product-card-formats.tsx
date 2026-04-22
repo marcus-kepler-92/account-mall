@@ -34,7 +34,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form"
-import { cardFormatSchema, type CardFormatInput } from "@/lib/validations/card-format"
+import { cardTemplateSchema, type CardTemplateInput } from "@/lib/validations/card-template"
 import { parseTemplate } from "@/lib/card-format"
 
 type CardFormat = {
@@ -58,8 +58,8 @@ export function ProductCardFormats({ productId, initialFormats }: ProductCardFor
   const [submitting, setSubmitting] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
-  const form = useForm<CardFormatInput>({
-    resolver: zodResolver(cardFormatSchema),
+  const form = useForm<CardTemplateInput>({
+    resolver: zodResolver(cardTemplateSchema),
     defaultValues: { name: "", template: "" },
   })
 
@@ -78,7 +78,7 @@ export function ProductCardFormats({ productId, initialFormats }: ProductCardFor
     setDialogOpen(true)
   }
 
-  const handleSubmit = async (data: CardFormatInput) => {
+  const handleSubmit = async (data: CardTemplateInput) => {
     setSubmitting(true)
     try {
       const url = editingFormat

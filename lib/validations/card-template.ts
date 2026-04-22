@@ -1,8 +1,8 @@
 import { z } from "zod"
 import { parseTemplate } from "@/lib/card-format"
 
-export const cardFormatSchema = z.object({
-  name: z.string().min(1, "格式名称不能为空").max(50, "格式名称不超过 50 字符"),
+export const cardTemplateSchema = z.object({
+  name: z.string().min(1, "模版名称不能为空").max(50, "模版名称不超过 50 字符"),
   template: z
     .string()
     .min(1, "格式模板不能为空")
@@ -11,4 +11,4 @@ export const cardFormatSchema = z.object({
     }),
 })
 
-export type CardFormatInput = z.infer<typeof cardFormatSchema>
+export type CardTemplateInput = z.infer<typeof cardTemplateSchema>

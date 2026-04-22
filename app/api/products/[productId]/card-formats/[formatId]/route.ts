@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getAdminSession } from "@/lib/auth-guard"
 import { unauthorized, invalidJsonBody, validationError, notFound } from "@/lib/api-response"
-import { cardFormatSchema } from "@/lib/validations/card-format"
+import { cardTemplateSchema } from "@/lib/validations/card-template"
 
 type RouteContext = { params: Promise<{ productId: string; formatId: string }> }
 
@@ -33,7 +33,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
     return invalidJsonBody()
   }
 
-  const parsed = cardFormatSchema.safeParse(body)
+  const parsed = cardTemplateSchema.safeParse(body)
   if (!parsed.success) return validationError(parsed.error.flatten())
 
   const updated = await prisma.productCardFormat.update({
