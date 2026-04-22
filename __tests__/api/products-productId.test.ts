@@ -428,7 +428,7 @@ describe("DELETE /api/products/[productId]", () => {
       });
       expect(prismaMock.product.update).toHaveBeenCalledWith({
         where: { id: "prod_1" },
-        data: { tags: { set: [] } },
+        data: { tags: { set: [] }, cardTemplates: { set: [] } },
       });
       expect(prismaMock.product.delete).toHaveBeenCalledWith({
         where: { id: "prod_1" },

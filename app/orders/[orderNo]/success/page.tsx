@@ -61,7 +61,7 @@ export default async function OrderSuccessPage({ params, searchParams }: PagePro
                     productType: true,
                     allowAccountSwitch: true,
                     accountSwitchLimit: true,
-                    cardFormats: {
+                    cardTemplates: {
                         orderBy: { sortOrder: "asc" },
                         select: { template: true },
                     },
@@ -101,8 +101,8 @@ export default async function OrderSuccessPage({ params, searchParams }: PagePro
     }
 
     const cards = order.cards.map((c) => c.content)
-    const cardFormats = order.product?.cardFormats ?? []
-    const resolvedCards = order.cards.map((c) => resolveCardFields(c.content, cardFormats))
+    const cardTemplates = order.product?.cardTemplates ?? []
+    const resolvedCards = order.cards.map((c) => resolveCardFields(c.content, cardTemplates))
     const productName = order.productNameSnapshot ?? order.product?.name ?? "商品"
     const isAutoFetch = order.product?.productType === "AUTO_FETCH"
     const expiresAt = order.expiresAt ? order.expiresAt.toISOString() : null

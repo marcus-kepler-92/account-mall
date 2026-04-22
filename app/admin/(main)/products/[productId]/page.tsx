@@ -3,7 +3,6 @@ import { prisma } from "@/lib/prisma"
 import { config } from "@/lib/config"
 import { ProductForm } from "@/app/components/product-form"
 import { DeactivateProductButton } from "./product-actions"
-import { ProductCardFormats } from "./product-card-formats"
 
 export const dynamic = "force-dynamic"
 
@@ -14,22 +13,25 @@ type PageProps = {
 export default async function AdminEditProductPage({ params }: PageProps) {
     const { productId } = await params
 
-    const [product, tags] = await Promise.all([
+    const [product, tags, cardTemplates] = await Promise.all([
         prisma.product.findUnique({
             where: { id: productId },
             include: {
                 tags: {
                     select: { id: true, name: true, slug: true },
                 },
-                cardFormats: {
-                    orderBy: { sortOrder: "asc" },
-                    select: { id: true, name: true, template: true, sortOrder: true },
+                cardTemplates: {
+                    select: { id: true, name: true, template: true },
                 },
             },
         }),
         prisma.tag.findMany({
             select: { id: true, name: true, slug: true },
             orderBy: { name: "asc" },
+        }),
+        prisma.cardTemplate.findMany({
+            select: { id: true, name: true, template: true },
+            orderBy: { sortOrder: "asc" },
         }),
     ])
 
@@ -45,17 +47,9 @@ export default async function AdminEditProductPage({ params }: PageProps) {
                     price: Number(product.price),
                 }}
                 allTags={tags}
+                allCardTemplates={cardTemplates}
                 sourceUrlOptions={config.autoFetchSourceUrls}
             />
-
-            {product.productType !== "AUTO_FETCH" && (
-                <div className="rounded-lg border p-4">
-                    <ProductCardFormats
-                        productId={product.id}
-                        initialFormats={product.cardFormats}
-                    />
-                </div>
-            )}
 
             {/* Danger zone */}
             <div className="rounded-lg border border-destructive/20 p-4">
