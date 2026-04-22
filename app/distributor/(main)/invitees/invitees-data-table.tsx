@@ -5,7 +5,9 @@ import {
     useReactTable,
     getCoreRowModel,
     getFilteredRowModel,
+    getSortedRowModel,
     type ColumnFiltersState,
+    type SortingState,
     type VisibilityState,
 } from "@tanstack/react-table"
 import { DataTable } from "@/app/admin/components"
@@ -19,6 +21,7 @@ interface InviteesDataTableProps {
 }
 
 export function InviteesDataTable({ data, level2RatePercent }: InviteesDataTableProps) {
+    const [sorting, setSorting] = useState<SortingState>([])
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
         if (typeof window === "undefined") return {} as VisibilityState
@@ -28,11 +31,13 @@ export function InviteesDataTable({ data, level2RatePercent }: InviteesDataTable
     const table = useReactTable({
         data,
         columns: inviteesColumns,
-        state: { columnFilters, columnVisibility },
+        state: { columnFilters, columnVisibility, sorting },
         onColumnFiltersChange: setColumnFilters,
         onColumnVisibilityChange: setColumnVisibility,
+        onSortingChange: setSorting,
         getCoreRowModel: getCoreRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
+        getSortedRowModel: getSortedRowModel(),
         getRowId: (row) => row.id,
     })
 
