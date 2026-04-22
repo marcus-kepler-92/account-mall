@@ -20,6 +20,7 @@ import {
     Mail,
     Landmark,
     ShieldCheck,
+    LayoutTemplate,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { authClient } from "@/lib/auth-client"
@@ -46,6 +47,7 @@ const allNavItems = [
     { title: "商品管理", href: "/admin/products", icon: Package },
     { title: "订单管理", href: "/admin/orders", icon: ShoppingCart },
     { title: "卡密管理", href: "/admin/cards", icon: CreditCard },
+    { title: "卡密模版", href: "/admin/card-templates", icon: LayoutTemplate },
     { title: "公告管理", href: "/admin/announcements", icon: Megaphone },
     { title: "分销指南", href: "/admin/guides", icon: BookOpen },
     { title: "分销员管理", href: "/admin/distributors", icon: Users },
@@ -145,8 +147,6 @@ export function AdminSidebar({ allowedMenus, isSuperAdmin }: AdminSidebarProps) 
 
             <SidebarFooter>
                 <SidebarMenu>
-                    <SidebarMenuItem>
-                    </SidebarMenuItem>
                     <SidebarMenuItem>
                         <SidebarMenuButton
                             tooltip="退出登录"
