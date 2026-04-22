@@ -15,13 +15,8 @@ import {
   CommandList,
 } from "@/components/ui/command"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
+import { parseTemplate } from "@/lib/card-format"
 import type { ProductFormSchema } from "@/lib/validations/product"
 
 type CardTemplate = { id: string; name: string; template: string }
@@ -51,52 +46,59 @@ export function ProductFormCardTemplateSelect({
         <CardTitle>卡密模版</CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
-        <TooltipProvider>
-          <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                type="button"
-                variant="outline"
-                role="combobox"
-                aria-expanded={open}
-                className="w-full justify-between font-normal"
-              >
-                {selected.length > 0 ? `已选 ${selected.length} 个模版` : "选择卡密模版..."}
-                <ChevronsUpDown className="size-4 shrink-0 opacity-50" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[--radix-popover-trigger-width] overflow-hidden p-0" align="start">
-              <Command>
-                <CommandInput placeholder="搜索模版..." />
-                <CommandList className="max-h-[50vh]">
-                  <CommandEmpty>无匹配模版</CommandEmpty>
-                  <CommandGroup>
-                    {initialTemplates.map((t) => {
-                      const isSelected = templateIds.includes(t.id)
-                      return (
-                        <Tooltip key={t.id}>
-                          <TooltipTrigger asChild>
-                            <CommandItem
-                              value={t.name}
-                              onSelect={() => toggleTemplate(t.id)}
-                              className="py-2.5"
-                            >
-                              <Check className={cn("size-4 shrink-0", isSelected ? "opacity-100" : "opacity-0")} />
-                              <span className="flex-1 min-w-0 truncate">{t.name}</span>
-                            </CommandItem>
-                          </TooltipTrigger>
-                          <TooltipContent side="right" className="max-w-xs font-mono text-xs">
-                            {t.template}
-                          </TooltipContent>
-                        </Tooltip>
-                      )
-                    })}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
-        </TooltipProvider>
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              role="combobox"
+              aria-expanded={open}
+              className="w-full justify-between font-normal"
+            >
+              {selected.length > 0 ? `已选 ${selected.length} 个模版` : "选择卡密模版..."}
+              <ChevronsUpDown className="size-4 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[--radix-popover-trigger-width] overflow-hidden p-0" align="start">
+            <Command>
+              <CommandInput placeholder="搜索模版..." />
+              <CommandList className="max-h-[50vh]">
+                <CommandEmpty>无匹配模版</CommandEmpty>
+                <CommandGroup>
+                  {initialTemplates.map((t) => {
+                    const isSelected = templateIds.includes(t.id)
+                    const fields = parseTemplate(t.template)?.fields ?? []
+                    return (
+                      <CommandItem
+                        key={t.id}
+                        value={t.name}
+                        onSelect={() => toggleTemplate(t.id)}
+                        className="items-start py-2.5"
+                      >
+                        <Check className={cn("mt-0.5 size-4 shrink-0", isSelected ? "opacity-100" : "opacity-0")} />
+                        <div className="flex-1 min-w-0 space-y-1.5">
+                          <div className="font-medium leading-none truncate">{t.name}</div>
+                          {fields.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {fields.map((f, i) => (
+                                <span
+                                  key={i}
+                                  className="rounded-sm bg-muted px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground"
+                                >
+                                  {f}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </CommandItem>
+                    )
+                  })}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
 
         {selected.length > 0 && (
           <div className="flex flex-wrap gap-1">
