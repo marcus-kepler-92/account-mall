@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { toast } from "sonner"
-import { Link2, Loader2, Copy, Check } from "lucide-react"
+import { Loader2, Copy, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -52,6 +52,13 @@ export function GenerateInviteLinkDialog({ open, onOpenChange }: GenerateInviteL
     setTimeout(() => setCopied(false), 2000)
   }
 
+  useEffect(() => {
+    if (open && !link) {
+      handleGenerate()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
   const handleOpenChange = (open: boolean) => {
     if (!open) {
       setLink(null)
@@ -69,21 +76,12 @@ export function GenerateInviteLinkDialog({ open, onOpenChange }: GenerateInviteL
             生成一次性邀请链接，将链接发给对方，对方点击后可设置用户名和密码加入。链接 7 天内有效，仅限一人使用。
           </DialogDescription>
         </DialogHeader>
-        {!link ? (
-          <Button onClick={handleGenerate} disabled={loading} className="w-full">
-            {loading ? (
-              <>
-                <Loader2 className="mr-2 size-4 animate-spin" />
-                生成中...
-              </>
-            ) : (
-              <>
-                <Link2 className="mr-2 size-4" />
-                生成邀请链接
-              </>
-            )}
-          </Button>
-        ) : (
+        {loading ? (
+          <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">
+            <Loader2 className="mr-2 size-4 animate-spin" />
+            生成中...
+          </div>
+        ) : link ? (
           <div className="space-y-3">
             <div className="flex gap-2">
               <Input value={link} readOnly className="text-xs" />
@@ -99,7 +97,7 @@ export function GenerateInviteLinkDialog({ open, onOpenChange }: GenerateInviteL
             </div>
             <p className="text-xs text-muted-foreground">复制后通过微信或其他方式发给对方</p>
           </div>
-        )}
+        ) : null}
       </DialogContent>
     </Dialog>
   )
