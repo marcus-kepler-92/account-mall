@@ -58,7 +58,7 @@ export function ProductFormCardTemplateSelect({
             <ChevronsUpDown className="size-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <PopoverContent className="w-[--radix-popover-trigger-width] max-w-[calc(100vw-2rem)] overflow-hidden p-0" align="start">
           <Command>
             <CommandInput placeholder="搜索模版..." />
             <CommandList className="max-h-[50vh]">
