@@ -5,6 +5,7 @@ import {
     parseDistributorOrderFilters,
     type DistributorOrderFiltersInput,
 } from "./orders-filters"
+import { parseServerSort } from "@/lib/table-sort"
 import { Suspense } from "react"
 import { DistributorOrdersDataTable } from "./orders-data-table"
 import type { DistributorOrderRow } from "./orders-columns"
@@ -14,7 +15,7 @@ export const dynamic = "force-dynamic"
 export default async function DistributorOrdersPage({
     searchParams,
 }: {
-    searchParams: Promise<{ page?: string; pageSize?: string; status?: string; search?: string }>
+    searchParams: Promise<{ page?: string; pageSize?: string; status?: string; search?: string; sort?: string; sortDir?: string }>
 }) {
     const session = await getDistributorSession()
     if (!session) redirect("/distributor/login")
@@ -22,6 +23,12 @@ export default async function DistributorOrdersPage({
     const user = session.user as { id: string }
     const params = await searchParams
     const filters = parseDistributorOrderFilters(params as DistributorOrderFiltersInput)
+    const { orderBy } = parseServerSort(
+        params.sort ?? null,
+        params.sortDir ?? null,
+        ["createdAt", "amount"] as const,
+        { sort: "createdAt", sortDir: "desc" },
+    )
 
     const where: { distributorId: string; status?: { in: ("PENDING" | "COMPLETED" | "CLOSED")[] }; orderNo?: { contains: string } } = {
         distributorId: user.id,
@@ -37,7 +44,7 @@ export default async function DistributorOrdersPage({
         prisma.order.findMany({
             where,
             include: { product: { select: { name: true } } },
-            orderBy: { createdAt: "desc" },
+            orderBy,
             skip: (filters.page - 1) * filters.pageSize,
             take: filters.pageSize,
         }),

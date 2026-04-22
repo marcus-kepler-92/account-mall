@@ -8,6 +8,7 @@ import {
     parseDistributorCommissionFilters,
     type DistributorCommissionFiltersInput,
 } from "./commissions-filters"
+import { parseServerSort } from "@/lib/table-sort"
 import { Suspense } from "react"
 import { DistributorCommissionsDataTable } from "./commissions-data-table"
 import type { DistributorCommissionRow } from "./commissions-columns"
@@ -20,7 +21,7 @@ export const dynamic = "force-dynamic"
 export default async function DistributorCommissionsPage({
     searchParams,
 }: {
-    searchParams: Promise<{ page?: string; pageSize?: string; status?: string; search?: string }>
+    searchParams: Promise<{ page?: string; pageSize?: string; status?: string; search?: string; sort?: string; sortDir?: string }>
 }) {
     const session = await getDistributorSession()
     if (!session) redirect("/distributor/login")
@@ -28,6 +29,12 @@ export default async function DistributorCommissionsPage({
     const user = session.user as { id: string }
     const params = await searchParams
     const filters = parseDistributorCommissionFilters(params as DistributorCommissionFiltersInput)
+    const { orderBy } = parseServerSort(
+        params.sort ?? null,
+        params.sortDir ?? null,
+        ["createdAt", "amount"] as const,
+        { sort: "createdAt", sortDir: "desc" },
+    )
 
     const statusFilter = filters.statusList.length > 0
         ? { in: filters.statusList }
@@ -56,7 +63,7 @@ export default async function DistributorCommissionsPage({
             include: {
                 order: { select: { orderNo: true } },
             },
-            orderBy: { createdAt: "desc" },
+            orderBy,
             skip: (filters.page - 1) * filters.pageSize,
             take: filters.pageSize,
         }),

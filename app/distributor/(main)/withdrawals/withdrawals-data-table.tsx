@@ -1,12 +1,14 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useTransition } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
     useReactTable,
     getCoreRowModel,
     type VisibilityState,
 } from "@tanstack/react-table"
+import { useQueryStates, parseAsInteger } from "nuqs"
+import { sortQueryStates, parseSortingState, encodeSortingState } from "@/lib/table-sort"
 import { Badge } from "@/components/ui/badge"
 import {
     DataTable,
@@ -25,6 +27,8 @@ interface DistributorWithdrawalsDataTableProps {
     }
 }
 
+const SORT_DEFAULTS = { sort: "createdAt", sortDir: "desc" } as const
+
 const statusOptions = [
     { label: "全部", value: "" },
     { label: "待处理", value: "PENDING" },
@@ -39,6 +43,12 @@ export function DistributorWithdrawalsDataTable({
 }: DistributorWithdrawalsDataTableProps) {
     const router = useRouter()
     const searchParams = useSearchParams()
+    const [isPending, startTransition] = useTransition()
+    const [{ sort, sortDir }, setQuery] = useQueryStates(
+        { ...sortQueryStates, page: parseAsInteger },
+        { history: "push", shallow: false, startTransition },
+    )
+    const sorting = parseSortingState(sort, sortDir, SORT_DEFAULTS)
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
 
     useEffect(() => {
@@ -50,12 +60,17 @@ export function DistributorWithdrawalsDataTable({
     const table = useReactTable({
         data,
         columns: distributorWithdrawalsColumns,
-        state: { columnVisibility },
+        state: { columnVisibility, sorting },
         onColumnVisibilityChange: setColumnVisibility,
+        onSortingChange: (updater) => {
+            const next = typeof updater === "function" ? updater(sorting) : updater
+            setQuery({ ...encodeSortingState(next, SORT_DEFAULTS), page: null })
+        },
         getCoreRowModel: getCoreRowModel(),
         getRowId: (row) => row.id,
         manualPagination: true,
         manualFiltering: true,
+        manualSorting: true,
     })
 
     const currentStatus = searchParams.get("status") ?? ""
@@ -89,13 +104,15 @@ export function DistributorWithdrawalsDataTable({
                 </div>
             </DataTableToolbar>
 
-            <DataTable
-                table={table}
-                columns={distributorWithdrawalsColumns}
-                emptyMessage="暂无提现记录，在「我的奖金」页可提现余额处填写金额并上传收款码，提交后记录将在此展示。"
-            />
+            <div className={isPending ? "opacity-50 pointer-events-none transition-opacity" : "transition-opacity"}>
+                <DataTable
+                    table={table}
+                    columns={distributorWithdrawalsColumns}
+                    emptyMessage="暂无提现记录，在「我的奖金」页可提现余额处填写金额并上传收款码，提交后记录将在此展示。"
+                />
 
-            <DataTablePagination table={table} total={total} />
+                <DataTablePagination table={table} total={total} />
+            </div>
         </div>
     )
 }

@@ -7,6 +7,7 @@ import {
     parseDistributorWithdrawalFilters,
     type DistributorWithdrawalFiltersInput,
 } from "./withdrawals-filters"
+import { parseServerSort } from "@/lib/table-sort"
 import { Suspense } from "react"
 import { DistributorWithdrawalsDataTable } from "./withdrawals-data-table"
 import type { DistributorWithdrawalRow } from "./withdrawals-columns"
@@ -16,7 +17,7 @@ export const dynamic = "force-dynamic"
 export default async function DistributorWithdrawalsPage({
     searchParams,
 }: {
-    searchParams: Promise<{ page?: string; pageSize?: string; status?: string }>
+    searchParams: Promise<{ page?: string; pageSize?: string; status?: string; sort?: string; sortDir?: string }>
 }) {
     const session = await getDistributorSession()
     if (!session) redirect("/distributor/login")
@@ -24,6 +25,12 @@ export default async function DistributorWithdrawalsPage({
     const user = session.user as { id: string }
     const params = await searchParams
     const filters = parseDistributorWithdrawalFilters(params as DistributorWithdrawalFiltersInput)
+    const { orderBy } = parseServerSort(
+        params.sort ?? null,
+        params.sortDir ?? null,
+        ["createdAt", "amount"] as const,
+        { sort: "createdAt", sortDir: "desc" },
+    )
 
     const where: { distributorId: string; status?: { in: ("PENDING" | "PAID" | "REJECTED")[] } } = {
         distributorId: user.id,
@@ -35,7 +42,7 @@ export default async function DistributorWithdrawalsPage({
     const [withdrawals, total, statusCounts] = await Promise.all([
         prisma.withdrawal.findMany({
             where,
-            orderBy: { createdAt: "desc" },
+            orderBy,
             skip: (filters.page - 1) * filters.pageSize,
             take: filters.pageSize,
         }),

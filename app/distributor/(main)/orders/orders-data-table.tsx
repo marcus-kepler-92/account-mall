@@ -1,12 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useTransition } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
     useReactTable,
     getCoreRowModel,
     type VisibilityState,
 } from "@tanstack/react-table"
+import { useQueryStates, parseAsInteger } from "nuqs"
+import { sortQueryStates, parseSortingState, encodeSortingState } from "@/lib/table-sort"
 import { Badge } from "@/components/ui/badge"
 import {
     DataTable,
@@ -25,6 +27,8 @@ interface DistributorOrdersDataTableProps {
     }
 }
 
+const SORT_DEFAULTS = { sort: "createdAt", sortDir: "desc" } as const
+
 const statusOptions = [
     { label: "全部", value: "" },
     { label: "待支付", value: "PENDING" },
@@ -39,6 +43,12 @@ export function DistributorOrdersDataTable({
 }: DistributorOrdersDataTableProps) {
     const router = useRouter()
     const searchParams = useSearchParams()
+    const [isPending, startTransition] = useTransition()
+    const [{ sort, sortDir }, setQuery] = useQueryStates(
+        { ...sortQueryStates, page: parseAsInteger },
+        { history: "push", shallow: false, startTransition },
+    )
+    const sorting = parseSortingState(sort, sortDir, SORT_DEFAULTS)
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
         if (typeof window === "undefined") return {} as VisibilityState
         return window.innerWidth < 768 ? { quantity: false, createdAt: false } : {} as VisibilityState
@@ -47,12 +57,17 @@ export function DistributorOrdersDataTable({
     const table = useReactTable({
         data,
         columns: distributorOrdersColumns,
-        state: { columnVisibility },
+        state: { columnVisibility, sorting },
         onColumnVisibilityChange: setColumnVisibility,
+        onSortingChange: (updater) => {
+            const next = typeof updater === "function" ? updater(sorting) : updater
+            setQuery({ ...encodeSortingState(next, SORT_DEFAULTS), page: null })
+        },
         getCoreRowModel: getCoreRowModel(),
         getRowId: (row) => row.id,
         manualPagination: true,
         manualFiltering: true,
+        manualSorting: true,
     })
 
     const currentStatus = searchParams.get("status") ?? ""
@@ -86,13 +101,15 @@ export function DistributorOrdersDataTable({
                 </div>
             </DataTableToolbar>
 
-            <DataTable
-                table={table}
-                columns={distributorOrdersColumns}
-                emptyMessage="暂无订单，分享推广链接获得订单后将在此展示。"
-            />
+            <div className={isPending ? "opacity-50 pointer-events-none transition-opacity" : "transition-opacity"}>
+                <DataTable
+                    table={table}
+                    columns={distributorOrdersColumns}
+                    emptyMessage="暂无订单，分享推广链接获得订单后将在此展示。"
+                />
 
-            <DataTablePagination table={table} total={total} />
+                <DataTablePagination table={table} total={total} />
+            </div>
         </div>
     )
 }
