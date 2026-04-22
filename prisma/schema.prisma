@@ -149,6 +149,7 @@ model Product {
   exitDiscountUsages   ExitDiscountUsage[]
   accountBlacklist     AccountBlacklist[]
   cardFormats          ProductCardFormat[]
+  cardTemplates        CardTemplate[]
 
   @@index([sortOrder])
 }
@@ -191,6 +192,18 @@ model ProductCardFormat {
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId, sortOrder])
+}
+
+model CardTemplate {
+  id        String    @id @default(cuid())
+  name      String
+  template  String
+  sortOrder Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  products  Product[]
+
+  @@index([sortOrder])
 }
 
 model Order {
