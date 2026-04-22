@@ -205,7 +205,7 @@ export async function DELETE(
             await tx.restockSubscription.deleteMany({ where: { productId } });
             await tx.product.update({
                 where: { id: productId },
-                data: { tags: { set: [] } },
+                data: { tags: { set: [] }, cardTemplates: { set: [] } },
             });
             await tx.product.delete({ where: { id: productId } });
         });
