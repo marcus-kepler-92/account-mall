@@ -82,7 +82,7 @@ export async function PUT(
         return notFound("Product not found");
     }
 
-    const { tagIds, productType, sourceUrl, price, validityHours, allowAccountSwitch, accountSwitchLimit, riskWarningEnabled, riskWarningTitle, riskWarningContent, riskWarningCountdown, riskWarningConfirmText, purchaseLimitEnabled, purchaseLimitQuantity, ...rest } = parsed.data;
+    const { tagIds, cardTemplateIds, productType, sourceUrl, price, validityHours, allowAccountSwitch, accountSwitchLimit, riskWarningEnabled, riskWarningTitle, riskWarningContent, riskWarningCountdown, riskWarningConfirmText, purchaseLimitEnabled, purchaseLimitQuantity, ...rest } = parsed.data;
 
     // Check slug uniqueness if updating slug
     if (rest.slug && rest.slug !== existing.slug) {
@@ -104,6 +104,9 @@ export async function PUT(
         }),
         ...(tagIds !== undefined && {
             tags: { set: tagIds.map((id) => ({ id })) },
+        }),
+        ...(cardTemplateIds !== undefined && {
+            cardTemplates: { set: cardTemplateIds.map((id) => ({ id })) },
         }),
 
     };
