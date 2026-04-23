@@ -23,7 +23,7 @@ export function ChannelWithdrawalDialog({ open, onOpenChange, channelId, channel
     const router = useRouter()
     const [error, setError] = useState<string | null>(null)
 
-    const form = useForm<CreateChannelWithdrawalInput>({
+    const form = useForm({
         resolver: zodResolver(createChannelWithdrawalSchema),
         defaultValues: {
             amount: 0,
@@ -75,7 +75,13 @@ export function ChannelWithdrawalDialog({ open, onOpenChange, channelId, channel
                                 <FormItem>
                                     <FormLabel>提现金额 (元)</FormLabel>
                                     <FormControl>
-                                        <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                                        <Input
+                                            type="text"
+                                            inputMode="decimal"
+                                            placeholder="0.00"
+                                            value={field.value === 0 ? "" : String(field.value)}
+                                            onChange={(e) => field.onChange(e.target.value)}
+                                        />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>

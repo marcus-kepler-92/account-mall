@@ -81,11 +81,11 @@ export function WithdrawalFormDialog({ open, onOpenChange, channelId, withdrawal
                                     <FormLabel>提现金额 (元)</FormLabel>
                                     <FormControl>
                                         <Input
-                                            type="number"
-                                            step="0.01"
+                                            type="text"
+                                            inputMode="decimal"
                                             placeholder="0.00"
-                                            value={value as number}
-                                            onChange={(e) => onChange(e.target.valueAsNumber)}
+                                            value={value === 0 ? "" : String(value)}
+                                            onChange={(e) => onChange(e.target.value)}
                                             {...rest}
                                         />
                                     </FormControl>

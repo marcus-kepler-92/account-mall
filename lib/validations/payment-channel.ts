@@ -15,7 +15,7 @@ export const createPaymentChannelSchema = z.object({
 export const updatePaymentChannelSchema = createPaymentChannelSchema.partial()
 
 export const createChannelWithdrawalSchema = z.object({
-    amount: z.number().positive("金额必须大于 0"),
+    amount: z.coerce.number().positive("金额必须大于 0"),
     note: z.string().max(500).optional(),
 })
 
