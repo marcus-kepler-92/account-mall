@@ -13,12 +13,7 @@ function sanitizeDatabaseUrl(url: string): string {
 
 const envSchema = z
   .object({
-    databaseUrl: z.string().optional(),
-    postgresUser: z.string().optional(),
-    postgresPassword: z.string().optional(),
-    postgresDb: z.string().optional(),
-    postgresHost: z.string().optional(),
-    postgresPort: z.string().optional(),
+    databaseUrl: z.string().min(1, "DATABASE_URL is required"),
     betterAuthSecret: z.string().optional(),
     betterAuthUrl: z.string().optional(),
     vercelUrl: z.string().optional(),
@@ -156,22 +151,7 @@ const envSchema = z
     contactEmail: z.string().default(""),
   })
   .transform((data) => {
-    const urlFromEnv = data.databaseUrl?.trim();
-    const user = data.postgresUser?.trim();
-    const password = data.postgresPassword;
-    const db = data.postgresDb?.trim();
-    const host = data.postgresHost?.trim() || "localhost";
-    const port = data.postgresPort?.trim() || "5432";
-    const databaseUrl =
-      urlFromEnv ? sanitizeDatabaseUrl(urlFromEnv) :
-      (user && db
-        ? `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password ?? "")}@${host}:${port}/${encodeURIComponent(db)}`
-        : "");
-    if (!databaseUrl) {
-      throw new Error(
-        "Set DATABASE_URL or (POSTGRES_USER + POSTGRES_DB and optionally POSTGRES_PASSWORD, POSTGRES_HOST, POSTGRES_PORT)",
-      );
-    }
+    const databaseUrl = sanitizeDatabaseUrl(data.databaseUrl.trim());
 
     const secret = data.betterAuthSecret?.trim();
     const minLen = 32;
@@ -222,11 +202,6 @@ function getEnvInput() {
   const e = process.env;
   return {
     databaseUrl: e.DATABASE_URL,
-    postgresUser: e.POSTGRES_USER,
-    postgresPassword: e.POSTGRES_PASSWORD,
-    postgresDb: e.POSTGRES_DB,
-    postgresHost: e.POSTGRES_HOST,
-    postgresPort: e.POSTGRES_PORT,
     betterAuthSecret: e.BETTER_AUTH_SECRET,
     betterAuthUrl: e.BETTER_AUTH_URL,
     vercelUrl: e.VERCEL_URL,
