@@ -1,5 +1,16 @@
 import * as z from "zod";
 
+function sanitizeDatabaseUrl(url: string): string {
+  try {
+    const parsed = new URL(url)
+    if (parsed.username) parsed.username = encodeURIComponent(decodeURIComponent(parsed.username))
+    if (parsed.password) parsed.password = encodeURIComponent(decodeURIComponent(parsed.password))
+    return parsed.toString()
+  } catch {
+    return url
+  }
+}
+
 const envSchema = z
   .object({
     databaseUrl: z.string().optional(),
@@ -152,7 +163,7 @@ const envSchema = z
     const host = data.postgresHost?.trim() || "localhost";
     const port = data.postgresPort?.trim() || "5432";
     const databaseUrl =
-      urlFromEnv ||
+      urlFromEnv ? sanitizeDatabaseUrl(urlFromEnv) :
       (user && db
         ? `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password ?? "")}@${host}:${port}/${encodeURIComponent(db)}`
         : "");
