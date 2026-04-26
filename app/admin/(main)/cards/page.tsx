@@ -168,7 +168,9 @@ export default async function AdminCardsPage({
 
     return (
         <div className="space-y-6">
-            <PageHeader title="卡密管理" description="跨商品查看和管理所有卡密库存" />
+            <PageHeader title="卡密管理" description="跨商品查看和管理所有卡密库存">
+                <CardsHeaderActions />
+            </PageHeader>
 
             <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">
                 <StatCard
@@ -214,7 +216,6 @@ export default async function AdminCardsPage({
                     data={serializedCards}
                     total={total}
                     statusCounts={stats}
-                    actions={<CardsHeaderActions />}
                     isSuperAdmin={isSuperAdmin}
                 />
             ) : (

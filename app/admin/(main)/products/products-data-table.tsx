@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, type ReactNode } from "react"
+import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
@@ -81,7 +81,7 @@ const statusOptions = [
     { label: "下架", value: "INACTIVE" },
 ]
 
-export function ProductsDataTable({ data, actions, isSuperAdmin = false }: { data: ProductRow[]; actions?: ReactNode; isSuperAdmin?: boolean }) {
+export function ProductsDataTable({ data, isSuperAdmin = false }: { data: ProductRow[]; isSuperAdmin?: boolean }) {
     const router = useRouter()
     const [dragRows, setDragRows] = useState<ProductRow[] | null>(null)
     const rows = dragRows ?? data
@@ -146,10 +146,7 @@ export function ProductsDataTable({ data, actions, isSuperAdmin = false }: { dat
     return (
         <Card>
             <CardHeader className="pb-4">
-                <div className="flex items-center justify-between">
-                    <CardTitle className="text-base">商品列表</CardTitle>
-                    {actions}
-                </div>
+                <CardTitle className="text-base">商品列表</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 pt-0">
                 <ClientDataTableToolbar

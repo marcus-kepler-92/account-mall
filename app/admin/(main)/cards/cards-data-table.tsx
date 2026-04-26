@@ -35,7 +35,6 @@ import {
 } from "@/app/admin/components";
 import { cardsColumns, type CardRow } from "./cards-columns";
 
-import type { ReactNode } from "react";
 
 interface CardsDataTableProps {
     data: CardRow[];
@@ -46,7 +45,6 @@ interface CardsDataTableProps {
         SOLD: number;
         DISABLED: number;
     };
-    actions?: ReactNode;
     isSuperAdmin?: boolean;
 }
 
@@ -59,7 +57,7 @@ const statusOptions = [
 
 const SORT_DEFAULTS = { sort: "createdAt", sortDir: "desc" } as const;
 
-export function CardsDataTable({ data, total, statusCounts, actions, isSuperAdmin = false }: CardsDataTableProps) {
+export function CardsDataTable({ data, total, statusCounts, isSuperAdmin = false }: CardsDataTableProps) {
     const router = useRouter();
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
@@ -142,10 +140,7 @@ export function CardsDataTable({ data, total, statusCounts, actions, isSuperAdmi
     return (
         <Card>
             <CardHeader className="pb-4">
-                <div className="flex items-center justify-between">
-                    <CardTitle className="text-base">卡密列表</CardTitle>
-                    {actions}
-                </div>
+                <CardTitle className="text-base">卡密列表</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 pt-0">
                 <DataTableToolbar

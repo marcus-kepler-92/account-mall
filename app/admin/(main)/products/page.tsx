@@ -49,19 +49,17 @@ export default async function AdminProductsPage() {
 
     return (
         <div className="space-y-6">
-            <PageHeader title="商品管理" description="管理数字商品和价格" />
-            <ProductsTableWrapper
-                data={data}
-                isSuperAdmin={isSuperAdmin}
-                actions={isSuperAdmin ? (
+            <PageHeader title="商品管理" description="管理数字商品和价格">
+                {isSuperAdmin && (
                     <Button asChild size="sm">
                         <Link href="/admin/products/new">
                             <Plus className="size-4" />
                             添加商品
                         </Link>
                     </Button>
-                ) : undefined}
-            />
+                )}
+            </PageHeader>
+            <ProductsTableWrapper data={data} isSuperAdmin={isSuperAdmin} />
         </div>
     )
 }

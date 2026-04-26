@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { PageHeader } from "@/app/admin/components"
 import { CardTemplatesDataTable } from "./card-templates-data-table"
+import { CardTemplatesCreateButton } from "./card-templates-create-button"
 
 export const dynamic = "force-dynamic"
 
@@ -29,7 +30,9 @@ export default async function CardTemplatesPage() {
       <PageHeader
         title="卡密模版"
         description="管理全局卡密格式模版，商品可按需选择挂载"
-      />
+      >
+        <CardTemplatesCreateButton />
+      </PageHeader>
       <CardTemplatesDataTable data={rows} />
     </div>
   )

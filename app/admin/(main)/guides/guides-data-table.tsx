@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, type ReactNode } from "react"
+import { useState } from "react"
 import {
     useReactTable,
     getCoreRowModel,
@@ -22,7 +22,7 @@ const statusOptions = [
     { label: "草稿", value: "DRAFT" },
 ]
 
-export function GuidesDataTable({ data, actions }: { data: GuideRow[]; actions?: ReactNode }) {
+export function GuidesDataTable({ data }: { data: GuideRow[] }) {
     const [sorting, setSorting] = useState<SortingState>([])
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
@@ -45,10 +45,7 @@ export function GuidesDataTable({ data, actions }: { data: GuideRow[]; actions?:
     return (
         <Card>
             <CardHeader className="pb-4">
-                <div className="flex items-center justify-between">
-                    <CardTitle className="text-base">指南列表</CardTitle>
-                    {actions}
-                </div>
+                <CardTitle className="text-base">指南列表</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 pt-0">
                 <ClientDataTableToolbar

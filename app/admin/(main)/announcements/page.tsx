@@ -26,18 +26,15 @@ export default async function AdminAnnouncementsPage() {
 
     return (
         <div className="space-y-6">
-            <PageHeader title="公告管理" description="管理站内公告，已发布的公告将展示在前台首页" />
-            <AnnouncementsDataTable
-                data={data}
-                actions={
-                    <Button asChild size="sm">
-                        <Link href="/admin/announcements/new">
-                            <Plus className="size-4" />
-                            新建公告
-                        </Link>
-                    </Button>
-                }
-            />
+            <PageHeader title="公告管理" description="管理站内公告，已发布的公告将展示在前台首页">
+                <Button asChild size="sm">
+                    <Link href="/admin/announcements/new">
+                        <Plus className="size-4" />
+                        新建公告
+                    </Link>
+                </Button>
+            </PageHeader>
+            <AnnouncementsDataTable data={data} />
         </div>
     )
 }

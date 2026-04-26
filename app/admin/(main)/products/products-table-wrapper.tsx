@@ -2,7 +2,6 @@
 
 import dynamic from "next/dynamic"
 import type { ProductRow } from "./products-columns"
-import type { ReactNode } from "react"
 
 const ProductsDataTable = dynamic(
     () => import("./products-data-table").then((m) => ({ default: m.ProductsDataTable })),
@@ -11,12 +10,10 @@ const ProductsDataTable = dynamic(
 
 export function ProductsTableWrapper({
     data,
-    actions,
     isSuperAdmin = false,
 }: {
     data: ProductRow[]
-    actions?: ReactNode
     isSuperAdmin?: boolean
 }) {
-    return <ProductsDataTable data={data} actions={actions} isSuperAdmin={isSuperAdmin} />
+    return <ProductsDataTable data={data} isSuperAdmin={isSuperAdmin} />
 }
