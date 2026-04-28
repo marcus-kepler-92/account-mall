@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import { useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -253,9 +254,12 @@ export function ApplyWithdrawalForm({
                     ) : (
                         <div className="flex flex-wrap items-start gap-4 rounded-lg border bg-muted/20 p-4">
                             {previewUrl && (
-                                <img
+                                <Image
                                     src={previewUrl}
                                     alt="收款码预览"
+                                    width={96}
+                                    height={96}
+                                    unoptimized
                                     className="h-24 w-24 rounded-md border object-cover"
                                 />
                             )}

@@ -11,11 +11,6 @@ import { descriptionToPlainText } from "@/lib/description"
 import { SoldOutOverlay } from "@/app/components/sold-out-overlay"
 import { configClient } from "@/lib/config-client"
 
-/** Relative or same-origin URLs use next/image; data: or external URLs use img (no optimization). */
-function isOptimizableImage(src: string): boolean {
-    return src.startsWith("/")
-}
-
 export type ProductCardData = {
     id: string
     name: string
@@ -68,31 +63,17 @@ export function ProductCard({ product, gradientIndex = 0, className, code }: Pro
                 {/* Cover: 1:1 aspect ratio, image preserves ratio via object-cover */}
                 <div className="relative aspect-square w-full shrink-0 overflow-hidden rounded-t-xl bg-muted">
                     {product.image ? (
-                        isOptimizableImage(product.image) ? (
-                            <Image
-                                src={product.image}
-                                alt={product.name}
-                                fill
-                                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, (max-width: 1536px) 25vw, (max-width: 1600px) 20vw, 16vw"
-                                className={cn(
-                                    "object-fill transition-all duration-300 group-hover:scale-105",
-                                    isSoldOut && "grayscale"
-                                )}
-                                priority={gradientIndex === 0}
-                            />
-                        ) : (
-                            /* eslint-disable-next-line @next/next/no-img-element */
-                            <img
-                                src={product.image}
-                                alt={product.name}
-                                loading={gradientIndex === 0 ? "eager" : "lazy"}
-                                fetchPriority={gradientIndex === 0 ? "high" : "low"}
-                                className={cn(
-                                    "size-full object-fill transition-all duration-300 group-hover:scale-105",
-                                    isSoldOut && "grayscale"
-                                )}
-                            />
-                        )
+                        <Image
+                            src={product.image}
+                            alt={product.name}
+                            fill
+                            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, (max-width: 1536px) 25vw, (max-width: 1600px) 20vw, 16vw"
+                            className={cn(
+                                "object-fill transition-all duration-300 group-hover:scale-105",
+                                isSoldOut && "grayscale"
+                            )}
+                            priority={gradientIndex === 0}
+                        />
                     ) : (
                         <div className="flex size-full items-center justify-center">
                             <Package className="size-8 text-muted-foreground/40 transition-transform duration-300 group-hover:scale-110 sm:size-12" />

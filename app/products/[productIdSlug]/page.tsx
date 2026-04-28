@@ -333,11 +333,6 @@ type ProductMediaSectionProps = {
   isSoldOut: boolean;
 };
 
-/** Only paths like /... are optimized by next/image; data: or external URLs use img. */
-function isOptimizableImage(src: string): boolean {
-  return src.startsWith("/");
-}
-
 function ProductMediaSection({
   image,
   name,
@@ -348,25 +343,14 @@ function ProductMediaSection({
   return (
     <section aria-label="商品图片">
       <div className="relative aspect-[4/3] w-full overflow-hidden rounded-xl bg-muted lg:aspect-square">
-        {isOptimizableImage(image) ? (
-          <Image
-            src={image}
-            alt={name}
-            fill
-            sizes="(max-width: 1024px) 100vw, 50vw"
-            className={cn("object-fill", isSoldOut && "grayscale")}
-            priority
-          />
-        ) : (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            src={image}
-            alt={name}
-            loading="eager"
-            fetchPriority="high"
-            className={cn("size-full object-fill", isSoldOut && "grayscale")}
-          />
-        )}
+        <Image
+          src={image}
+          alt={name}
+          fill
+          sizes="(max-width: 1024px) 100vw, 50vw"
+          className={cn("object-fill", isSoldOut && "grayscale")}
+          priority
+        />
         {isSoldOut && <SoldOutOverlay badgePosition="right-3 top-3" />}
       </div>
     </section>

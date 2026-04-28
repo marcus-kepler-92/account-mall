@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import {
@@ -262,10 +263,9 @@ export function MediaLibrary(props: MediaLibraryProps) {
               selectedUrls.includes(b.url) && "ring-2 ring-primary"
             )}
           >
-            <div className="flex aspect-video items-center justify-center bg-muted">
+            <div className="relative flex aspect-video items-center justify-center overflow-hidden bg-muted">
               {isImagePath(b.pathname) ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={b.url} alt="" className="h-full w-full object-cover" />
+                <Image src={b.url} alt="" fill className="object-cover" />
               ) : (
                 <ImageIcon className="size-12 text-muted-foreground" />
               )}
@@ -315,10 +315,9 @@ export function MediaLibrary(props: MediaLibraryProps) {
                 : "border-transparent hover:border-muted-foreground/30"
             )}
           >
-            <div className="flex aspect-video items-center justify-center bg-muted">
+            <div className="relative flex aspect-video items-center justify-center overflow-hidden bg-muted">
               {isImagePath(b.pathname) ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={b.url} alt="" className="h-full w-full object-cover" />
+                <Image src={b.url} alt="" fill className="object-cover" />
               ) : (
                 <ImageIcon className="size-12 text-muted-foreground" />
               )}
@@ -367,8 +366,7 @@ export function MediaLibrary(props: MediaLibraryProps) {
             </TableCell>
             <TableCell>
               {isImagePath(b.pathname) ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={b.url} alt="" className="size-10 rounded object-cover" />
+                <Image src={b.url} alt="" width={40} height={40} className="size-10 rounded object-cover" />
               ) : (
                 <div className="flex size-10 items-center justify-center rounded bg-muted">
                   <ImageIcon className="size-5 text-muted-foreground" />

@@ -26,6 +26,8 @@ const nextConfig: NextConfig = {
       { protocol: "http", hostname: "localhost", pathname: "/**" },
       { protocol: "https", hostname: "**.blob.vercel-storage.com", pathname: "/**" },
     ],
+    formats: ["image/avif", "image/webp"],
+    minimumCacheTTL: 31536000,
   },
   experimental: {
     optimizePackageImports: ["lucide-react"],

@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import { useState } from "react"
 import { useFormContext } from "react-hook-form"
 import { toast } from "sonner"
@@ -118,10 +119,11 @@ export function ProductFormBasicFields({
                                 {field.value ? (
                                     <>
                                         <div className="relative inline-block">
-                                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                                            <img
+                                            <Image
                                                 src={field.value}
                                                 alt="商品图片预览"
+                                                width={200}
+                                                height={200}
                                                 className="size-32 sm:size-50 rounded-md border object-cover"
                                             />
                                             <Button

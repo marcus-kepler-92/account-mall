@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
@@ -32,9 +33,11 @@ export function ReceiptCell({ url }: { url: string | null }) {
                         <DialogDescription>分销员上传的收款码，打款时请核对</DialogDescription>
                     </DialogHeader>
                     <div className="flex justify-center overflow-hidden rounded-md border bg-muted/30 p-4">
-                        <img
+                        <Image
                             src={url}
                             alt="收款码"
+                            width={600}
+                            height={600}
                             className="max-h-[60vh] max-w-full object-contain"
                         />
                     </div>
