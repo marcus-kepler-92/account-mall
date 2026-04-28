@@ -29,7 +29,6 @@ describe("dashboard-data", () => {
     it("returns array of length equal to days with 净收入 field", async () => {
       prismaMock.order.groupBy.mockResolvedValueOnce([])
       prismaMock.commission.groupBy.mockResolvedValueOnce([])
-      prismaMock.withdrawal.groupBy.mockResolvedValueOnce([])
 
       const result = await getDashboardTrend(7)
 
@@ -45,7 +44,7 @@ describe("dashboard-data", () => {
       ).toBe(true)
     })
 
-    it("calculates 净收入 as revenue minus commission plus fee for each day", async () => {
+    it("calculates 净收入 as revenue minus commission for each day", async () => {
       const testDay = new Date("2024-02-13T12:00:00.000Z")
       prismaMock.order.groupBy.mockResolvedValueOnce([
         { createdAt: testDay, _sum: { amount: 100 }, _count: { id: 1 } } as any,
@@ -53,13 +52,10 @@ describe("dashboard-data", () => {
       prismaMock.commission.groupBy.mockResolvedValueOnce([
         { createdAt: testDay, _sum: { amount: 20 } } as any,
       ])
-      prismaMock.withdrawal.groupBy.mockResolvedValueOnce([
-        { processedAt: testDay, _sum: { feeAmount: 2 } } as any,
-      ])
 
       const result = await getDashboardTrend(7)
       const dayResult = result.find((r) => r.营收 === 100)
-      expect(dayResult?.净收入).toBe(82)
+      expect(dayResult?.净收入).toBe(80)
     })
   })
 

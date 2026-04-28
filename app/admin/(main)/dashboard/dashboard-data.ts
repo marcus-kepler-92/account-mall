@@ -19,10 +19,9 @@ export async function getDashboardTrend(days: number): Promise<DashboardTrendPoi
   start.setDate(todayStart.getDate() - days)
 
   type AmountGroupRow = { createdAt: Date; _sum: { amount: unknown } }
-  type FeeGroupRow = { processedAt: Date | null; _sum: { feeAmount?: unknown } }
 
   const dayList = getDaysForTrend(days)
-  const [chartRaw, commissionRaw, withdrawalFeeRaw] = await Promise.all([
+  const [chartRaw, commissionRaw] = await Promise.all([
     prisma.order.groupBy({
       by: ["createdAt"],
       where: { createdAt: { gte: start }, status: "COMPLETED" },
@@ -33,11 +32,6 @@ export async function getDashboardTrend(days: number): Promise<DashboardTrendPoi
       by: ["createdAt"],
       where: { createdAt: { gte: start }, status: "SETTLED" },
       _sum: { amount: true },
-    }),
-    (prisma as any).withdrawal.groupBy({
-      by: ["processedAt"],
-      where: { processedAt: { gte: start }, status: "PAID" },
-      _sum: { feeAmount: true },
     }),
   ])
 
@@ -50,10 +44,7 @@ export async function getDashboardTrend(days: number): Promise<DashboardTrendPoi
     const dayCommission = commissionRaw
       .filter((r: AmountGroupRow) => r.createdAt >= d && r.createdAt < next)
       .reduce((s: number, r: AmountGroupRow) => s + Number(r._sum.amount ?? 0), 0)
-    const dayFee = withdrawalFeeRaw
-      .filter((r: FeeGroupRow) => r.processedAt && r.processedAt >= d && r.processedAt < next)
-      .reduce((s: number, r: FeeGroupRow) => s + Number(r._sum.feeAmount ?? 0), 0)
-    const dayNetIncome = Math.round((dayRevenue - dayCommission + dayFee) * 100) / 100
+    const dayNetIncome = Math.round((dayRevenue - dayCommission) * 100) / 100
     return {
       date: d.toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" }),
       订单: dayOrders,
