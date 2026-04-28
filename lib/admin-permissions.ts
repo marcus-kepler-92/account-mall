@@ -10,6 +10,7 @@ export const getAdminPermissions = cache(async () => {
   if (!result || result.role !== "ADMIN") return null
 
   const { isSuperAdmin, allowedMenus, canReassignDistributor } = resolvePermissions(result.adminRole)
+  const user = result.session.user as { name?: string; email?: string }
 
   return {
     adminRole: result.adminRole,
@@ -17,5 +18,7 @@ export const getAdminPermissions = cache(async () => {
     allowedMenus,
     canReassignDistributor,
     mustChangePassword: result.mustChangePassword,
+    name: user.name ?? "",
+    email: user.email ?? "",
   }
 })

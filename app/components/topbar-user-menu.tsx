@@ -31,7 +31,7 @@ export function TopbarUserMenu({
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 {/* suppressHydrationWarning: radix-ui 1.4.x + React 19 known useId() mismatch */}
-                <Button suppressHydrationWarning variant="ghost" className="relative size-9 min-w-9 rounded-full touch-manipulation">
+                <Button suppressHydrationWarning variant="ghost" size="icon" className="relative min-w-9 rounded-full touch-manipulation">
                     <Avatar className="size-8">
                         <AvatarFallback className="bg-primary text-primary-foreground text-sm">
                             {initial}

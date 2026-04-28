@@ -29,7 +29,7 @@ export default async function AdminMainLayout({
                     <div className="flex-1 min-w-0">
                         <AdminBreadcrumb />
                     </div>
-                    <AdminTopbarActions />
+                    <AdminTopbarActions name={perms.name} email={perms.email} />
                 </header>
                 <div className="flex-1 min-w-0 p-3 sm:p-6">
                     {children}

@@ -17,6 +17,7 @@ export default async function DistributorMainLayout({
     if (!session) {
         redirect("/distributor/login")
     }
+    const user = session.user as { name?: string; email?: string; username?: string; distributorCode?: string | null }
 
     return (
         <SidebarProvider>
@@ -27,7 +28,12 @@ export default async function DistributorMainLayout({
                 <header className="sticky top-0 z-50 flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4">
                     <SidebarTrigger className="-ml-1 hidden md:flex" />
                     <DistributorBreadcrumb />
-                    <DistributorTopbarActions />
+                    <DistributorTopbarActions
+                        name={user.name ?? ""}
+                        email={user.email ?? ""}
+                        username={user.username ?? ""}
+                        distributorCode={user.distributorCode ?? ""}
+                    />
                 </header>
                 <div className="flex-1 min-w-0 p-4 md:p-6">
                     {children}

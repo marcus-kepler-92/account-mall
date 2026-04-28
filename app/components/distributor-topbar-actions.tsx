@@ -9,9 +9,20 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ExternalLink } from "lucide-react"
 
-export function DistributorTopbarActions() {
+interface DistributorTopbarActionsProps {
+    name: string
+    email: string
+    username: string
+    distributorCode: string
+}
+
+export function DistributorTopbarActions({
+    name,
+    email,
+    username,
+    distributorCode,
+}: DistributorTopbarActionsProps) {
     const router = useRouter()
-    const { data: session } = authClient.useSession()
 
     const handleSignOut = async () => {
         await authClient.signOut({
@@ -23,16 +34,6 @@ export function DistributorTopbarActions() {
         })
     }
 
-    const user = session?.user as {
-        name?: string
-        email?: string
-        username?: string
-        distributorCode?: string | null
-    } | undefined
-    const name = user?.name ?? ""
-    const email = user?.email ?? ""
-    const username = user?.username ?? ""
-    const distributorCode = user?.distributorCode ?? ""
     const displayName = name || username || email || "分销员"
     const subLabel = name ? (email || username || undefined) : (email || username || undefined)
     const initial = displayName[0].toUpperCase()

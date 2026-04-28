@@ -10,9 +10,13 @@ import { Bell, ExternalLink } from "lucide-react"
 import { NotificationBadge } from "@/app/admin/components"
 import { usePendingWithdrawals } from "@/app/admin/hooks/use-pending-withdrawals"
 
-export function AdminTopbarActions() {
+interface AdminTopbarActionsProps {
+    name: string
+    email: string
+}
+
+export function AdminTopbarActions({ name, email }: AdminTopbarActionsProps) {
     const router = useRouter()
-    const { data: session } = authClient.useSession()
     const { count } = usePendingWithdrawals()
 
     const handleSignOut = async () => {
@@ -25,8 +29,6 @@ export function AdminTopbarActions() {
         })
     }
 
-    const email = session?.user?.email ?? ""
-    const name = session?.user?.name ?? ""
     const displayName = name || email || "管理员"
     const initial = displayName[0].toUpperCase()
 
@@ -36,7 +38,7 @@ export function AdminTopbarActions() {
             <Button
                 variant="ghost"
                 size="icon"
-                className="relative"
+                className="relative min-w-9 touch-manipulation"
                 asChild
                 aria-label={count > 0 ? `${count} 笔提现待审核` : "提现管理"}
             >
@@ -45,7 +47,7 @@ export function AdminTopbarActions() {
                     <NotificationBadge variant="dot" count={count} />
                 </Link>
             </Button>
-            <Button variant="ghost" size="icon" asChild aria-label="前往商城">
+            <Button variant="ghost" size="icon" className="min-w-9 touch-manipulation" asChild aria-label="前往商城">
                 <Link href="/" target="_blank" rel="noopener noreferrer">
                     <ExternalLink className="size-4" />
                 </Link>
