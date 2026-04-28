@@ -91,8 +91,8 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
 
 /**
  * POST /api/admin/products/[productId]/blacklist
- * Admin: purge auto-blacklist entries that are expired OR currently available on source.
- * Manual entries (reason = "管理员手动拉黑") are never purged.
+ * Admin: restore auto-blacklisted accounts that are currently available on source.
+ * Manual entries (reason = "管理员手动拉黑") are never restored.
  */
 export async function POST(_request: NextRequest, context: RouteContext) {
     const session = await getAdminSession()
@@ -106,35 +106,24 @@ export async function POST(_request: NextRequest, context: RouteContext) {
     })
     if (!product) return notFound("商品不存在")
 
-    // Scrape current available accounts from source URL
     const sourceUrl = (product.sourceUrl?.trim() || config.autoFetchSourceUrls[0]?.trim()) ?? ""
+    if (!sourceUrl) return NextResponse.json({ removed: 0 })
+
     let availableAccounts: string[] = []
-    if (sourceUrl) {
-        try {
-            const scraped = await scrapeMultipleUrls(sourceUrl)
-            availableAccounts = scraped.map((a) => a.account)
-        } catch {
-            // Scrape failure is non-fatal: fall back to expiry-only cleanup
-        }
+    try {
+        const scraped = await scrapeMultipleUrls(sourceUrl)
+        availableAccounts = scraped.map((a) => a.account)
+    } catch {
+        return NextResponse.json({ removed: 0 })
     }
 
-    const expiryDate = new Date(Date.now() - config.blacklistExpiryHours * 60 * 60 * 1000)
+    if (availableAccounts.length === 0) return NextResponse.json({ removed: 0 })
+
     const { count } = await prisma.accountBlacklist.deleteMany({
         where: {
             productId,
-            AND: [
-                // Never purge manually blacklisted entries
-                { OR: [{ reason: null }, { reason: { not: MANUAL_BLACKLIST_REASON } }] },
-                // Remove if expired OR currently available on source
-                {
-                    OR: [
-                        { createdAt: { lt: expiryDate } },
-                        ...(availableAccounts.length > 0
-                            ? [{ account: { in: availableAccounts } }]
-                            : []),
-                    ],
-                },
-            ],
+            account: { in: availableAccounts },
+            OR: [{ reason: null }, { reason: { not: MANUAL_BLACKLIST_REASON } }],
         },
     })
 

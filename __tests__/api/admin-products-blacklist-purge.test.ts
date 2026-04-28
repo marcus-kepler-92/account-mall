@@ -1,6 +1,6 @@
 /**
  * POST /api/admin/products/[productId]/blacklist
- * Tests for the purge endpoint: expired cleanup, available-account cleanup, manual entry preservation.
+ * Restores auto-blacklisted accounts that are currently available on source.
  */
 import { NextRequest } from "next/server"
 import { POST } from "@/app/api/admin/products/[productId]/blacklist/route"
@@ -21,7 +21,6 @@ jest.mock("@/lib/auth-guard", () => ({
 jest.mock("@/lib/config", () => ({
     __esModule: true,
     config: {
-        blacklistExpiryHours: 24,
         autoFetchSourceUrls: ["http://example.com"],
     },
 }))
@@ -51,7 +50,7 @@ function makeContext(productId = "prod_1") {
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
-describe("POST /api/admin/products/[productId]/blacklist (purge)", () => {
+describe("POST /api/admin/products/[productId]/blacklist", () => {
     beforeEach(() => {
         jest.clearAllMocks()
         getAdminSessionMock.mockResolvedValue({ user: { id: "admin_1" } })
@@ -71,7 +70,7 @@ describe("POST /api/admin/products/[productId]/blacklist (purge)", () => {
         expect(res.status).toBe(401)
     })
 
-    // ─── Product not found ───────────────────────────────────────────────────
+    // ─── Product lookup ───────────────────────────────────────────────────────
 
     it("returns 404 when product does not exist", async () => {
         prismaMock.product.findUnique.mockResolvedValue(null)
@@ -79,109 +78,88 @@ describe("POST /api/admin/products/[productId]/blacklist (purge)", () => {
         expect(res.status).toBe(404)
     })
 
-    // ─── Expiry-only cleanup (scrape failure fallback) ───────────────────────
+    // ─── No source URL ────────────────────────────────────────────────────────
 
-    it("purges only by expiry when scrape fails", async () => {
+    it("returns { removed: 0 } when product has no sourceUrl and no global fallback", async () => {
+        jest.mock("@/lib/config", () => ({
+            __esModule: true,
+            config: { autoFetchSourceUrls: [] },
+        }))
+        prismaMock.product.findUnique.mockResolvedValue({ id: "prod_1", sourceUrl: null } as never)
+
+        const res = await POST(makeRequest(), makeContext())
+        expect(res.status).toBe(200)
+        expect(await res.json()).toEqual({ removed: 0 })
+        expect(prismaMock.accountBlacklist.deleteMany).not.toHaveBeenCalled()
+    })
+
+    // ─── Scrape failure ───────────────────────────────────────────────────────
+
+    it("returns { removed: 0 } and does not touch DB when scrape throws", async () => {
         scrapeMultipleUrlsMock.mockRejectedValue(new Error("network error"))
+
+        const res = await POST(makeRequest(), makeContext())
+        expect(res.status).toBe(200)
+        expect(await res.json()).toEqual({ removed: 0 })
+        expect(prismaMock.accountBlacklist.deleteMany).not.toHaveBeenCalled()
+    })
+
+    // ─── Empty scrape result ──────────────────────────────────────────────────
+
+    it("returns { removed: 0 } and does not touch DB when source has no accounts", async () => {
+        scrapeMultipleUrlsMock.mockResolvedValue([])
+
+        const res = await POST(makeRequest(), makeContext())
+        expect(res.status).toBe(200)
+        expect(await res.json()).toEqual({ removed: 0 })
+        expect(prismaMock.accountBlacklist.deleteMany).not.toHaveBeenCalled()
+    })
+
+    // ─── Restore available accounts ───────────────────────────────────────────
+
+    it("deletes blacklist entries for accounts currently in source", async () => {
+        scrapeMultipleUrlsMock.mockResolvedValue([
+            { account: "back@source.com", password: "p1" },
+            { account: "also@source.com", password: "p2" },
+        ])
         prismaMock.accountBlacklist.deleteMany.mockResolvedValue({ count: 2 })
 
         const res = await POST(makeRequest(), makeContext())
         expect(res.status).toBe(200)
+        expect(await res.json()).toEqual({ removed: 2 })
 
-        const data = await res.json()
-        expect(data.removed).toBe(2)
-
-        // Should still call deleteMany, OR condition should only have createdAt (no account in)
-        const call = prismaMock.accountBlacklist.deleteMany.mock.calls[0][0]!
-        const andClause = (call.where as Record<string, unknown>).AND as Array<Record<string, unknown>>
-        const orClause = andClause[1].OR as Array<Record<string, unknown>>
-        // Only expiry condition, no account-in condition
-        expect(orClause).toHaveLength(1)
-        expect(orClause[0]).toHaveProperty("createdAt")
+        expect(prismaMock.accountBlacklist.deleteMany).toHaveBeenCalledWith({
+            where: {
+                productId: "prod_1",
+                account: { in: ["back@source.com", "also@source.com"] },
+                OR: [{ reason: null }, { reason: { not: "管理员手动拉黑" } }],
+            },
+        })
     })
 
-    // ─── Normal path: purge expired records ──────────────────────────────────
+    // ─── Uses global fallback sourceUrl ──────────────────────────────────────
 
-    it("purges expired records on normal path", async () => {
-        scrapeMultipleUrlsMock.mockResolvedValue([
-            { account: "still@available.com", password: "p1" },
-        ])
-        prismaMock.accountBlacklist.deleteMany.mockResolvedValue({ count: 3 })
-
-        const res = await POST(makeRequest(), makeContext())
-        expect(res.status).toBe(200)
-
-        const data = await res.json()
-        expect(data.removed).toBe(3)
-
-        // Should have called deleteMany with productId filter
-        expect(prismaMock.accountBlacklist.deleteMany).toHaveBeenCalledWith(
-            expect.objectContaining({
-                where: expect.objectContaining({ productId: "prod_1" }),
-            })
-        )
-    })
-
-    // ─── Available account cleanup ───────────────────────────────────────────
-
-    it("includes available accounts from scrape in purge criteria", async () => {
-        scrapeMultipleUrlsMock.mockResolvedValue([
-            { account: "available@test.com", password: "pw" },
-            { account: "also@available.com", password: "pw2" },
-        ])
+    it("uses global autoFetchSourceUrls[0] when product has no sourceUrl", async () => {
+        prismaMock.product.findUnique.mockResolvedValue({ id: "prod_1", sourceUrl: null } as never)
+        scrapeMultipleUrlsMock.mockResolvedValue([{ account: "a@b.com", password: "pw" }])
         prismaMock.accountBlacklist.deleteMany.mockResolvedValue({ count: 1 })
 
-        const res = await POST(makeRequest(), makeContext())
-        expect(res.status).toBe(200)
+        await POST(makeRequest(), makeContext())
 
-        const call = prismaMock.accountBlacklist.deleteMany.mock.calls[0][0]!
-        const andClause = (call.where as Record<string, unknown>).AND as Array<Record<string, unknown>>
-        const orClause = andClause[1].OR as Array<Record<string, unknown>>
-        // Should have both expiry and account-in conditions
-        expect(orClause).toHaveLength(2)
-        expect(orClause[0]).toHaveProperty("createdAt")
-        expect(orClause[1]).toEqual({ account: { in: ["available@test.com", "also@available.com"] } })
+        expect(scrapeMultipleUrlsMock).toHaveBeenCalledWith("http://example.com")
     })
 
-    // ─── Manual blacklist entries are never purged ───────────────────────────
+    // ─── Manual entries are never restored ───────────────────────────────────
 
-    it("never purges manual blacklist entries", async () => {
-        scrapeMultipleUrlsMock.mockResolvedValue([])
+    it("never restores manually blacklisted entries", async () => {
+        scrapeMultipleUrlsMock.mockResolvedValue([{ account: "manual@test.com", password: "pw" }])
         prismaMock.accountBlacklist.deleteMany.mockResolvedValue({ count: 0 })
 
         await POST(makeRequest(), makeContext())
 
         const call = prismaMock.accountBlacklist.deleteMany.mock.calls[0][0]!
-        const andClause = (call.where as Record<string, unknown>).AND as Array<Record<string, unknown>>
-        // First AND condition should exclude manual entries
-        const manualFilter = andClause[0].OR as Array<Record<string, unknown>>
-        expect(manualFilter).toEqual([
-            { reason: null },
-            { reason: { not: "管理员手动拉黑" } },
-        ])
-    })
-
-    // ─── Manual + expired: still preserved ───────────────────────────────────
-
-    it("does not purge manual entries even if expired", async () => {
-        // The filter structure inherently excludes manual entries regardless of expiry.
-        // Verify the AND clause structure:
-        // AND[0]: exclude manual entries
-        // AND[1]: expired OR available
-        scrapeMultipleUrlsMock.mockResolvedValue([
-            { account: "manual@test.com", password: "pw" },
-        ])
-        prismaMock.accountBlacklist.deleteMany.mockResolvedValue({ count: 0 })
-
-        await POST(makeRequest(), makeContext())
-
-        const call = prismaMock.accountBlacklist.deleteMany.mock.calls[0][0]!
-        const andClause = (call.where as Record<string, unknown>).AND as Array<Record<string, unknown>>
-        // Verify structure: manual exclusion is in AND[0], separate from expiry/available in AND[1]
-        expect(andClause).toHaveLength(2)
-        // Manual exclusion
-        expect(andClause[0]).toHaveProperty("OR")
-        // Expiry/available
-        expect(andClause[1]).toHaveProperty("OR")
+        expect(call.where).toMatchObject({
+            OR: [{ reason: null }, { reason: { not: "管理员手动拉黑" } }],
+        })
     })
 })
