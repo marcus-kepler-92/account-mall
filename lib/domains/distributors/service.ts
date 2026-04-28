@@ -475,10 +475,10 @@ export async function createOrderCommissions(
   if (shouldSplitLevel2 && inviter != null) {
     const level2Amount = Math.round(totalCommission * level2Rate / 100 * 100) / 100
     const level1Amount = Math.round((totalCommission - level2Amount) * 100) / 100
-    if (level1Amount > 0) await tx.commission.create({ data: { orderId, distributorId, amount: level1Amount, status: "SETTLED", level: 1 } })
-    if (level2Amount > 0) await tx.commission.create({ data: { orderId, distributorId: inviterId, amount: level2Amount, status: "SETTLED", level: 2, sourceDistributorId: distributorId } })
+    if (level1Amount > 0) await tx.commission.create({ data: { orderId, distributorId, amount: level1Amount, status: "SETTLED", level: 1, createdAt: paidAt } })
+    if (level2Amount > 0) await tx.commission.create({ data: { orderId, distributorId: inviterId, amount: level2Amount, status: "SETTLED", level: 2, sourceDistributorId: distributorId, createdAt: paidAt } })
   } else {
-    await tx.commission.create({ data: { orderId, distributorId, amount: totalCommission, status: "SETTLED", level: 1 } })
+    await tx.commission.create({ data: { orderId, distributorId, amount: totalCommission, status: "SETTLED", level: 1, createdAt: paidAt } })
   }
 }
 

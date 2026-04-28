@@ -1,4 +1,8 @@
 jest.mock("../repository")
+jest.mock("@/lib/prisma", () => {
+  const { prismaMock } = require("../../../../__mocks__/prisma")
+  return { __esModule: true, prisma: prismaMock }
+})
 jest.mock("@/lib/send-distributor-invitation", () => ({
   sendDistributorInvitation: jest.fn(),
 }))
@@ -21,6 +25,7 @@ jest.mock("@/app/emails/distributor-invitation", () => ({ DistributorInvitation:
 jest.mock("better-auth/crypto", () => ({ hashPassword: jest.fn().mockResolvedValue("hashed") }))
 
 import * as repo from "../repository"
+import { prismaMock } from "../../../../__mocks__/prisma"
 import {
   updateDistributor,
   deleteDistributor,
@@ -28,6 +33,7 @@ import {
   createWithdrawal,
   createCommissionTier,
   acceptInvite,
+  reassignOrderDistributor,
 } from "../service"
 import {
   DistributorNotFoundError,
@@ -242,5 +248,71 @@ describe("acceptInvite", () => {
     await expect(
       acceptInvite("tok", { name: "Alice", password: "pass1234" }),
     ).rejects.toThrow(InviteTokenExpiredError)
+  })
+})
+
+// ── reassignOrderDistributor ──────────────────────────────────────────────────
+
+describe("reassignOrderDistributor", () => {
+  const paidAt = new Date("2026-04-15T06:56:24.961Z")
+
+  beforeEach(() => {
+    ;(repo.findOrderById as jest.Mock).mockResolvedValue({
+      id: "ord1",
+      status: "COMPLETED",
+      amount: 100,
+      email: "buyer@example.com",
+      distributorId: null,
+      discountPercentApplied: null,
+      paidAt,
+    })
+    ;(repo.findUserById as jest.Mock).mockResolvedValue({ id: "dist1", role: "DISTRIBUTOR" })
+    ;(repo.countWithdrawnCommissions as jest.Mock).mockResolvedValue(0)
+    ;(repo.findOrderCommissions as jest.Mock).mockResolvedValue([])
+    ;(repo.cancelOrderCommissions as jest.Mock).mockResolvedValue(undefined)
+    ;(repo.updateOrderDistributor as jest.Mock).mockResolvedValue(undefined)
+
+    prismaMock.$transaction.mockImplementation(
+      (async (fn: (tx: any) => Promise<void>) => fn(prismaMock)) as any,
+    )
+    prismaMock.user.findUnique.mockResolvedValue({ email: "dist@example.com", inviterId: null } as any)
+    prismaMock.order.findMany.mockResolvedValue([])
+    prismaMock.commissionTier.findMany.mockResolvedValue([
+      { minAmount: 0, maxAmount: 999999, ratePercent: 10 },
+    ] as any)
+    prismaMock.commission.create.mockResolvedValue({} as any)
+  })
+
+  it("commission.createdAt equals order.paidAt when reassigning a historical order", async () => {
+    await reassignOrderDistributor("ord1", "dist1")
+
+    expect(prismaMock.commission.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          createdAt: paidAt,
+          status: "SETTLED",
+        }),
+      }),
+    )
+  })
+
+  it("both level-1 and level-2 commissions use order.paidAt as createdAt", async () => {
+    ;(repo.findUserById as jest.Mock).mockResolvedValue({ id: "dist1", role: "DISTRIBUTOR" })
+    prismaMock.user.findUnique.mockResolvedValue({
+      email: "dist@example.com",
+      inviterId: "inviter1",
+    } as any)
+    // inviter lookup inside createOrderCommissions
+    prismaMock.user.findUnique
+      .mockResolvedValueOnce({ email: "dist@example.com", inviterId: "inviter1" } as any)
+      .mockResolvedValueOnce({ email: "inviter@example.com", role: "DISTRIBUTOR", disabledAt: null } as any)
+
+    await reassignOrderDistributor("ord1", "dist1")
+
+    const calls = prismaMock.commission.create.mock.calls
+    expect(calls.length).toBeGreaterThanOrEqual(2)
+    for (const [arg] of calls) {
+      expect(arg.data.createdAt).toEqual(paidAt)
+    }
   })
 })
