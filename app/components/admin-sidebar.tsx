@@ -2,7 +2,6 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useEffect, useState } from "react"
 import {
     LayoutDashboard,
     Package,
@@ -35,12 +34,13 @@ import {
     SidebarGroupLabel,
     SidebarHeader,
     SidebarMenu,
-    SidebarMenuBadge,
     SidebarMenuButton,
     SidebarMenuItem,
     SidebarRail,
 } from "@/components/ui/sidebar"
 import { useSiteName, useAdminPanelLabel } from "@/app/components/site-name-provider"
+import { NotificationBadge } from "@/app/admin/components"
+import { usePendingWithdrawals } from "@/app/admin/hooks/use-pending-withdrawals"
 
 const allNavItems = [
     { title: "仪表盘", href: "/admin/dashboard", icon: LayoutDashboard },
@@ -74,14 +74,7 @@ export function AdminSidebar({ allowedMenus, isSuperAdmin }: AdminSidebarProps) 
     useTheme()
     const siteName = useSiteName()
     const adminPanelLabel = useAdminPanelLabel()
-    const [pendingWithdrawals, setPendingWithdrawals] = useState(0)
-
-    useEffect(() => {
-        fetch("/api/admin/withdrawals/count")
-            .then((r) => r.json())
-            .then((data) => setPendingWithdrawals(data.pending ?? 0))
-            .catch(() => {})
-    }, [])
+    const { count: pendingWithdrawals } = usePendingWithdrawals()
 
     const handleSignOut = async () => {
         await authClient.signOut({
@@ -123,23 +116,39 @@ export function AdminSidebar({ allowedMenus, isSuperAdmin }: AdminSidebarProps) 
                     <SidebarGroupLabel>导航</SidebarGroupLabel>
                     <SidebarGroupContent>
                         <SidebarMenu>
-                            {navItems.map((item) => (
-                                <SidebarMenuItem key={item.title}>
-                                    <SidebarMenuButton
-                                        asChild
-                                        isActive={pathname === item.href || pathname.startsWith(item.href + "/")}
-                                        tooltip={item.title}
-                                    >
-                                        <Link href={item.href}>
-                                            <item.icon />
-                                            <span>{item.title}</span>
-                                        </Link>
-                                    </SidebarMenuButton>
-                                    {item.href === "/admin/withdrawals" && pendingWithdrawals > 0 && (
-                                        <SidebarMenuBadge>{pendingWithdrawals}</SidebarMenuBadge>
-                                    )}
-                                </SidebarMenuItem>
-                            ))}
+                            {navItems.map((item) => {
+                                const isWithdrawals = item.href === "/admin/withdrawals"
+                                return (
+                                    <SidebarMenuItem key={item.title}>
+                                        <SidebarMenuButton
+                                            asChild
+                                            isActive={pathname === item.href || pathname.startsWith(item.href + "/")}
+                                            tooltip={item.title}
+                                        >
+                                            <Link href={item.href}>
+                                                <span className="relative">
+                                                    <item.icon />
+                                                    {isWithdrawals && (
+                                                        <NotificationBadge
+                                                            variant="dot"
+                                                            count={pendingWithdrawals}
+                                                            className="hidden group-data-[collapsible=icon]:inline-flex"
+                                                        />
+                                                    )}
+                                                </span>
+                                                <span>{item.title}</span>
+                                                {isWithdrawals && (
+                                                    <NotificationBadge
+                                                        variant="inline"
+                                                        count={pendingWithdrawals}
+                                                        className="ml-auto group-data-[collapsible=icon]:hidden"
+                                                    />
+                                                )}
+                                            </Link>
+                                        </SidebarMenuButton>
+                                    </SidebarMenuItem>
+                                )
+                            })}
                         </SidebarMenu>
                     </SidebarGroupContent>
                 </SidebarGroup>

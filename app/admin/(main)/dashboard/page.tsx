@@ -18,6 +18,7 @@ import { DashboardRestockPending } from "./dashboard-restock-pending"
 import { DashboardTrendSection, DashboardTopProductsChart } from "./dashboard-charts"
 import { DashboardSalesPanel } from "./dashboard-sales-panel"
 import { DashboardDistributorPanel } from "./dashboard-distributor-panel"
+import { DashboardPendingWithdrawals } from "./dashboard-pending-withdrawals"
 import { config } from "@/lib/config"
 import { PageHeader } from "@/app/admin/components"
 
@@ -36,6 +37,8 @@ export default async function AdminDashboardPage() {
       <DashboardSalesPanel />
 
       <DashboardDistributorPanel />
+
+      <DashboardPendingWithdrawals />
 
       <section className={`min-w-0 ${cardGrid}`} aria-label="趋势与商品">
         <Card className="min-w-0">
