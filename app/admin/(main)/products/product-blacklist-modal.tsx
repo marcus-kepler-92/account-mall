@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Copy, Check, Trash2, Loader2, ShieldOff, RefreshCw, Clock } from "lucide-react"
+import { Copy, Check, Trash2, Loader2, ShieldOff, RefreshCw } from "lucide-react"
 import { toast } from "sonner"
 import { MANUAL_BLACKLIST_REASON } from "@/lib/auto-fetch-card"
 
@@ -45,7 +45,7 @@ export function ProductBlacklistModal({ productId, productName, open, onOpenChan
     const [entries, setEntries] = useState<BlacklistEntry[]>([])
     const [expiryHours, setExpiryHours] = useState<number>(12)
     const [loading, setLoading] = useState(false)
-    const [purging, setPurging] = useState(false)
+    const [restoring, setRestoring] = useState(false)
     const [clearing, setClearing] = useState(false)
     const [removingId, setRemovingId] = useState<string | null>(null)
     const [copiedId, setCopiedId] = useState<string | null>(null)
@@ -65,18 +65,18 @@ export function ProductBlacklistModal({ productId, productName, open, onOpenChan
         }
     }, [productId])
 
-    const handlePurge = async () => {
-        setPurging(true)
+    const handleRestore = async () => {
+        setRestoring(true)
         try {
             const res = await fetch(`/api/admin/products/${productId}/blacklist`, { method: "POST" })
-            if (!res.ok) { toast.error("清理失败"); return }
+            if (!res.ok) { toast.error("恢复失败"); return }
             const data = await res.json() as { removed: number }
-            toast.success(`已恢复 ${data.removed} 个有效账号`)
+            toast.success(data.removed > 0 ? `已恢复 ${data.removed} 个账号` : "暂无可恢复账号")
             await fetchBlacklist()
         } catch {
             toast.error("网络异常")
         } finally {
-            setPurging(false)
+            setRestoring(false)
         }
     }
 
@@ -192,16 +192,16 @@ export function ProductBlacklistModal({ productId, productName, open, onOpenChan
                         <Button
                             variant="outline"
                             size="sm"
-                            disabled={loading || purging}
-                            onClick={handlePurge}
+                            disabled={loading || restoring}
+                            onClick={handleRestore}
                             className="gap-1.5"
                         >
-                            {purging ? (
+                            {restoring ? (
                                 <Loader2 className="size-3.5 animate-spin" />
                             ) : (
-                                <Clock className="size-3.5" />
+                                <RefreshCw className="size-3.5" />
                             )}
-                            恢复有效账号
+                            立即恢复
                         </Button>
                         <Button
                             variant="outline"
