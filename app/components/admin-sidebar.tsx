@@ -127,7 +127,7 @@ export function AdminSidebar({ allowedMenus, isSuperAdmin }: AdminSidebarProps) 
                                         >
                                             <Link href={item.href}>
                                                 <span className="relative">
-                                                    <item.icon />
+                                                    <item.icon className="size-4 shrink-0" />
                                                     {isWithdrawals && (
                                                         <NotificationBadge
                                                             variant="dot"
