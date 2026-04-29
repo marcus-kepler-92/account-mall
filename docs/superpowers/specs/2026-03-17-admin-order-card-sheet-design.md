@@ -59,12 +59,13 @@ type SerializedCard = {
   content: string
   maskedContent: string
   status: string
-  createdAt: Date
+  createdAt: string   // ISO string，不能传 Date 对象给 Client Component
   productId: string
   resolved: ResolvedCard   // 新增
-  index: number            // 新增，用于 Sheet 标题"卡密 #N"
 }
 ```
+
+> **注意**：Next.js 不允许从 Server Component 向 Client Component 传递 `Date` 对象（非 plain object）。`createdAt` 需在 `page.tsx` 序列化为 ISO 字符串：`createdAt: c.createdAt.toISOString()`。`index` 不需存入类型，直接用 `cards.findIndex` 或数组下标即可。
 
 ### 2. 组件结构
 
