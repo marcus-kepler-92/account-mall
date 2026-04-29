@@ -14,6 +14,7 @@ import {
     TableRow,
 } from "@/components/ui/table"
 import { ArrowLeft, CreditCard, Package, ShoppingCart } from "lucide-react"
+import { resolveAdminCard } from "@/lib/card-format"
 import { CardCompactActions } from "@/app/admin/(main)/cards/card-row-actions"
 
 export const dynamic = "force-dynamic"
@@ -40,6 +41,10 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
                     id: true,
                     name: true,
                     slug: true,
+                    cardTemplates: {
+                        orderBy: { sortOrder: "asc" },
+                        select: { template: true },
+                    },
                 },
             },
             cards: {
@@ -59,13 +64,15 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
               ? "已完成"
               : "已关闭"
 
+    const cardTemplates = order.product.cardTemplates
     const serializedCards = order.cards.map((c) => ({
         id: c.id,
         content: c.content,
         maskedContent: maskContent(c.content),
         status: c.status,
-        createdAt: c.createdAt,
+        createdAt: c.createdAt.toISOString(),
         productId: order.product.id,
+        resolved: resolveAdminCard(c.content, cardTemplates),
     }))
 
     return (
