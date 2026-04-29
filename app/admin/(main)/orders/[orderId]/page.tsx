@@ -5,17 +5,9 @@ import { formatDateTime } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table"
-import { ArrowLeft, CreditCard, Package, ShoppingCart } from "lucide-react"
+import { ArrowLeft, CreditCard, ShoppingCart } from "lucide-react"
 import { resolveAdminCard } from "@/lib/card-format"
-import { CardCompactActions } from "@/app/admin/(main)/cards/card-row-actions"
+import { OrderCardsTable } from "@/app/admin/(main)/orders/[orderId]/order-cards-table"
 
 export const dynamic = "force-dynamic"
 
@@ -185,72 +177,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    {serializedCards.length > 0 ? (
-                        <div className="rounded-md border">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow className="bg-muted/50">
-                                        <TableHead className="pl-4">卡密</TableHead>
-                                        <TableHead className="text-center">状态</TableHead>
-                                        <TableHead className="hidden text-right sm:table-cell">创建时间</TableHead>
-                                        <TableHead className="text-right pr-4 w-[120px]">操作</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {serializedCards.map((card) => (
-                                        <TableRow key={card.id}>
-                                            <TableCell className="pl-4">
-                                                <span className="font-mono text-xs">
-                                                    {card.maskedContent}
-                                                </span>
-                                            </TableCell>
-                                            <TableCell className="text-center">
-                                                <Badge
-                                                    variant="outline"
-                                                    className={
-                                                        card.status === "UNSOLD"
-                                                            ? "border-success/50 bg-success/10 text-success"
-                                                            : card.status === "RESERVED"
-                                                              ? "border-warning/50 bg-warning/10 text-warning"
-                                                              : card.status === "DISABLED"
-                                                                ? "border-muted-foreground/30 bg-muted/50 text-muted-foreground"
-                                                                : "border-muted-foreground/30 bg-muted text-muted-foreground"
-                                                    }
-                                                >
-                                                    {card.status === "UNSOLD"
-                                                        ? "未售"
-                                                        : card.status === "RESERVED"
-                                                          ? "预占中"
-                                                          : card.status === "DISABLED"
-                                                            ? "停用"
-                                                            : "已售"}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell className="hidden text-right text-muted-foreground text-xs sm:table-cell">
-                                                {formatDateTime(card.createdAt)}
-                                            </TableCell>
-                                            <TableCell className="text-right pr-4">
-                                                <CardCompactActions
-                                                    cardId={card.id}
-                                                    content={card.content}
-                                                    status={card.status}
-                                                    productId={card.productId}
-                                                />
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    ) : (
-                        <div className="flex flex-col items-center justify-center py-12 text-center">
-                            <Package className="size-10 text-muted-foreground mb-2" />
-                            <p className="text-sm font-medium">暂无卡密</p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                                该订单尚未关联卡密
-                            </p>
-                        </div>
-                    )}
+                    <OrderCardsTable cards={serializedCards} />
                 </CardContent>
             </Card>
         </div>
