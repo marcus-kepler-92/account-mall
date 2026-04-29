@@ -1,16 +1,46 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { ChevronDown, Megaphone } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Megaphone,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MarkdownViewClient } from "@/app/components/markdown-view-client";
 
-const STORAGE_KEY = "announcements-expanded";
+function ModalContentSkeleton() {
+  return (
+    <div className="space-y-2 py-1">
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-4 w-4/5" />
+      <Skeleton className="h-4 w-3/4" />
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-4 w-2/3" />
+    </div>
+  );
+}
+
+const ModalMarkdownView = dynamic(
+  () => import("@/app/components/markdown-view").then((m) => m.MarkdownView),
+  { ssr: false, loading: () => <ModalContentSkeleton /> },
+);
 
 export type FrontAnnouncement = {
   id: string;
@@ -33,129 +63,151 @@ function formatDate(iso: string | null) {
   });
 }
 
-function getDefaultExpandedId(
-  announcements: FrontAnnouncement[],
-): string | null {
-  const firstWithContent = announcements.find((x) => x.content?.trim());
-  return firstWithContent?.id ?? null;
-}
+function ModalContent({ announcement }: { announcement: FrontAnnouncement }) {
+  const [showSkeleton, setShowSkeleton] = useState(true);
 
-// Cache parsed snapshot to keep reference stable between renders.
-let cachedRaw: string | null = undefined as unknown as string | null;
-let cachedIds: string[] = [];
+  useEffect(() => {
+    const t = setTimeout(() => setShowSkeleton(false), 400);
+    return () => clearTimeout(t);
+  }, []);
 
-function readSnapshot(defaultIds: string[]): string[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw !== cachedRaw) {
-      cachedRaw = raw;
-      if (raw) {
-        const parsed = JSON.parse(raw) as unknown;
-        cachedIds = Array.isArray(parsed) && parsed.every((x) => typeof x === "string")
-          ? (parsed as string[])
-          : defaultIds;
-      } else {
-        cachedIds = defaultIds;
-      }
-    }
-    return cachedIds;
-  } catch {
-    return defaultIds;
-  }
-}
-
-function subscribeToStorage(callback: () => void) {
-  window.addEventListener("storage", callback);
-  return () => window.removeEventListener("storage", callback);
+  return (
+    <div className="max-h-96 overflow-y-auto text-sm">
+      {showSkeleton ? (
+        <ModalContentSkeleton />
+      ) : announcement.content?.trim() ? (
+        <ModalMarkdownView content={announcement.content} />
+      ) : (
+        <p className="text-muted-foreground text-center py-4">此公告无详细内容</p>
+      )}
+    </div>
+  );
 }
 
 export function AnnouncementsBlock({ announcements }: AnnouncementsBlockProps) {
-  const defaultIds: string[] = (() => {
-    const id = getDefaultExpandedId(announcements);
-    return id ? [id] : [];
-  })();
+  const [expandedIds, setExpandedIds] = useState<string[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [modalOpen, setModalOpen] = useState(true);
 
-  const expandedIds = useSyncExternalStore(
-    subscribeToStorage,
-    () => readSnapshot(defaultIds),
-    () => defaultIds,
-  );
-
-  const setExpanded = (id: string, open: boolean) => {
-    const next = open
-      ? expandedIds.includes(id) ? expandedIds : [...expandedIds, id]
-      : expandedIds.filter((x) => x !== id);
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      // storage event doesn't fire in the same tab — dispatch manually
-      window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }));
-    } catch {
-      // ignore
-    }
+  const toggleExpanded = (id: string, open: boolean) => {
+    setExpandedIds((prev) =>
+      open ? [...prev, id] : prev.filter((x) => x !== id),
+    );
   };
 
   if (!announcements.length) return null;
 
+  const current = announcements[currentIndex];
+  const total = announcements.length;
+
   return (
-    <section
-      className="mb-10 animate-in fade-in duration-300"
-      aria-label="站内公告"
-    >
-      <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold tracking-tight">
-        <Megaphone className="size-5 text-primary" aria-hidden />
-        公告
-      </h2>
-      <ul className="space-y-3">
-        {announcements.map((a) => {
-          const hasContent = !!a.content?.trim();
-          const open = expandedIds.includes(a.id);
-          return (
-            <li
-              key={a.id}
-              className={cn(
-                "rounded-lg border bg-muted/50 shadow-sm transition-shadow hover:shadow",
-                "animate-in fade-in duration-200",
-              )}
-            >
-              {hasContent ? (
-                <Collapsible
-                  className="group"
-                  open={open}
-                  onOpenChange={(openState) => setExpanded(a.id, openState)}
-                >
-                  <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-muted/50 rounded-lg transition-colors">
-                    <span className="font-medium text-foreground">
-                      {a.title}
-                    </span>
-                    <div className="flex shrink-0 items-center gap-2">
-                      {a.publishedAt && (
-                        <span className="text-xs text-muted-foreground">
-                          {formatDate(a.publishedAt)}
-                        </span>
-                      )}
-                      <ChevronDown className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
-                    </div>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <div className="border-t border-border bg-card px-8 py-3 text-sm text-muted-foreground rounded-b-lg">
-                      <MarkdownViewClient content={a.content!} />
-                    </div>
-                  </CollapsibleContent>
-                </Collapsible>
-              ) : (
-                <div className="flex items-center justify-between gap-3 px-4 py-3">
-                  <span className="font-medium text-foreground">{a.title}</span>
-                  {a.publishedAt && (
-                    <span className="text-xs text-muted-foreground shrink-0">
-                      {formatDate(a.publishedAt)}
-                    </span>
-                  )}
-                </div>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-    </section>
+    <>
+      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+        <DialogContent
+          className="max-w-lg"
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Megaphone className="size-4 text-primary" aria-hidden />
+              {current.title}
+            </DialogTitle>
+            {current.publishedAt && (
+              <DialogDescription>{formatDate(current.publishedAt)}</DialogDescription>
+            )}
+          </DialogHeader>
+
+          <ModalContent key={currentIndex} announcement={current} />
+
+          {total > 1 && (
+            <div className="flex items-center justify-between pt-2 border-t">
+              <Button
+                variant="ghost"
+                size="icon"
+                disabled={currentIndex === 0}
+                onClick={() => setCurrentIndex((i) => i - 1)}
+                aria-label="上一条公告"
+              >
+                <ChevronLeft className="size-4" />
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                {currentIndex + 1} / {total}
+              </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                disabled={currentIndex === total - 1}
+                onClick={() => setCurrentIndex((i) => i + 1)}
+                aria-label="下一条公告"
+              >
+                <ChevronRight className="size-4" />
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <section
+        className="mb-10 animate-in fade-in duration-300"
+        aria-label="站内公告"
+      >
+        <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold tracking-tight">
+          <Megaphone className="size-5 text-primary" aria-hidden />
+          公告
+        </h2>
+        <ul className="space-y-3">
+          {announcements.map((a) => {
+            const hasContent = !!a.content?.trim();
+            const open = expandedIds.includes(a.id);
+            return (
+              <li
+                key={a.id}
+                className={cn(
+                  "rounded-lg border bg-muted/50 shadow-sm transition-shadow hover:shadow",
+                  "animate-in fade-in duration-200",
+                )}
+              >
+                {hasContent ? (
+                  <Collapsible
+                    className="group"
+                    open={open}
+                    onOpenChange={(openState) => toggleExpanded(a.id, openState)}
+                  >
+                    <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-muted/50 rounded-lg transition-colors">
+                      <span className="font-medium text-foreground">
+                        {a.title}
+                      </span>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {a.publishedAt && (
+                          <span className="text-xs text-muted-foreground">
+                            {formatDate(a.publishedAt)}
+                          </span>
+                        )}
+                        <ChevronDown className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+                      </div>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="border-t border-border bg-card px-8 py-3 text-sm text-muted-foreground rounded-b-lg">
+                        <MarkdownViewClient content={a.content!} />
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                ) : (
+                  <div className="flex items-center justify-between gap-3 px-4 py-3">
+                    <span className="font-medium text-foreground">{a.title}</span>
+                    {a.publishedAt && (
+                      <span className="text-xs text-muted-foreground shrink-0">
+                        {formatDate(a.publishedAt)}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+    </>
   );
 }
