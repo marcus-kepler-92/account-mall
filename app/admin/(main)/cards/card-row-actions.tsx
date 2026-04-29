@@ -314,17 +314,7 @@ export function CardCompactActions({
                     </TooltipTrigger>
                     <TooltipContent>前往该商品卡密管理</TooltipContent>
                 </Tooltip>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="size-8 shrink-0" aria-label="查看完整卡密">
-                            <Eye className="size-4" />
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="left" className="max-w-sm break-all font-mono text-xs whitespace-pre-wrap">
-                        <span className="block text-muted-foreground mb-1">完整卡密</span>
-                        {textToCopy}
-                    </TooltipContent>
-                </Tooltip>
+
             </div>
         </TooltipProvider>
     )
