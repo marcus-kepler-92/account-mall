@@ -161,7 +161,7 @@ export function AdminSidebar({ allowedMenus, isSuperAdmin }: AdminSidebarProps) 
                             tooltip="退出登录"
                             onClick={handleSignOut}
                         >
-                            <LogOut />
+                            <LogOut className="size-4" />
                             <span>退出登录</span>
                         </SidebarMenuButton>
                     </SidebarMenuItem>
