@@ -8,6 +8,7 @@ import { ExportCards } from "./export-cards";
 import { ProductCardsDataTable } from "./product-cards-data-table";
 import { StatCard } from "@/app/admin/components";
 import type { ProductCardRow } from "./product-cards-columns";
+import { resolveAdminCard } from "@/lib/card-format";
 
 export const dynamic = "force-dynamic";
 
@@ -24,20 +25,21 @@ type PageProps = {
     }>;
 };
 
-const MASK_LEN = 8;
-
-function maskContent(content: string) {
-    if (content.length <= MASK_LEN) return content;
-    return content.slice(0, MASK_LEN) + "***";
-}
-
 export default async function AdminProductCardsPage({ params, searchParams }: PageProps) {
     const { productId } = await params;
     const rawParams = await searchParams;
 
     const product = await prisma.product.findUnique({
         where: { id: productId },
-        select: { id: true, name: true, slug: true },
+        select: {
+            id: true,
+            name: true,
+            slug: true,
+            cardTemplates: {
+                orderBy: { sortOrder: "asc" },
+                select: { template: true },
+            },
+        },
     });
 
     if (!product) {
@@ -100,7 +102,7 @@ export default async function AdminProductCardsPage({ params, searchParams }: Pa
     const serializedCards: ProductCardRow[] = cards.map((c) => ({
         id: c.id,
         content: c.content,
-        maskedContent: maskContent(c.content),
+        resolved: resolveAdminCard(c.content, product.cardTemplates),
         status: c.status as ProductCardRow["status"],
         orderNo: c.order?.orderNo ?? null,
         createdAt: c.createdAt.toISOString(),

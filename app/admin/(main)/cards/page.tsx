@@ -15,6 +15,7 @@ import {
 import { CardsHeaderActions } from "./cards-header-actions";
 import { CardsDataTable } from "./cards-data-table";
 import type { CardRow } from "./cards-columns";
+import { resolveAdminCard } from "@/lib/card-format";
 
 export const dynamic = "force-dynamic";
 
@@ -28,13 +29,6 @@ type SearchParams = Promise<{
     sort?: string;
     sortDir?: string;
 }>;
-
-const MASK_LEN = 8;
-
-function maskContent(content: string) {
-    if (content.length <= MASK_LEN) return content;
-    return content.slice(0, MASK_LEN) + "***";
-}
 
 export default async function AdminCardsPage({
     searchParams,
@@ -107,6 +101,10 @@ export default async function AdminCardsPage({
                         slug: true,
                         productType: true,
                         price: true,
+                        cardTemplates: {
+                            orderBy: { sortOrder: "asc" },
+                            select: { template: true },
+                        },
                     },
                 },
                 order: {
@@ -136,7 +134,7 @@ export default async function AdminCardsPage({
     const serializedCards: CardRow[] = cards.map((card) => ({
         id: card.id,
         content: card.content,
-        maskedContent: maskContent(card.content),
+        resolved: resolveAdminCard(card.content, card.product.cardTemplates),
         status: card.status as CardRow["status"],
         orderNo: card.order?.orderNo ?? null,
         product: {

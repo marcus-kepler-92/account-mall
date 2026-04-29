@@ -43,11 +43,12 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 import { DataTableColumnHeader } from "@/app/admin/components";
+import type { ResolvedCard } from "@/lib/card-format";
 
 export type ProductCardRow = {
     id: string;
     content: string;
-    maskedContent: string;
+    resolved: ResolvedCard;
     status: "UNSOLD" | "RESERVED" | "SOLD" | "DISABLED";
     orderNo: string | null;
     createdAt: string;
@@ -243,13 +244,13 @@ export const productCardsColumns: ColumnDef<ProductCardRow>[] = [
         enableHiding: false,
     },
     {
-        accessorKey: "maskedContent",
+        accessorKey: "content",
         header: ({ column }) => (
             <DataTableColumnHeader column={column} title="卡密" />
         ),
         enableSorting: false,
         cell: ({ row }) => (
-            <span className="font-mono text-xs">{row.getValue("maskedContent")}</span>
+            <span className="font-mono text-xs">{row.getValue("content")}</span>
         ),
     },
     {
@@ -296,6 +297,10 @@ export const productCardsColumns: ColumnDef<ProductCardRow>[] = [
     },
     {
         id: "actions",
-        cell: ({ row }) => <ProductCardRowActions card={row.original} />,
+        cell: ({ row }) => (
+            <div onClick={(e) => e.stopPropagation()}>
+                <ProductCardRowActions card={row.original} />
+            </div>
+        ),
     },
 ];

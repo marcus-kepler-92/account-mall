@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { CardDetailSheet } from "./card-detail-sheet";
 import {
     useReactTable,
     getCoreRowModel,
@@ -61,6 +62,7 @@ export function CardsDataTable({ data, total, statusCounts, isSuperAdmin = false
     const router = useRouter();
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+    const [selectedCard, setSelectedCard] = useState<CardRow | null>(null);
     const [batchLoading, setBatchLoading] = useState(false);
     const [batchAction, setBatchAction] = useState<"DELETE" | "DISABLE" | "ENABLE" | null>(null);
     const [isPending, startTransition] = useTransition()
@@ -194,7 +196,7 @@ export function CardsDataTable({ data, total, statusCounts, isSuperAdmin = false
 
                 <Separator />
                 <div className={isPending ? "opacity-50 pointer-events-none transition-opacity" : "transition-opacity"}>
-                    <DataTable table={table} columns={cardsColumns} emptyMessage="暂无卡密" />
+                    <DataTable table={table} columns={cardsColumns} emptyMessage="暂无卡密" onRowClick={setSelectedCard} />
                     <DataTablePagination table={table} total={total} />
                 </div>
             </CardContent>
@@ -229,6 +231,11 @@ export function CardsDataTable({ data, total, statusCounts, isSuperAdmin = false
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            <CardDetailSheet
+                card={selectedCard}
+                onClose={() => setSelectedCard(null)}
+            />
         </Card>
     );
 }

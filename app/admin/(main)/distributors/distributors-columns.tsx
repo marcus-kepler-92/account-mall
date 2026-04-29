@@ -38,18 +38,12 @@ export type DistributorRow = {
     inviter: { id: string; name: string; distributorCode: string | null } | null
 }
 
-export function DistributorIdentityCell({ row, onViewDetail }: { row: DistributorRow; onViewDetail?: () => void }) {
+export function DistributorIdentityCell({ row }: { row: DistributorRow }) {
     const disabled = !!row.disabledAt
     return (
         <div className="space-y-0.5">
             <div className="flex items-center gap-2">
-                <button
-                    type="button"
-                    className="font-medium hover:underline text-left"
-                    onClick={onViewDetail}
-                >
-                    {row.name}
-                </button>
+                <span className="font-medium">{row.name}</span>
                 <Badge variant={disabled ? "destructive" : "default"} className="text-xs">
                     {disabled ? "已停用" : "启用"}
                 </Badge>
@@ -97,14 +91,13 @@ export function DistributorDiscountCell({ row }: { row: DistributorRow }) {
     return <Badge variant="secondary">{label}</Badge>
 }
 
-export function getDistributorsColumns(onViewDetail: (row: DistributorRow) => void): ColumnDef<DistributorRow>[] {
-  return [
+export const distributorsColumns: ColumnDef<DistributorRow>[] = [
     {
         accessorKey: "name",
         header: ({ column }) => (
             <DataTableColumnHeader column={column} title="分销员" />
         ),
-        cell: ({ row }) => <DistributorIdentityCell row={row.original} onViewDetail={() => onViewDetail(row.original)} />,
+        cell: ({ row }) => <DistributorIdentityCell row={row.original} />,
     },
     {
         accessorKey: "inviter",
@@ -164,5 +157,4 @@ export function getDistributorsColumns(onViewDetail: (row: DistributorRow) => vo
         enableSorting: false,
         enableHiding: false,
     },
-  ]
-}
+]

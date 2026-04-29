@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition, useMemo } from "react"
+import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import {
     useReactTable,
@@ -17,7 +17,7 @@ import {
     DataTablePagination,
 } from "@/app/admin/components"
 import { sortQueryStates, parseSortingState, encodeSortingState } from "@/lib/table-sort"
-import { getDistributorsColumns, type DistributorRow } from "./distributors-columns"
+import { distributorsColumns, type DistributorRow } from "./distributors-columns"
 import type { TierSummaryItem } from "@/lib/distributor-tier-summary"
 import { InviteDistributorButtonClient } from "./invite-distributor-button-client"
 import { DistributorDetailSheet } from "./distributor-detail-sheet"
@@ -47,11 +47,6 @@ export function DistributorsDataTable({
     const [selectedRow, setSelectedRow] = useState<DistributorRow | null>(null)
     const [sheetOpen, setSheetOpen] = useState(false)
 
-    const columns = useMemo(
-        () => getDistributorsColumns((row) => { setSelectedRow(row); setSheetOpen(true) }),
-        []
-    )
-
     const [isPending, startTransition] = useTransition()
     const [sortState, setSortState] = useQueryStates(
         { ...sortQueryStates, page: parseAsInteger },
@@ -61,7 +56,7 @@ export function DistributorsDataTable({
 
     const table = useReactTable({
         data,
-        columns,
+        columns: distributorsColumns,
         state: { columnVisibility, sorting },
         onColumnVisibilityChange: setColumnVisibility,
         getCoreRowModel: getCoreRowModel(),
@@ -96,8 +91,9 @@ export function DistributorsDataTable({
                     <div className={isPending ? "opacity-50 pointer-events-none transition-opacity" : "transition-opacity"}>
                         <DataTable
                             table={table}
-                            columns={columns}
+                            columns={distributorsColumns}
                             emptyMessage="暂无分销员，分销员可通过前台注册成为分销员。"
+                            onRowClick={(row) => { setSelectedRow(row); setSheetOpen(true) }}
                         />
                         <DataTablePagination table={table} total={total} />
                     </div>

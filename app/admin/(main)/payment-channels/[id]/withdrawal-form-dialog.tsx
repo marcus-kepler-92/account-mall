@@ -67,7 +67,7 @@ export function WithdrawalFormDialog({ open, onOpenChange, channelId, withdrawal
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-sm">
+            <DialogContent className="sm:max-w-sm" aria-describedby={undefined}>
                 <DialogHeader>
                     <DialogTitle>{isEdit ? "编辑提现记录" : "记录提现"}</DialogTitle>
                 </DialogHeader>

@@ -7,11 +7,12 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
 import { DataTableColumnHeader } from "@/app/admin/components"
 import { CardRowActions } from "./card-row-actions"
+import type { ResolvedCard } from "@/lib/card-format"
 
 export type CardRow = {
     id: string
     content: string
-    maskedContent: string
+    resolved: ResolvedCard
     status: "UNSOLD" | "RESERVED" | "SOLD" | "DISABLED"
     orderNo: string | null
     product: {
@@ -54,13 +55,13 @@ export const cardsColumns: ColumnDef<CardRow>[] = [
         enableHiding: false,
     },
     {
-        accessorKey: "maskedContent",
+        accessorKey: "content",
         header: ({ column }) => (
             <DataTableColumnHeader column={column} title="卡密" />
         ),
         enableSorting: false,
         cell: ({ row }) => (
-            <span className="font-mono text-xs">{row.getValue("maskedContent")}</span>
+            <span className="font-mono text-xs">{row.getValue("content")}</span>
         ),
     },
     {
@@ -127,6 +128,10 @@ export const cardsColumns: ColumnDef<CardRow>[] = [
     },
     {
         id: "actions",
-        cell: ({ row }) => <CardRowActions card={row.original} />,
+        cell: ({ row }) => (
+            <div onClick={(e) => e.stopPropagation()}>
+                <CardRowActions card={row.original} />
+            </div>
+        ),
     },
 ]

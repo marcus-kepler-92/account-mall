@@ -124,7 +124,7 @@ export function ChannelFormDialog({ open, onOpenChange, channel }: Props) {
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-lg">
+            <DialogContent className="sm:max-w-lg" aria-describedby={undefined}>
                 <DialogHeader>
                     <DialogTitle>{isEdit ? "编辑渠道" : "添加渠道"}</DialogTitle>
                 </DialogHeader>

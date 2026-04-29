@@ -26,7 +26,7 @@ export function ImagePickerDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[85vh] max-w-3xl flex-col">
+      <DialogContent className="flex max-h-[85vh] max-w-3xl flex-col" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>选择图片</DialogTitle>
         </DialogHeader>

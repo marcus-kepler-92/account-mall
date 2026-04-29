@@ -73,7 +73,7 @@ export function CardTemplatesCreateButton() {
           新建模版
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>新建卡密模版</DialogTitle>
         </DialogHeader>

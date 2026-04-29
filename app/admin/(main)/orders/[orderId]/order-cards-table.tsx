@@ -1,8 +1,7 @@
 "use client"
 
-import { useState, useCallback, useRef } from "react"
-import { Check, Copy, Package } from "lucide-react"
-import { toast } from "sonner"
+import { useState } from "react"
+import { Package } from "lucide-react"
 import {
   Table,
   TableBody,
@@ -12,21 +11,14 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet"
 import { formatDateTime } from "@/lib/utils"
 import type { ResolvedCard } from "@/lib/card-format"
 import { CardCompactActions } from "@/app/admin/(main)/cards/card-row-actions"
+import { CardDetailSheet } from "@/app/admin/(main)/cards/card-detail-sheet"
 
 type SerializedCard = {
   id: string
   content: string
-  maskedContent: string
   status: string
   createdAt: string
   productId: string
@@ -48,40 +40,10 @@ const STATUS_MAP: Record<string, { label: string; className: string }> = {
 
 export function OrderCardsTable({ cards }: { cards: SerializedCard[] }) {
   const [selectedCard, setSelectedCard] = useState<SerializedCard | null>(null)
-  const [copiedId, setCopiedId] = useState<string | null>(null)
-  const copiedTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   const selectedIndex = selectedCard
     ? cards.findIndex((c) => c.id === selectedCard.id)
     : -1
-
-  const copy = useCallback(async (text: string, id: string) => {
-    try {
-      await navigator.clipboard.writeText(text)
-      clearTimeout(copiedTimerRef.current)
-      setCopiedId(id)
-      copiedTimerRef.current = setTimeout(() => setCopiedId(null), 2000)
-      toast.success("已复制")
-    } catch {
-      toast.error("复制失败")
-    }
-  }, [])
-
-  const copyAll = useCallback(
-    async (card: SerializedCard) => {
-      const text =
-        card.resolved.type === "formatted"
-          ? card.resolved.fields.map((f) => `${f.label}：${f.value}`).join("\n")
-          : card.content
-      try {
-        await navigator.clipboard.writeText(text)
-        toast.success("已复制全部")
-      } catch {
-        toast.error("复制失败")
-      }
-    },
-    [],
-  )
 
   if (cards.length === 0) {
     return (
@@ -115,7 +77,7 @@ export function OrderCardsTable({ cards }: { cards: SerializedCard[] }) {
                   onClick={() => setSelectedCard(card)}
                 >
                   <TableCell className="pl-4">
-                    <span className="font-mono text-xs">{card.maskedContent}</span>
+                    <span className="font-mono text-xs">{card.content}</span>
                   </TableCell>
                   <TableCell className="text-center">
                     <Badge variant="outline" className={statusInfo.className}>
@@ -143,84 +105,11 @@ export function OrderCardsTable({ cards }: { cards: SerializedCard[] }) {
         </Table>
       </div>
 
-      <Sheet open={!!selectedCard} onOpenChange={(open) => !open && setSelectedCard(null)}>
-        <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
-          {selectedCard && (
-            <>
-              <SheetHeader className="pb-4">
-                <SheetTitle className="flex items-center gap-2">
-                  卡密 #{selectedIndex + 1}
-                  <Badge
-                    variant="outline"
-                    className={STATUS_MAP[selectedCard.status]?.className}
-                  >
-                    {STATUS_MAP[selectedCard.status]?.label}
-                  </Badge>
-                </SheetTitle>
-              </SheetHeader>
-
-              {selectedCard.resolved.type === "formatted" ? (
-                <div className="space-y-4">
-                  <div className="rounded-lg border divide-y divide-border/60">
-                    {selectedCard.resolved.fields.map((field, i) => (
-                      <div
-                        key={i}
-                        className="flex items-center justify-between gap-4 px-4 py-3"
-                      >
-                        <span className="text-xs font-medium text-muted-foreground shrink-0 w-20">
-                          {field.label}
-                        </span>
-                        <div className="flex items-center gap-2 min-w-0 flex-1 justify-end">
-                          <code className="min-w-0 break-all font-mono text-sm text-foreground">
-                            {field.value}
-                          </code>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-8 shrink-0"
-                            onClick={() => copy(field.value, `field-${i}`)}
-                            aria-label={`复制${field.label}`}
-                          >
-                            {copiedId === `field-${i}` ? (
-                              <Check className="size-4 text-emerald-600" />
-                            ) : (
-                              <Copy className="size-4" />
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <Button
-                    variant="secondary"
-                    className="w-full gap-2"
-                    onClick={() => copyAll(selectedCard)}
-                  >
-                    <Copy className="size-4" />
-                    复制全部
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="rounded-lg border p-4">
-                    <code className="break-all font-mono text-sm text-foreground">
-                      {selectedCard.resolved.content}
-                    </code>
-                  </div>
-                  <Button
-                    variant="secondary"
-                    className="w-full gap-2"
-                    onClick={() => copyAll(selectedCard)}
-                  >
-                    <Copy className="size-4" />
-                    复制
-                  </Button>
-                </div>
-              )}
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
+      <CardDetailSheet
+        card={selectedCard}
+        title={selectedIndex >= 0 ? `卡密 #${selectedIndex + 1}` : "卡密详情"}
+        onClose={() => setSelectedCard(null)}
+      />
     </>
   )
 }

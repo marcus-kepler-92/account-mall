@@ -11,13 +11,6 @@ import { OrderCardsTable } from "@/app/admin/(main)/orders/[orderId]/order-cards
 
 export const dynamic = "force-dynamic"
 
-const MASK_LEN = 8
-
-function maskContent(content: string) {
-    if (content.length <= MASK_LEN) return content
-    return content.slice(0, MASK_LEN) + "***"
-}
-
 type PageProps = {
     params: Promise<{ orderId: string }>
 }
@@ -60,7 +53,6 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
     const serializedCards = order.cards.map((c) => ({
         id: c.id,
         content: c.content,
-        maskedContent: maskContent(c.content),
         status: c.status,
         createdAt: c.createdAt.toISOString(),
         productId: order.product.id,
