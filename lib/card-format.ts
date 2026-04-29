@@ -1,4 +1,4 @@
-import { parseCardContentWithDelimiter } from "@/lib/auto-fetch-card"
+import { parseCardContentWithDelimiter, parseAutoFetchCardContent, type AutoFetchCardPayload } from "@/lib/auto-fetch-card"
 
 export interface ParsedFormat {
   delimiter: string
@@ -84,4 +84,32 @@ export function resolveCardFields(
 
   // Tier 3: plain text
   return { type: "plain", content: trimmed }
+}
+
+const AUTO_FETCH_ADMIN_LABELS: Array<[keyof AutoFetchCardPayload, string]> = [
+  ["account", "账号"],
+  ["password", "密码"],
+  ["region", "地区"],
+  ["birthday", "生日"],
+  ["securityAnswerFriend", "密保朋友"],
+  ["securityAnswerWork", "工作答案"],
+  ["securityAnswerParents", "父母答案"],
+]
+
+/**
+ * Resolve card content for admin display: tries AUTO_FETCH JSON first,
+ * then falls back to template-based resolveCardFields.
+ */
+export function resolveAdminCard(
+  content: string,
+  cardTemplates: Array<{ template: string }>
+): ResolvedCard {
+  const payload = parseAutoFetchCardContent(content)
+  if (payload) {
+    const fields = AUTO_FETCH_ADMIN_LABELS
+      .filter(([key]) => !!payload[key])
+      .map(([key, label]) => ({ label, value: payload[key] as string }))
+    if (fields.length >= 1) return { type: "formatted", fields }
+  }
+  return resolveCardFields(content, cardTemplates)
 }
