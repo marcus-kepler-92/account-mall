@@ -25,21 +25,35 @@ import {
 import { cn } from "@/lib/utils";
 import { MarkdownViewClient } from "@/app/components/markdown-view-client";
 
-function ModalContentSkeleton() {
+function ContentSkeleton({ lines = 5 }: { lines?: number }) {
+  const widths = ["w-full", "w-4/5", "w-3/4", "w-full", "w-2/3"];
   return (
     <div className="space-y-2 py-1">
-      <Skeleton className="h-4 w-full" />
-      <Skeleton className="h-4 w-4/5" />
-      <Skeleton className="h-4 w-3/4" />
-      <Skeleton className="h-4 w-full" />
-      <Skeleton className="h-4 w-2/3" />
+      {Array.from({ length: lines }).map((_, i) => (
+        <Skeleton key={i} className={`h-4 ${widths[i % widths.length]}`} />
+      ))}
     </div>
+  );
+}
+
+function CollapsibleMarkdownContent({ content }: { content: string }) {
+  const [showSkeleton, setShowSkeleton] = useState(true);
+
+  useEffect(() => {
+    const t = setTimeout(() => setShowSkeleton(false), 400);
+    return () => clearTimeout(t);
+  }, []);
+
+  return showSkeleton ? (
+    <ContentSkeleton lines={3} />
+  ) : (
+    <MarkdownViewClient content={content} />
   );
 }
 
 const ModalMarkdownView = dynamic(
   () => import("@/app/components/markdown-view").then((m) => m.MarkdownView),
-  { ssr: false, loading: () => <ModalContentSkeleton /> },
+  { ssr: false, loading: () => <ContentSkeleton /> },
 );
 
 export type FrontAnnouncement = {
@@ -74,7 +88,7 @@ function ModalContent({ announcement }: { announcement: FrontAnnouncement }) {
   return (
     <div className="max-h-96 overflow-y-auto text-sm">
       {showSkeleton ? (
-        <ModalContentSkeleton />
+        <ContentSkeleton />
       ) : announcement.content?.trim() ? (
         <ModalMarkdownView content={announcement.content} />
       ) : (
@@ -189,7 +203,7 @@ export function AnnouncementsBlock({ announcements }: AnnouncementsBlockProps) {
                     </CollapsibleTrigger>
                     <CollapsibleContent>
                       <div className="border-t border-border bg-card px-8 py-3 text-sm text-muted-foreground rounded-b-lg">
-                        <MarkdownViewClient content={a.content!} />
+                        <CollapsibleMarkdownContent content={a.content!} />
                       </div>
                     </CollapsibleContent>
                   </Collapsible>
