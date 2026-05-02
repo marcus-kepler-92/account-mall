@@ -108,7 +108,7 @@ export async function fetchPlatformContext(): Promise<PlatformContext> {
             select: { title: true, content: true, tag: { select: { name: true } } },
         }),
         prisma.announcement.findMany({
-            where: { status: "PUBLISHED" },
+            where: { status: "PUBLISHED", audience: { in: ["DISTRIBUTOR", "ALL"] } },
             orderBy: [{ sortOrder: "desc" }, { publishedAt: "desc" }],
             take: 10,
             select: { title: true, content: true, publishedAt: true },

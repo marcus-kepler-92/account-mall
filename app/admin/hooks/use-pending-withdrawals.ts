@@ -8,7 +8,7 @@ export function usePendingWithdrawals() {
     queryFn: () =>
       fetch("/api/admin/withdrawals/count")
         .then((r) => r.json())
-        .then((d) => d.pending as number),
+        .then((d) => (typeof d.pending === "number" ? d.pending : 0)),
     staleTime: 30_000,
     refetchOnWindowFocus: true,
     refetchOnMount: "always",

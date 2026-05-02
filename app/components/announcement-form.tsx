@@ -1,7 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { useForm } from "react-hook-form"
+import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { toast } from "sonner"
@@ -26,6 +26,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 import { applyFieldErrors } from "@/lib/form-utils"
 import { ArrowLeft, Loader2 } from "lucide-react"
 
@@ -33,6 +34,8 @@ const announcementFormSchema = z.object({
     title: z.string().min(1, "标题不能为空").max(200, "标题过长"),
     content: z.string().max(10000).nullable().optional(), // Markdown
     status: z.enum(["DRAFT", "PUBLISHED"]),
+    audience: z.enum(["CUSTOMER", "DISTRIBUTOR", "ALL"]),
+    isMandatory: z.boolean(),
     sortOrder: z.number().int().min(-1000).max(10000),
 })
 
@@ -43,6 +46,8 @@ export type AnnouncementFormData = {
     title: string
     content: string | null
     status: string
+    audience: string
+    isMandatory: boolean
     sortOrder: number
     publishedAt: string | null
     createdAt: string
@@ -64,9 +69,14 @@ export function AnnouncementForm({ announcement }: AnnouncementFormProps) {
             title: announcement?.title ?? "",
             content: announcement?.content ?? "",
             status: (announcement?.status as "DRAFT" | "PUBLISHED") ?? "DRAFT",
+            audience: (announcement?.audience as "CUSTOMER" | "DISTRIBUTOR" | "ALL") ?? "CUSTOMER",
+            isMandatory: announcement?.isMandatory ?? false,
             sortOrder: announcement?.sortOrder ?? 0,
         },
     })
+
+    const audience = useWatch({ control: form.control, name: "audience" })
+    const distributorAudience = audience === "DISTRIBUTOR" || audience === "ALL"
 
     const onSubmit = async (data: AnnouncementFormSchema) => {
         try {
@@ -74,6 +84,8 @@ export function AnnouncementForm({ announcement }: AnnouncementFormProps) {
                 title: data.title,
                 content: data.content && data.content.trim() ? data.content.trim() : null,
                 status: data.status,
+                audience: data.audience,
+                isMandatory: data.isMandatory,
                 sortOrder: data.sortOrder,
             }
             const url = isEditing
@@ -185,6 +197,58 @@ export function AnnouncementForm({ announcement }: AnnouncementFormProps) {
                                             </Select>
                                             <FormDescription>仅「已发布」的公告会在前台展示</FormDescription>
                                             <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <FormField
+                                    control={form.control}
+                                    name="audience"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>展示对象</FormLabel>
+                                            <Select
+                                                value={field.value}
+                                                onValueChange={field.onChange}
+                                            >
+                                                <FormControl>
+                                                    <SelectTrigger>
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    <SelectItem value="CUSTOMER">客户端（首页店铺）</SelectItem>
+                                                    <SelectItem value="DISTRIBUTOR">分销中心</SelectItem>
+                                                    <SelectItem value="ALL">全部</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                            <FormDescription>控制公告在哪些端展示</FormDescription>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            </div>
+
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <FormField
+                                    control={form.control}
+                                    name="isMandatory"
+                                    render={({ field }) => (
+                                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                                            <div className="space-y-0.5">
+                                                <FormLabel>必读弹窗</FormLabel>
+                                                <FormDescription>
+                                                    {distributorAudience
+                                                        ? "开启后分销员进入分销中心时自动弹出，关闭即标记已读"
+                                                        : "必读弹窗仅对分销中心生效"}
+                                                </FormDescription>
+                                            </div>
+                                            <FormControl>
+                                                <Switch
+                                                    checked={field.value}
+                                                    onCheckedChange={field.onChange}
+                                                    disabled={!distributorAudience}
+                                                />
+                                            </FormControl>
                                         </FormItem>
                                     )}
                                 />

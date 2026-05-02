@@ -18,6 +18,8 @@ export default async function AdminAnnouncementsPage() {
         title: a.title,
         content: a.content,
         status: a.status,
+        audience: a.audience,
+        isMandatory: a.isMandatory,
         sortOrder: a.sortOrder,
         publishedAt: a.publishedAt?.toISOString() ?? null,
         createdAt: a.createdAt.toISOString(),

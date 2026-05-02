@@ -30,7 +30,12 @@ export async function GET(request: NextRequest) {
         }
     }
 
-    const where = isAdmin ? {} : { status: "PUBLISHED" as const };
+    const where = isAdmin
+        ? undefined
+        : {
+              status: "PUBLISHED" as const,
+              audience: { in: ["CUSTOMER" as const, "ALL" as const] },
+          };
 
     const announcements = await prisma.announcement.findMany({
         where,
@@ -65,7 +70,7 @@ export async function POST(request: NextRequest) {
         return validationError(parsed.error.flatten());
     }
 
-    const { title, content, status, sortOrder } = parsed.data;
+    const { title, content, status, audience, isMandatory, sortOrder } = parsed.data;
     const isPublished = status === "PUBLISHED";
 
     const announcement = await prisma.announcement.create({
@@ -73,6 +78,8 @@ export async function POST(request: NextRequest) {
             title,
             content: content ?? null,
             status: status ?? "DRAFT",
+            audience: audience ?? "CUSTOMER",
+            isMandatory: isMandatory ?? false,
             sortOrder: sortOrder ?? 0,
             publishedAt: isPublished ? new Date() : null,
         },

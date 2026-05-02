@@ -101,6 +101,22 @@ export function buildVoidloginsSourceUrl(code: string, password?: string): strin
 }
 
 /**
+ * 格式化为纯日期（年/月/日），如 "2025/01/15"，用于公告等无需时区的日期展示。
+ */
+export function formatDate(iso: string | null | undefined): string {
+  if (!iso) return ""
+  try {
+    return new Date(iso).toLocaleDateString("zh-CN", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    })
+  } catch {
+    return ""
+  }
+}
+
+/**
  * 格式化为短日期时间（不含年份），如 "01/15 14:30"
  * 服务端/客户端均可用，始终使用 Asia/Hong_Kong 时区。
  */

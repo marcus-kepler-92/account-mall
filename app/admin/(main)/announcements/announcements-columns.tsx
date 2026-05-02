@@ -12,6 +12,8 @@ export type AnnouncementRow = {
     title: string
     content: string | null
     status: "PUBLISHED" | "DRAFT"
+    audience: "CUSTOMER" | "DISTRIBUTOR" | "ALL"
+    isMandatory: boolean
     sortOrder: number
     publishedAt: string | null
     createdAt: string
@@ -21,6 +23,12 @@ export type AnnouncementRow = {
 const statusMap: Record<AnnouncementRow["status"], { label: string; variant: "default" | "secondary" }> = {
     PUBLISHED: { label: "已发布", variant: "default" },
     DRAFT: { label: "草稿", variant: "secondary" },
+}
+
+const audienceMap: Record<AnnouncementRow["audience"], string> = {
+    CUSTOMER: "客户端",
+    DISTRIBUTOR: "分销中心",
+    ALL: "全部",
 }
 
 export const announcementsColumns: ColumnDef<AnnouncementRow>[] = [
@@ -51,6 +59,21 @@ export const announcementsColumns: ColumnDef<AnnouncementRow>[] = [
             return <Badge variant={variant}>{label}</Badge>
         },
         filterFn: (row, id, value: string) => !value || row.getValue(id) === value,
+    },
+    {
+        accessorKey: "audience",
+        header: "受众",
+        cell: ({ row }) => (
+            <Badge variant="outline">{audienceMap[row.original.audience]}</Badge>
+        ),
+    },
+    {
+        accessorKey: "isMandatory",
+        header: "必读",
+        cell: ({ row }) =>
+            row.original.isMandatory ? (
+                <Badge variant="destructive">必读</Badge>
+            ) : null,
     },
     {
         accessorKey: "sortOrder",

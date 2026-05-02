@@ -8,7 +8,7 @@ import { prisma } from "@/lib/prisma"
  */
 export async function GET() {
   const announcements = await prisma.announcement.findMany({
-    where: { status: "PUBLISHED" },
+    where: { status: "PUBLISHED", audience: { in: ["CUSTOMER", "ALL"] } },
     select: {
       title: true,
       content: true,

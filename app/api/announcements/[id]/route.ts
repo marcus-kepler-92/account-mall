@@ -67,12 +67,14 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         return notFound("Announcement not found");
     }
 
-    const { title, content, status, sortOrder } = parsed.data;
+    const { title, content, status, audience, isMandatory, sortOrder } = parsed.data;
 
     const updateData: {
         title?: string;
         content?: string | null;
         status?: "DRAFT" | "PUBLISHED";
+        audience?: "CUSTOMER" | "DISTRIBUTOR" | "ALL";
+        isMandatory?: boolean;
         sortOrder?: number;
         publishedAt?: Date | null;
     } = {};
@@ -80,6 +82,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (title !== undefined) updateData.title = title;
     if (content !== undefined) updateData.content = content;
     if (status !== undefined) updateData.status = status;
+    if (audience !== undefined) updateData.audience = audience;
+    if (isMandatory !== undefined) updateData.isMandatory = isMandatory;
     if (sortOrder !== undefined) updateData.sortOrder = sortOrder;
 
     if (status === "PUBLISHED" && existing.status !== "PUBLISHED") {

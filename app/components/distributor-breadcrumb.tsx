@@ -17,6 +17,7 @@ const routeLabels: Record<string, string> = {
     commissions: "我的奖金",
     withdrawals: "提现记录",
     invitees: "我的团队",
+    announcements: "公告",
 }
 
 function getBreadcrumbItems(pathname: string) {

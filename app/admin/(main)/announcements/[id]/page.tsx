@@ -25,6 +25,8 @@ export default async function AdminEditAnnouncementPage({ params }: PageProps) {
         title: announcement.title,
         content: announcement.content,
         status: announcement.status,
+        audience: announcement.audience,
+        isMandatory: announcement.isMandatory,
         sortOrder: announcement.sortOrder,
         publishedAt: announcement.publishedAt?.toISOString() ?? null,
         createdAt: announcement.createdAt.toISOString(),

@@ -5,9 +5,9 @@ import { usePathname } from "next/navigation"
 import { navItems } from "@/app/components/distributor-sidebar"
 import { cn } from "@/lib/utils"
 
-// "入门手册" is accessible from the dashboard page; hide it from the mobile tab bar
+// "入门手册" and "公告" are accessible elsewhere; hide from mobile tab bar
 // to keep the bottom bar to 5 items max for comfortable thumb reach
-const MOBILE_HIDDEN_TABS = new Set(["/distributor/guide"])
+const MOBILE_HIDDEN_TABS = new Set(["/distributor/guide", "/distributor/announcements"])
 
 const shortLabels: Record<string, string> = {
     "我的团队": "团队",

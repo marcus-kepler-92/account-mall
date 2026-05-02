@@ -7,6 +7,7 @@ import { DistributorTopbarActions } from "@/app/components/distributor-topbar-ac
 import { DistributorMobileNav } from "./distributor-mobile-nav"
 import { VisibilityRefresh } from "@/app/components/visibility-refresh"
 import { FloatingChatLoader } from "./floating-chat-loader"
+import { DistributorMandatoryAnnouncements } from "./distributor-mandatory-announcements"
 
 export default async function DistributorMainLayout({
     children,
@@ -40,6 +41,7 @@ export default async function DistributorMainLayout({
                 </div>
             </SidebarInset>
             <FloatingChatLoader />
+            <DistributorMandatoryAnnouncements />
         </SidebarProvider>
     )
 }

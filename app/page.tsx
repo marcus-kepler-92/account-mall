@@ -38,7 +38,7 @@ export const metadata: Metadata = {
 
 export default async function HomePage() {
     const announcements = await prisma.announcement.findMany({
-        where: { status: "PUBLISHED" },
+        where: { status: "PUBLISHED", audience: { in: ["CUSTOMER", "ALL"] } },
         orderBy: [{ sortOrder: "desc" }, { publishedAt: "desc" }, { createdAt: "desc" }],
         take: ANNOUNCEMENTS_LIMIT,
     })

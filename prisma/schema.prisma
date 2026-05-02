@@ -37,6 +37,7 @@ model User {
   commissions      Commission[]
   withdrawals      Withdrawal[]
   distributorInvitationsSent DistributorInvitation[] @relation("DistributorInvitationInviter")
+  announcementReads          AnnouncementRead[]
 
   @@index([inviterId])
 }
@@ -363,18 +364,41 @@ enum AnnouncementStatus {
   PUBLISHED
 }
 
+enum AnnouncementAudience {
+  CUSTOMER      // 客户端（首页店铺）
+  DISTRIBUTOR   // 分销中心
+  ALL           // 两端都展示
+}
+
 model Announcement {
-  id          String              @id @default(cuid())
+  id          String               @id @default(cuid())
   title       String
-  content     String?             @db.Text
-  status      AnnouncementStatus  @default(DRAFT)
-  sortOrder   Int                 @default(0)
+  content     String?              @db.Text
+  status      AnnouncementStatus   @default(DRAFT)
+  audience    AnnouncementAudience @default(CUSTOMER)
+  isMandatory Boolean              @default(false)
+  sortOrder   Int                  @default(0)
   publishedAt DateTime?
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  reads       AnnouncementRead[]
 
   @@index([status])
   @@index([status, sortOrder])
+  @@index([audience, status])
+}
+
+model AnnouncementRead {
+  id             String       @id @default(cuid())
+  userId         String
+  announcementId String
+  readAt         DateTime     @default(now())
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, announcementId])
+  @@index([userId])
+  @@index([announcementId])
 }
 
 model DistributorGuide {
