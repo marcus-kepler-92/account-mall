@@ -48,6 +48,7 @@ export function WithdrawalProcessSheet({
     const resetDialog = () => {
         setAction(null)
         setNote("")
+        setLoading(false)
     }
 
     const handleConfirm = async () => {
