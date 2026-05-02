@@ -43,20 +43,26 @@ import { NotificationBadge } from "@/app/admin/components"
 import { usePendingWithdrawals } from "@/app/admin/hooks/use-pending-withdrawals"
 
 const allNavItems = [
+    // 总览
     { title: "仪表盘", href: "/admin/dashboard", icon: LayoutDashboard },
+    // 商品
     { title: "商品管理", href: "/admin/products", icon: Package },
-    { title: "订单管理", href: "/admin/orders", icon: ShoppingCart },
     { title: "卡密管理", href: "/admin/cards", icon: CreditCard },
     { title: "卡密模版", href: "/admin/card-templates", icon: LayoutTemplate },
+    { title: "自动获取验证", href: "/admin/auto-fetch", icon: FlaskConical },
+    // 数据
+    { title: "订单管理", href: "/admin/orders", icon: ShoppingCart },
+    // 提现
+    { title: "提现管理", href: "/admin/withdrawals", icon: Wallet },
+    // 公告
     { title: "公告管理", href: "/admin/announcements", icon: Megaphone },
     { title: "分销指南", href: "/admin/guides", icon: BookOpen },
+    { title: "邮件营销", href: "/admin/email-marketing", icon: Mail },
+    // 运维
     { title: "分销员管理", href: "/admin/distributors", icon: Users },
     { title: "阶梯佣金配置", href: "/admin/commission-tiers", icon: Layers },
-    { title: "提现管理", href: "/admin/withdrawals", icon: Wallet },
     { title: "收款渠道", href: "/admin/payment-channels", icon: Landmark },
     { title: "文件管理", href: "/admin/files", icon: FolderOpen },
-    { title: "自动获取验证", href: "/admin/auto-fetch", icon: FlaskConical },
-    { title: "邮件营销", href: "/admin/email-marketing", icon: Mail },
 ]
 
 const superAdminOnlyItems = [
