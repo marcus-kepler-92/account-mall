@@ -507,6 +507,10 @@ export async function POST(request: NextRequest) {
         return badRequest("该商品不支持使用优惠码")
     }
 
+    if (product.excludeFromAttribution) {
+        distributorId = null
+    }
+
     if (product.purchaseLimitEnabled) {
         const limitResult = await checkPurchaseLimit({
             productId,

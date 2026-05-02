@@ -141,7 +141,7 @@ export async function POST(request: NextRequest) {
         return validationError(parsed.error.flatten());
     }
 
-    const { name, slug, description, summary, image, price, maxQuantity, status, tagIds, productType, sourceUrl, validityHours, allowAccountSwitch, accountSwitchLimit, couponEnabled, riskWarningEnabled, riskWarningTitle, riskWarningContent, riskWarningCountdown, riskWarningConfirmText, purchaseLimitEnabled, purchaseLimitQuantity } =
+    const { name, slug, description, summary, image, price, maxQuantity, status, tagIds, productType, sourceUrl, validityHours, allowAccountSwitch, accountSwitchLimit, couponEnabled, riskWarningEnabled, riskWarningTitle, riskWarningContent, riskWarningCountdown, riskWarningConfirmText, purchaseLimitEnabled, purchaseLimitQuantity, excludeFromAttribution } =
         parsed.data;
 
     // Check slug uniqueness
@@ -186,6 +186,7 @@ export async function POST(request: NextRequest) {
             couponEnabled: couponEnabled ?? false,
             purchaseLimitEnabled: purchaseLimitEnabled ?? false,
             purchaseLimitQuantity: purchaseLimitQuantity ?? 1,
+            excludeFromAttribution: excludeFromAttribution ?? false,
             tags:
                 tagIds && tagIds.length > 0
                     ? { connect: tagIds.map((id) => ({ id })) }

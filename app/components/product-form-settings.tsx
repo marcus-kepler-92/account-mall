@@ -8,8 +8,9 @@ import type { ProductFormSchema } from "@/lib/validations/product"
 
 export function ProductFormSettings() {
     const { watch, setValue } = useFormContext<ProductFormSchema>()
-    const isActive = watch("isActive")
+    const isActive = watch("isActive") ?? false
     const couponEnabled = watch("couponEnabled") ?? false
+    const excludeFromAttribution = watch("excludeFromAttribution") ?? false
 
     return (
         <Card>
@@ -41,6 +42,21 @@ export function ProductFormSettings() {
                         id="coupon-enabled"
                         checked={couponEnabled}
                         onCheckedChange={(v) => setValue("couponEnabled", v)}
+                    />
+                </div>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <Label htmlFor="exclude-from-attribution">不参与分销归因</Label>
+                        <p className="text-xs text-muted-foreground">
+                            {excludeFromAttribution
+                                ? "该商品订单不归因到任何分销员，不产生佣金"
+                                : "正常按推广码 / 优惠码归因到分销员"}
+                        </p>
+                    </div>
+                    <Switch
+                        id="exclude-from-attribution"
+                        checked={excludeFromAttribution}
+                        onCheckedChange={(v) => setValue("excludeFromAttribution", v)}
                     />
                 </div>
             </CardContent>

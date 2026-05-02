@@ -45,6 +45,7 @@ type ProductData = {
     riskWarningConfirmText?: string | null
     purchaseLimitEnabled?: boolean
     purchaseLimitQuantity?: number
+    excludeFromAttribution?: boolean
     tags: Tag[]
     cardTemplates: { id: string; name: string; template: string }[]
 }
@@ -96,6 +97,7 @@ export function ProductForm({
             riskWarningConfirmText: product?.riskWarningConfirmText ?? "",
             purchaseLimitEnabled: product?.purchaseLimitEnabled ?? false,
             purchaseLimitQuantity: product?.purchaseLimitQuantity != null ? String(product.purchaseLimitQuantity) : "1",
+            excludeFromAttribution: product?.excludeFromAttribution ?? false,
         },
     })
 
@@ -151,6 +153,7 @@ export function ProductForm({
             purchaseLimitQuantity: data.purchaseLimitEnabled && data.purchaseLimitQuantity && data.purchaseLimitQuantity !== ""
                 ? parseInt(data.purchaseLimitQuantity, 10)
                 : 1,
+            excludeFromAttribution: data.excludeFromAttribution ?? false,
         }
 
         try {

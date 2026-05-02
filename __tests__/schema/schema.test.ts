@@ -479,6 +479,7 @@ describe("Enum default values", () => {
       couponEnabled: false,
       purchaseLimitEnabled: false,
       purchaseLimitQuantity: 1,
+      excludeFromAttribution: false,
       createdAt: new Date(),
       updatedAt: new Date(),
     };

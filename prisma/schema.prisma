@@ -140,6 +140,8 @@ model Product {
   riskWarningConfirmText String?   @db.VarChar(50)
   purchaseLimitEnabled  Boolean @default(false)
   purchaseLimitQuantity Int     @default(1)
+  /// When true, orders for this product are never attributed to a distributor (no distributorId, no commission).
+  excludeFromAttribution Boolean @default(false)
   createdAt        DateTime      @default(now())
   sortOrder        Int           @default(0)
   updatedAt        DateTime      @updatedAt
