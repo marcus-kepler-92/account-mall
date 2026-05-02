@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition, useMemo, useEffect } from "react"
+import { useState, useTransition, useMemo, useCallback, useEffect } from "react"
 import {
     useReactTable,
     getCoreRowModel,
@@ -72,12 +72,12 @@ export function WithdrawalsDataTable({
     const [selectedRow, setSelectedRow] = useState<WithdrawalRow | null>(null)
     const [sheetOpen, setSheetOpen] = useState(false)
 
-    const handleProcess = (row: WithdrawalRow) => {
+    const handleProcess = useCallback((row: WithdrawalRow) => {
         setSelectedRow(row)
         setSheetOpen(true)
-    }
+    }, [])
 
-    const columns = useMemo(() => makeWithdrawalsColumns(handleProcess), [])
+    const columns = useMemo(() => makeWithdrawalsColumns(handleProcess), [handleProcess])
 
     const table = useReactTable({
         data,
@@ -124,7 +124,10 @@ export function WithdrawalsDataTable({
             <WithdrawalProcessSheet
                 row={selectedRow}
                 open={sheetOpen}
-                onOpenChange={setSheetOpen}
+                onOpenChange={(o) => {
+                    setSheetOpen(o)
+                    if (!o) setSelectedRow(null)
+                }}
                 onSuccess={() => router.refresh()}
             />
         </>
