@@ -161,12 +161,6 @@ export default async function AdminWithdrawalsPage({ searchParams }: { searchPar
         }
     })
 
-    const statusCounts2 = {
-        PENDING: counts.PENDING,
-        PAID: counts.PAID,
-        REJECTED: counts.REJECTED,
-    }
-
     const buildStatusLink = (statusKey: "PENDING" | "REJECTED") => {
         const params = new URLSearchParams()
         const nextList = filters.statusList.includes(statusKey)
@@ -194,7 +188,6 @@ export default async function AdminWithdrawalsPage({ searchParams }: { searchPar
             <WithdrawalsDataTable
                 data={data}
                 total={total}
-                statusCounts={statusCounts2}
                 defaultFilters={DEFAULT_WITHDRAWAL_FILTERS}
             />
         </div>

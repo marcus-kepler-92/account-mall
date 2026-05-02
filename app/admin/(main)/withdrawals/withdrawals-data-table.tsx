@@ -25,11 +25,6 @@ import { WithdrawalProcessSheet } from "./withdrawal-process-sheet"
 interface WithdrawalsDataTableProps {
     data: WithdrawalRow[]
     total: number
-    statusCounts: {
-        PENDING: number
-        PAID: number
-        REJECTED: number
-    }
     defaultFilters: WithdrawalFiltersState
 }
 
@@ -52,7 +47,6 @@ const MOBILE_HIDDEN_COLUMNS: VisibilityState = {
 export function WithdrawalsDataTable({
     data,
     total,
-    statusCounts,
 }: WithdrawalsDataTableProps) {
     const router = useRouter()
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})

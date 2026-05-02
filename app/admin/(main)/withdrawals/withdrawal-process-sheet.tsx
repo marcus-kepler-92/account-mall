@@ -78,6 +78,12 @@ export function WithdrawalProcessSheet({
 
     if (!row) return null
 
+    const statusConfig = {
+        PENDING: { label: "待处理", variant: "warning" as const },
+        PAID: { label: "已打款", variant: "success" as const },
+        REJECTED: { label: "已拒绝", variant: "destructive" as const },
+    }
+
     const {
         distributor,
         amount,
@@ -105,7 +111,9 @@ export function WithdrawalProcessSheet({
                     <SheetHeader className="border-b pb-4 shrink-0">
                         <SheetTitle className="flex items-center gap-2 flex-wrap">
                             {distributor.name}
-                            <Badge variant="warning" className="text-xs">待处理</Badge>
+                            <Badge variant={statusConfig[row.status].variant} className="text-xs">
+                                {statusConfig[row.status].label}
+                            </Badge>
                         </SheetTitle>
                         <p className="text-sm text-muted-foreground">
                             {distributor.email ?? distributor.username ?? "—"} · {formatDateTime(row.createdAt)}
