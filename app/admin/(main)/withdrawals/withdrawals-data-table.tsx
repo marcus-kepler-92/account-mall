@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition, useMemo } from "react"
+import { useState, useTransition, useMemo, useEffect } from "react"
 import {
     useReactTable,
     getCoreRowModel,
@@ -17,6 +17,7 @@ import {
     DataTableToolbar,
     DataTablePagination,
 } from "@/app/admin/components"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { makeWithdrawalsColumns, type WithdrawalRow } from "./withdrawals-columns"
 import type { WithdrawalFiltersState } from "./withdrawals-filters"
 import { WithdrawalProcessSheet } from "./withdrawal-process-sheet"
@@ -40,6 +41,14 @@ const statusOptions = [
 
 const SORT_DEFAULTS = { sort: "createdAt", sortDir: "desc" } as const
 
+const MOBILE_HIDDEN_COLUMNS: VisibilityState = {
+    amount: false,
+    currentBalance: false,
+    receipt: false,
+    createdAt: false,
+    note: false,
+}
+
 export function WithdrawalsDataTable({
     data,
     total,
@@ -47,6 +56,12 @@ export function WithdrawalsDataTable({
 }: WithdrawalsDataTableProps) {
     const router = useRouter()
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
+    const isMobile = useIsMobile()
+
+    useEffect(() => {
+        setColumnVisibility(isMobile ? MOBILE_HIDDEN_COLUMNS : {})
+    }, [isMobile])
+
     const [isPending, startTransition] = useTransition()
     const [sortState, setSortState] = useQueryStates(
         { ...sortQueryStates, page: parseAsInteger },
