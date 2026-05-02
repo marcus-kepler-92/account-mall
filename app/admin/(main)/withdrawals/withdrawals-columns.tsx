@@ -21,7 +21,6 @@ export type WithdrawalRow = {
     note: string | null
     processedAt: string | null
     createdAt: string
-    // Balance fields
     level1Settled: number
     level2Settled: number
     paidTotal: number
@@ -29,114 +28,120 @@ export type WithdrawalRow = {
     currentBalance: number
 }
 
-const statusMap: Record<WithdrawalRow["status"], { label: string; variant: "warning" | "success" | "destructive" }> =
-    {
-        PENDING: { label: "待处理", variant: "warning" },
-        PAID: { label: "已打款", variant: "success" },
-        REJECTED: { label: "已拒绝", variant: "destructive" },
-    }
+const statusMap: Record<
+    WithdrawalRow["status"],
+    { label: string; variant: "warning" | "success" | "destructive" }
+> = {
+    PENDING: { label: "待处理", variant: "warning" },
+    PAID: { label: "已打款", variant: "success" },
+    REJECTED: { label: "已拒绝", variant: "destructive" },
+}
 
-export const withdrawalsColumns: ColumnDef<WithdrawalRow>[] = [
-    {
-        id: "distributor",
-        accessorFn: (row) => row.distributor.name,
-        header: "分销员",
-        cell: ({ row }) => (
-            <div className="flex flex-col">
-                <span className="font-medium">{row.original.distributor.name}</span>
-                <span className="text-xs text-muted-foreground">
-                    {row.original.distributor.email ?? row.original.distributor.username ?? "—"}
-                </span>
-            </div>
-        ),
-    },
-    {
-        accessorKey: "amount",
-        header: ({ column }) => (
-            <DataTableColumnHeader column={column} title="申请金额" className="justify-end" />
-        ),
-        cell: ({ row }) => (
-            <div className="text-right font-medium">{formatCurrency(row.original.amount)}</div>
-        ),
-    },
-    {
-        id: "actualAmount",
-        header: () => <div className="text-right">实付金额</div>,
-        cell: ({ row }) => {
-            const { feeAmount, actualAmount, feePercent } = row.original
-            return (
-                <div className="text-right">
-                    <span className="font-medium">{formatCurrency(actualAmount)}</span>
-                    {feeAmount > 0 && (
-                        <span className="block text-xs text-muted-foreground">
-                            手续费 {feePercent}% = -¥{feeAmount.toFixed(2)}
-                        </span>
-                    )}
+export function makeWithdrawalsColumns(
+    onProcess: (row: WithdrawalRow) => void
+): ColumnDef<WithdrawalRow>[] {
+    return [
+        {
+            id: "distributor",
+            accessorFn: (row) => row.distributor.name,
+            header: "分销员",
+            cell: ({ row }) => (
+                <div className="flex flex-col">
+                    <span className="font-medium">{row.original.distributor.name}</span>
+                    <span className="text-xs text-muted-foreground">
+                        {row.original.distributor.email ?? row.original.distributor.username ?? "—"}
+                    </span>
                 </div>
-            )
+            ),
         },
-    },
-    {
-        id: "currentBalance",
-        header: () => <div className="text-right">可提现余额</div>,
-        cell: ({ row }) => (
-            <div className="text-right">
-                <BalanceCell row={row.original} />
-            </div>
-        ),
-    },
-    {
-        id: "receipt",
-        header: "收款码",
-        cell: ({ row }) => <ReceiptCell url={row.original.receiptImageUrl} />,
-    },
-    {
-        accessorKey: "status",
-        header: "状态",
-        cell: ({ row }) => {
-            const { label, variant } = statusMap[row.original.status]
-            return <Badge variant={variant}>{label}</Badge>
+        {
+            accessorKey: "amount",
+            header: ({ column }) => (
+                <DataTableColumnHeader column={column} title="申请金额" className="justify-end" />
+            ),
+            cell: ({ row }) => (
+                <div className="text-right font-medium">{formatCurrency(row.original.amount)}</div>
+            ),
         },
-    },
-    {
-        accessorKey: "createdAt",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="申请时间" />,
-        cell: ({ row }) => (
-            <span className="text-muted-foreground text-sm">
-                {formatDateTime(row.original.createdAt)}
-            </span>
-        ),
-    },
-    {
-        accessorKey: "note",
-        header: "备注",
-        cell: ({ row }) => (
-            <span className="text-sm text-muted-foreground max-w-[200px] truncate block">
-                {row.original.note || "—"}
-            </span>
-        ),
-    },
-    {
-        id: "actions",
-        header: () => <div className="w-[200px]">操作</div>,
-        cell: ({ row }) => (
-            <WithdrawalRowActions
-                id={row.original.id}
-                status={row.original.status}
-                amount={row.original.amount}
-                feeAmount={row.original.feeAmount}
-                feePercent={row.original.feePercent}
-                actualAmount={row.original.actualAmount}
-                distributorName={row.original.distributor.name}
-                distributorEmail={row.original.distributor.email ?? row.original.distributor.username ?? "—"}
-                balance={{
-                    level1Settled: row.original.level1Settled,
-                    level2Settled: row.original.level2Settled,
-                    paidTotal: row.original.paidTotal,
-                    pendingTotal: row.original.pendingTotal,
-                    currentBalance: row.original.currentBalance,
-                }}
-            />
-        ),
-    },
-]
+        {
+            id: "actualAmount",
+            header: () => (
+                <div className="text-right">
+                    <span className="hidden md:inline">实付金额</span>
+                    <span className="md:hidden">打款金额</span>
+                </div>
+            ),
+            cell: ({ row }) => {
+                const { feeAmount, actualAmount, feePercent } = row.original
+                return (
+                    <div className="text-right">
+                        <span className="font-medium">{formatCurrency(actualAmount)}</span>
+                        {feeAmount > 0 && (
+                            <span className="block text-xs text-muted-foreground">
+                                手续费 {feePercent}% = -¥{feeAmount.toFixed(2)}
+                            </span>
+                        )}
+                    </div>
+                )
+            },
+        },
+        {
+            id: "currentBalance",
+            header: () => <div className="text-right">可提现余额</div>,
+            cell: ({ row }) => (
+                <div className="text-right">
+                    <BalanceCell row={row.original} />
+                </div>
+            ),
+        },
+        {
+            id: "receipt",
+            header: "收款码",
+            cell: ({ row }) => (
+                <ReceiptCell
+                    url={row.original.receiptImageUrl}
+                    distributorName={row.original.distributor.name}
+                    actualAmount={row.original.actualAmount}
+                    amount={row.original.amount}
+                    feeAmount={row.original.feeAmount}
+                    feePercent={row.original.feePercent}
+                />
+            ),
+        },
+        {
+            accessorKey: "status",
+            header: "状态",
+            cell: ({ row }) => {
+                const { label, variant } = statusMap[row.original.status]
+                return <Badge variant={variant}>{label}</Badge>
+            },
+        },
+        {
+            accessorKey: "createdAt",
+            header: ({ column }) => (
+                <DataTableColumnHeader column={column} title="申请时间" />
+            ),
+            cell: ({ row }) => (
+                <span className="text-muted-foreground text-sm">
+                    {formatDateTime(row.original.createdAt)}
+                </span>
+            ),
+        },
+        {
+            accessorKey: "note",
+            header: "备注",
+            cell: ({ row }) => (
+                <span className="text-sm text-muted-foreground max-w-[200px] truncate block">
+                    {row.original.note || "—"}
+                </span>
+            ),
+        },
+        {
+            id: "actions",
+            header: () => <div className="w-[100px]">操作</div>,
+            cell: ({ row }) => (
+                <WithdrawalRowActions row={row.original} onProcess={onProcess} />
+            ),
+        },
+    ]
+}
