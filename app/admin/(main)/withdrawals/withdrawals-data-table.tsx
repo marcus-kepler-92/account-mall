@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition, useMemo, useCallback, useEffect } from "react"
+import { useState, useTransition, useEffect } from "react"
 import {
     useReactTable,
     getCoreRowModel,
@@ -18,7 +18,7 @@ import {
     DataTablePagination,
 } from "@/app/admin/components"
 import { useIsMobile } from "@/hooks/use-mobile"
-import { makeWithdrawalsColumns, type WithdrawalRow } from "./withdrawals-columns"
+import { withdrawalsColumns, type WithdrawalRow } from "./withdrawals-columns"
 import type { WithdrawalFiltersState } from "./withdrawals-filters"
 import { WithdrawalProcessSheet } from "./withdrawal-process-sheet"
 
@@ -66,16 +66,9 @@ export function WithdrawalsDataTable({
     const [selectedRow, setSelectedRow] = useState<WithdrawalRow | null>(null)
     const [sheetOpen, setSheetOpen] = useState(false)
 
-    const handleProcess = useCallback((row: WithdrawalRow) => {
-        setSelectedRow(row)
-        setSheetOpen(true)
-    }, [])
-
-    const columns = useMemo(() => makeWithdrawalsColumns(handleProcess), [handleProcess])
-
     const table = useReactTable({
         data,
-        columns,
+        columns: withdrawalsColumns,
         state: { columnVisibility, sorting },
         onColumnVisibilityChange: setColumnVisibility,
         getCoreRowModel: getCoreRowModel(),
@@ -107,8 +100,12 @@ export function WithdrawalsDataTable({
                     <div className={isPending ? "opacity-50 pointer-events-none transition-opacity" : "transition-opacity"}>
                         <DataTable
                             table={table}
-                            columns={columns}
+                            columns={withdrawalsColumns}
                             emptyMessage="暂无提现记录"
+                            onRowClick={(row) => {
+                                setSelectedRow(row)
+                                setSheetOpen(true)
+                            }}
                         />
                         <DataTablePagination table={table} total={total} />
                     </div>

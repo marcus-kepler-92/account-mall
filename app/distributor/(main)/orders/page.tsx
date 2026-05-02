@@ -56,6 +56,15 @@ export default async function DistributorOrdersPage({
         }),
     ])
 
+    const completedOrderIds = orders.filter((o) => o.status === "COMPLETED").map((o) => o.id)
+    const pageCommissions = completedOrderIds.length > 0
+        ? await prisma.commission.findMany({
+              where: { orderId: { in: completedOrderIds }, distributorId: user.id, status: { not: "CANCELLED" } },
+              select: { orderId: true, amount: true },
+          })
+        : []
+    const commissionMap = new Map(pageCommissions.map((c) => [c.orderId, Number(c.amount)]))
+
     const orderStats = {
         PENDING: statusCounts.find((c) => c.status === "PENDING")?._count.id ?? 0,
         COMPLETED: statusCounts.find((c) => c.status === "COMPLETED")?._count.id ?? 0,
@@ -69,6 +78,9 @@ export default async function DistributorOrdersPage({
         quantity: o.quantity,
         amount: Number(o.amount),
         status: o.status,
+        commissionAmount: o.status === "COMPLETED"
+            ? (commissionMap.has(o.id) ? commissionMap.get(o.id)! : null)
+            : null,
         createdAt: o.createdAt.toISOString(),
     }))
 

@@ -178,21 +178,36 @@ export function WithdrawalProcessSheet({
                             </div>
                         </div>
 
-                        {/* Action buttons */}
-                        <div className="flex gap-2">
-                            <Button className="flex-1" onClick={() => setAction("PAID")}>
-                                <CheckCircle className="size-4" />
-                                已打款
-                            </Button>
-                            <Button
-                                variant="outline"
-                                className="flex-1 text-destructive hover:text-destructive"
-                                onClick={() => setAction("REJECTED")}
-                            >
-                                <XCircle className="size-4" />
-                                拒绝
-                            </Button>
-                        </div>
+                        {/* Action buttons — PENDING only */}
+                        {row.status === "PENDING" ? (
+                            <div className="flex gap-2">
+                                <Button className="flex-1" onClick={() => setAction("PAID")}>
+                                    <CheckCircle className="size-4" />
+                                    已打款
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    className="flex-1 text-destructive hover:text-destructive"
+                                    onClick={() => setAction("REJECTED")}
+                                >
+                                    <XCircle className="size-4" />
+                                    拒绝
+                                </Button>
+                            </div>
+                        ) : (
+                            <div className="rounded-lg border px-4 py-3 space-y-1 text-sm">
+                                <div className="flex justify-between">
+                                    <span className="text-muted-foreground">处理时间</span>
+                                    <span>{row.processedAt ? formatDateTime(row.processedAt) : "—"}</span>
+                                </div>
+                                {row.note && (
+                                    <div className="flex justify-between gap-4">
+                                        <span className="text-muted-foreground shrink-0">备注</span>
+                                        <span className="text-right">{row.note}</span>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </SheetContent>
             </Sheet>

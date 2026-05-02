@@ -4,7 +4,6 @@ import { formatDateTime, formatCurrency } from "@/lib/utils"
 import type { ColumnDef } from "@tanstack/react-table"
 import { Badge } from "@/components/ui/badge"
 import { DataTableColumnHeader } from "@/app/admin/components"
-import { WithdrawalRowActions } from "./withdrawal-row-actions"
 import { ReceiptCell } from "./receipt-cell"
 import { BalanceCell } from "./balance-cell"
 
@@ -37,10 +36,7 @@ const statusMap: Record<
     REJECTED: { label: "已拒绝", variant: "destructive" },
 }
 
-export function makeWithdrawalsColumns(
-    onProcess: (row: WithdrawalRow) => void
-): ColumnDef<WithdrawalRow>[] {
-    return [
+export const withdrawalsColumns: ColumnDef<WithdrawalRow>[] = [
         {
             id: "distributor",
             accessorFn: (row) => row.distributor.name,
@@ -136,12 +132,4 @@ export function makeWithdrawalsColumns(
                 </span>
             ),
         },
-        {
-            id: "actions",
-            header: () => <div className="w-[100px]">操作</div>,
-            cell: ({ row }) => (
-                <WithdrawalRowActions row={row.original} onProcess={onProcess} />
-            ),
-        },
-    ]
-}
+]

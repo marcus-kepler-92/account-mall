@@ -3,6 +3,7 @@
 import { ColumnDef } from "@tanstack/react-table"
 import { formatDateTime } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { DataTableColumnHeader } from "@/app/admin/components/data-table-column-header"
 
 export type DistributorOrderRow = {
@@ -12,7 +13,24 @@ export type DistributorOrderRow = {
     quantity: number
     amount: number
     status: "PENDING" | "COMPLETED" | "CLOSED"
+    commissionAmount: number | null
     createdAt: string
+}
+
+export function CommissionCell({ row }: { row: { original: Pick<DistributorOrderRow, "status" | "commissionAmount"> } }) {
+    const { status, commissionAmount } = row.original
+    if (status !== "COMPLETED") return <span className="text-muted-foreground text-sm">—</span>
+    if (commissionAmount !== null) return <span className="text-sm font-medium">¥{commissionAmount.toFixed(2)}</span>
+    return (
+        <TooltipProvider delayDuration={0}>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <Badge variant="secondary" className="text-xs cursor-help" aria-label="无奖金：下单邮箱与您的账号邮箱相同，此订单不计奖金">无奖金</Badge>
+                </TooltipTrigger>
+                <TooltipContent>下单邮箱与您的账号邮箱相同，此订单不计奖金</TooltipContent>
+            </Tooltip>
+        </TooltipProvider>
+    )
 }
 
 const statusMap = {
@@ -59,6 +77,11 @@ export const distributorOrdersColumns: ColumnDef<DistributorOrderRow>[] = [
                 ¥{(row.getValue("amount") as number).toFixed(2)}
             </span>
         ),
+    },
+    {
+        id: "commissionAmount",
+        header: "奖金",
+        cell: ({ row }) => <CommissionCell row={row} />,
     },
     {
         accessorKey: "status",

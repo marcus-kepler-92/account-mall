@@ -45,9 +45,13 @@ export async function uploadBinary(
     options: UploadOptions,
 ): Promise<string> {
     if (!process.env.BLOB_READ_WRITE_TOKEN) {
-        throw new Error(
-            "图片上传需要配置 Vercel Blob：请在 Vercel Dashboard → Storage 创建 Blob Store，并配置 BLOB_READ_WRITE_TOKEN。",
-        )
+        if (process.env.NODE_ENV === "production") {
+            throw new Error(
+                "图片上传需要配置 Vercel Blob：请在 Vercel Dashboard → Storage 创建 Blob Store，并配置 BLOB_READ_WRITE_TOKEN。",
+            )
+        }
+        console.warn("[upload] BLOB_READ_WRITE_TOKEN 未配置，dev 环境使用占位符 URL。")
+        return "/file.svg"
     }
     const {
         mimeType,
