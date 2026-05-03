@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { toast } from "sonner"
-import { Link2, Loader2, Copy, Check } from "lucide-react"
+import { Copy, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
     Dialog,
@@ -12,6 +12,7 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { Loader2 } from "lucide-react"
 
 interface GenerateLinkDialogProps {
     open: boolean
@@ -24,26 +25,33 @@ export function GenerateLinkDialog({ open, onOpenChange, apiEndpoint }: Generate
     const [link, setLink] = useState<string | null>(null)
     const [copied, setCopied] = useState(false)
 
-    const handleGenerate = async () => {
+    useEffect(() => {
+        if (!open) return
+        const controller = new AbortController()
+        setLink(null)
+        setCopied(false)
         setLoading(true)
-        try {
-            const res = await fetch(apiEndpoint, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({}),
+        fetch(apiEndpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({}),
+            signal: controller.signal,
+        })
+            .then(async (res) => {
+                const data = await res.json()
+                if (!res.ok) {
+                    toast.error(data.error || "生成失败，请稍后重试")
+                    return
+                }
+                setLink(data.link)
             })
-            const data = await res.json()
-            if (!res.ok) {
-                toast.error(data.error || "生成失败，请稍后重试")
-                return
-            }
-            setLink(data.link)
-        } catch {
-            toast.error("生成失败，请稍后重试")
-        } finally {
-            setLoading(false)
-        }
-    }
+            .catch((err) => {
+                if (err.name === "AbortError") return
+                toast.error("生成失败，请稍后重试")
+            })
+            .finally(() => setLoading(false))
+        return () => controller.abort()
+    }, [open, apiEndpoint])
 
     const handleCopy = async () => {
         if (!link) return
@@ -57,16 +65,8 @@ export function GenerateLinkDialog({ open, onOpenChange, apiEndpoint }: Generate
         }
     }
 
-    const handleOpenChange = (open: boolean) => {
-        if (!open) {
-            setLink(null)
-            setCopied(false)
-        }
-        onOpenChange(open)
-    }
-
     return (
-        <Dialog open={open} onOpenChange={handleOpenChange}>
+        <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>生成邀请链接</DialogTitle>
@@ -74,21 +74,12 @@ export function GenerateLinkDialog({ open, onOpenChange, apiEndpoint }: Generate
                         生成一次性邀请链接，将链接发给对方，对方点击后可设置用户名和密码加入。链接 7 天内有效，仅限一人使用。
                     </DialogDescription>
                 </DialogHeader>
-                {!link ? (
-                    <Button onClick={handleGenerate} disabled={loading} className="w-full">
-                        {loading ? (
-                            <>
-                                <Loader2 className="mr-2 size-4 animate-spin" />
-                                生成中...
-                            </>
-                        ) : (
-                            <>
-                                <Link2 className="mr-2 size-4" />
-                                生成邀请链接
-                            </>
-                        )}
-                    </Button>
-                ) : (
+                {loading ? (
+                    <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">
+                        <Loader2 className="mr-2 size-4 animate-spin" />
+                        生成中...
+                    </div>
+                ) : link ? (
                     <div className="space-y-3">
                         <div className="flex gap-2">
                             <Input value={link} readOnly className="text-xs" />
@@ -104,7 +95,7 @@ export function GenerateLinkDialog({ open, onOpenChange, apiEndpoint }: Generate
                         </div>
                         <p className="text-xs text-muted-foreground">复制后通过微信或其他方式发给对方</p>
                     </div>
-                )}
+                ) : null}
             </DialogContent>
         </Dialog>
     )

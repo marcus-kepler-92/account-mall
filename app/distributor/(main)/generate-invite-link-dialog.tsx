@@ -23,52 +23,48 @@ export function GenerateInviteLinkDialog({ open, onOpenChange }: GenerateInviteL
   const [link, setLink] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
-  const handleGenerate = async () => {
+  useEffect(() => {
+    if (!open) return
+    const controller = new AbortController()
+    setLink(null)
+    setCopied(false)
     setLoading(true)
-    try {
-      const res = await fetch("/api/distributor/invite", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+    fetch("/api/distributor/invite", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+      signal: controller.signal,
+    })
+      .then(async (res) => {
+        const data = await res.json()
+        if (!res.ok) {
+          toast.error(data.error || "生成失败，请稍后重试")
+          return
+        }
+        setLink(data.link)
       })
-      const data = await res.json()
-      if (!res.ok) {
-        toast.error(data.error || "生成失败，请稍后重试")
-        return
-      }
-      setLink(data.link)
-    } catch {
-      toast.error("生成失败，请稍后重试")
-    } finally {
-      setLoading(false)
-    }
-  }
+      .catch((err) => {
+        if (err.name === "AbortError") return
+        toast.error("生成失败，请稍后重试")
+      })
+      .finally(() => setLoading(false))
+    return () => controller.abort()
+  }, [open])
 
   const handleCopy = async () => {
     if (!link) return
-    await navigator.clipboard.writeText(link)
-    setCopied(true)
-    toast.success("链接已复制")
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-  useEffect(() => {
-    if (open && !link) {
-      handleGenerate()
+    try {
+      await navigator.clipboard.writeText(link)
+      setCopied(true)
+      toast.success("链接已复制")
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      toast.error("复制失败，请手动复制")
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open])
-
-  const handleOpenChange = (open: boolean) => {
-    if (!open) {
-      setLink(null)
-      setCopied(false)
-    }
-    onOpenChange(open)
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>生成邀请链接</DialogTitle>
