@@ -65,8 +65,8 @@ describe("POST /api/distributor/accept-invite", () => {
         expect(res.status).toBe(400)
     })
 
-    it("returns 400 when password is too short", async () => {
-        const res = await AcceptInvitePost(createRequest({ token: "valid-token", name: "Alice", password: "12345" }))
+    it("returns 400 when password is 7 characters (boundary)", async () => {
+        const res = await AcceptInvitePost(createRequest({ token: "valid-token", name: "Alice", password: "1234567" }))
         expect(res.status).toBe(400)
     })
 
@@ -214,7 +214,7 @@ describe("POST /api/distributor/accept-invite", () => {
         expect(body.error).toMatch(/冲突|重试/)
     })
 
-    it("accepts password at exact min length (6 chars)", async () => {
+    it("accepts password at exact min length (8 chars)", async () => {
         prismaMock.distributorInvitation.findUnique.mockResolvedValue(makeInvitation())
         prismaMock.user.findUnique.mockResolvedValue(null)
         ;(prismaMock.$transaction as any).mockImplementation(async (fn: (tx: any) => Promise<void>) => {
@@ -229,7 +229,7 @@ describe("POST /api/distributor/accept-invite", () => {
             })
         })
 
-        const res = await AcceptInvitePost(createRequest({ token: "valid-token", name: "Alice", password: "123456" }))
+        const res = await AcceptInvitePost(createRequest({ token: "valid-token", name: "Alice", password: "12345678" }))
         expect(res.status).toBe(200)
     })
 

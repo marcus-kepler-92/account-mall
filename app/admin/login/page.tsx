@@ -24,7 +24,7 @@ export default function AdminLoginPage() {
 
         try {
             const { error: signInError } = await authClient.signIn.email({
-                email,
+                email: email.trim().toLowerCase(),
                 password,
                 fetchOptions: {
                     onError: (ctx) => {

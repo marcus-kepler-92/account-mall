@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
+import { passwordSchema } from "@/lib/validations/auth"
 import { toast } from "sonner"
 import { Eye, EyeOff, Loader2 } from "lucide-react"
 import { authClient } from "@/lib/auth-client"
@@ -24,7 +25,7 @@ import {
 const schema = z.object({
     name: z.string().min(1, "请输入昵称").max(50, "昵称不能超过 50 字符"),
     email: z.string().email("请输入有效的邮箱地址"),
-    password: z.string().min(6, "密码至少 6 位").max(128, "密码不能超过 128 位"),
+    password: passwordSchema,
 })
 
 type FormValues = z.infer<typeof schema>

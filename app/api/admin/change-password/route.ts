@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { hashPassword } from "better-auth/crypto"
+import { passwordSchema } from "@/lib/validations/auth"
 import { prisma } from "@/lib/prisma"
 import { getSessionForAdminArea } from "@/lib/auth-guard"
 import { unauthorized, invalidJsonBody, validationError, internalServerError } from "@/lib/api-response"
 
 const schema = z.object({
-  password: z.string().min(8, "密码至少 8 位"),
+  password: passwordSchema,
 })
 
 export async function POST(request: NextRequest) {

@@ -1,5 +1,6 @@
 // lib/domains/distributors/validators.ts
 import * as z from "zod"
+import { passwordSchema } from "@/lib/validations/auth"
 
 // ── Distributor invite ────────────────────────────────────────────────────────
 export const distributorInviteSchema = z.object({
@@ -12,7 +13,7 @@ export const distributorInviteSchema = z.object({
 export const acceptInviteSchema = z.object({
   token: z.string().min(1, "邀请 token 不能为空"),
   name: z.string().min(1, "请输入昵称").max(50, "昵称不能超过 50 字符"),
-  password: z.string().min(6, "密码至少 6 位").max(128, "密码不能超过 128 位"),
+  password: passwordSchema,
 })
 
 export const usernameSchema = z

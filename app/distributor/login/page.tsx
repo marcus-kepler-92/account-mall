@@ -23,10 +23,11 @@ export default function DistributorLoginPage() {
 
         try {
             const isEmail = account.includes("@")
+            const normalizedAccount = isEmail ? account.trim() : account.trim().toLowerCase()
 
             if (isEmail) {
                 const { error: signInError } = await authClient.signIn.email({
-                    email: account,
+                    email: normalizedAccount,
                     password,
                     fetchOptions: {
                         onError: (ctx) => {
@@ -37,7 +38,7 @@ export default function DistributorLoginPage() {
                 if (signInError) return
             } else {
                 const { error: signInError } = await authClient.signIn.username({
-                    username: account,
+                    username: normalizedAccount,
                     password,
                     fetchOptions: {
                         onError: (ctx) => {

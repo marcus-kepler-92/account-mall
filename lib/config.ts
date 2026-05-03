@@ -167,9 +167,10 @@ const envSchema = z
         ? secret
         : "dev-secret-at-least-32-characters-long";
     if (data.nodeEnv === "development" && (!secret || secret.length < minLen)) {
-      console.warn(
+      warnOnce(
+        "BETTER_AUTH_SECRET",
         "[config] BETTER_AUTH_SECRET missing or too short; using dev default. Set a 32+ character secret in .env for production.",
-      );
+      )
     }
     const orderSuccessTokenRaw = data.orderSuccessTokenSecret?.trim();
     const orderSuccessTokenSecret =
@@ -182,9 +183,10 @@ const envSchema = z
       data.nodeEnv === "development" &&
       (!orderSuccessTokenRaw || orderSuccessTokenRaw.length < 16)
     ) {
-      console.warn(
+      warnOnce(
+        "ORDER_SUCCESS_TOKEN_SECRET",
         "[config] ORDER_SUCCESS_TOKEN_SECRET missing or too short; using dev default. Set 16+ chars in production.",
-      );
+      )
     }
     const siteUrl =
       data.betterAuthUrl?.trim() ||
@@ -273,6 +275,14 @@ function getEnvInput() {
     businessLicenseNo: e.BUSINESS_LICENSE_NO,
     contactEmail: e.CONTACT_EMAIL,
   };
+}
+
+const _warnedFlags = new Set<string>()
+function warnOnce(key: string, msg: string) {
+  if (!_warnedFlags.has(key)) {
+    _warnedFlags.add(key)
+    console.warn(msg)
+  }
 }
 
 function parseConfig(): z.infer<typeof envSchema> {

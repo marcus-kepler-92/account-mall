@@ -32,11 +32,6 @@ export async function POST(request: NextRequest) {
 
     const { email, password } = parsed.data
 
-    // Validate password before transaction
-    if (!password || typeof password !== "string" || password.length < 6) {
-        return validationError(undefined)
-    }
-
     try {
         const MAX_ORDERS_TO_CHECK = 20
 
@@ -108,8 +103,7 @@ export async function POST(request: NextRequest) {
             ? { type: "single" as const, data: matchingOrders[0] }
             : { type: "multiple" as const, data: matchingOrders }
 
-        // Format response based on result type
-        if (result.type === "single") {
+if (result.type === "single") {
             const order = result.data
             if (!order.product) {
                 throw new Error("LOOKUP_FAILED")

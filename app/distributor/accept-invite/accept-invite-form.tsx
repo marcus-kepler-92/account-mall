@@ -1,11 +1,14 @@
 "use client"
 
-import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
-import { usernameSchema } from "@/lib/validations/distributor-invite"
+import {
+  acceptInviteSchema,
+  acceptNoEmailInviteSchema,
+} from "@/lib/validations/distributor-invite"
+import { confirmPasswordRefine } from "@/lib/validations/auth"
 import { toast } from "sonner"
 import {
   Form,
@@ -19,28 +22,15 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Loader2 } from "lucide-react"
 
-const emailFormSchema = z
-  .object({
-    name: z.string().min(1, "请输入昵称").max(50, "昵称不能超过 50 字符"),
-    password: z.string().min(6, "密码至少 6 位").max(128, "密码不能超过 128 位"),
-    confirmPassword: z.string(),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "两次密码不一致",
-    path: ["confirmPassword"],
-  })
+const emailFormSchema = acceptInviteSchema
+  .omit({ token: true })
+  .extend({ confirmPassword: z.string() })
+  .refine(confirmPasswordRefine.fn, confirmPasswordRefine.opts)
 
-const noEmailFormSchema = z
-  .object({
-    username: usernameSchema,
-    name: z.string().min(1, "请输入昵称").max(50, "昵称不能超过 50 字符"),
-    password: z.string().min(6, "密码至少 6 位").max(128, "密码不能超过 128 位"),
-    confirmPassword: z.string(),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "两次密码不一致",
-    path: ["confirmPassword"],
-  })
+const noEmailFormSchema = acceptNoEmailInviteSchema
+  .omit({ token: true })
+  .extend({ confirmPassword: z.string() })
+  .refine(confirmPasswordRefine.fn, confirmPasswordRefine.opts)
 
 interface AcceptInviteFormProps {
   token: string
@@ -49,7 +39,6 @@ interface AcceptInviteFormProps {
 
 export function AcceptInviteForm({ token, email }: AcceptInviteFormProps) {
   const router = useRouter()
-  const [loading, setLoading] = useState(false)
   const isNoEmail = email === null
 
   const emailForm = useForm<z.infer<typeof emailFormSchema>>({
@@ -63,7 +52,6 @@ export function AcceptInviteForm({ token, email }: AcceptInviteFormProps) {
   })
 
   const handleEmailSubmit = async (values: z.infer<typeof emailFormSchema>) => {
-    setLoading(true)
     try {
       const res = await fetch("/api/distributor/accept-invite", {
         method: "POST",
@@ -79,13 +67,10 @@ export function AcceptInviteForm({ token, email }: AcceptInviteFormProps) {
       router.push("/distributor/login")
     } catch {
       toast.error("注册失败，请稍后重试")
-    } finally {
-      setLoading(false)
     }
   }
 
   const handleNoEmailSubmit = async (values: z.infer<typeof noEmailFormSchema>) => {
-    setLoading(true)
     try {
       const res = await fetch("/api/distributor/accept-invite", {
         method: "POST",
@@ -110,8 +95,6 @@ export function AcceptInviteForm({ token, email }: AcceptInviteFormProps) {
       router.push("/distributor/login")
     } catch {
       toast.error("注册失败，请稍后重试")
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -152,7 +135,7 @@ export function AcceptInviteForm({ token, email }: AcceptInviteFormProps) {
               <FormItem>
                 <FormLabel>设置密码</FormLabel>
                 <FormControl>
-                  <Input type="password" placeholder="至少 6 位" {...field} />
+                  <Input type="password" placeholder="至少 8 位" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -171,9 +154,9 @@ export function AcceptInviteForm({ token, email }: AcceptInviteFormProps) {
               </FormItem>
             )}
           />
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading && <Loader2 className="mr-2 size-4 animate-spin" />}
-            {loading ? "注册中..." : "完成注册"}
+          <Button type="submit" className="w-full" disabled={noEmailForm.formState.isSubmitting}>
+            {noEmailForm.formState.isSubmitting && <Loader2 className="mr-2 size-4 animate-spin" />}
+            {noEmailForm.formState.isSubmitting ? "注册中..." : "完成注册"}
           </Button>
         </form>
       </Form>
@@ -207,7 +190,7 @@ export function AcceptInviteForm({ token, email }: AcceptInviteFormProps) {
             <FormItem>
               <FormLabel>设置密码</FormLabel>
               <FormControl>
-                <Input type="password" placeholder="至少 6 位" {...field} />
+                <Input type="password" placeholder="至少 8 位" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -226,9 +209,9 @@ export function AcceptInviteForm({ token, email }: AcceptInviteFormProps) {
             </FormItem>
           )}
         />
-        <Button type="submit" className="w-full" disabled={loading}>
-          {loading && <Loader2 className="mr-2 size-4 animate-spin" />}
-          {loading ? "注册中..." : "完成注册"}
+        <Button type="submit" className="w-full" disabled={emailForm.formState.isSubmitting}>
+          {emailForm.formState.isSubmitting && <Loader2 className="mr-2 size-4 animate-spin" />}
+          {emailForm.formState.isSubmitting ? "注册中..." : "完成注册"}
         </Button>
       </form>
     </Form>

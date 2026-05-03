@@ -39,8 +39,19 @@ describe("POST /api/admin/change-password", () => {
     expect(res.status).toBe(401)
   })
 
-  it("returns 400 when password is too short", async () => {
-    const res = await POST(makeReq({ password: "short" }))
+  it("returns 400 when password is 7 characters (boundary)", async () => {
+    const res = await POST(makeReq({ password: "1234567" }))
+    expect(res.status).toBe(400)
+  })
+
+  it("returns 200 when password is exactly 8 characters (boundary)", async () => {
+    prismaMock.$transaction.mockResolvedValue([{ count: 1 }, { id: "admin-1" }] as any)
+    const res = await POST(makeReq({ password: "12345678" }))
+    expect(res.status).toBe(200)
+  })
+
+  it("returns 400 when password exceeds 128 characters", async () => {
+    const res = await POST(makeReq({ password: "a".repeat(129) }))
     expect(res.status).toBe(400)
   })
 
