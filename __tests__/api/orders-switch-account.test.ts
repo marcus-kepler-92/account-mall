@@ -48,7 +48,7 @@ function makeContext(orderNo = "order-1") {
     return { params: Promise.resolve({ orderId: orderNo }) }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 function makeOrder(overrides?: Record<string, unknown>): any {
     return {
         id: "ord_1",
@@ -85,7 +85,7 @@ describe("POST /api/orders/[orderId]/switch-account", () => {
         verifyOrderSuccessTokenMock.mockReturnValue(true)
         scrapeMultipleUrlsMock.mockResolvedValue([NEW_ACCOUNT])
         prismaMock.accountBlacklist.findMany.mockResolvedValue([])
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         ;(prismaMock.$transaction as any).mockImplementation(async (ops: any[]) => Promise.all(ops))
         prismaMock.accountBlacklist.upsert.mockResolvedValue({} as never)
         prismaMock.card.update.mockResolvedValue({} as never)

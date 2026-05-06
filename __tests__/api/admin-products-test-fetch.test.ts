@@ -42,7 +42,7 @@ function makeContext(productId = "prod_1") {
     return { params: Promise.resolve({ productId }) }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 function makeProduct(overrides?: Record<string, unknown>): any {
     return {
         id: "prod_1",

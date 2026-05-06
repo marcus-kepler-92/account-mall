@@ -73,6 +73,7 @@ function createWithdrawalFormRequestWithFile(amount: string, fileType: string, f
 describe("GET /api/distributor/me", () => {
     beforeEach(() => {
         getDistributorSession.mockReset()
+        prismaMock.invitationMilestoneBonus.aggregate.mockResolvedValue({ _sum: { amount: null }, _count: { id: 0 }, _avg: null, _min: null, _max: null } as any)
     })
 
     it("returns 401 when no session", async () => {
@@ -182,6 +183,7 @@ describe("GET /api/distributor/orders", () => {
 describe("GET /api/distributor/commissions", () => {
     beforeEach(() => {
         getDistributorSession.mockReset()
+        prismaMock.invitationMilestoneBonus.aggregate.mockResolvedValue({ _sum: { amount: null }, _count: { id: 0 }, _avg: null, _min: null, _max: null } as any)
     })
 
     it("returns 401 when no session", async () => {
@@ -284,6 +286,7 @@ describe("GET /api/distributor/withdrawals", () => {
 describe("POST /api/distributor/withdrawals", () => {
     beforeEach(() => {
         getDistributorSession.mockReset()
+        prismaMock.invitationMilestoneBonus.aggregate.mockResolvedValue({ _sum: { amount: null }, _count: { id: 0 }, _avg: null, _min: null, _max: null } as any)
     })
 
     it("returns 401 when no session", async () => {

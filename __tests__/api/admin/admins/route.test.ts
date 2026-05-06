@@ -70,7 +70,7 @@ describe("POST /api/admin/admins", () => {
 
   it("creates user and account, returns generated password", async () => {
     prismaMock.user.findUnique.mockResolvedValue(null)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     ;(prismaMock.$transaction as any).mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
       fn(prismaMock)
     )

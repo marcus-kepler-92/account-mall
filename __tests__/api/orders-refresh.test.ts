@@ -48,7 +48,7 @@ function makeContext(orderNo = "order-1") {
     return { params: Promise.resolve({ orderId: orderNo }) }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 function makeCompletedAutoFetchOrder(overrides?: Record<string, unknown>): any {
     return {
         id: "ord_1",
@@ -318,7 +318,7 @@ describe("POST /api/orders/[orderId]/refresh", () => {
             scrapeMultipleUrlsMock.mockResolvedValue([SCRAPED_ACCOUNT])
 
             let capturedUpdateData: Record<string, unknown> | undefined
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+             
             ;(prismaMock.card.update as any).mockImplementation(async (args: any) => {
                 capturedUpdateData = args.data
                 return {}
