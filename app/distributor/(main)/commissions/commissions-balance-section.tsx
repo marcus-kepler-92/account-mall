@@ -12,6 +12,7 @@ import { ApplyWithdrawalForm } from "./apply-withdrawal-form";
 interface CommissionsBalanceSectionProps {
   level1Settled: number;
   level2Settled: number;
+  milestoneBonusTotal?: number;
   paidTotal: number;
   pendingTotal: number;
   withdrawableBalance: number;
@@ -23,6 +24,7 @@ interface CommissionsBalanceSectionProps {
 export function CommissionsBalanceSection({
   level1Settled,
   level2Settled,
+  milestoneBonusTotal = 0,
   paidTotal,
   pendingTotal,
   withdrawableBalance,
@@ -38,7 +40,7 @@ export function CommissionsBalanceSection({
           <div className="flex flex-col gap-2">
             <CardTitle>可提现余额</CardTitle>
             <CardDescription>
-              （推广奖金 ¥{level1Settled.toFixed(2)} + 团队奖金 ¥{level2Settled.toFixed(2)}）− 已打款 ¥{paidTotal.toFixed(2)} − 提现中 ¥{pendingTotal.toFixed(2)} = 可提现余额{feePercent > 0 ? `；提现时扣除 ${feePercent}% 服务费` : ""}
+              （推广奖金 ¥{level1Settled.toFixed(2)} + 团队奖金 ¥{level2Settled.toFixed(2)}{milestoneBonusTotal > 0 ? ` + 里程碑奖励 ¥${milestoneBonusTotal.toFixed(2)}` : ""}）− 已打款 ¥{paidTotal.toFixed(2)} − 提现中 ¥{pendingTotal.toFixed(2)} = 可提现余额{feePercent > 0 ? `；提现时扣除 ${feePercent}% 服务费` : ""}
             </CardDescription>
           </div>
           <Button variant="outline" size="sm" className="min-h-9 touch-manipulation" asChild>

@@ -140,11 +140,12 @@ export async function listDistributors(): Promise<DistributorRow[]> {
   const distributors = await repo.findAllDistributors()
   return Promise.all(
     distributors.map(async (d) => {
-      const [completedOrderCount, settled, paid, pending] = await Promise.all([
+      const [completedOrderCount, settled, paid, pending, bonuses] = await Promise.all([
         prisma.order.count({ where: { distributorId: d.id, status: "COMPLETED" } }),
         repo.aggregateCommissionSum(d.id, "SETTLED"),
         repo.aggregateWithdrawalSum(d.id, "PAID"),
         repo.aggregateWithdrawalSum(d.id, "PENDING"),
+        repo.aggregateMilestoneBonusSum(d.id),
       ])
       return {
         id: d.id,
@@ -158,7 +159,7 @@ export async function listDistributors(): Promise<DistributorRow[]> {
         orderCount: d._count.ordersAsDistributor,
         completedOrderCount,
         totalCommission: settled,
-        withdrawableBalance: Math.round((settled - paid - pending) * 100) / 100,
+        withdrawableBalance: Math.round((settled + bonuses - paid - pending) * 100) / 100,
       }
     }),
   )
@@ -326,14 +327,15 @@ export async function getDistributorProfile(userId: string, currentDistributorCo
   const level2Rate = config.level2CommissionRatePercent
   const promoUrl = `${config.siteUrl}/?promoCode=${encodeURIComponent(distributorCode)}`
 
-  const [settled, paid, pending, tierSummary] = await Promise.all([
+  const [settled, paid, pending, bonuses, tierSummary] = await Promise.all([
     repo.aggregateCommissionSum(userId, "SETTLED"),
     repo.aggregateWithdrawalSum(userId, "PAID"),
     repo.aggregateWithdrawalSum(userId, "PENDING"),
+    repo.aggregateMilestoneBonusSum(userId),
     getDistributorTierSummary(userId, level2Rate),
   ])
 
-  const withdrawableBalance = Math.round((settled - paid - pending) * 100) / 100
+  const withdrawableBalance = Math.round((settled + bonuses - paid - pending) * 100) / 100
 
   return {
     distributorCode,
@@ -489,14 +491,15 @@ export async function listDistributorCommissions(
   pageSize: number,
 ) {
   const skip = (page - 1) * pageSize
-  const [commissions, total, settled, paid, pending] = await Promise.all([
+  const [commissions, total, settled, paid, pending, bonuses] = await Promise.all([
     repo.findCommissions(distributorId, status, skip, pageSize),
     repo.countCommissions(distributorId, status),
     repo.aggregateCommissionSum(distributorId, "SETTLED"),
     repo.aggregateWithdrawalSum(distributorId, "PAID"),
     repo.aggregateWithdrawalSum(distributorId, "PENDING"),
+    repo.aggregateMilestoneBonusSum(distributorId),
   ])
-  const withdrawableBalance = Math.round((settled - paid - pending) * 100) / 100
+  const withdrawableBalance = Math.round((settled + bonuses - paid - pending) * 100) / 100
   const data: CommissionRow[] = commissions.map((c) => ({
     id: c.id,
     orderId: c.orderId,
@@ -541,12 +544,13 @@ export async function createWithdrawal(
 ): Promise<WithdrawalRow> {
   const feeAmount = Math.round(amount * feePercent) / 100
 
-  const [settled, paid, pending] = await Promise.all([
+  const [settled, paid, pending, bonuses] = await Promise.all([
     repo.aggregateCommissionSum(distributorId, "SETTLED"),
     repo.aggregateWithdrawalSum(distributorId, "PAID"),
     repo.aggregateWithdrawalSum(distributorId, "PENDING"),
+    repo.aggregateMilestoneBonusSum(distributorId),
   ])
-  const balance = Math.round((settled - paid - pending) * 100) / 100
+  const balance = Math.round((settled + bonuses - paid - pending) * 100) / 100
   if (amount > balance) throw new WithdrawalOverBalanceError()
 
   const w = await repo.createWithdrawalRecord({ distributorId, amount, feePercent, feeAmount, receiptImageUrl })

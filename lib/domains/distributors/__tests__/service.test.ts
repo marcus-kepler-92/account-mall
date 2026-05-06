@@ -157,7 +157,8 @@ describe("createWithdrawal", () => {
     ;(repo.aggregateWithdrawalSum as jest.Mock)
       .mockResolvedValueOnce(40) // PAID
       .mockResolvedValueOnce(0)  // PENDING
-    // balance = 50 - 40 - 0 = 10; withdraw 20 → over
+    ;(repo.aggregateMilestoneBonusSum as jest.Mock).mockResolvedValue(0)
+    // balance = 50 + 0 - 40 - 0 = 10; withdraw 20 → over
     await expect(
       createWithdrawal("d1", 20, 2, "https://img.url/receipt.png"),
     ).rejects.toThrow(WithdrawalOverBalanceError)
@@ -166,6 +167,7 @@ describe("createWithdrawal", () => {
   it("creates withdrawal when amount is within balance", async () => {
     ;(repo.aggregateCommissionSum as jest.Mock).mockResolvedValue(100)
     ;(repo.aggregateWithdrawalSum as jest.Mock).mockResolvedValue(0)
+    ;(repo.aggregateMilestoneBonusSum as jest.Mock).mockResolvedValue(0)
     ;(repo.createWithdrawalRecord as jest.Mock).mockResolvedValue({
       id: "w1",
       amount: 50,

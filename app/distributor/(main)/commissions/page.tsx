@@ -57,6 +57,7 @@ export default async function DistributorCommissionsPage({
         pendingSum,
         tierSummary,
         inviteeCount,
+        milestoneBonusSum,
     ] = await Promise.all([
         prisma.commission.findMany({
             where,
@@ -91,15 +92,20 @@ export default async function DistributorCommissionsPage({
         }),
         getDistributorTierSummary(user.id, level2Rate),
         prisma.user.count({ where: { inviterId: user.id } }),
+        prisma.invitationMilestoneBonus.aggregate({
+            where: { inviterId: user.id },
+            _sum: { amount: true },
+        }),
     ])
 
     const hasInviter = tierSummary.hasInviter
     const level1SettledTotal = Number(level1Settled._sum.amount ?? 0)
     const level2SettledTotal = Number(level2Settled._sum.amount ?? 0)
+    const milestoneBonusTotal = Number(milestoneBonusSum._sum.amount ?? 0)
     const paidTotal = Number(paidSum._sum.amount ?? 0)
     const pendingWithdrawalTotal = Number(pendingSum._sum.amount ?? 0)
     const withdrawableBalance =
-        level1SettledTotal + level2SettledTotal - paidTotal - pendingWithdrawalTotal
+        level1SettledTotal + level2SettledTotal + milestoneBonusTotal - paidTotal - pendingWithdrawalTotal
 
     // Fetch sourceDistributor names for level-2 commissions
     const sourceDistributorIds = [
@@ -182,6 +188,7 @@ export default async function DistributorCommissionsPage({
             <CommissionsBalanceSection
                 level1Settled={level1SettledTotal}
                 level2Settled={level2SettledTotal}
+                milestoneBonusTotal={milestoneBonusTotal}
                 paidTotal={paidTotal}
                 pendingTotal={pendingWithdrawalTotal}
                 withdrawableBalance={withdrawableBalance}

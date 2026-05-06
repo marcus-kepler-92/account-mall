@@ -55,6 +55,7 @@ export default async function DistributorDashboardPage() {
     tierSummary,
     inviteeCount,
     selfUser,
+    milestoneBonusSum,
   ] = await Promise.all([
     prisma.order.count({
       where: { distributorId: user.id, status: "COMPLETED" },
@@ -81,6 +82,10 @@ export default async function DistributorDashboardPage() {
       where: { id: user.id },
       select: { discountCodeEnabled: true, discountPercent: true },
     }),
+    prisma.invitationMilestoneBonus.aggregate({
+      where: { inviterId: user.id },
+      _sum: { amount: true },
+    }),
   ]);
 
   const hasInviter = tierSummary.hasInviter;
@@ -103,10 +108,11 @@ export default async function DistributorDashboardPage() {
       })
     )._sum.amount ?? 0,
   );
+  const milestoneBonusTotal = Number(milestoneBonusSum._sum.amount ?? 0);
   const paidTotal = Number(paidSum._sum.amount ?? 0);
   const pendingTotal = Number(pendingSum._sum.amount ?? 0);
   const withdrawableBalance =
-    level1Settled + level2Settled - paidTotal - pendingTotal;
+    level1Settled + level2Settled + milestoneBonusTotal - paidTotal - pendingTotal;
 
   return (
     <div className="space-y-3">
