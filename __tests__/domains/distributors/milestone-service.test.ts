@@ -15,6 +15,7 @@ import {
   createInvitationMilestone,
   updateInvitationMilestone,
   deleteInvitationMilestone,
+  listDistributorMilestoneBonuses,
 } from "@/lib/domains/distributors/milestone-service"
 
 beforeEach(() => jest.clearAllMocks())
@@ -241,5 +242,52 @@ describe("deleteInvitationMilestone", () => {
     prismaMock.invitationMilestone.delete.mockResolvedValue({ id: "m1" } as never)
     await deleteInvitationMilestone("m1")
     expect(prismaMock.invitationMilestone.delete).toHaveBeenCalledWith({ where: { id: "m1" } })
+  })
+})
+
+describe("updateInvitationMilestone", () => {
+  it("throws InvitationMilestoneNotFoundError when not found", async () => {
+    prismaMock.invitationMilestone.findUnique.mockResolvedValue(null)
+    await expect(
+      updateInvitationMilestone("bad-id", { thresholdAmount: 100 })
+    ).rejects.toThrow(InvitationMilestoneNotFoundError)
+  })
+
+  it("updates milestone and returns serialized row", async () => {
+    prismaMock.invitationMilestone.findUnique.mockResolvedValue({ id: "m1" } as never)
+    prismaMock.invitationMilestone.update.mockResolvedValue({
+      id: "m1",
+      thresholdAmount: "1000.00",
+      bonusAmount: "50.00",
+      sortOrder: 0,
+      createdAt: new Date("2026-01-01"),
+      updatedAt: new Date(),
+    } as never)
+    const row = await updateInvitationMilestone("m1", { thresholdAmount: 1000 })
+    expect(row.thresholdAmount).toBe(1000)
+  })
+})
+
+describe("listDistributorMilestoneBonuses", () => {
+  it("returns paginated bonus records with invitee names", async () => {
+    prismaMock.invitationMilestoneBonus.findMany.mockResolvedValue([
+      {
+        id: "b1",
+        inviteeId: "inv1",
+        invitee: { name: "Alice" },
+        thresholdSnapshot: "500.00",
+        amount: "20.00",
+        createdAt: new Date("2026-02-01"),
+      },
+    ] as never)
+    prismaMock.invitationMilestoneBonus.count.mockResolvedValue(1)
+
+    const result = await listDistributorMilestoneBonuses("inviter1", 1, 20)
+
+    expect(result.total).toBe(1)
+    expect(result.data).toHaveLength(1)
+    expect(result.data[0].inviteeName).toBe("Alice")
+    expect(result.data[0].thresholdSnapshot).toBe(500)
+    expect(result.data[0].amount).toBe(20)
   })
 })
