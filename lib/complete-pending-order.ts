@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { sendOrderCompletionEmail } from "@/lib/order-completion-email";
 import { createOrderCommissions } from "@/lib/calculate-order-commission";
+import { checkAndIssueMilestoneBonuses } from "@/lib/domains/distributors";
 
 export type CompletePendingOrderResult =
   | { done: true; orderNo: string }
@@ -75,6 +76,7 @@ export async function completePendingOrder(
         discountPercentApplied: order.discountPercentApplied,
         paidAt,
       });
+      await checkAndIssueMilestoneBonuses(tx, distributorId);
     }
   });
 
