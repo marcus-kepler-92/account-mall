@@ -126,16 +126,18 @@ export async function checkAndIssueMilestoneBonuses(
   const untriggered = milestones.filter((m) => !triggeredSet.has(m.id))
   if (untriggered.length === 0) return
 
-  for (const milestone of untriggered) {
-    const { _sum } = await tx.order.aggregate({
-      where: {
-        distributorId: inviteeId,
-        status: "COMPLETED",
-        paidAt: { gte: milestone.createdAt },
-      },
-      _sum: { amount: true },
-    })
-    const cumulative = Number(_sum.amount ?? 0)
+  const aggregates = await Promise.all(
+    untriggered.map((milestone) =>
+      tx.order.aggregate({
+        where: { distributorId: inviteeId, status: "COMPLETED", paidAt: { gte: milestone.createdAt } },
+        _sum: { amount: true },
+      })
+    )
+  )
+
+  for (let i = 0; i < untriggered.length; i++) {
+    const milestone = untriggered[i]
+    const cumulative = Number(aggregates[i]._sum.amount ?? 0)
     if (cumulative < Number(milestone.thresholdAmount)) continue
 
     try {

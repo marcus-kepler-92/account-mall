@@ -56,6 +56,8 @@ export default async function DistributorDashboardPage() {
     inviteeCount,
     selfUser,
     milestoneBonusSum,
+    level1SettledAgg,
+    level2SettledAgg,
   ] = await Promise.all([
     prisma.order.count({
       where: { distributorId: user.id, status: "COMPLETED" },
@@ -86,28 +88,22 @@ export default async function DistributorDashboardPage() {
       where: { inviterId: user.id },
       _sum: { amount: true },
     }),
+    prisma.commission.aggregate({
+      where: { distributorId: user.id, level: 1, status: "SETTLED" },
+      _sum: { amount: true },
+    }),
+    prisma.commission.aggregate({
+      where: { distributorId: user.id, level: 2, status: "SETTLED" },
+      _sum: { amount: true },
+    }),
   ]);
 
   const hasInviter = tierSummary.hasInviter;
 
   const level1Total = Number(level1Sum._sum.amount ?? 0);
   const level2Total = Number(level2Sum._sum.amount ?? 0);
-  const level1Settled = Number(
-    (
-      await prisma.commission.aggregate({
-        where: { distributorId: user.id, level: 1, status: "SETTLED" },
-        _sum: { amount: true },
-      })
-    )._sum.amount ?? 0,
-  );
-  const level2Settled = Number(
-    (
-      await prisma.commission.aggregate({
-        where: { distributorId: user.id, level: 2, status: "SETTLED" },
-        _sum: { amount: true },
-      })
-    )._sum.amount ?? 0,
-  );
+  const level1Settled = Number(level1SettledAgg._sum.amount ?? 0);
+  const level2Settled = Number(level2SettledAgg._sum.amount ?? 0);
   const milestoneBonusTotal = Number(milestoneBonusSum._sum.amount ?? 0);
   const paidTotal = Number(paidSum._sum.amount ?? 0);
   const pendingTotal = Number(pendingSum._sum.amount ?? 0);

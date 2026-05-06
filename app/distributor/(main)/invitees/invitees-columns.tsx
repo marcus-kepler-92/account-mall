@@ -1,6 +1,6 @@
 "use client"
 
-import { ColumnDef } from "@tanstack/react-table"
+import type { ColumnDef } from "@tanstack/react-table"
 import { DataTableColumnHeader } from "@/app/admin/components/data-table-column-header"
 
 export type InviteeRow = {
@@ -10,7 +10,6 @@ export type InviteeRow = {
     username: string | null
     createdAt: string
     level2CommissionTotal: number
-    // Milestone progress fields
     nextMilestone: { thresholdAmount: number; bonusAmount: number; cumulative: number } | null
     triggeredMilestoneCount: number
 }

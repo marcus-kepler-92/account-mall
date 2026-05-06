@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma"
+import { listInvitationMilestones } from "@/lib/domains/distributors"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { PageHeader } from "@/app/admin/components"
 import { InvitationMilestonesDataTable } from "./invitation-milestones-data-table"
@@ -8,14 +8,12 @@ import type { MilestoneRow } from "./invitation-milestones-columns"
 export const dynamic = "force-dynamic"
 
 export default async function InvitationMilestonesPage() {
-    const milestones = await prisma.invitationMilestone.findMany({
-        orderBy: { thresholdAmount: "asc" },
-    })
+    const milestones = await listInvitationMilestones()
 
     const data: MilestoneRow[] = milestones.map((m) => ({
         id: m.id,
-        thresholdAmount: Number(m.thresholdAmount),
-        bonusAmount: Number(m.bonusAmount),
+        thresholdAmount: m.thresholdAmount,
+        bonusAmount: m.bonusAmount,
         sortOrder: m.sortOrder,
         createdAt: m.createdAt.toISOString(),
     }))
