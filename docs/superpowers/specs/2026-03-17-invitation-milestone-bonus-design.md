@@ -126,9 +126,19 @@ balance = SETTLED commissions + SUM(InvitationMilestoneBonus.amount WHERE invite
           - PAID withdrawals - PENDING withdrawals
 ```
 
-Files affected:
-- `lib/domains/distributors/repository.ts` — add `aggregateMilestoneBonusSum(distributorId)`
-- `lib/domains/distributors/service.ts` — `getDistributorProfile`, `listDistributorCommissions`, `createWithdrawal` (balance guard)
+Files affected (exhaustive — all six locations that compute withdrawable balance):
+
+1. `lib/domains/distributors/repository.ts` — add `aggregateMilestoneBonusSum(distributorId)` helper
+2. `lib/domains/distributors/service.ts: listDistributors` — admin distributor list shows `withdrawableBalance` per row
+3. `lib/domains/distributors/service.ts: getDistributorProfile` — distributor profile API
+4. `lib/domains/distributors/service.ts: listDistributorCommissions` — commissions page balance
+5. `lib/domains/distributors/service.ts: createWithdrawal` — balance guard before creating withdrawal
+6. `app/distributor/(main)/page.tsx` — dashboard RSC computes balance directly via `prisma.commission.aggregate`; does NOT go through service
+7. `app/distributor/(main)/commissions/page.tsx` — commissions RSC also computes balance directly; does NOT go through service
+
+> Note: `reassignOrderDistributor` (service.ts line ~638) does a `settled - cancelAmount - paid` check to verify commission solvency before reassignment. This is commission-only logic and should NOT include milestone bonuses.
+
+**UI formula string**: `app/distributor/(main)/commissions/commissions-balance-section.tsx` hardcodes the balance breakdown description as "推广奖金 + 团队奖金 − 已打款 − 提现中". This string must be updated to include "＋邀请奖励 ¥X". Add a `milestoneBonusTotal: number` prop to this component; only show the term when `milestoneBonusTotal > 0`.
 
 Commission statistics queries (`aggregateCommissionsByStatusAndPeriod`, leaderboard, etc.) are **not modified** — they only touch the `Commission` table.
 
@@ -153,7 +163,7 @@ invitation-milestones/
 - Edit: same Dialog form, pre-populated
 - Delete: AlertDialog; blocked if any `InvitationMilestoneBonus` records reference this milestone (error: "该档位已有奖励发放记录，不可删除")
 
-**Sidebar**: placed under the distributor management group, after "佣金档位".
+**Sidebar**: `app/components/admin-sidebar.tsx` — add entry after `{ title: "阶梯佣金配置", href: "/admin/commission-tiers" }`.
 
 **API routes**:
 - `GET /api/admin/invitation-milestones` — list all
@@ -163,14 +173,14 @@ invitation-milestones/
 
 ## Distributor UI
 
-### Invitation progress page
+### Invitation progress (extend existing invitees page)
 
-**Route**: `app/distributor/(main)/invitations/` (new page) or merged into existing invite flow.
+**Route**: `app/distributor/(main)/invitees/` — **already exists**. Do not create a new page. The current page shows invitees with their level-2 commission total. Extend it to also show milestone progress per invitee.
 
-**Content per invitee**:
-- Name / join date
+**Additional data per invitee row**:
 - Per-milestone progress: each milestone has its own cumulative sales window starting from `milestone.createdAt`. Display the next unclaimed milestone's progress bar (sales so far vs. threshold), and badges for already-triggered milestones.
-- If no milestones are configured, show a placeholder.
+- Preserve all existing level-2 commission display — do not remove or replace it.
+- If no milestones are configured, show nothing extra (no placeholder needed).
 
 ### Bonus records
 
