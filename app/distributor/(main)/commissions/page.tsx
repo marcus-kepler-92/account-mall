@@ -107,6 +107,13 @@ export default async function DistributorCommissionsPage({
     const withdrawableBalance =
         level1SettledTotal + level2SettledTotal + milestoneBonusTotal - paidTotal - pendingWithdrawalTotal
 
+    const milestoneBonuses = await prisma.invitationMilestoneBonus.findMany({
+        where: { inviterId: user.id },
+        include: { invitee: { select: { name: true } } },
+        orderBy: { createdAt: "desc" },
+        take: 20,
+    })
+
     // Fetch sourceDistributor names for level-2 commissions
     const sourceDistributorIds = [
         ...new Set(
@@ -210,6 +217,43 @@ export default async function DistributorCommissionsPage({
                     />
                 </Suspense>
             </div>
+
+            {milestoneBonuses.length > 0 && (
+                <div>
+                    <h3 className="text-lg font-semibold">邀请奖励记录</h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                        共 {milestoneBonuses.length} 笔。
+                    </p>
+                    <div className="rounded-md border">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="border-b bg-muted/50">
+                                    <th className="px-4 py-2 text-left font-medium">被邀请人</th>
+                                    <th className="px-4 py-2 text-right font-medium">门槛金额</th>
+                                    <th className="px-4 py-2 text-right font-medium">奖励金额</th>
+                                    <th className="px-4 py-2 text-right font-medium">触发时间</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {milestoneBonuses.map((b) => (
+                                    <tr key={b.id} className="border-b last:border-0">
+                                        <td className="px-4 py-2">{b.invitee.name}</td>
+                                        <td className="px-4 py-2 text-right text-muted-foreground">
+                                            ¥{Number(b.thresholdSnapshot).toFixed(2)}
+                                        </td>
+                                        <td className="px-4 py-2 text-right font-medium text-green-600">
+                                            +¥{Number(b.amount).toFixed(2)}
+                                        </td>
+                                        <td className="px-4 py-2 text-right text-muted-foreground">
+                                            {b.createdAt.toLocaleDateString("zh-CN")}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
