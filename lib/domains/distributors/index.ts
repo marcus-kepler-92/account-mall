@@ -39,6 +39,8 @@ export {
   updateTierSchema,
   updateWithdrawalSchema,
   reassignDistributorSchema,
+  createMilestoneSchema,
+  updateMilestoneSchema,
 } from "./validators"
 export type {
   DistributorInviteInput,
