@@ -65,6 +65,23 @@ export type {
   CreateOrderCommissionsParams,
 } from "./types"
 
+// Milestone CRUD (will be added in Task 3)
+export {
+  listInvitationMilestones,
+  createInvitationMilestone,
+  updateInvitationMilestone,
+  deleteInvitationMilestone,
+  listDistributorMilestoneBonuses,
+  checkAndIssueMilestoneBonuses,
+} from "./milestone-service"
+
+export type { CreateMilestoneInput, UpdateMilestoneInput } from "./validators"
+export type { MilestoneRow, MilestoneBonusRow } from "./types"
+export {
+  InvitationMilestoneNotFoundError,
+  InvitationMilestoneHasBonusesError,
+} from "./types"
+
 // Domain errors
 export {
   DistributorNotFoundError,

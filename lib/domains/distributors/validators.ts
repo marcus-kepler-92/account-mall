@@ -75,3 +75,14 @@ export type CreateTierInput = z.infer<typeof createTierSchema>
 export type UpdateTierInput = z.infer<typeof updateTierSchema>
 export type UpdateWithdrawalInput = z.infer<typeof updateWithdrawalSchema>
 export type ReassignDistributorInput = z.infer<typeof reassignDistributorSchema>
+
+// ── Invitation milestones ─────────────────────────────────────────────────────
+export const createMilestoneSchema = z.object({
+  thresholdAmount: z.number().positive("门槛金额必须大于 0"),
+  bonusAmount: z.number().positive("奖励金额必须大于 0"),
+})
+
+export const updateMilestoneSchema = createMilestoneSchema.partial()
+
+export type CreateMilestoneInput = z.infer<typeof createMilestoneSchema>
+export type UpdateMilestoneInput = z.infer<typeof updateMilestoneSchema>

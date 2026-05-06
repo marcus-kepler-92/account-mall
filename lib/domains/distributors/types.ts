@@ -241,3 +241,35 @@ export class CommissionAlreadyPaidOutError extends Error {
     this.name = "CommissionAlreadyPaidOutError"
   }
 }
+
+export type MilestoneRow = {
+  id: string
+  thresholdAmount: number
+  bonusAmount: number
+  sortOrder: number
+  createdAt: Date
+  updatedAt: Date
+}
+
+export type MilestoneBonusRow = {
+  id: string
+  inviteeId: string
+  inviteeName: string
+  thresholdSnapshot: number
+  amount: number
+  createdAt: Date
+}
+
+export class InvitationMilestoneNotFoundError extends Error {
+  constructor(id: string) {
+    super(`InvitationMilestone ${id} not found`)
+    this.name = "InvitationMilestoneNotFoundError"
+  }
+}
+
+export class InvitationMilestoneHasBonusesError extends Error {
+  constructor() {
+    super("该档位已有奖励发放记录，不可删除")
+    this.name = "InvitationMilestoneHasBonusesError"
+  }
+}
