@@ -4,6 +4,7 @@ import { useState } from "react"
 import { toast } from "sonner"
 import { Eye, EyeOff } from "lucide-react"
 import { authClient } from "@/lib/auth-client"
+import { translateAuthError } from "@/lib/auth-errors"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -31,7 +32,7 @@ export default function DistributorLoginPage() {
                     password,
                     fetchOptions: {
                         onError: (ctx) => {
-                            toast.error(ctx.error.message)
+                            toast.error(translateAuthError(ctx.error.message))
                         },
                     },
                 })
@@ -42,7 +43,7 @@ export default function DistributorLoginPage() {
                     password,
                     fetchOptions: {
                         onError: (ctx) => {
-                            toast.error(ctx.error.message)
+                            toast.error(translateAuthError(ctx.error.message))
                         },
                     },
                 })

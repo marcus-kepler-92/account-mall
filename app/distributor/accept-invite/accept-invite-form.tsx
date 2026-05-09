@@ -51,6 +51,14 @@ export function AcceptInviteForm({ token, email }: AcceptInviteFormProps) {
     defaultValues: { username: "", name: "", password: "", confirmPassword: "" },
   })
 
+  const KNOWN_API_ERRORS: Record<string, string> = {
+    "Validation failed": "提交内容有误，请检查各项填写",
+  }
+
+  const handleApiErrorToast = (data: { error?: string }) => {
+    toast.error(KNOWN_API_ERRORS[data.error ?? ""] ?? data.error ?? "注册失败，请稍后重试")
+  }
+
   const handleEmailSubmit = async (values: z.infer<typeof emailFormSchema>) => {
     try {
       const res = await fetch("/api/distributor/accept-invite", {
@@ -60,7 +68,7 @@ export function AcceptInviteForm({ token, email }: AcceptInviteFormProps) {
       })
       const data = await res.json()
       if (!res.ok) {
-        toast.error(data.error || "注册失败，请稍后重试")
+        handleApiErrorToast(data)
         return
       }
       toast.success("注册成功，请登录")
@@ -84,10 +92,12 @@ export function AcceptInviteForm({ token, email }: AcceptInviteFormProps) {
       })
       const data = await res.json()
       if (!res.ok) {
-        if (data.error?.includes("用户名已被使用")) {
-          noEmailForm.setError("username", { message: data.error })
+        // details is directly { fieldName: string[] } (from validationError())
+        const usernameMsg = data.details?.username?.[0]
+        if (usernameMsg) {
+          noEmailForm.setError("username", { message: usernameMsg })
         } else {
-          toast.error(data.error || "注册失败，请稍后重试")
+          handleApiErrorToast(data)
         }
         return
       }
