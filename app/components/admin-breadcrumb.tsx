@@ -17,10 +17,12 @@ const routeLabels: Record<string, string> = {
     products: "商品管理",
     orders: "订单管理",
     cards: "卡密管理",
+    "card-templates": "卡密模版",
     announcements: "公告管理",
     guides: "分销指南",
     distributors: "分销商",
     "commission-tiers": "佣金档位",
+    "invitation-milestones": "邀请里程碑奖励",
     withdrawals: "提现",
     files: "文件管理",
     "auto-fetch": "自动获取验证",
@@ -28,6 +30,7 @@ const routeLabels: Record<string, string> = {
     templates: "邮件模板",
     campaigns: "群发活动",
     "payment-channels": "收款渠道",
+    admins: "管理员管理",
 }
 
 function isIdSegment(seg: string) {
