@@ -15,12 +15,23 @@ import { Input } from "@/components/ui/input"
 import { inviteesColumns, type InviteeRow } from "./invitees-columns"
 import { InviteSubDistributorButton } from "../invite-sub-distributor-button"
 
+interface MilestoneSummary {
+    triggeredCount: number
+    nextMilestone: {
+        thresholdAmount: number
+        thresholdCount: number
+        bonusAmount: number
+        qualifiedCount: number
+    } | null
+}
+
 interface InviteesDataTableProps {
     data: InviteeRow[]
     level2RatePercent: number
+    milestoneSummary?: MilestoneSummary
 }
 
-export function InviteesDataTable({ data, level2RatePercent }: InviteesDataTableProps) {
+export function InviteesDataTable({ data, level2RatePercent, milestoneSummary }: InviteesDataTableProps) {
     const [sorting, setSorting] = useState<SortingState>([])
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
@@ -41,8 +52,28 @@ export function InviteesDataTable({ data, level2RatePercent }: InviteesDataTable
         getRowId: (row) => row.id,
     })
 
+    const showMilestone = milestoneSummary && (milestoneSummary.triggeredCount > 0 || milestoneSummary.nextMilestone !== null)
+
     return (
         <div className="space-y-4">
+            {showMilestone && (
+                <div className="rounded-lg border bg-muted/40 px-4 py-3 text-sm space-y-1">
+                    {milestoneSummary!.triggeredCount > 0 && (
+                        <p className="text-green-600 font-medium">
+                            已触发 {milestoneSummary!.triggeredCount} 个里程碑奖励
+                        </p>
+                    )}
+                    {milestoneSummary!.nextMilestone && (() => {
+                        const { thresholdAmount, thresholdCount, bonusAmount, qualifiedCount } = milestoneSummary!.nextMilestone!
+                        return (
+                            <p className="text-muted-foreground">
+                                下一档：{thresholdCount} 人各满 ¥{thresholdAmount.toFixed(0)} → 奖励 ¥{bonusAmount.toFixed(0)}，
+                                当前已有 <span className="text-foreground font-medium">{qualifiedCount}/{thresholdCount}</span> 人达标
+                            </p>
+                        )
+                    })()}
+                </div>
+            )}
             <div className="flex items-center justify-between gap-2">
                 <Input
                     placeholder="搜索昵称..."

@@ -23,12 +23,18 @@ import { ModalForm } from "@/app/admin/components"
 const schema = z.object({
     thresholdAmount: z
         .string()
-        .refine((v) => !Number.isNaN(parseFloat(v)), "请输入有效数字")
-        .refine((v) => parseFloat(v) > 0, "必须大于 0"),
+        .min(1, "请输入门槛金额")
+        .refine((v) => !Number.isNaN(Number(v)), "请输入有效数字")
+        .refine((v) => Number(v) > 0, "必须大于 0"),
+    thresholdCount: z
+        .string()
+        .min(1, "请输入达标人数")
+        .refine((v) => Number.isInteger(Number(v)) && Number(v) >= 1, "至少 1 人（整数）"),
     bonusAmount: z
         .string()
-        .refine((v) => !Number.isNaN(parseFloat(v)), "请输入有效数字")
-        .refine((v) => parseFloat(v) > 0, "必须大于 0"),
+        .min(1, "请输入奖励金额")
+        .refine((v) => !Number.isNaN(Number(v)), "请输入有效数字")
+        .refine((v) => Number(v) > 0, "必须大于 0"),
 })
 type FormValues = z.infer<typeof schema>
 
@@ -37,7 +43,7 @@ export function AddMilestoneDialog() {
     const [open, setOpen] = useState(false)
     const form = useForm<FormValues>({
         resolver: zodResolver(schema),
-        defaultValues: { thresholdAmount: "", bonusAmount: "" },
+        defaultValues: { thresholdAmount: "", thresholdCount: "", bonusAmount: "" },
     })
 
     const onSubmit = async (values: FormValues) => {
@@ -47,6 +53,7 @@ export function AddMilestoneDialog() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     thresholdAmount: parseFloat(values.thresholdAmount),
+                    thresholdCount: parseInt(values.thresholdCount),
                     bonusAmount: parseFloat(values.bonusAmount),
                 }),
             })
@@ -73,7 +80,7 @@ export function AddMilestoneDialog() {
                 </Button>
             }
             title="添加邀请里程碑"
-            description="被邀请人累计销售额（自本里程碑创建日起）达到门槛时，邀请人一次性获得奖励金额。"
+            description="当您名下有 N 位被邀请分销员各自累计销售额（自本里程碑创建日起）达到门槛时，您一次性获得奖励。"
             open={open}
             onOpenChange={(v) => {
                 setOpen(v)
@@ -90,6 +97,19 @@ export function AddMilestoneDialog() {
                                 <FormLabel>累计销售额门槛（元）</FormLabel>
                                 <FormControl>
                                     <Input type="number" min={0} step="0.01" placeholder="500" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="thresholdCount"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>达标人数</FormLabel>
+                                <FormControl>
+                                    <Input type="number" min={1} step={1} placeholder="3" {...field} />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>

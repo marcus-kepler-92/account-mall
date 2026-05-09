@@ -51,7 +51,7 @@ export function DistributorCommissionsDataTable({
     const sorting = parseSortingState(sort, sortDir, SORT_DEFAULTS)
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
         if (typeof window === "undefined") return {} as VisibilityState
-        return window.innerWidth < 768 ? { orderNo: false, createdAt: false } : {} as VisibilityState
+        return window.innerWidth < 768 ? { description: false, createdAt: false } : {} as VisibilityState
     })
 
     const table = useReactTable({

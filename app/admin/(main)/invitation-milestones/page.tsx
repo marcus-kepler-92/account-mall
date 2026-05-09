@@ -13,6 +13,7 @@ export default async function InvitationMilestonesPage() {
     const data: MilestoneRow[] = milestones.map((m) => ({
         id: m.id,
         thresholdAmount: m.thresholdAmount,
+        thresholdCount: m.thresholdCount,
         bonusAmount: m.bonusAmount,
         sortOrder: m.sortOrder,
         createdAt: m.createdAt.toISOString(),

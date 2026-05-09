@@ -1,4 +1,7 @@
 jest.mock("../repository")
+jest.mock("../milestone-service", () => ({
+  checkAndIssueMilestoneBonuses: jest.fn().mockResolvedValue(undefined),
+}))
 jest.mock("@/lib/prisma", () => {
   const { prismaMock } = require("../../../../__mocks__/prisma")
   return { __esModule: true, prisma: prismaMock }
@@ -25,6 +28,7 @@ jest.mock("@/app/emails/distributor-invitation", () => ({ DistributorInvitation:
 jest.mock("better-auth/crypto", () => ({ hashPassword: jest.fn().mockResolvedValue("hashed") }))
 
 import * as repo from "../repository"
+import { checkAndIssueMilestoneBonuses } from "../milestone-service"
 import { prismaMock } from "../../../../__mocks__/prisma"
 import {
   updateDistributor,
@@ -32,6 +36,7 @@ import {
   processWithdrawal,
   createWithdrawal,
   createCommissionTier,
+  createOrderCommissions,
   acceptInvite,
   reassignOrderDistributor,
 } from "../service"
@@ -46,9 +51,15 @@ import {
   InviteTokenNotFoundError,
   InviteTokenUsedError,
   InviteTokenExpiredError,
+  InviteTokenConcurrentAcceptError,
 } from "../types"
 
-beforeEach(() => jest.clearAllMocks())
+const checkMilestoneMock = checkAndIssueMilestoneBonuses as jest.Mock
+
+beforeEach(() => {
+  jest.clearAllMocks()
+  prismaMock.$transaction.mockImplementation(async (fn: any) => fn(prismaMock))
+})
 
 // ── updateDistributor ─────────────────────────────────────────────────────────
 
@@ -120,16 +131,28 @@ describe("processWithdrawal", () => {
   })
 
   it("throws WithdrawalNotPendingError when already processed", async () => {
-    ;(repo.findWithdrawalById as jest.Mock).mockResolvedValue({ id: "w1", status: "PAID" })
+    ;(repo.findWithdrawalById as jest.Mock).mockResolvedValue({ id: "w1", status: "PAID", distributorId: "d1", amount: 100 })
     await expect(processWithdrawal("w1", { status: "PAID" })).rejects.toThrow(WithdrawalNotPendingError)
   })
 
-  it("updates withdrawal when PENDING", async () => {
-    ;(repo.findWithdrawalById as jest.Mock).mockResolvedValue({ id: "w1", status: "PENDING" })
+  it("throws WithdrawalOverBalanceError when marking PAID with insufficient balance", async () => {
+    ;(repo.findWithdrawalById as jest.Mock).mockResolvedValue({ id: "w1", status: "PENDING", distributorId: "d1", amount: 200 })
+    ;(repo.aggregateCommissionSum as jest.Mock).mockResolvedValue(100)
+    ;(repo.aggregateWithdrawalSum as jest.Mock).mockResolvedValue(80)
+    ;(repo.aggregateMilestoneBonusSum as jest.Mock).mockResolvedValue(0)
+    // available = 100 + 0 - 80 = 20; amount = 200 → over
+    await expect(processWithdrawal("w1", { status: "PAID" })).rejects.toThrow(WithdrawalOverBalanceError)
+  })
+
+  it("updates withdrawal when PENDING with sufficient balance", async () => {
+    ;(repo.findWithdrawalById as jest.Mock).mockResolvedValue({ id: "w1", status: "PENDING", distributorId: "d1", amount: 50 })
+    ;(repo.aggregateCommissionSum as jest.Mock).mockResolvedValue(200)
+    ;(repo.aggregateWithdrawalSum as jest.Mock).mockResolvedValue(0)
+    ;(repo.aggregateMilestoneBonusSum as jest.Mock).mockResolvedValue(0)
     ;(repo.updateWithdrawalRecord as jest.Mock).mockResolvedValue({
       id: "w1",
-      amount: { toNumber: () => 100 },
-      feeAmount: 2,
+      amount: { toNumber: () => 50 },
+      feeAmount: 1,
       feePercent: 2,
       status: "PAID",
       note: null,
@@ -145,7 +168,28 @@ describe("processWithdrawal", () => {
     expect(repo.updateWithdrawalRecord).toHaveBeenCalledWith(
       "w1",
       expect.objectContaining({ status: "PAID", processedAt: expect.any(Date) }),
+      prismaMock,
     )
+  })
+
+  it("does not check balance when marking REJECTED", async () => {
+    ;(repo.findWithdrawalById as jest.Mock).mockResolvedValue({ id: "w1", status: "PENDING", distributorId: "d1", amount: 999 })
+    ;(repo.updateWithdrawalRecord as jest.Mock).mockResolvedValue({
+      id: "w1",
+      amount: { toNumber: () => 999 },
+      feeAmount: 0,
+      feePercent: 0,
+      status: "REJECTED",
+      note: null,
+      processedAt: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      distributorId: "d1",
+      distributor: { id: "d1", email: "a@b.com", name: null },
+      receiptImageUrl: null,
+    })
+    await processWithdrawal("w1", { status: "REJECTED" })
+    expect(repo.aggregateCommissionSum).not.toHaveBeenCalled()
   })
 })
 
@@ -183,6 +227,7 @@ describe("createWithdrawal", () => {
     expect(result.id).toBe("w1")
     expect(repo.createWithdrawalRecord).toHaveBeenCalledWith(
       expect.objectContaining({ distributorId: "d1", amount: 50, feePercent: 2 }),
+      prismaMock,
     )
   })
 })
@@ -214,13 +259,42 @@ describe("createCommissionTier", () => {
   })
 })
 
+// ── createOrderCommissions — tier fallback ────────────────────────────────────
+
+describe("createOrderCommissions — tier fallback", () => {
+  it("uses the highest-rate tier when weekTotal exceeds all maxAmounts", async () => {
+    prismaMock.user.findUnique.mockResolvedValue({ email: "dist@example.com", inviterId: null } as any)
+    prismaMock.order.findMany.mockResolvedValue([{ amount: 10000 }] as any) // weekTotal = 10000
+    prismaMock.commissionTier.findMany.mockResolvedValue([
+      { minAmount: 0, maxAmount: 1000, ratePercent: 5, sortOrder: 1 },
+      { minAmount: 1000, maxAmount: 5000, ratePercent: 10, sortOrder: 2 }, // 10000 exceeds maxAmount=5000
+    ] as any)
+    prismaMock.commission.create.mockResolvedValue({} as any)
+
+    await createOrderCommissions(prismaMock as any, {
+      orderId: "ord1",
+      distributorId: "dist1",
+      orderEmail: "buyer@example.com",
+      orderAmount: 100 as any,
+      discountPercentApplied: 0,
+      paidAt: new Date(),
+    })
+
+    expect(prismaMock.commission.create).toHaveBeenCalledTimes(1)
+    // highest tier ratePercent=10: amount = 100 * 10 / 100 = 10
+    expect(prismaMock.commission.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ amount: 10 }) }),
+    )
+  })
+})
+
 // ── acceptInvite ──────────────────────────────────────────────────────────────
 
 describe("acceptInvite", () => {
   it("throws InviteTokenNotFoundError when token missing", async () => {
     ;(repo.findInvitationByToken as jest.Mock).mockResolvedValue(null)
     await expect(
-      acceptInvite("bad-token", { name: "Alice", password: "pass1234" }),
+      acceptInvite("bad-token", { token: "bad-token", name: "Alice", password: "pass1234" }),
     ).rejects.toThrow(InviteTokenNotFoundError)
   })
 
@@ -234,7 +308,7 @@ describe("acceptInvite", () => {
       inviter: { role: "ADMIN" },
     })
     await expect(
-      acceptInvite("tok", { name: "Alice", password: "pass1234" }),
+      acceptInvite("tok", { token: "tok", name: "Alice", password: "pass1234" }),
     ).rejects.toThrow(InviteTokenUsedError)
   })
 
@@ -248,8 +322,26 @@ describe("acceptInvite", () => {
       inviter: { role: "ADMIN" },
     })
     await expect(
-      acceptInvite("tok", { name: "Alice", password: "pass1234" }),
+      acceptInvite("tok", { token: "tok", name: "Alice", password: "pass1234" }),
     ).rejects.toThrow(InviteTokenExpiredError)
+  })
+
+  it("throws InviteTokenConcurrentAcceptError when token already claimed by concurrent request", async () => {
+    ;(repo.findInvitationByToken as jest.Mock).mockResolvedValue({
+      token: "tok",
+      acceptedAt: null,
+      expiresAt: new Date(Date.now() + 10000),
+      email: "a@b.com",
+      inviterId: "inviter1",
+      inviter: { role: "DISTRIBUTOR" },
+    })
+    ;(repo.findUserByEmail as jest.Mock).mockResolvedValue(null)
+    ;(repo.claimInvitation as jest.Mock).mockResolvedValue(0) // concurrent request already claimed
+
+    await expect(
+      acceptInvite("tok", { token: "tok", name: "Alice", password: "pass1234" }),
+    ).rejects.toThrow(InviteTokenConcurrentAcceptError)
+    expect(repo.createDistributorUser).not.toHaveBeenCalled()
   })
 })
 
@@ -300,11 +392,6 @@ describe("reassignOrderDistributor", () => {
 
   it("both level-1 and level-2 commissions use order.paidAt as createdAt", async () => {
     ;(repo.findUserById as jest.Mock).mockResolvedValue({ id: "dist1", role: "DISTRIBUTOR" })
-    prismaMock.user.findUnique.mockResolvedValue({
-      email: "dist@example.com",
-      inviterId: "inviter1",
-    } as any)
-    // inviter lookup inside createOrderCommissions
     prismaMock.user.findUnique
       .mockResolvedValueOnce({ email: "dist@example.com", inviterId: "inviter1" } as any)
       .mockResolvedValueOnce({ email: "inviter@example.com", role: "DISTRIBUTOR", disabledAt: null } as any)
@@ -316,5 +403,18 @@ describe("reassignOrderDistributor", () => {
     for (const [arg] of calls) {
       expect(arg.data.createdAt).toEqual(paidAt)
     }
+  })
+
+  it("calls checkAndIssueMilestoneBonuses with tx and new distributorId after commission creation", async () => {
+    await reassignOrderDistributor("ord1", "dist1")
+
+    expect(checkMilestoneMock).toHaveBeenCalledTimes(1)
+    expect(checkMilestoneMock).toHaveBeenCalledWith(prismaMock, "dist1")
+  })
+
+  it("does NOT call checkAndIssueMilestoneBonuses when distributorId is null", async () => {
+    await reassignOrderDistributor("ord1", null)
+
+    expect(checkMilestoneMock).not.toHaveBeenCalled()
   })
 })

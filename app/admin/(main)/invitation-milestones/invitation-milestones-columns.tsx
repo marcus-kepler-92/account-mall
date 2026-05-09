@@ -8,6 +8,7 @@ import { InvitationMilestoneRowActions } from "./invitation-milestones-row-actio
 export type MilestoneRow = {
     id: string
     thresholdAmount: number
+    thresholdCount: number
     bonusAmount: number
     sortOrder: number
     createdAt: string
@@ -17,10 +18,19 @@ export const invitationMilestonesColumns: ColumnDef<MilestoneRow>[] = [
     {
         accessorKey: "thresholdAmount",
         header: ({ column }) => (
-            <DataTableColumnHeader column={column} title="被邀请人累计销售额门槛" className="justify-end" />
+            <DataTableColumnHeader column={column} title="个人销售门槛" className="justify-end" />
         ),
         cell: ({ row }) => (
             <div className="text-right">{formatCurrency(row.original.thresholdAmount)}</div>
+        ),
+    },
+    {
+        accessorKey: "thresholdCount",
+        header: ({ column }) => (
+            <DataTableColumnHeader column={column} title="达标人数" className="justify-end" />
+        ),
+        cell: ({ row }) => (
+            <div className="text-right">{row.original.thresholdCount} 人</div>
         ),
     },
     {
@@ -36,7 +46,8 @@ export const invitationMilestonesColumns: ColumnDef<MilestoneRow>[] = [
     },
     {
         accessorKey: "createdAt",
-        header: "创建时间（销售额起算日）",
+        header: () => <div>起算日期</div>,
+        meta: { className: "hidden sm:table-cell" },
         cell: ({ row }) => (
             <span className="text-muted-foreground text-sm">
                 {new Date(row.original.createdAt).toLocaleDateString("zh-CN")}
@@ -50,6 +61,7 @@ export const invitationMilestonesColumns: ColumnDef<MilestoneRow>[] = [
             <InvitationMilestoneRowActions
                 id={row.original.id}
                 thresholdAmount={row.original.thresholdAmount}
+                thresholdCount={row.original.thresholdCount}
                 bonusAmount={row.original.bonusAmount}
             />
         ),

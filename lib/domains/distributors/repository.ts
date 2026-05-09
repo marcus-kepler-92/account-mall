@@ -405,12 +405,20 @@ export async function updateOrderDistributor(
   return (tx ?? prisma).order.update({ where: { id: orderId }, data: { distributorId } })
 }
 
-export async function aggregateMilestoneBonusSum(distributorId: string) {
-  const r = await prisma.invitationMilestoneBonus.aggregate({
+export async function aggregateMilestoneBonusSum(distributorId: string, tx?: Tx) {
+  const r = await (tx ?? prisma).invitationMilestoneBonus.aggregate({
     where: { inviterId: distributorId },
     _sum: { amount: true },
   })
   return Number(r._sum.amount ?? 0)
+}
+
+export async function claimInvitation(token: string, acceptedAt: Date, tx?: Tx) {
+  const r = await (tx ?? prisma).distributorInvitation.updateMany({
+    where: { token, acceptedAt: null },
+    data: { acceptedAt },
+  })
+  return r.count
 }
 
 export async function findWeeklyCompletedOrders(

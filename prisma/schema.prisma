@@ -38,7 +38,6 @@ model User {
   withdrawals      Withdrawal[]
   distributorInvitationsSent DistributorInvitation[] @relation("DistributorInvitationInviter")
   inviterMilestoneBonuses InvitationMilestoneBonus[] @relation("InviterMilestoneBonuses")
-  inviteeMilestoneBonuses InvitationMilestoneBonus[] @relation("InviteeMilestoneBonuses")
   announcementReads          AnnouncementRead[]
 
   @@index([inviterId])
@@ -366,6 +365,7 @@ model DistributorInvitation {
 model InvitationMilestone {
   id              String   @id @default(cuid())
   thresholdAmount Decimal  @db.Decimal(12, 2)
+  thresholdCount  Int
   bonusAmount     Decimal  @db.Decimal(10, 2)
   sortOrder       Int      @default(0)
   createdAt       DateTime @default(now())
@@ -379,19 +379,17 @@ model InvitationMilestone {
 model InvitationMilestoneBonus {
   id                String   @id @default(cuid())
   inviterId         String
-  inviteeId         String
   milestoneId       String
   thresholdSnapshot Decimal  @db.Decimal(12, 2)
+  countSnapshot     Int
   amount            Decimal  @db.Decimal(10, 2)
   createdAt         DateTime @default(now())
 
   inviter   User                @relation("InviterMilestoneBonuses", fields: [inviterId], references: [id])
-  invitee   User                @relation("InviteeMilestoneBonuses", fields: [inviteeId], references: [id])
   milestone InvitationMilestone @relation(fields: [milestoneId], references: [id])
 
-  @@unique([inviteeId, milestoneId])
+  @@unique([inviterId, milestoneId])
   @@index([inviterId])
-  @@index([inviteeId])
   @@index([milestoneId])
 }
 

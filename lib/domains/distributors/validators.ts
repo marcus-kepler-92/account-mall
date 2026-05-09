@@ -79,6 +79,7 @@ export type ReassignDistributorInput = z.infer<typeof reassignDistributorSchema>
 // ── Invitation milestones ─────────────────────────────────────────────────────
 export const createMilestoneSchema = z.object({
   thresholdAmount: z.number().positive("门槛金额必须大于 0"),
+  thresholdCount: z.number().int().min(1, "达标人数至少为 1"),
   bonusAmount: z.number().positive("奖励金额必须大于 0"),
 })
 

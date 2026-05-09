@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog"
 
 interface ModalFormProps {
-    trigger: ReactNode
+    trigger?: ReactNode
     title: string
     description?: string
     /** Controlled open state. If provided, component becomes controlled. */
@@ -42,7 +42,7 @@ export function ModalForm({
 
     return (
         <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-            <DialogTrigger asChild>{trigger}</DialogTrigger>
+            {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>{title}</DialogTitle>

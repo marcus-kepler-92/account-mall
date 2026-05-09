@@ -24,7 +24,7 @@ export default async function DistributorInviteesPage() {
 
   const invitees = await prisma.user.findMany({
     where: { inviterId: user.id },
-    select: { id: true, name: true, email: true, username: true, createdAt: true },
+    select: { id: true, name: true, email: true, username: true, createdAt: true, disabledAt: true },
     orderBy: { createdAt: "desc" },
   });
 
@@ -60,73 +60,45 @@ export default async function DistributorInviteesPage() {
 
   const [milestones, triggeredBonuses] = await Promise.all([
     prisma.invitationMilestone.findMany({ orderBy: { thresholdAmount: "asc" } }),
-    inviteeIds.length > 0
-      ? prisma.invitationMilestoneBonus.findMany({
-          where: { inviterId: user.id, inviteeId: { in: inviteeIds } },
-          select: { inviteeId: true, milestoneId: true },
-        })
-      : Promise.resolve([]),
+    prisma.invitationMilestoneBonus.findMany({
+      where: { inviterId: user.id },
+      select: { milestoneId: true },
+    }),
   ])
 
-  const triggeredByInvitee = new Map<string, Set<string>>()
-  for (const b of triggeredBonuses) {
-    if (!triggeredByInvitee.has(b.inviteeId)) triggeredByInvitee.set(b.inviteeId, new Set())
-    triggeredByInvitee.get(b.inviteeId)!.add(b.milestoneId)
-  }
+  const triggeredMilestoneIds = new Set(triggeredBonuses.map((b) => b.milestoneId))
+  const triggeredMilestoneCount = triggeredMilestoneIds.size
 
-  const inviteeProgressMap = new Map<string, {
-    nextMilestone: { thresholdAmount: number; bonusAmount: number; cumulative: number } | null
-    triggeredMilestoneCount: number
-  }>()
+  const nextMilestone = milestones.find((m) => !triggeredMilestoneIds.has(m.id)) ?? null
 
-  if (milestones.length > 0) {
-    const milestoneToInvitees = new Map<string, typeof invitees>()
-    const inviteeToMilestone = new Map<string, typeof milestones[number]>()
-    const inviteeTriggeredCount = new Map<string, number>()
+  const cumulativeMap =
+    nextMilestone && inviteeIds.length > 0
+      ? new Map(
+          (
+            await prisma.order.groupBy({
+              by: ["distributorId"],
+              where: { distributorId: { in: inviteeIds }, status: "COMPLETED", paidAt: { gte: nextMilestone.createdAt } },
+              _sum: { amount: true },
+            })
+          ).map((r) => [r.distributorId, Number(r._sum.amount ?? 0)])
+        )
+      : null
 
-    for (const invitee of invitees) {
-      const triggered = triggeredByInvitee.get(invitee.id) ?? new Set<string>()
-      inviteeTriggeredCount.set(invitee.id, triggered.size)
-      const next = milestones.find((m) => !triggered.has(m.id))
-      if (next) {
-        inviteeToMilestone.set(invitee.id, next)
-        if (!milestoneToInvitees.has(next.id)) milestoneToInvitees.set(next.id, [])
-        milestoneToInvitees.get(next.id)!.push(invitee)
-      }
-    }
+  // Only count active invitees — consistent with checkAndIssueMilestoneBonuses trigger logic
+  const qualifiedForNextCount = nextMilestone && cumulativeMap
+    ? invitees.filter((u) => !u.disabledAt && (cumulativeMap.get(u.id) ?? 0) >= Number(nextMilestone.thresholdAmount)).length
+    : 0
 
-    await Promise.all(
-      [...milestoneToInvitees.entries()].map(async ([milestoneId, group]) => {
-        const milestone = milestones.find((m) => m.id === milestoneId)!
-        const ids = group.map((u) => u.id)
-        const results = await prisma.order.groupBy({
-          by: ["distributorId"],
-          where: { distributorId: { in: ids }, status: "COMPLETED", paidAt: { gte: milestone.createdAt } },
-          _sum: { amount: true },
-        })
-        const cumulativeMap = new Map(results.map((r) => [r.distributorId, Number(r._sum.amount ?? 0)]))
-        for (const invitee of group) {
-          inviteeProgressMap.set(invitee.id, {
-            nextMilestone: {
-              thresholdAmount: Number(milestone.thresholdAmount),
-              bonusAmount: Number(milestone.bonusAmount),
-              cumulative: cumulativeMap.get(invitee.id) ?? 0,
-            },
-            triggeredMilestoneCount: inviteeTriggeredCount.get(invitee.id) ?? 0,
-          })
-        }
-      }),
-    )
-
-    for (const invitee of invitees) {
-      if (!inviteeProgressMap.has(invitee.id)) {
-        inviteeProgressMap.set(invitee.id, {
-          nextMilestone: null,
-          triggeredMilestoneCount: inviteeTriggeredCount.get(invitee.id) ?? 0,
-        })
-      }
-    }
-  }
+  const inviteeProgressMap = new Map(
+    invitees.map((u) => [
+      u.id,
+      {
+        nextMilestone: cumulativeMap
+          ? { thresholdAmount: Number(nextMilestone!.thresholdAmount), bonusAmount: Number(nextMilestone!.bonusAmount), cumulative: cumulativeMap.get(u.id) ?? 0 }
+          : null,
+      },
+    ])
+  )
 
   const rows: InviteeRow[] = invitees.map((u) => ({
     id: u.id,
@@ -135,7 +107,7 @@ export default async function DistributorInviteesPage() {
     username: u.username,
     createdAt: u.createdAt.toISOString(),
     level2CommissionTotal: level2Map.get(u.id) ?? 0,
-    ...(inviteeProgressMap.get(u.id) ?? { nextMilestone: null, triggeredMilestoneCount: 0 }),
+    ...(inviteeProgressMap.get(u.id) ?? { nextMilestone: null }),
   }));
 
   return (
@@ -169,7 +141,21 @@ export default async function DistributorInviteesPage() {
         </Card>
       </div>
 
-      <InviteesDataTable data={rows} level2RatePercent={config.level2CommissionRatePercent} />
+      <InviteesDataTable
+        data={rows}
+        level2RatePercent={config.level2CommissionRatePercent}
+        milestoneSummary={{
+          triggeredCount: triggeredMilestoneCount,
+          nextMilestone: nextMilestone
+            ? {
+                thresholdAmount: Number(nextMilestone.thresholdAmount),
+                thresholdCount: nextMilestone.thresholdCount,
+                bonusAmount: Number(nextMilestone.bonusAmount),
+                qualifiedCount: qualifiedForNextCount,
+              }
+            : null,
+        }}
+      />
     </div>
   );
 }

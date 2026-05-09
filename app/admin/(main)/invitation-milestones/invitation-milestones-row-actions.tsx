@@ -3,8 +3,15 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Trash2, Loader2 } from "lucide-react"
+import { MoreHorizontal, Pencil, Trash2, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
     AlertDialog,
     AlertDialogAction,
@@ -17,11 +24,12 @@ import {
 } from "@/components/ui/alert-dialog"
 import { EditMilestoneDialog } from "./edit-milestone-dialog"
 
-type Props = { id: string; thresholdAmount: number; bonusAmount: number }
+type Props = { id: string; thresholdAmount: number; thresholdCount: number; bonusAmount: number }
 
-export function InvitationMilestoneRowActions({ id, thresholdAmount, bonusAmount }: Props) {
+export function InvitationMilestoneRowActions({ id, thresholdAmount, thresholdCount, bonusAmount }: Props) {
     const router = useRouter()
-    const [open, setOpen] = useState(false)
+    const [editOpen, setEditOpen] = useState(false)
+    const [deleteOpen, setDeleteOpen] = useState(false)
     const [deleting, setDeleting] = useState(false)
 
     const handleDelete = async () => {
@@ -33,7 +41,7 @@ export function InvitationMilestoneRowActions({ id, thresholdAmount, bonusAmount
                 toast.error(err?.error ?? "删除失败")
                 return
             }
-            setOpen(false)
+            setDeleteOpen(false)
             toast.success("已删除")
             router.refresh()
         } catch {
@@ -45,19 +53,36 @@ export function InvitationMilestoneRowActions({ id, thresholdAmount, bonusAmount
 
     return (
         <>
-            <div className="flex items-center gap-1">
-                <EditMilestoneDialog id={id} thresholdAmount={thresholdAmount} bonusAmount={bonusAmount} />
-                <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-destructive hover:text-destructive"
-                    onClick={() => setOpen(true)}
-                >
-                    <Trash2 className="size-4" />
-                    删除
-                </Button>
-            </div>
-            <AlertDialog open={open} onOpenChange={setOpen}>
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="size-8">
+                        <MoreHorizontal className="size-4" />
+                        <span className="sr-only">操作</span>
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => setEditOpen(true)}>
+                        <Pencil className="size-4" />
+                        编辑
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem variant="destructive" onClick={() => setDeleteOpen(true)}>
+                        <Trash2 className="size-4" />
+                        删除
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
+
+            <EditMilestoneDialog
+                id={id}
+                thresholdAmount={thresholdAmount}
+                thresholdCount={thresholdCount}
+                bonusAmount={bonusAmount}
+                open={editOpen}
+                onOpenChange={setEditOpen}
+            />
+
+            <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>确认删除</AlertDialogTitle>

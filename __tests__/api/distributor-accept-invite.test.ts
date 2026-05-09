@@ -110,8 +110,7 @@ describe("POST /api/distributor/accept-invite", () => {
             await fn({
                 ...prismaMock,
                 distributorInvitation: {
-                    findUnique: jest.fn().mockResolvedValue({ acceptedAt: null }),
-                    update: jest.fn().mockResolvedValue({}),
+                    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
                 },
                 user: { create: jest.fn().mockResolvedValue({ id: "new_user" }) },
                 account: { create: jest.fn().mockResolvedValue({}) },
@@ -132,8 +131,7 @@ describe("POST /api/distributor/accept-invite", () => {
             await fn({
                 ...prismaMock,
                 distributorInvitation: {
-                    findUnique: jest.fn().mockResolvedValue({ acceptedAt: null }),
-                    update: jest.fn().mockResolvedValue({}),
+                    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
                 },
                 user: { create: userCreateMock },
                 account: { create: jest.fn().mockResolvedValue({}) },
@@ -158,8 +156,7 @@ describe("POST /api/distributor/accept-invite", () => {
             await fn({
                 ...prismaMock,
                 distributorInvitation: {
-                    findUnique: jest.fn().mockResolvedValue({ acceptedAt: null }),
-                    update: jest.fn().mockResolvedValue({}),
+                    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
                 },
                 user: { create: userCreateMock },
                 account: { create: jest.fn().mockResolvedValue({}) },
@@ -179,8 +176,7 @@ describe("POST /api/distributor/accept-invite", () => {
             await fn({
                 ...prismaMock,
                 distributorInvitation: {
-                    findUnique: jest.fn().mockResolvedValue({ acceptedAt: new Date() }),
-                    update: jest.fn(),
+                    updateMany: jest.fn().mockResolvedValue({ count: 0 }),
                 },
                 user: { create: jest.fn() },
                 account: { create: jest.fn() },
@@ -221,8 +217,7 @@ describe("POST /api/distributor/accept-invite", () => {
             await fn({
                 ...prismaMock,
                 distributorInvitation: {
-                    findUnique: jest.fn().mockResolvedValue({ acceptedAt: null }),
-                    update: jest.fn().mockResolvedValue({}),
+                    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
                 },
                 user: { create: jest.fn().mockResolvedValue({ id: "new_user" }) },
                 account: { create: jest.fn().mockResolvedValue({}) },
@@ -246,8 +241,7 @@ describe("POST /api/distributor/accept-invite", () => {
             await fn({
                 ...prismaMock,
                 distributorInvitation: {
-                    findUnique: jest.fn().mockResolvedValue({ acceptedAt: null }),
-                    update: jest.fn().mockResolvedValue({}),
+                    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
                 },
                 user: { create: jest.fn().mockResolvedValue({ id: "new_user" }) },
                 account: { create: jest.fn().mockResolvedValue({}) },
@@ -270,8 +264,7 @@ describe("POST /api/distributor/accept-invite", () => {
             await fn({
                 ...prismaMock,
                 distributorInvitation: {
-                    findUnique: jest.fn().mockResolvedValue({ acceptedAt: null }),
-                    update: jest.fn().mockResolvedValue({}),
+                    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
                 },
                 user: { create: jest.fn().mockResolvedValue({ id: "new_user" }) },
                 account: { create: jest.fn().mockResolvedValue({}) },
@@ -329,8 +322,7 @@ describe("POST /api/distributor/accept-invite", () => {
             await fn({
                 ...prismaMock,
                 distributorInvitation: {
-                    findUnique: jest.fn().mockResolvedValue({ acceptedAt: null }),
-                    update: jest.fn().mockResolvedValue({}),
+                    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
                 },
                 user: { create: userCreateMock },
                 account: { create: jest.fn().mockResolvedValue({}) },
@@ -356,8 +348,7 @@ describe("POST /api/distributor/accept-invite", () => {
             await fn({
                 ...prismaMock,
                 distributorInvitation: {
-                    findUnique: jest.fn().mockResolvedValue({ acceptedAt: null }),
-                    update: jest.fn().mockResolvedValue({}),
+                    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
                 },
                 user: { create: jest.fn().mockResolvedValue({ id: "new_user" }) },
                 account: { create: jest.fn().mockResolvedValue({}) },
@@ -388,8 +379,7 @@ describe("POST /api/distributor/accept-invite", () => {
             await fn({
                 ...prismaMock,
                 distributorInvitation: {
-                    findUnique: jest.fn().mockResolvedValue({ acceptedAt: null }),
-                    update: jest.fn().mockResolvedValue({}),
+                    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
                 },
                 user: { create: userCreateMock },
                 account: { create: jest.fn().mockResolvedValue({}) },

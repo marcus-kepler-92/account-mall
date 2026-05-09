@@ -5,8 +5,6 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { toast } from "sonner"
-import { Pencil } from "lucide-react"
-import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
     Form,
@@ -23,24 +21,37 @@ import { ModalForm } from "@/app/admin/components"
 const schema = z.object({
     thresholdAmount: z
         .string()
-        .refine((v) => !Number.isNaN(parseFloat(v)), "请输入有效数字")
-        .refine((v) => parseFloat(v) > 0, "必须大于 0"),
+        .min(1, "请输入门槛金额")
+        .refine((v) => !Number.isNaN(Number(v)), "请输入有效数字")
+        .refine((v) => Number(v) > 0, "必须大于 0"),
+    thresholdCount: z
+        .string()
+        .min(1, "请输入达标人数")
+        .refine((v) => Number.isInteger(Number(v)) && Number(v) >= 1, "至少 1 人（整数）"),
     bonusAmount: z
         .string()
-        .refine((v) => !Number.isNaN(parseFloat(v)), "请输入有效数字")
-        .refine((v) => parseFloat(v) > 0, "必须大于 0"),
+        .min(1, "请输入奖励金额")
+        .refine((v) => !Number.isNaN(Number(v)), "请输入有效数字")
+        .refine((v) => Number(v) > 0, "必须大于 0"),
 })
 type FormValues = z.infer<typeof schema>
 
-type Props = { id: string; thresholdAmount: number; bonusAmount: number }
+type Props = {
+    id: string
+    thresholdAmount: number
+    thresholdCount: number
+    bonusAmount: number
+    open: boolean
+    onOpenChange: (open: boolean) => void
+}
 
-export function EditMilestoneDialog({ id, thresholdAmount, bonusAmount }: Props) {
+export function EditMilestoneDialog({ id, thresholdAmount, thresholdCount, bonusAmount, open, onOpenChange }: Props) {
     const router = useRouter()
-    const [open, setOpen] = useState(false)
     const form = useForm<FormValues>({
         resolver: zodResolver(schema),
         defaultValues: {
             thresholdAmount: String(thresholdAmount),
+            thresholdCount: String(thresholdCount),
             bonusAmount: String(bonusAmount),
         },
     })
@@ -52,6 +63,7 @@ export function EditMilestoneDialog({ id, thresholdAmount, bonusAmount }: Props)
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     thresholdAmount: parseFloat(values.thresholdAmount),
+                    thresholdCount: parseInt(values.thresholdCount),
                     bonusAmount: parseFloat(values.bonusAmount),
                 }),
             })
@@ -61,7 +73,7 @@ export function EditMilestoneDialog({ id, thresholdAmount, bonusAmount }: Props)
                 return
             }
             toast.success("已保存")
-            setOpen(false)
+            onOpenChange(false)
             router.refresh()
         } catch {
             toast.error("保存失败")
@@ -70,17 +82,11 @@ export function EditMilestoneDialog({ id, thresholdAmount, bonusAmount }: Props)
 
     return (
         <ModalForm
-            trigger={
-                <Button size="sm" variant="ghost">
-                    <Pencil className="size-4" />
-                    编辑
-                </Button>
-            }
             title="编辑里程碑"
             description="修改门槛或奖励金额。注意：创建时间不变，已触发的奖励不受影响。"
             open={open}
             onOpenChange={(v) => {
-                setOpen(v)
+                onOpenChange(v)
                 if (!v) form.reset()
             }}
         >
@@ -94,6 +100,19 @@ export function EditMilestoneDialog({ id, thresholdAmount, bonusAmount }: Props)
                                 <FormLabel>累计销售额门槛（元）</FormLabel>
                                 <FormControl>
                                     <Input type="number" min={0} step="0.01" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="thresholdCount"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>达标人数</FormLabel>
+                                <FormControl>
+                                    <Input type="number" min={1} step={1} placeholder="3" {...field} />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -117,7 +136,7 @@ export function EditMilestoneDialog({ id, thresholdAmount, bonusAmount }: Props)
                             type="button"
                             variant="outline"
                             onClick={() => {
-                                setOpen(false)
+                                onOpenChange(false)
                                 form.reset()
                             }}
                         >

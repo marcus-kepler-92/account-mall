@@ -57,14 +57,11 @@ export default async function DistributorCommissionsPage({
         pendingSum,
         tierSummary,
         inviteeCount,
-        milestoneBonusSum,
         milestoneBonuses,
     ] = await Promise.all([
         prisma.commission.findMany({
             where,
-            include: {
-                order: { select: { orderNo: true } },
-            },
+            include: { order: { select: { orderNo: true } } },
             orderBy,
             skip: (filters.page - 1) * filters.pageSize,
             take: filters.pageSize,
@@ -93,28 +90,21 @@ export default async function DistributorCommissionsPage({
         }),
         getDistributorTierSummary(user.id, level2Rate),
         prisma.user.count({ where: { inviterId: user.id } }),
-        prisma.invitationMilestoneBonus.aggregate({
-            where: { inviterId: user.id },
-            _sum: { amount: true },
-        }),
         prisma.invitationMilestoneBonus.findMany({
             where: { inviterId: user.id },
-            include: { invitee: { select: { name: true } } },
             orderBy: { createdAt: "desc" },
-            take: 20,
         }),
     ])
 
     const hasInviter = tierSummary.hasInviter
     const level1SettledTotal = Number(level1Settled._sum.amount ?? 0)
     const level2SettledTotal = Number(level2Settled._sum.amount ?? 0)
-    const milestoneBonusTotal = Number(milestoneBonusSum._sum.amount ?? 0)
+    const milestoneBonusTotal = milestoneBonuses.reduce((sum, b) => sum + Number(b.amount), 0)
     const paidTotal = Number(paidSum._sum.amount ?? 0)
     const pendingWithdrawalTotal = Number(pendingSum._sum.amount ?? 0)
     const withdrawableBalance =
         level1SettledTotal + level2SettledTotal + milestoneBonusTotal - paidTotal - pendingWithdrawalTotal
 
-    // Fetch sourceDistributor names for level-2 commissions
     const sourceDistributorIds = [
         ...new Set(
             commissions
@@ -137,7 +127,8 @@ export default async function DistributorCommissionsPage({
         WITHDRAWN: statusCounts.find((c) => c.status === "WITHDRAWN")?._count.id ?? 0,
     }
 
-    const rows: DistributorCommissionRow[] = commissions.map((c) => ({
+    const commissionRows: DistributorCommissionRow[] = commissions.map((c) => ({
+        kind: "commission",
         id: c.id,
         orderNo: c.order.orderNo,
         amount: Number(c.amount),
@@ -148,6 +139,22 @@ export default async function DistributorCommissionsPage({
             : undefined,
         createdAt: c.createdAt.toISOString(),
     }))
+
+    const milestoneRows: DistributorCommissionRow[] = milestoneBonuses.map((b) => ({
+        kind: "milestone",
+        id: b.id,
+        amount: Number(b.amount),
+        countSnapshot: b.countSnapshot,
+        thresholdSnapshot: Number(b.thresholdSnapshot),
+        createdAt: b.createdAt.toISOString(),
+    }))
+
+    // Milestone rows have no commission status or orderNo — only include them on page 1 of the default view
+    const includesMilestones = filters.statusList.length === 0 && !filters.search && filters.page === 1
+    const rows: DistributorCommissionRow[] = [
+        ...commissionRows,
+        ...(includesMilestones ? milestoneRows : []),
+    ].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
 
     return (
         <div className="space-y-6">
@@ -171,12 +178,12 @@ export default async function DistributorCommissionsPage({
                 </CardHeader>
                 <CardContent className="space-y-3">
                     {tierSummary.nextTier && (
-                    <TierProgress
-                        weeklySalesTotal={tierSummary.weeklySalesTotal}
-                        nextTierMinAmount={tierSummary.nextTier.minAmount}
-                    />
-                )}
-                <p className="text-muted-foreground text-sm">{tierSummary.encouragementMessage}</p>
+                        <TierProgress
+                            weeklySalesTotal={tierSummary.weeklySalesTotal}
+                            nextTierMinAmount={tierSummary.nextTier.minAmount}
+                        />
+                    )}
+                    <p className="text-muted-foreground text-sm">{tierSummary.encouragementMessage}</p>
                     {(tierSummary.currentTier ?? tierSummary.nextTier) && (() => {
                         const displayTier = tierSummary.currentTier ?? tierSummary.nextTier!
                         const rate = displayTier.ratePercent
@@ -207,7 +214,9 @@ export default async function DistributorCommissionsPage({
             <div>
                 <h3 className="text-lg font-semibold">奖金明细</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                    共 {total} 笔。使用本人账号邮箱下单的订单不记奖金。
+                    {includesMilestones && milestoneBonuses.length > 0
+                        ? `共 ${total + milestoneBonuses.length} 条（${total} 笔佣金 · ${milestoneBonuses.length} 笔邀请奖励）`
+                        : `共 ${total} 笔`}
                 </p>
                 <Suspense fallback={null}>
                     <DistributorCommissionsDataTable
@@ -217,43 +226,6 @@ export default async function DistributorCommissionsPage({
                     />
                 </Suspense>
             </div>
-
-            {milestoneBonuses.length > 0 && (
-                <div>
-                    <h3 className="text-lg font-semibold">邀请奖励记录</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                        共 {milestoneBonuses.length} 笔。
-                    </p>
-                    <div className="rounded-md border">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b bg-muted/50">
-                                    <th className="px-4 py-2 text-left font-medium">被邀请人</th>
-                                    <th className="px-4 py-2 text-right font-medium">门槛金额</th>
-                                    <th className="px-4 py-2 text-right font-medium">奖励金额</th>
-                                    <th className="px-4 py-2 text-right font-medium">触发时间</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {milestoneBonuses.map((b) => (
-                                    <tr key={b.id} className="border-b last:border-0">
-                                        <td className="px-4 py-2">{b.invitee.name}</td>
-                                        <td className="px-4 py-2 text-right text-muted-foreground">
-                                            ¥{Number(b.thresholdSnapshot).toFixed(2)}
-                                        </td>
-                                        <td className="px-4 py-2 text-right font-medium text-green-600">
-                                            +¥{Number(b.amount).toFixed(2)}
-                                        </td>
-                                        <td className="px-4 py-2 text-right text-muted-foreground">
-                                            {b.createdAt.toLocaleDateString("zh-CN")}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            )}
         </div>
     )
 }

@@ -603,7 +603,10 @@ describe("GET /api/admin/withdrawals", () => {
 describe("PATCH /api/admin/withdrawals/[id]", () => {
   const context = { params: Promise.resolve({ id: "w1" }) };
 
-  beforeEach(() => getAdminSession.mockReset());
+  beforeEach(() => {
+    getAdminSession.mockReset()
+    prismaMock.$transaction.mockImplementation(async (fn: any) => fn(prismaMock))
+  });
 
   it("returns 401 when no session", async () => {
     getAdminSession.mockResolvedValue(null);
@@ -688,6 +691,9 @@ describe("PATCH /api/admin/withdrawals/[id]", () => {
       createdAt: new Date(),
       updatedAt: new Date(),
     });
+    prismaMock.commission.aggregate.mockResolvedValue({ _sum: { amount: new Prisma.Decimal("200") } } as any);
+    prismaMock.withdrawal.aggregate.mockResolvedValue({ _sum: { amount: new Prisma.Decimal("0") } } as any);
+    prismaMock.invitationMilestoneBonus.aggregate.mockResolvedValue({ _sum: { amount: new Prisma.Decimal("0") } } as any);
     prismaMock.withdrawal.update.mockResolvedValue({
       id: "w1",
       distributorId: "dist_1",

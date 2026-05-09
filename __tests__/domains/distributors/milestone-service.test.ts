@@ -24,10 +24,10 @@ beforeEach(() => jest.clearAllMocks())
 
 function makeTx(overrides: Partial<Record<string, unknown>> = {}) {
   return {
-    user: { findUnique: jest.fn() },
+    user: { findUnique: jest.fn(), findMany: jest.fn() },
     invitationMilestone: { findMany: jest.fn() },
     invitationMilestoneBonus: { findMany: jest.fn(), create: jest.fn() },
-    order: { aggregate: jest.fn() },
+    order: { groupBy: jest.fn() },
     ...overrides,
   } as unknown as Prisma.TransactionClient
 }
@@ -35,10 +35,24 @@ function makeTx(overrides: Partial<Record<string, unknown>> = {}) {
 const BASE_MILESTONE = {
   id: "m1",
   thresholdAmount: 500,
+  thresholdCount: 3,
   bonusAmount: 20,
   sortOrder: 0,
   createdAt: new Date("2026-01-01"),
   updatedAt: new Date("2026-01-01"),
+}
+
+const THREE_INVITEES = [{ id: "inv1" }, { id: "inv2" }, { id: "inv3" }]
+const THREE_QUALIFIED = [{ distributorId: "inv1" }, { distributorId: "inv2" }, { distributorId: "inv3" }]
+
+function setupFullMocks(tx: ReturnType<typeof makeTx>, qualifiedResults = THREE_QUALIFIED) {
+  ;(tx.user.findUnique as jest.Mock)
+    .mockResolvedValueOnce({ inviterId: "inviter1" })
+    .mockResolvedValueOnce({ role: "DISTRIBUTOR", disabledAt: null })
+  ;(tx.invitationMilestone.findMany as jest.Mock).mockResolvedValue([BASE_MILESTONE])
+  ;(tx.invitationMilestoneBonus.findMany as jest.Mock).mockResolvedValue([])
+  ;(tx.user.findMany as jest.Mock).mockResolvedValue(THREE_INVITEES)
+  ;(tx.order.groupBy as jest.Mock).mockResolvedValue(qualifiedResults)
 }
 
 // ── checkAndIssueMilestoneBonuses ─────────────────────────────────────────────
@@ -51,7 +65,7 @@ describe("checkAndIssueMilestoneBonuses", () => {
     expect(tx.invitationMilestone.findMany).not.toHaveBeenCalled()
   })
 
-  it("skips when inviter is ADMIN", async () => {
+  it("skips when inviter is not DISTRIBUTOR", async () => {
     const tx = makeTx()
     ;(tx.user.findUnique as jest.Mock)
       .mockResolvedValueOnce({ inviterId: "inviter1" })
@@ -75,64 +89,12 @@ describe("checkAndIssueMilestoneBonuses", () => {
       .mockResolvedValueOnce({ inviterId: "inviter1" })
       .mockResolvedValueOnce({ role: "DISTRIBUTOR", disabledAt: null })
     ;(tx.invitationMilestone.findMany as jest.Mock).mockResolvedValue([])
-    await checkAndIssueMilestoneBonuses(tx, "invitee1")
-    expect(tx.invitationMilestoneBonus.findMany).not.toHaveBeenCalled()
-  })
-
-  it("inserts bonus when cumulative sales cross threshold", async () => {
-    const tx = makeTx()
-    ;(tx.user.findUnique as jest.Mock)
-      .mockResolvedValueOnce({ inviterId: "inviter1" })
-      .mockResolvedValueOnce({ role: "DISTRIBUTOR", disabledAt: null })
-    ;(tx.invitationMilestone.findMany as jest.Mock).mockResolvedValue([BASE_MILESTONE])
     ;(tx.invitationMilestoneBonus.findMany as jest.Mock).mockResolvedValue([])
-    ;(tx.order.aggregate as jest.Mock).mockResolvedValue({ _sum: { amount: 600 } })
-    ;(tx.invitationMilestoneBonus.create as jest.Mock).mockResolvedValue({})
-
     await checkAndIssueMilestoneBonuses(tx, "invitee1")
-
-    expect(tx.invitationMilestoneBonus.create).toHaveBeenCalledWith({
-      data: {
-        inviterId: "inviter1",
-        inviteeId: "invitee1",
-        milestoneId: "m1",
-        thresholdSnapshot: 500,
-        amount: 20,
-      },
-    })
+    expect(tx.user.findMany).not.toHaveBeenCalled()
   })
 
-  it("does not insert when cumulative sales below threshold", async () => {
-    const tx = makeTx()
-    ;(tx.user.findUnique as jest.Mock)
-      .mockResolvedValueOnce({ inviterId: "inviter1" })
-      .mockResolvedValueOnce({ role: "DISTRIBUTOR", disabledAt: null })
-    ;(tx.invitationMilestone.findMany as jest.Mock).mockResolvedValue([BASE_MILESTONE])
-    ;(tx.invitationMilestoneBonus.findMany as jest.Mock).mockResolvedValue([])
-    ;(tx.order.aggregate as jest.Mock).mockResolvedValue({ _sum: { amount: 400 } })
-
-    await checkAndIssueMilestoneBonuses(tx, "invitee1")
-
-    expect(tx.invitationMilestoneBonus.create).not.toHaveBeenCalled()
-  })
-
-  it("inserts multiple bonuses when multiple milestones crossed", async () => {
-    const m2 = { ...BASE_MILESTONE, id: "m2", thresholdAmount: 1000, bonusAmount: 50 }
-    const tx = makeTx()
-    ;(tx.user.findUnique as jest.Mock)
-      .mockResolvedValueOnce({ inviterId: "inviter1" })
-      .mockResolvedValueOnce({ role: "DISTRIBUTOR", disabledAt: null })
-    ;(tx.invitationMilestone.findMany as jest.Mock).mockResolvedValue([BASE_MILESTONE, m2])
-    ;(tx.invitationMilestoneBonus.findMany as jest.Mock).mockResolvedValue([])
-    ;(tx.order.aggregate as jest.Mock).mockResolvedValue({ _sum: { amount: 1500 } })
-    ;(tx.invitationMilestoneBonus.create as jest.Mock).mockResolvedValue({})
-
-    await checkAndIssueMilestoneBonuses(tx, "invitee1")
-
-    expect(tx.invitationMilestoneBonus.create).toHaveBeenCalledTimes(2)
-  })
-
-  it("skips already-triggered milestones (idempotent)", async () => {
+  it("skips when all milestones already triggered for inviter", async () => {
     const tx = makeTx()
     ;(tx.user.findUnique as jest.Mock)
       .mockResolvedValueOnce({ inviterId: "inviter1" })
@@ -141,44 +103,78 @@ describe("checkAndIssueMilestoneBonuses", () => {
     ;(tx.invitationMilestoneBonus.findMany as jest.Mock).mockResolvedValue([
       { milestoneId: "m1" },
     ])
-
     await checkAndIssueMilestoneBonuses(tx, "invitee1")
-
-    expect(tx.order.aggregate).not.toHaveBeenCalled()
-    expect(tx.invitationMilestoneBonus.create).not.toHaveBeenCalled()
+    expect(tx.user.findMany).not.toHaveBeenCalled()
   })
 
-  it("does not count orders before milestone.createdAt", async () => {
+  it("skips when inviter has no invitees", async () => {
     const tx = makeTx()
     ;(tx.user.findUnique as jest.Mock)
       .mockResolvedValueOnce({ inviterId: "inviter1" })
       .mockResolvedValueOnce({ role: "DISTRIBUTOR", disabledAt: null })
     ;(tx.invitationMilestone.findMany as jest.Mock).mockResolvedValue([BASE_MILESTONE])
     ;(tx.invitationMilestoneBonus.findMany as jest.Mock).mockResolvedValue([])
-    ;(tx.order.aggregate as jest.Mock).mockResolvedValue({ _sum: { amount: 0 } })
+    ;(tx.user.findMany as jest.Mock).mockResolvedValue([])
+    await checkAndIssueMilestoneBonuses(tx, "invitee1")
+    expect(tx.order.groupBy).not.toHaveBeenCalled()
+  })
+
+  it("does not trigger when qualified count < thresholdCount", async () => {
+    const tx = makeTx()
+    setupFullMocks(tx, [{ distributorId: "inv1" }, { distributorId: "inv2" }])
+    await checkAndIssueMilestoneBonuses(tx, "invitee1")
+    expect(tx.invitationMilestoneBonus.create).not.toHaveBeenCalled()
+  })
+
+  it("triggers bonus when qualified count >= thresholdCount", async () => {
+    const tx = makeTx()
+    setupFullMocks(tx)
+    ;(tx.invitationMilestoneBonus.create as jest.Mock).mockResolvedValue({})
 
     await checkAndIssueMilestoneBonuses(tx, "invitee1")
 
-    // Verify the aggregate was called with the paidAt >= createdAt filter
-    expect(tx.order.aggregate).toHaveBeenCalledWith({
+    expect(tx.invitationMilestoneBonus.create).toHaveBeenCalledWith({
+      data: {
+        inviterId: "inviter1",
+        milestoneId: "m1",
+        thresholdSnapshot: 500,
+        countSnapshot: 3,
+        amount: 20,
+      },
+    })
+  })
+
+  it("calls order.groupBy with correct where clause including paidAt >= milestone.createdAt", async () => {
+    const tx = makeTx()
+    ;(tx.user.findUnique as jest.Mock)
+      .mockResolvedValueOnce({ inviterId: "inviter1" })
+      .mockResolvedValueOnce({ role: "DISTRIBUTOR", disabledAt: null })
+    ;(tx.invitationMilestone.findMany as jest.Mock).mockResolvedValue([BASE_MILESTONE])
+    ;(tx.invitationMilestoneBonus.findMany as jest.Mock).mockResolvedValue([])
+    ;(tx.user.findMany as jest.Mock).mockResolvedValue([{ id: "inv1" }])
+    ;(tx.order.groupBy as jest.Mock).mockResolvedValue([])
+
+    await checkAndIssueMilestoneBonuses(tx, "invitee1")
+
+    expect(tx.order.groupBy).toHaveBeenCalledWith({
+      by: ["distributorId"],
       where: {
-        distributorId: "invitee1",
+        distributorId: { in: ["inv1"] },
         status: "COMPLETED",
         paidAt: { gte: BASE_MILESTONE.createdAt },
       },
       _sum: { amount: true },
+      having: {
+        amount: {
+          _sum: { gte: BASE_MILESTONE.thresholdAmount },
+        },
+      },
     })
-    expect(tx.invitationMilestoneBonus.create).not.toHaveBeenCalled()
   })
 
-  it("ignores P2002 unique constraint error (concurrent trigger safety)", async () => {
+  it("ignores P2002 error (concurrent safety)", async () => {
     const tx = makeTx()
-    ;(tx.user.findUnique as jest.Mock)
-      .mockResolvedValueOnce({ inviterId: "inviter1" })
-      .mockResolvedValueOnce({ role: "DISTRIBUTOR", disabledAt: null })
-    ;(tx.invitationMilestone.findMany as jest.Mock).mockResolvedValue([BASE_MILESTONE])
-    ;(tx.invitationMilestoneBonus.findMany as jest.Mock).mockResolvedValue([])
-    ;(tx.order.aggregate as jest.Mock).mockResolvedValue({ _sum: { amount: 600 } })
+    setupFullMocks(tx)
     ;(tx.invitationMilestoneBonus.create as jest.Mock).mockRejectedValue({ code: "P2002" })
 
     await expect(checkAndIssueMilestoneBonuses(tx, "invitee1")).resolves.toBeUndefined()
@@ -186,12 +182,7 @@ describe("checkAndIssueMilestoneBonuses", () => {
 
   it("rethrows non-P2002 errors", async () => {
     const tx = makeTx()
-    ;(tx.user.findUnique as jest.Mock)
-      .mockResolvedValueOnce({ inviterId: "inviter1" })
-      .mockResolvedValueOnce({ role: "DISTRIBUTOR", disabledAt: null })
-    ;(tx.invitationMilestone.findMany as jest.Mock).mockResolvedValue([BASE_MILESTONE])
-    ;(tx.invitationMilestoneBonus.findMany as jest.Mock).mockResolvedValue([])
-    ;(tx.order.aggregate as jest.Mock).mockResolvedValue({ _sum: { amount: 600 } })
+    setupFullMocks(tx)
     ;(tx.invitationMilestoneBonus.create as jest.Mock).mockRejectedValue(new Error("DB error"))
 
     await expect(checkAndIssueMilestoneBonuses(tx, "invitee1")).rejects.toThrow("DB error")
@@ -201,39 +192,89 @@ describe("checkAndIssueMilestoneBonuses", () => {
 // ── Milestone CRUD ────────────────────────────────────────────────────────────
 
 describe("listInvitationMilestones", () => {
-  it("returns serialized milestones ordered by thresholdAmount", async () => {
+  it("returns serialized milestones including thresholdCount", async () => {
     prismaMock.invitationMilestone.findMany.mockResolvedValue([
-      { id: "m1", thresholdAmount: "500.00", bonusAmount: "20.00", sortOrder: 0, createdAt: new Date("2026-01-01"), updatedAt: new Date("2026-01-01") },
+      {
+        id: "m1",
+        thresholdAmount: "500.00",
+        thresholdCount: 3,
+        bonusAmount: "20.00",
+        sortOrder: 0,
+        createdAt: new Date("2026-01-01"),
+        updatedAt: new Date("2026-01-01"),
+      },
     ] as never)
     const rows = await listInvitationMilestones()
     expect(rows).toHaveLength(1)
     expect(rows[0].thresholdAmount).toBe(500)
+    expect(rows[0].thresholdCount).toBe(3)
     expect(rows[0].bonusAmount).toBe(20)
   })
 })
 
 describe("createInvitationMilestone", () => {
-  it("creates a milestone and returns serialized row", async () => {
-    prismaMock.invitationMilestone.aggregate.mockResolvedValue({ _max: { sortOrder: null } } as never)
-    prismaMock.invitationMilestone.create.mockResolvedValue({
-      id: "m1", thresholdAmount: "500.00", bonusAmount: "20.00", sortOrder: 0,
-      createdAt: new Date(), updatedAt: new Date(),
+  it("creates a milestone with thresholdCount and returns serialized row", async () => {
+    prismaMock.invitationMilestone.aggregate.mockResolvedValue({
+      _max: { sortOrder: null },
     } as never)
-    const row = await createInvitationMilestone({ thresholdAmount: 500, bonusAmount: 20 })
+    prismaMock.invitationMilestone.create.mockResolvedValue({
+      id: "m1",
+      thresholdAmount: "500.00",
+      thresholdCount: 3,
+      bonusAmount: "20.00",
+      sortOrder: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as never)
+    const row = await createInvitationMilestone({
+      thresholdAmount: 500,
+      thresholdCount: 3,
+      bonusAmount: 20,
+    })
     expect(row.thresholdAmount).toBe(500)
+    expect(row.thresholdCount).toBe(3)
+  })
+})
+
+describe("updateInvitationMilestone", () => {
+  it("throws InvitationMilestoneNotFoundError when not found", async () => {
+    prismaMock.invitationMilestone.findUnique.mockResolvedValue(null)
+    await expect(
+      updateInvitationMilestone("bad-id", { thresholdAmount: 100 }),
+    ).rejects.toThrow(InvitationMilestoneNotFoundError)
+  })
+
+  it("updates milestone and returns serialized row", async () => {
+    prismaMock.invitationMilestone.findUnique.mockResolvedValue({ id: "m1" } as never)
+    prismaMock.invitationMilestone.update.mockResolvedValue({
+      id: "m1",
+      thresholdAmount: "1000.00",
+      thresholdCount: 5,
+      bonusAmount: "50.00",
+      sortOrder: 0,
+      createdAt: new Date("2026-01-01"),
+      updatedAt: new Date(),
+    } as never)
+    const row = await updateInvitationMilestone("m1", { thresholdAmount: 1000 })
+    expect(row.thresholdAmount).toBe(1000)
+    expect(row.thresholdCount).toBe(5)
   })
 })
 
 describe("deleteInvitationMilestone", () => {
   it("throws InvitationMilestoneNotFoundError when not found", async () => {
     prismaMock.invitationMilestone.findUnique.mockResolvedValue(null)
-    await expect(deleteInvitationMilestone("bad-id")).rejects.toThrow(InvitationMilestoneNotFoundError)
+    await expect(deleteInvitationMilestone("bad-id")).rejects.toThrow(
+      InvitationMilestoneNotFoundError,
+    )
   })
 
   it("throws InvitationMilestoneHasBonusesError when bonuses exist", async () => {
     prismaMock.invitationMilestone.findUnique.mockResolvedValue({ id: "m1" } as never)
     prismaMock.invitationMilestoneBonus.count.mockResolvedValue(1)
-    await expect(deleteInvitationMilestone("m1")).rejects.toThrow(InvitationMilestoneHasBonusesError)
+    await expect(deleteInvitationMilestone("m1")).rejects.toThrow(
+      InvitationMilestoneHasBonusesError,
+    )
   })
 
   it("deletes milestone when no bonuses exist", async () => {
@@ -245,37 +286,13 @@ describe("deleteInvitationMilestone", () => {
   })
 })
 
-describe("updateInvitationMilestone", () => {
-  it("throws InvitationMilestoneNotFoundError when not found", async () => {
-    prismaMock.invitationMilestone.findUnique.mockResolvedValue(null)
-    await expect(
-      updateInvitationMilestone("bad-id", { thresholdAmount: 100 })
-    ).rejects.toThrow(InvitationMilestoneNotFoundError)
-  })
-
-  it("updates milestone and returns serialized row", async () => {
-    prismaMock.invitationMilestone.findUnique.mockResolvedValue({ id: "m1" } as never)
-    prismaMock.invitationMilestone.update.mockResolvedValue({
-      id: "m1",
-      thresholdAmount: "1000.00",
-      bonusAmount: "50.00",
-      sortOrder: 0,
-      createdAt: new Date("2026-01-01"),
-      updatedAt: new Date(),
-    } as never)
-    const row = await updateInvitationMilestone("m1", { thresholdAmount: 1000 })
-    expect(row.thresholdAmount).toBe(1000)
-  })
-})
-
 describe("listDistributorMilestoneBonuses", () => {
-  it("returns paginated bonus records with invitee names", async () => {
+  it("returns paginated bonus records with countSnapshot (not inviteeName)", async () => {
     prismaMock.invitationMilestoneBonus.findMany.mockResolvedValue([
       {
         id: "b1",
-        inviteeId: "inv1",
-        invitee: { name: "Alice" },
         thresholdSnapshot: "500.00",
+        countSnapshot: 3,
         amount: "20.00",
         createdAt: new Date("2026-02-01"),
       },
@@ -286,8 +303,11 @@ describe("listDistributorMilestoneBonuses", () => {
 
     expect(result.total).toBe(1)
     expect(result.data).toHaveLength(1)
-    expect(result.data[0].inviteeName).toBe("Alice")
+    expect(result.data[0].countSnapshot).toBe(3)
     expect(result.data[0].thresholdSnapshot).toBe(500)
     expect(result.data[0].amount).toBe(20)
+    // Old field should not exist
+    expect((result.data[0] as Record<string, unknown>).inviteeName).toBeUndefined()
+    expect((result.data[0] as Record<string, unknown>).inviteeId).toBeUndefined()
   })
 })

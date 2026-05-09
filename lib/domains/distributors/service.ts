@@ -1,5 +1,5 @@
 // lib/domains/distributors/service.ts
-import type { Prisma } from "@prisma/client"
+import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { getConfig } from "@/lib/config"
 import { config } from "@/lib/config"
@@ -9,6 +9,7 @@ import React from "react"
 import { DistributorInvitation as DistributorInvitationEmail } from "@/app/emails/distributor-invitation"
 import { hashPassword } from "better-auth/crypto"
 import * as repo from "./repository"
+import { checkAndIssueMilestoneBonuses } from "./milestone-service"
 import type {
   TierRow,
   DistributorRow,
@@ -269,11 +270,8 @@ export async function acceptInvite(token: string, data: AcceptInviteInput & { us
   const distributorCode = `D${tempId.replace(/-/g, "").slice(-8).toUpperCase()}`
 
   await prisma.$transaction(async (tx) => {
-    const inv = await tx.distributorInvitation.findUnique({
-      where: { token },
-      select: { acceptedAt: true },
-    })
-    if (inv?.acceptedAt) throw new InviteTokenConcurrentAcceptError()
+    const claimed = await repo.claimInvitation(token, now, tx)
+    if (claimed === 0) throw new InviteTokenConcurrentAcceptError()
 
     const user = await repo.createDistributorUser(
       {
@@ -302,8 +300,6 @@ export async function acceptInvite(token: string, data: AcceptInviteInput & { us
       },
       tx as Parameters<typeof repo.createAccountRecord>[1],
     )
-
-    await repo.markInvitationAccepted(token, now, tx as Parameters<typeof repo.markInvitationAccepted>[2])
   })
 }
 
@@ -382,7 +378,7 @@ export async function getDistributorTierSummary(
       break
     }
   }
-  if (currentTier === null && tiersList.length > 0) currentTier = tiersList[0]
+  if (currentTier === null && tiersList.length > 0) currentTier = tiersList[tiersList.length - 1]
 
   let nextTier: TierSummaryItem | null = null
   if (currentTier) {
@@ -445,7 +441,7 @@ export async function createOrderCommissions(
       break
     }
   }
-  if (ratePercent == null && tiers.length > 0) ratePercent = toNumber(tiers[0].ratePercent)
+  if (ratePercent == null && tiers.length > 0) ratePercent = toNumber(tiers[tiers.length - 1].ratePercent)
 
   const paidAmount = toNumber(orderAmount)
   const totalCommission =
@@ -544,16 +540,21 @@ export async function createWithdrawal(
 ): Promise<WithdrawalRow> {
   const feeAmount = Math.round(amount * feePercent) / 100
 
-  const [settled, paid, pending, bonuses] = await Promise.all([
-    repo.aggregateCommissionSum(distributorId, "SETTLED"),
-    repo.aggregateWithdrawalSum(distributorId, "PAID"),
-    repo.aggregateWithdrawalSum(distributorId, "PENDING"),
-    repo.aggregateMilestoneBonusSum(distributorId),
-  ])
-  const balance = Math.round((settled + bonuses - paid - pending) * 100) / 100
-  if (amount > balance) throw new WithdrawalOverBalanceError()
+  const w = await prisma.$transaction(
+    async (tx) => {
+      const [settled, paid, pending, bonuses] = await Promise.all([
+        repo.aggregateCommissionSum(distributorId, "SETTLED", tx),
+        repo.aggregateWithdrawalSum(distributorId, "PAID", tx),
+        repo.aggregateWithdrawalSum(distributorId, "PENDING", tx),
+        repo.aggregateMilestoneBonusSum(distributorId, tx),
+      ])
+      const balance = Math.round((settled + bonuses - paid - pending) * 100) / 100
+      if (amount > balance) throw new WithdrawalOverBalanceError()
+      return repo.createWithdrawalRecord({ distributorId, amount, feePercent, feeAmount, receiptImageUrl }, tx)
+    },
+    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+  )
 
-  const w = await repo.createWithdrawalRecord({ distributorId, amount, feePercent, feeAmount, receiptImageUrl })
   return serializeWithdrawal(w)
 }
 
@@ -584,14 +585,30 @@ export async function countPendingWithdrawals(): Promise<number> {
 }
 
 export async function processWithdrawal(id: string, data: UpdateWithdrawalInput): Promise<AdminWithdrawalRow> {
-  const existing = await repo.findWithdrawalById(id)
-  if (!existing) throw new WithdrawalNotFoundError(id)
-  if (existing.status !== "PENDING") throw new WithdrawalNotPendingError()
-  const w = await repo.updateWithdrawalRecord(id, {
-    status: data.status,
-    ...(data.note !== undefined && { note: data.note }),
-    processedAt: new Date(),
-  })
+  const w = await prisma.$transaction(
+    async (tx) => {
+      const existing = await repo.findWithdrawalById(id, tx)
+      if (!existing) throw new WithdrawalNotFoundError(id)
+      if (existing.status !== "PENDING") throw new WithdrawalNotPendingError()
+
+      if (data.status === "PAID") {
+        const [settled, paid, bonuses] = await Promise.all([
+          repo.aggregateCommissionSum(existing.distributorId, "SETTLED", tx),
+          repo.aggregateWithdrawalSum(existing.distributorId, "PAID", tx),
+          repo.aggregateMilestoneBonusSum(existing.distributorId, tx),
+        ])
+        const available = Math.round((settled + bonuses - paid) * 100) / 100
+        if (toNumber(existing.amount) > available) throw new WithdrawalOverBalanceError()
+      }
+
+      return repo.updateWithdrawalRecord(id, {
+        status: data.status,
+        ...(data.note !== undefined && { note: data.note }),
+        processedAt: new Date(),
+      }, tx)
+    },
+    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+  )
   const feeAmount = toNumber(w.feeAmount)
   return {
     id: w.id,
@@ -659,6 +676,7 @@ export async function reassignOrderDistributor(
         discountPercentApplied: order.discountPercentApplied,
         paidAt: order.paidAt,
       })
+      await checkAndIssueMilestoneBonuses(tx, distributorId)
     }
   })
 }

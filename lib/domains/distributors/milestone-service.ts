@@ -10,6 +10,7 @@ import type { CreateMilestoneInput, UpdateMilestoneInput } from "./validators"
 function serializeMilestone(m: {
   id: string
   thresholdAmount: unknown
+  thresholdCount: number
   bonusAmount: unknown
   sortOrder: number
   createdAt: Date
@@ -18,6 +19,7 @@ function serializeMilestone(m: {
   return {
     id: m.id,
     thresholdAmount: Number(m.thresholdAmount),
+    thresholdCount: m.thresholdCount,
     bonusAmount: Number(m.bonusAmount),
     sortOrder: m.sortOrder,
     createdAt: m.createdAt,
@@ -38,7 +40,7 @@ export async function createInvitationMilestone(
   const maxSort = await prisma.invitationMilestone.aggregate({ _max: { sortOrder: true } })
   const nextSort = (maxSort._max.sortOrder ?? -1) + 1
   const row = await prisma.invitationMilestone.create({
-    data: { thresholdAmount: data.thresholdAmount, bonusAmount: data.bonusAmount, sortOrder: nextSort },
+    data: { thresholdAmount: data.thresholdAmount, thresholdCount: data.thresholdCount, bonusAmount: data.bonusAmount, sortOrder: nextSort },
   })
   return serializeMilestone(row)
 }
@@ -53,6 +55,7 @@ export async function updateInvitationMilestone(
     where: { id },
     data: {
       ...(data.thresholdAmount !== undefined && { thresholdAmount: data.thresholdAmount }),
+      ...(data.thresholdCount !== undefined && { thresholdCount: data.thresholdCount }),
       ...(data.bonusAmount !== undefined && { bonusAmount: data.bonusAmount }),
     },
   })
@@ -76,7 +79,6 @@ export async function listDistributorMilestoneBonuses(
   const [rows, total] = await Promise.all([
     prisma.invitationMilestoneBonus.findMany({
       where: { inviterId },
-      include: { invitee: { select: { name: true } } },
       orderBy: { createdAt: "desc" },
       skip,
       take: pageSize,
@@ -86,9 +88,8 @@ export async function listDistributorMilestoneBonuses(
   return {
     data: rows.map((r) => ({
       id: r.id,
-      inviteeId: r.inviteeId,
-      inviteeName: r.invitee.name,
       thresholdSnapshot: Number(r.thresholdSnapshot),
+      countSnapshot: r.countSnapshot,
       amount: Number(r.amount),
       createdAt: r.createdAt,
     })),
@@ -113,40 +114,56 @@ export async function checkAndIssueMilestoneBonuses(
   })
   if (!inviter || inviter.role !== "DISTRIBUTOR" || inviter.disabledAt !== null) return
 
-  const milestones = await tx.invitationMilestone.findMany({
-    orderBy: { thresholdAmount: "asc" },
-  })
+  const [milestones, triggered] = await Promise.all([
+    tx.invitationMilestone.findMany({ orderBy: { thresholdAmount: "asc" } }),
+    tx.invitationMilestoneBonus.findMany({
+      where: { inviterId },
+      select: { milestoneId: true },
+    }),
+  ])
   if (milestones.length === 0) return
-
-  const triggered = await tx.invitationMilestoneBonus.findMany({
-    where: { inviteeId },
-    select: { milestoneId: true },
-  })
   const triggeredSet = new Set(triggered.map((b) => b.milestoneId))
   const untriggered = milestones.filter((m) => !triggeredSet.has(m.id))
   if (untriggered.length === 0) return
 
-  const aggregates = await Promise.all(
+  const invitees = await tx.user.findMany({
+    where: { inviterId, role: "DISTRIBUTOR", disabledAt: null },
+    select: { id: true },
+  })
+  const inviteeIds = invitees.map((u) => u.id)
+  if (inviteeIds.length === 0) return
+
+  const qualifiedCounts = await Promise.all(
     untriggered.map((milestone) =>
-      tx.order.aggregate({
-        where: { distributorId: inviteeId, status: "COMPLETED", paidAt: { gte: milestone.createdAt } },
+      tx.order.groupBy({
+        by: ["distributorId"],
+        where: {
+          distributorId: { in: inviteeIds },
+          status: "COMPLETED",
+          paidAt: { gte: milestone.createdAt },
+        },
         _sum: { amount: true },
+        having: {
+          amount: {
+            _sum: { gte: milestone.thresholdAmount },
+          },
+        },
       })
     )
   )
 
   for (let i = 0; i < untriggered.length; i++) {
     const milestone = untriggered[i]
-    const cumulative = Number(aggregates[i]._sum.amount ?? 0)
-    if (cumulative < Number(milestone.thresholdAmount)) continue
+    const qualifiedCount = qualifiedCounts[i].length
+    if (qualifiedCount < milestone.thresholdCount) continue
 
     try {
       await tx.invitationMilestoneBonus.create({
         data: {
           inviterId,
-          inviteeId,
           milestoneId: milestone.id,
           thresholdSnapshot: milestone.thresholdAmount,
+          countSnapshot: qualifiedCount,
           amount: milestone.bonusAmount,
         },
       })
