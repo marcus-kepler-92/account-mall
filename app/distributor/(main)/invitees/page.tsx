@@ -11,6 +11,7 @@ import {
 import { Users, Coins } from "lucide-react";
 import { InviteesDataTable } from "./invitees-data-table";
 import type { InviteeRow } from "./invitees-columns";
+import { buildMilestoneCumulativeMap } from "@/lib/milestone-cumulative";
 
 export const dynamic = "force-dynamic";
 
@@ -71,18 +72,14 @@ export default async function DistributorInviteesPage() {
 
   const nextMilestone = milestones.find((m) => !triggeredMilestoneIds.has(m.id)) ?? null
 
-  const cumulativeMap =
-    nextMilestone && inviteeIds.length > 0
-      ? new Map(
-          (
-            await prisma.order.groupBy({
-              by: ["distributorId"],
-              where: { distributorId: { in: inviteeIds }, status: "COMPLETED", paidAt: { gte: nextMilestone.createdAt } },
-              _sum: { amount: true },
-            })
-          ).map((r) => [r.distributorId, Number(r._sum.amount ?? 0)])
-        )
-      : null
+  let cumulativeMap: Map<string, number> | null = null
+  if (nextMilestone && inviteeIds.length > 0) {
+    const orders = await prisma.order.findMany({
+      where: { distributorId: { in: inviteeIds }, status: "COMPLETED", paidAt: { gte: nextMilestone.createdAt } },
+      select: { distributorId: true, amount: true, email: true },
+    })
+    cumulativeMap = buildMilestoneCumulativeMap(orders, invitees)
+  }
 
   // Only count active invitees — consistent with checkAndIssueMilestoneBonuses trigger logic
   const qualifiedForNextCount = nextMilestone && cumulativeMap

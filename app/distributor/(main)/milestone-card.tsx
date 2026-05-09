@@ -56,6 +56,8 @@ export function MilestoneCard({
     const displayAmount = triggered && triggeredBonus ? triggeredBonus.thresholdSnapshot : thresholdAmount
     const displayBonus = triggered && triggeredBonus ? triggeredBonus.amount : bonusAmount
 
+    const progressColor = progress >= 80 ? "bg-green-500" : progress >= 40 ? "bg-amber-400" : "bg-primary"
+
     return (
         <Sheet open={open} onOpenChange={setOpen}>
             <Card
@@ -76,7 +78,7 @@ export function MilestoneCard({
                         <div className="flex items-start justify-between gap-3">
                             <div>
                                 <p className="text-sm font-medium">
-                                    {displayCount} 人各满 ¥{displayAmount.toFixed(0)}
+                                    {displayCount} 位团队成员各完成 ¥{displayAmount.toFixed(0)} 销售额
                                 </p>
                                 <p className="text-xs text-muted-foreground mt-0.5">
                                     {new Date(triggeredBonus.createdAt).toLocaleDateString("zh-CN")} 触发
@@ -89,15 +91,18 @@ export function MilestoneCard({
                         </div>
                     ) : (
                         <div className="space-y-2.5">
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-start justify-between gap-2">
                                 <p className="text-sm font-medium">
-                                    {displayCount} 人各满 ¥{displayAmount.toFixed(0)}
+                                    {displayCount} 位团队成员各完成 ¥{displayAmount.toFixed(0)} 销售额
                                 </p>
-                                <span className="text-xs text-muted-foreground shrink-0">奖 ¥{displayBonus.toFixed(0)}</span>
+                                <div className="text-right shrink-0">
+                                    <p className="text-xs text-muted-foreground">达成奖励</p>
+                                    <p className="text-sm font-bold text-amber-600">¥{displayBonus.toFixed(0)}</p>
+                                </div>
                             </div>
                             <div className="h-1.5 rounded-full bg-muted overflow-hidden">
                                 <div
-                                    className="h-full rounded-full bg-primary transition-all"
+                                    className={cn("h-full rounded-full transition-all", progressColor)}
                                     style={{ width: `${progress.toFixed(1)}%` }}
                                 />
                             </div>
@@ -120,7 +125,7 @@ export function MilestoneCard({
             >
                 <SheetHeader className="px-6 pb-4 border-b">
                     <SheetTitle>
-                        {displayCount} 人各满 ¥{displayAmount.toFixed(0)}
+                        {displayCount} 位团队成员各完成 ¥{displayAmount.toFixed(0)} 销售额
                     </SheetTitle>
                     <SheetDescription>
                         达成即得 ¥{displayBonus.toFixed(0)} 邀请奖励

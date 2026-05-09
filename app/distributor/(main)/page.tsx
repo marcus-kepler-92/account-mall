@@ -11,6 +11,7 @@ import { getDistributorTierSummary, adjustRate } from "@/lib/distributor-tier-su
 import { DashboardKpiSection } from "./dashboard-kpi-section";
 import { TierProgress } from "./tier-progress";
 import { MilestoneCard } from "./milestone-card";
+import { buildMilestoneCumulativeMap } from "@/lib/milestone-cumulative";
 
 export const dynamic = "force-dynamic";
 
@@ -96,7 +97,7 @@ export default async function DistributorDashboardPage() {
     prisma.invitationMilestone.findMany({ orderBy: { thresholdAmount: "asc" } }),
     prisma.user.findMany({
       where: { inviterId: user.id, disabledAt: null },
-      select: { id: true, name: true },
+      select: { id: true, name: true, email: true },
     }),
   ]);
 
@@ -119,16 +120,15 @@ export default async function DistributorDashboardPage() {
     activeInviteeIds.length > 0 && untriggeredMilestones.length > 0
       ? await Promise.all(
           untriggeredMilestones.map(async (m) => {
-            const data = await prisma.order.groupBy({
-              by: ["distributorId"],
+            const orders = await prisma.order.findMany({
               where: {
                 distributorId: { in: activeInviteeIds },
                 status: "COMPLETED",
                 paidAt: { gte: m.createdAt },
               },
-              _sum: { amount: true },
+              select: { distributorId: true, amount: true, email: true },
             })
-            const cumulativeMap = new Map(data.map((r) => [r.distributorId, Number(r._sum.amount ?? 0)]))
+            const cumulativeMap = buildMilestoneCumulativeMap(orders, activeInvitees)
             const threshold = Number(m.thresholdAmount)
             const allProgress = activeInvitees
               .map((u) => ({
