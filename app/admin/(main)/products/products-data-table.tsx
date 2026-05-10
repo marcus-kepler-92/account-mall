@@ -6,7 +6,8 @@ import { toast } from "sonner"
 import {
     DndContext,
     closestCenter,
-    PointerSensor,
+    MouseSensor,
+    TouchSensor,
     useSensor,
     useSensors,
     type DragEndEvent,
@@ -110,7 +111,10 @@ export function ProductsDataTable({ data, isSuperAdmin = false }: { data: Produc
         state: { sorting, columnFilters, columnVisibility },
     })
 
-    const sensors = useSensors(useSensor(PointerSensor))
+    const sensors = useSensors(
+        useSensor(MouseSensor),
+        useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } })
+    )
 
     const handleDragEnd = async (event: DragEndEvent) => {
         const { active, over } = event
