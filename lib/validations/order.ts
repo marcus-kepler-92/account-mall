@@ -36,6 +36,7 @@ export const createOrderSchema = z.object({
     turnstileToken: z.string().optional(),
     promoCode: z.string().max(64).optional(),
     exitDiscountToken: z.string().optional(),
+    crossSellToken: z.string().optional(),
     fingerprintHash: z.string().max(128).optional(),
 })
 

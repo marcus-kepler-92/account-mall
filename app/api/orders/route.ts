@@ -15,6 +15,7 @@ import { config } from "@/lib/config"
 import { verifyTurnstileToken } from "@/lib/turnstile"
 import { isStorefrontTurnstileEnforced } from "@/lib/turnstile-policy"
 import { verifyExitDiscountToken, type ExitDiscountPayload } from "@/lib/exit-discount"
+import { verifyCrossSellToken } from "@/lib/cross-sell-token"
 import { scrapeMultipleUrls } from "@/lib/scrape-shared-accounts"
 import { sharedAccountToCardPayload, toCardContentJson, MANUAL_BLACKLIST_REASON } from "@/lib/auto-fetch-card"
 import { createOrderSuccessToken } from "@/lib/order-success-token"
@@ -58,11 +59,13 @@ async function createAutoFetchOrder(params: {
     distributorDiscountPercent: number | null
     exitDiscountPercent: number | null
     exitDiscountMeta: string | null
+    crossSellDiscountPercent: number | null
+    crossSellPayload: { sourceOrderId: string; targetProductId: string; discountPercent: number } | null
     promoCode: string | null
     fingerprintHash: string | null
     paymentMethod: string
 }): Promise<NextResponse> {
-    const { productId, product, email, orderPassword, clientIp, distributorId, distributorDiscountPercent, exitDiscountPercent, exitDiscountMeta, promoCode, fingerprintHash, paymentMethod } = params
+    const { productId, product, email, orderPassword, clientIp, distributorId, distributorDiscountPercent, exitDiscountPercent, exitDiscountMeta, crossSellDiscountPercent, crossSellPayload, promoCode, fingerprintHash, paymentMethod } = params
     const sourceUrl = (product.sourceUrl?.trim() || config.autoFetchSourceUrls[0]?.trim()) ?? ""
     if (!sourceUrl) {
         return badRequest("该商品暂时无法领取，请联系客服。")
@@ -113,6 +116,9 @@ async function createAutoFetchOrder(params: {
     if (exitDiscountPercent != null) {
         amount = Math.round(amount * (1 - exitDiscountPercent / 100) * 100) / 100
     }
+    if (crossSellDiscountPercent != null) {
+        amount = Math.round(amount * (1 - crossSellDiscountPercent / 100) * 100) / 100
+    }
     if (amount < 0.01) amount = 0.01
     const discountPercentApplied = amount < originalAmount
         ? Math.round((1 - amount / originalAmount) * 10000) / 100
@@ -158,6 +164,16 @@ async function createAutoFetchOrder(params: {
                         orderId: newOrder.id,
                     },
                 })
+                if (crossSellPayload) {
+                    await tx.crossSellUsage.create({
+                        data: {
+                            sourceOrderId: crossSellPayload.sourceOrderId,
+                            targetOrderId: newOrder.id,
+                            targetProductId: crossSellPayload.targetProductId,
+                            discountPercent: crossSellPayload.discountPercent,
+                        },
+                    })
+                }
                 return { orderNo: newOrder.orderNo }
             })
         } catch (err) {
@@ -210,6 +226,16 @@ async function createAutoFetchOrder(params: {
                         orderId: newOrder.id,
                     },
                 })
+                if (crossSellPayload) {
+                    await tx.crossSellUsage.create({
+                        data: {
+                            sourceOrderId: crossSellPayload.sourceOrderId,
+                            targetOrderId: newOrder.id,
+                            targetProductId: crossSellPayload.targetProductId,
+                            discountPercent: crossSellPayload.discountPercent,
+                        },
+                    })
+                }
                 return { orderNo: newOrder.orderNo, orderId: newOrder.id }
             })
         } catch (err) {
@@ -414,7 +440,7 @@ export async function POST(request: NextRequest) {
         return validationError(parsed.error.flatten())
     }
 
-    const { productId, email, orderPassword, quantity, paymentMethod, turnstileToken, promoCode: bodyPromoCode, exitDiscountToken, fingerprintHash: rawFingerprintHash } = parsed.data
+    const { productId, email, orderPassword, quantity, paymentMethod, turnstileToken, promoCode: bodyPromoCode, exitDiscountToken, crossSellToken, fingerprintHash: rawFingerprintHash } = parsed.data
     const fingerprintHash = rawFingerprintHash?.trim() || null
 
     // 优惠码：用户主动填写，用于归因 + 折扣；受 couponEnabled 限制
@@ -560,6 +586,34 @@ export async function POST(request: NextRequest) {
         }
     }
 
+    // Cross-sell discount: verify HMAC token and one-time usage constraint
+    let crossSellDiscountPercent: number | null = null
+    let crossSellPayload: { sourceOrderId: string; targetProductId: string; discountPercent: number } | null = null
+    if (crossSellToken) {
+        const csVerify = verifyCrossSellToken(crossSellToken)
+        if (csVerify.valid && csVerify.payload) {
+            const p = csVerify.payload
+            if (p.targetProductId === productId) {
+                // Source order must be COMPLETED
+                const sourceOrder = await prisma.order.findUnique({
+                    where: { id: p.sourceOrderId },
+                    select: { status: true },
+                })
+                if (sourceOrder?.status === "COMPLETED") {
+                    // One-time: check CrossSellUsage not already consumed
+                    const usageExists = await prisma.crossSellUsage.findUnique({
+                        where: { sourceOrderId_targetProductId: { sourceOrderId: p.sourceOrderId, targetProductId: p.targetProductId } },
+                    })
+                    if (!usageExists) {
+                        crossSellDiscountPercent = p.discountPercent
+                        crossSellPayload = { sourceOrderId: p.sourceOrderId, targetProductId: p.targetProductId, discountPercent: p.discountPercent }
+                    }
+                }
+            }
+        }
+        // If token is invalid/expired/used: silently skip discount, proceed at full price
+    }
+
     // ─── AUTO_FETCH：实时爬取，随机取一个账号，单次领取 ─────────────────────────
     if (isAutoFetch) {
         const autoFetchPrice = Number(product.price)
@@ -574,6 +628,8 @@ export async function POST(request: NextRequest) {
             distributorDiscountPercent,
             exitDiscountPercent,
             exitDiscountMeta,
+            crossSellDiscountPercent,
+            crossSellPayload,
             promoCode: lookupCode,
             fingerprintHash,
             paymentMethod,
@@ -597,6 +653,9 @@ export async function POST(request: NextRequest) {
     }
     if (exitDiscountPercent != null) {
         amount = amount * (1 - exitDiscountPercent / 100)
+    }
+    if (crossSellDiscountPercent != null) {
+        amount = amount * (1 - crossSellDiscountPercent / 100)
     }
     if (amount < originalAmount) {
         discountPercentApplied = Math.round((1 - amount / originalAmount) * 10000) / 100
@@ -665,6 +724,17 @@ export async function POST(request: NextRequest) {
                             visitorId: exitDiscountPayload.visitorId,
                             fingerprintHash: exitDiscountPayload.fingerprintHash,
                             ip: exitDiscountPayload.ip,
+                        },
+                    })
+                }
+
+                if (crossSellPayload) {
+                    await tx.crossSellUsage.create({
+                        data: {
+                            sourceOrderId: crossSellPayload.sourceOrderId,
+                            targetOrderId: newOrder.id,
+                            targetProductId: crossSellPayload.targetProductId,
+                            discountPercent: crossSellPayload.discountPercent,
                         },
                     })
                 }
