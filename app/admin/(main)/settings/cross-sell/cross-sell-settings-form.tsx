@@ -22,7 +22,7 @@ import { z } from "zod"
 
 const formSchema = z.object({
     enabled: z.boolean(),
-    discountPercent: z.number().min(1).max(50),
+    discountPercent: z.number().min(0).max(50),
     ttlMinutes: z.number().int().min(5).max(180),
 })
 
@@ -108,14 +108,14 @@ export function CrossSellSettingsForm({ setting }: Props) {
                                     <FormControl>
                                         <Input
                                             type="number"
-                                            min={1}
+                                            min={0}
                                             max={50}
                                             {...field}
                                             onChange={(e) => field.onChange(e.target.valueAsNumber)}
                                         />
                                     </FormControl>
                                     <FormDescription>
-                                        在原价基础上减免的百分比，范围 1-50。例如 10 表示减免 10%（九折）
+                                        在原价基础上减免的百分比，范围 0-50。0 表示纯推荐不打折，10 表示九折
                                     </FormDescription>
                                     <FormMessage />
                                 </FormItem>

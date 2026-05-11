@@ -126,16 +126,25 @@ export default async function OrderSuccessPage({ params, searchParams }: PagePro
 
     const ttlMs = crossSellSetting.ttlMinutes * 60_000
 
+    const hasDiscount = crossSellSetting.discountPercent > 0
+
     const crossSellItems = crossSellSetting.enabled
         ? crossSellRecommendations
             .map((product) => {
-                const csToken = generateCrossSellToken(
-                    { sourceOrderId: order.id, targetProductId: product.id, discountPercent: crossSellSetting.discountPercent },
-                    ttlMs,
-                )
-                if (!csToken) return null
-                const params = new URLSearchParams({ email: order.email, csToken })
-                const href = `/products/${product.id}-${product.slug}?${params}`
+                let href: string
+                if (hasDiscount) {
+                    const csToken = generateCrossSellToken(
+                        { sourceOrderId: order.id, targetProductId: product.id, discountPercent: crossSellSetting.discountPercent },
+                        ttlMs,
+                    )
+                    if (!csToken) return null
+                    const params = new URLSearchParams({ email: order.email, csToken })
+                    href = `/products/${product.id}-${product.slug}?${params}`
+                } else {
+                    // No discount — plain link with email prefill only
+                    const params = new URLSearchParams({ email: order.email })
+                    href = `/products/${product.id}-${product.slug}?${params}`
+                }
                 return { product, href, discountPercent: crossSellSetting.discountPercent }
             })
             .filter((x): x is NonNullable<typeof x> => x !== null)

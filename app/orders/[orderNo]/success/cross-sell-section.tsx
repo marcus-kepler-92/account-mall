@@ -39,9 +39,10 @@ function useCountdownMs(expiresAt: number): number {
 }
 
 export function CrossSellSection({ recommendations, discountPercent, ttlMs }: CrossSellSectionProps) {
+    const hasDiscount = discountPercent > 0
     const [expiresAt] = useState(() => Date.now() + ttlMs)
     const remainingMs = useCountdownMs(expiresAt)
-    const isExpired = remainingMs <= 0
+    const isExpired = hasDiscount && remainingMs <= 0
     const minutes = Math.floor(remainingMs / 60_000)
     const seconds = Math.floor((remainingMs % 60_000) / 1000)
     const countdownStr = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
@@ -49,30 +50,40 @@ export function CrossSellSection({ recommendations, discountPercent, ttlMs }: Cr
 
     return (
         <section className="mx-auto max-w-4xl px-4">
-            {/* Banner */}
-            <Card className={cn("mb-4 transition-opacity", isExpired ? "opacity-50" : "")}>
-                <CardContent className="py-4">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                            <p className="font-semibold text-sm sm:text-base">
-                                <Sparkles className="inline size-4 mr-1 text-amber-500" />
-                                为你推荐 · 成功页专享{discountLabel}
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                                {isExpired ? "折扣已过期" : `仅本页有效 · ${remainingMs <= 5 * 60_000 ? "即将过期 " : ""}限时专享`}
-                            </p>
+            {/* Banner — only shown when a discount is configured */}
+            {hasDiscount && (
+                <Card className={cn("mb-4 transition-opacity", isExpired ? "opacity-50" : "")}>
+                    <CardContent className="py-4">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <p className="font-semibold text-sm sm:text-base">
+                                    <Sparkles className="inline size-4 mr-1 text-amber-500" />
+                                    为你推荐 · 成功页专享{discountLabel}
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                    {isExpired ? "折扣已过期" : `仅本页有效 · ${remainingMs <= 5 * 60_000 ? "即将过期 " : ""}限时专享`}
+                                </p>
+                            </div>
+                            {!isExpired && (
+                                <span className={cn(
+                                    "font-mono tabular-nums font-bold text-xl sm:text-2xl",
+                                    remainingMs <= 60_000 ? "text-destructive animate-pulse" : "text-foreground"
+                                )}>
+                                    {countdownStr}
+                                </span>
+                            )}
                         </div>
-                        {!isExpired && (
-                            <span className={cn(
-                                "font-mono tabular-nums font-bold text-xl sm:text-2xl",
-                                remainingMs <= 60_000 ? "text-destructive animate-pulse" : "text-foreground"
-                            )}>
-                                {countdownStr}
-                            </span>
-                        )}
-                    </div>
-                </CardContent>
-            </Card>
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* Minimal header when no discount */}
+            {!hasDiscount && (
+                <p className="mb-3 text-sm font-semibold">
+                    <Sparkles className="inline size-4 mr-1 text-amber-500" />
+                    为你推荐
+                </p>
+            )}
 
             {/* Product list — horizontal cards stacked vertically */}
             <div className={cn(

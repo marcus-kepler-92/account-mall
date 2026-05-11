@@ -106,15 +106,17 @@ async function createAutoFetchOrder(params: {
     const cardContent = toCardContentJson(cardPayload)
     const passwordHash = await hashPassword(orderPassword)
 
-    // 计算实际金额（promo + exit 折扣均参与）
-    // Distributor discount applied first, exit-intent discount second (multiplicative)
+    // Discounts are mutually exclusive: cross-sell takes precedence over all others
+    const effectiveDistributorPct = crossSellDiscountPercent != null ? null : distributorDiscountPercent
+    const effectiveExitPct = crossSellDiscountPercent != null ? null : exitDiscountPercent
+
     const originalAmount = params.price
     let amount = originalAmount
-    if (distributorDiscountPercent != null) {
-        amount = Math.round(amount * (1 - distributorDiscountPercent / 100) * 100) / 100
+    if (effectiveDistributorPct != null) {
+        amount = Math.round(amount * (1 - effectiveDistributorPct / 100) * 100) / 100
     }
-    if (exitDiscountPercent != null) {
-        amount = Math.round(amount * (1 - exitDiscountPercent / 100) * 100) / 100
+    if (effectiveExitPct != null) {
+        amount = Math.round(amount * (1 - effectiveExitPct / 100) * 100) / 100
     }
     if (crossSellDiscountPercent != null) {
         amount = Math.round(amount * (1 - crossSellDiscountPercent / 100) * 100) / 100
@@ -594,12 +596,15 @@ export async function POST(request: NextRequest) {
         if (csVerify.valid && csVerify.payload) {
             const p = csVerify.payload
             if (p.targetProductId === productId) {
-                // Source order must be COMPLETED
+                // Source order must be COMPLETED and belong to the same buyer email
                 const sourceOrder = await prisma.order.findUnique({
                     where: { id: p.sourceOrderId },
-                    select: { status: true },
+                    select: { status: true, email: true },
                 })
-                if (sourceOrder?.status === "COMPLETED") {
+                if (
+                    sourceOrder?.status === "COMPLETED" &&
+                    sourceOrder.email === email.trim().toLowerCase()
+                ) {
                     // One-time: check CrossSellUsage not already consumed
                     const usageExists = await prisma.crossSellUsage.findUnique({
                         where: { sourceOrderId_targetProductId: { sourceOrderId: p.sourceOrderId, targetProductId: p.targetProductId } },
@@ -643,6 +648,12 @@ export async function POST(request: NextRequest) {
 
     if (unsoldCount < quantity) {
         return badRequest(`Insufficient stock. Available: ${unsoldCount}`)
+    }
+
+    // Discounts are mutually exclusive: cross-sell takes precedence over all others
+    if (crossSellDiscountPercent != null) {
+        distributorDiscountPercent = null
+        exitDiscountPercent = null
     }
 
     const originalAmount = Number(product.price) * quantity
