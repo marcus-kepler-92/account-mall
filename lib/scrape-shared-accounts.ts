@@ -10,12 +10,20 @@ import { config } from "@/lib/config"
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
 import { VOIDLOGINS_SCHEME, parseVoidloginsSourceUrl } from "@/lib/utils"
 
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
 /** Only accept accounts with this status; accounts with any other explicit status are rejected. */
 const ALLOWED_STATUS = "正常"
-/** Regions to exclude from distribution. */
-const BLOCKED_REGIONS = ["中国大陆"]
+/** Substrings that, if present in a region name, cause the account to be excluded. */
+const BLOCKED_REGION_KEYWORDS = ["中国大陆", "小火箭"]
 const DEFAULT_USER_AGENT =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 export interface SharedAccount {
     account: string
@@ -29,6 +37,24 @@ export interface SharedAccount {
     remark?: string
 }
 
+interface VoidloginsResponse {
+    code: number
+    status: boolean
+    msg: string
+    accounts: {
+        id: number
+        username: string
+        password: string
+        status: boolean
+        region_display?: string
+        frontend_remark?: string
+        message?: string
+        last_check?: string
+        last_check_success?: number
+        check_interval?: number
+    }[]
+}
+
 // ---------------------------------------------------------------------------
 // Shared regexes
 // ---------------------------------------------------------------------------
@@ -36,7 +62,6 @@ export interface SharedAccount {
 const STATUS_RE = /状态[：:]\s*([^\s\n]+)/
 /** Matches various timestamp labels used across different source sites */
 const LAST_CHECKED_RE = /(?:上次检查|检测时间|账号更新)[：:]\s*(\d{4}-\d{2}-\d{2}(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?)/
-const INSTALL_STATUS_RE = /装好(?:状态)?[：:]\s*([^\s\n]+)/
 const ACCOUNT_RE = /账号[：:]\s*([^\s\n]+)|([^\s]+@[^\s]+)/
 const PASSWORD_RE = /密码[：:]\s*([^\s\n]+)/
 const REGION_RE = /地区[：:]\s*([^\s\n]+)|(美国|香港|日本|新加坡|台湾|韩国|英国|德国|法国)/
@@ -63,7 +88,7 @@ function decodeCfEmail(hex: string): string {
     }
 }
 
-/** Decode JS unicode escapes (e.g. \u0026 → &) found in onclick attribute values. */
+/** Decode JS unicode escapes (e.g. & → &) found in onclick attribute values. */
 function decodeJsUnicodeEscapes(s: string): string {
     return s.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
 }
@@ -87,11 +112,12 @@ function isAllowedStatus(status: string): boolean {
 }
 
 function isAllowedRegion(region: string): boolean {
-    return !BLOCKED_REGIONS.includes(region.trim())
+    const r = region.trim()
+    return !BLOCKED_REGION_KEYWORDS.some((kw) => r.includes(kw))
 }
 
 // ---------------------------------------------------------------------------
-// Per-element extraction
+// Extraction helpers
 // ---------------------------------------------------------------------------
 
 /**
@@ -159,8 +185,27 @@ function tryExtractCard($: cheerio.CheerioAPI, el: any, seen: Set<string>): Shar
     return { account, password, region, status: status || ALLOWED_STATUS, lastCheckedAt }
 }
 
+/** Try to extract a SharedAccount from a plain text blob (used by strategies 2 and 3). */
+function tryExtractFromText(text: string, seen: Set<string>): SharedAccount | null {
+    const status = extractGroup(text, STATUS_RE)?.trim() ?? ""
+    if (!isAllowedStatus(status)) return null
+    const account = extractGroup(text, ACCOUNT_RE)
+    const password = extractGroup(text, PASSWORD_RE)
+    if (!account || !password || seen.has(account)) return null
+    const region = extractGroup(text, REGION_RE) || "未知"
+    if (!isAllowedRegion(region)) return null
+    seen.add(account)
+    return {
+        account,
+        password,
+        region,
+        status: status || ALLOWED_STATUS,
+        lastCheckedAt: extractGroup(text, LAST_CHECKED_RE)?.trim() ?? undefined,
+    }
+}
+
 // ---------------------------------------------------------------------------
-// Main parser
+// HTML parser
 // ---------------------------------------------------------------------------
 
 function parseAccountsFromHtml(html: string): SharedAccount[] {
@@ -178,22 +223,8 @@ function parseAccountsFromHtml(html: string): SharedAccount[] {
 
     // Strategy 2: table rows
     $("tr").each((_, tr) => {
-        const text = $(tr).text()
-        const status = extractGroup(text, STATUS_RE)?.trim() ?? ""
-        if (!isAllowedStatus(status)) return
-        const account = extractGroup(text, ACCOUNT_RE)
-        const password = extractGroup(text, PASSWORD_RE)
-        const region = extractGroup(text, REGION_RE) || "未知"
-        if (account && password && !seen.has(account) && isAllowedRegion(region)) {
-            seen.add(account)
-            results.push({
-                account,
-                password,
-                region,
-                status: status || ALLOWED_STATUS,
-                lastCheckedAt: extractGroup(text, LAST_CHECKED_RE)?.trim() ?? undefined,
-            })
-        }
+        const acc = tryExtractFromText($(tr).text(), seen)
+        if (acc) results.push(acc)
     })
     if (results.length > 0) return results
 
@@ -207,27 +238,14 @@ function parseAccountsFromHtml(html: string): SharedAccount[] {
     ]
     for (const sel of blockSelectors) {
         $(sel).each((_, el) => {
-            const text = $(el).text()
-            const status = extractGroup(text, STATUS_RE)?.trim() ?? ""
-            if (!isAllowedStatus(status)) return
-            const account = extractGroup(text, ACCOUNT_RE)
-            const password = extractGroup(text, PASSWORD_RE)
-            const region = extractGroup(text, REGION_RE) || "未知"
-            if (account && password && !seen.has(account) && isAllowedRegion(region)) {
-                seen.add(account)
-                results.push({
-                    account,
-                    password,
-                    region,
-                    status: status || ALLOWED_STATUS,
-                    lastCheckedAt: extractGroup(text, LAST_CHECKED_RE)?.trim() ?? undefined,
-                    })
-            }
+            const acc = tryExtractFromText($(el).text(), seen)
+            if (acc) results.push(acc)
         })
         if (results.length > 0) return results
     }
 
-    // Strategy 4: split page by "状态:正常" markers — last resort for plain-text pages
+    // Strategy 4: split page by "状态:正常" markers — last resort for plain-text pages.
+    // Segments inherit ALLOWED_STATUS from the marker that preceded them; status is not re-extracted.
     const segments = html.split(/状态[：:]\s*正常/).slice(1)
     for (const seg of segments) {
         const text = cheerio.load(seg).text()
@@ -250,29 +268,28 @@ function parseAccountsFromHtml(html: string): SharedAccount[] {
 }
 
 // ---------------------------------------------------------------------------
-// Voidlogins API
+// Cache helper
 // ---------------------------------------------------------------------------
 
-interface VoidloginsResponse {
-    code: number
-    status: boolean
-    msg: string
-    accounts: {
-        id: number
-        username: string
-        password: string
-        status: boolean
-        region_display?: string
-        frontend_remark?: string
-        message?: string
-        last_check?: string
-        last_check_success?: number
-        check_interval?: number
-    }[]
+/** In-process TTL cache keyed by source URL / strategy key */
+const scrapeCache = new Map<string, { data: SharedAccount[]; expiresAt: number }>()
+
+/** Read from cache or call fetcher; caches non-empty results for ttlMs. */
+async function withCache(
+    key: string,
+    ttlMs: number,
+    fetcher: () => Promise<SharedAccount[]>,
+): Promise<SharedAccount[]> {
+    const now = Date.now()
+    const cached = scrapeCache.get(key)
+    if (cached && cached.expiresAt > now) return cached.data
+    const data = await fetcher()
+    if (data.length > 0) scrapeCache.set(key, { data, expiresAt: now + ttlMs })
+    return data
 }
 
 // ---------------------------------------------------------------------------
-// Fetch strategies — each fetches raw data and normalises to SharedAccount[]
+// Fetch strategy
 // ---------------------------------------------------------------------------
 
 /**
@@ -294,11 +311,8 @@ function resolveStrategy(sourceUrl: string): FetchStrategy | null {
 }
 
 // ---------------------------------------------------------------------------
-// Public API
+// Strategy executors
 // ---------------------------------------------------------------------------
-
-/** In-process cache keyed by source URL */
-const scrapeCache = new Map<string, { data: SharedAccount[]; expiresAt: number }>()
 
 /**
  * Fetch sourceUrl and parse all valid shared accounts (HTML scraping).
@@ -309,11 +323,7 @@ export async function scrapeSharedAccounts(sourceUrl: string): Promise<SharedAcc
     const url = sourceUrl.trim()
     if (!url.startsWith("http://") && !url.startsWith("https://")) return []
 
-    const now = Date.now()
-    const cached = scrapeCache.get(url)
-    if (cached && cached.expiresAt > now) return cached.data
-
-    try {
+    return withCache(url, config.autoFetchScrapeCacheTtlMs, async () => {
         const res = await fetchWithTimeout(url, {
             timeoutMs: config.autoFetchScrapeTimeoutMs,
             headers: {
@@ -322,7 +332,6 @@ export async function scrapeSharedAccounts(sourceUrl: string): Promise<SharedAcc
                 "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
             },
         })
-
         if (!res.ok) {
             console.warn(`[scrape] HTTP ${res.status} from ${url}`)
             return []
@@ -330,14 +339,11 @@ export async function scrapeSharedAccounts(sourceUrl: string): Promise<SharedAcc
         const html = await res.text()
         const data = parseAccountsFromHtml(html)
         console.log(`[scrape] parsed ${data.length} accounts from ${url}`)
-        if (data.length > 0) {
-            scrapeCache.set(url, { data, expiresAt: now + config.autoFetchScrapeCacheTtlMs })
-        }
         return data
-    } catch (err) {
+    }).catch((err) => {
         console.warn("[scrape] fetch failed:", err instanceof Error ? err.message : err)
         return []
-    }
+    })
 }
 
 /** Execute the scrape strategy: fetch one or more HTML sources and merge results. */
@@ -366,33 +372,26 @@ async function executeVoidloginsStrategy(code: string, password: string): Promis
         ? `${VOIDLOGINS_SCHEME}${encodedCode}/${encodedPassword}`
         : `${VOIDLOGINS_SCHEME}${encodedCode}`
 
-    const now = Date.now()
-    const cached = scrapeCache.get(cacheKey)
-    if (cached && cached.expiresAt > now) return cached.data
-
     const apiPath = encodedPassword
         ? `/shareapi/${encodedCode}/${encodedPassword}`
         : `/shareapi/${encodedCode}`
     const url = `${appleHostingBaseUrl}${apiPath}`
-    console.log(`[voidlogins] fetching ${url}`)
 
-    try {
+    return withCache(cacheKey, config.autoFetchScrapeCacheTtlMs, async () => {
+        console.log(`[voidlogins] fetching ${url}`)
         const res = await fetchWithTimeout(url, {
             timeoutMs: config.autoFetchScrapeTimeoutMs,
             headers: { Accept: "application/json" },
         })
-
         if (!res.ok) {
             console.warn(`[voidlogins] HTTP ${res.status} from ${appleHostingBaseUrl}`)
             return []
         }
-
         const json = await res.json() as VoidloginsResponse
         if (!json.status || !Array.isArray(json.accounts)) {
             console.warn(`[voidlogins] API error: ${json.msg}`)
             return []
         }
-
         const seen = new Set<string>()
         const data: SharedAccount[] = []
         for (const acc of json.accounts) {
@@ -410,15 +409,16 @@ async function executeVoidloginsStrategy(code: string, password: string): Promis
             })
         }
         console.log(`[voidlogins] got ${data.length} accounts`)
-        if (data.length > 0) {
-            scrapeCache.set(cacheKey, { data, expiresAt: now + config.autoFetchScrapeCacheTtlMs })
-        }
         return data
-    } catch (err) {
+    }).catch((err) => {
         console.warn("[voidlogins] fetch failed:", err instanceof Error ? err.message : err)
         return []
-    }
+    })
 }
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
 
 /**
  * Resolve the source URL to a fetch strategy, execute it, and return normalised SharedAccount[].
