@@ -74,9 +74,9 @@ export function CrossSellSection({ recommendations, discountPercent, ttlMs }: Cr
                 </CardContent>
             </Card>
 
-            {/* Product grid */}
+            {/* Product list — horizontal cards stacked vertically */}
             <div className={cn(
-                "grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 transition-opacity",
+                "flex flex-col gap-3 transition-opacity",
                 isExpired ? "opacity-50 pointer-events-none" : ""
             )}>
                 {recommendations.map((rec) => (
@@ -85,6 +85,7 @@ export function CrossSellSection({ recommendations, discountPercent, ttlMs }: Cr
                         product={rec.product}
                         href={rec.href}
                         discountPercent={rec.discountPercent}
+                        horizontal
                     />
                 ))}
             </div>
