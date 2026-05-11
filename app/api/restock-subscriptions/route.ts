@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
     });
     if (pendingCount >= MAX_PENDING_SUBSCRIPTIONS_PER_EMAIL) {
         return badRequest(
-            `每个邮箱最多订阅 ${MAX_PENDING_SUBSCRIPTIONS_PER_EMAIL} 个商品的补货提醒，请先取消部分订阅后再试`,
+            `每个邮箱最多催货 ${MAX_PENDING_SUBSCRIPTIONS_PER_EMAIL} 个商品，等部分商品补货通知发送后可继续`,
         );
     }
 

@@ -54,6 +54,12 @@ export function RestockReminderForm({
     }, [searchParams])
 
     useEffect(() => {
+        const handler = () => setOpen(true)
+        document.addEventListener("open-restock-dialog", handler)
+        return () => document.removeEventListener("open-restock-dialog", handler)
+    }, [])
+
+    useEffect(() => {
         if (defaultEmail) form.reset({ email: defaultEmail })
     }, [defaultEmail, form])
 
@@ -67,7 +73,7 @@ export function RestockReminderForm({
             const data = await res.json()
 
             if (res.ok) {
-                toast.success("已为你开启补货提醒")
+                toast.success("催货需求已登记")
                 setSubscribed(true)
                 setOpen(false)
                 return
@@ -88,9 +94,8 @@ export function RestockReminderForm({
     return (
         <>
             <div className="space-y-3">
-                <h3 className="text-sm font-semibold text-muted-foreground">补货提醒</h3>
                 <p className="text-sm text-muted-foreground">
-                    商品补货后，我们会通过邮箱第一时间通知你。
+                    告诉我们你需要这款，补货后第一时间通知你。
                 </p>
                 <Button
                     type="button"
@@ -100,16 +105,16 @@ export function RestockReminderForm({
                     className="w-full sm:w-auto"
                 >
                     <Bell className="size-4 shrink-0" />
-                    {subscribed ? "已开启补货提醒" : "补货提醒我"}
+                    {subscribed ? "已提交催货" : "我要催货"}
                 </Button>
             </div>
 
             <Dialog open={open} onOpenChange={setOpen}>
                 <DialogContent showCloseButton>
                     <DialogHeader>
-                        <DialogTitle>补货提醒</DialogTitle>
+                        <DialogTitle>催货</DialogTitle>
                         <DialogDescription>
-                            输入邮箱，商品补货后我们会第一时间通知你。
+                            留下邮箱告诉我们你要这款，补货后第一时间通知你。
                         </DialogDescription>
                     </DialogHeader>
                     <Form {...form}>
@@ -145,7 +150,7 @@ export function RestockReminderForm({
                                     {form.formState.isSubmitting && (
                                         <Loader2 className="size-4 animate-spin" />
                                     )}
-                                    确认订阅
+                                    提交催货
                                 </Button>
                             </div>
                         </form>

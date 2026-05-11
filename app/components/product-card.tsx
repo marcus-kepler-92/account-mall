@@ -149,7 +149,7 @@ export function ProductCard({ product, gradientIndex = 0, className, code }: Pro
                             {isSoldOut ? (
                                 <>
                                     <Bell className="size-3.5" />
-                                    <span className="text-xs sm:text-sm">补货提醒</span>
+                                    <span className="text-xs sm:text-sm">催货</span>
                                 </>
                             ) : isFree ? (
                                 <span className="text-xs sm:text-sm">免费领取</span>

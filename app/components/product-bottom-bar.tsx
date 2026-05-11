@@ -13,7 +13,6 @@ type ProductBottomBarProps = {
     price: number
     inStock: boolean
     orderSectionId: string
-    restockSectionId?: string
     formId?: string
     isFree?: boolean
     requireTurnstile?: boolean
@@ -23,7 +22,6 @@ export function ProductBottomBar({
     price,
     inStock,
     orderSectionId,
-    restockSectionId,
     formId,
     isFree,
     requireTurnstile = false,
@@ -58,12 +56,13 @@ export function ProductBottomBar({
 
         if (isSubmitting) return
 
-        const targetId = inStock ? orderSectionId : restockSectionId ?? orderSectionId
-        if (!targetId) return
+        if (!inStock) {
+            document.dispatchEvent(new CustomEvent("open-restock-dialog"))
+            return
+        }
 
-        const el = document.getElementById(targetId)
+        const el = document.getElementById(orderSectionId)
         if (!el) return
-
         el.scrollIntoView({ behavior: "smooth", block: "start" })
     }
 
@@ -100,7 +99,7 @@ export function ProductBottomBar({
                         )}
                         {!inStock && (
                             <span className="mt-0.5 text-[11px] text-muted-foreground">
-                                已售罄，可订阅补货提醒
+                                已售罄，催货告诉我们你要
                             </span>
                         )}
                     </div>
@@ -110,7 +109,7 @@ export function ProductBottomBar({
                     size="lg"
                     className="min-h-11 min-w-28 gap-2 touch-manipulation"
                     onClick={handleClick}
-                    disabled={(!inStock && !restockSectionId) || isSubmitting || (inStock && turnstileLoading)}
+                    disabled={isSubmitting || (inStock && turnstileLoading)}
                 >
                     {(showSubmitState || (inStock && turnstileLoading && turnstileStatus !== "interactive")) && (
                         <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
@@ -123,7 +122,7 @@ export function ProductBottomBar({
                             ? "准备中…"
                             : inStock
                               ? (isFree ? "免费领取" : "立即购买")
-                              : "补货提醒"}
+                              : "催货"}
                 </Button>
             </div>
         </div>

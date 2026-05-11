@@ -36,7 +36,7 @@ export async function notifyRestockSubscribers(product: ProductInfo): Promise<vo
     const price = product.price;
     const productUrl = `${config.siteUrl}/products/${product.id}-${product.slug}`;
 
-    const userSubject = `[${config.siteName}] 你关注的商品已补货`;
+    const userSubject = `[${config.siteName}] 你催货的商品已到货`;
     const userHtml = await render(
         React.createElement(RestockNotifyUser, {
             productName: product.name,

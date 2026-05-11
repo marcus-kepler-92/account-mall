@@ -302,7 +302,7 @@ export default async function ProductDetailPage({
 
             {isSoldOut && (
               <Suspense
-                fallback={<Skeleton className="h-32 w-full rounded-lg" />}
+                fallback={<Skeleton className="h-32 w-full rounded-lg hidden lg:block" />}
               >
                 <ProductRestockSection
                   productId={product.id}
@@ -318,7 +318,6 @@ export default async function ProductDetailPage({
         price={priceNumber}
         inStock={!isSoldOut}
         orderSectionId="order-section"
-        restockSectionId={isSoldOut ? "restock-section" : undefined}
         formId="product-order-form"
         isFree={isFree}
         requireTurnstile={requireTurnstile}
@@ -478,7 +477,7 @@ function ProductRestockSection({
   productName,
 }: ProductRestockSectionProps) {
   return (
-    <section id="restock-section" aria-label="补货提醒">
+    <section id="restock-section" aria-label="催货" className="hidden lg:block">
       <div className="rounded-xl border bg-card p-4 shadow-sm sm:p-5">
         <RestockReminderForm productId={productId} productName={productName} />
       </div>

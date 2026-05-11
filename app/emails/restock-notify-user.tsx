@@ -17,7 +17,7 @@ export function RestockNotifyUser({
 }: RestockNotifyUserProps) {
     const sections: NotificationSection[] = [
         { type: "text", content: "你好，" },
-        { type: "text", content: `你曾订阅补货提醒的商品 ${productName} 现已到货。` },
+        { type: "text", content: `你催货的 ${productName} 现已到货。` },
         { type: "price", value: `¥${price.toFixed(2)}` },
         { type: "cta", label: "立即查看", href: productUrl },
         { type: "note", content: "库存有限，请尽快下单。" },
@@ -25,10 +25,10 @@ export function RestockNotifyUser({
 
     return (
         <BaseNotification
-            previewText="你关注的商品已补货，点击查看"
-            title="你关注的商品已补货"
+            previewText="你催货的商品已到货，点击查看"
+            title="你催货的商品已到货"
             sections={sections}
-            footerLabel="补货提醒"
+            footerLabel="催货通知"
             brandName={brandName}
         />
     );

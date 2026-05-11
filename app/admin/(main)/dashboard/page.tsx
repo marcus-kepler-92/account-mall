@@ -73,8 +73,8 @@ export default async function AdminDashboardPage() {
         </Card>
         <Card className="min-w-0">
           <CardHeader>
-            <CardTitle className="text-base sm:text-lg">待通知补货提醒</CardTitle>
-            <CardDescription>缺货商品的订阅人数</CardDescription>
+            <CardTitle className="text-base sm:text-lg">催货记录</CardTitle>
+            <CardDescription>缺货商品的催货人数</CardDescription>
           </CardHeader>
           <CardContent className="min-w-0">
             <DashboardRestockPending data={restockPending} />
