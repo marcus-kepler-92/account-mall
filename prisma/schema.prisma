@@ -221,7 +221,6 @@ model Order {
   clientIp                String?     // For rate limit: max PENDING orders per IP
   fingerprintHash         String?     // 浏览器指纹，用于免费商品多因素领取限制
   exitDiscountMeta        String?     @db.Text // Exit intent 折扣信号 JSON，订单 COMPLETED 后转存到 ExitDiscountUsage
-  crossSellSourceOrderId  String?
   /// AUTO_FETCH：用户已使用的换号次数
   switchAccountCount      Int         @default(0)
   paymentChannelId        String?
@@ -560,6 +559,7 @@ model CrossSellSetting {
   enabled         Boolean  @default(true)
   discountPercent Decimal  @db.Decimal(5, 2) @default(10)
   ttlMinutes      Int      @default(30)
+  createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
 
@@ -570,11 +570,12 @@ model CrossSellUsage {
   targetOrderId   String   @unique
   targetProductId String
   discountPercent Decimal  @db.Decimal(5, 2)
-  usedAt          DateTime @default(now())
+  createdAt       DateTime @default(now())
 
   sourceOrder Order @relation("CrossSellSource", fields: [sourceOrderId], references: [id], onDelete: Cascade)
   targetOrder Order @relation("CrossSellTarget", fields: [targetOrderId], references: [id], onDelete: Cascade)
 
   @@unique([sourceOrderId, targetProductId])
   @@index([sourceOrderId])
+  @@index([targetProductId])
 }
