@@ -48,7 +48,7 @@ export function CrossSellSection({ recommendations, discountPercent, ttlMs }: Cr
     const discountLabel = `${100 - discountPercent} 折`
 
     return (
-        <section className="mx-auto max-w-4xl px-0">
+        <section className="mx-auto max-w-4xl px-4">
             {/* Banner */}
             <Card className={cn("mb-4 transition-opacity", isExpired ? "opacity-50" : "")}>
                 <CardContent className="py-4">

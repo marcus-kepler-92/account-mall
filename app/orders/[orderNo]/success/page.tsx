@@ -145,8 +145,8 @@ export default async function OrderSuccessPage({ params, searchParams }: PagePro
         <div className="flex min-h-screen flex-col">
             <OrderSuccessSyncHistory orderNo={orderNo} />
             <SiteHeader />
-            <main className="flex-1 px-4 py-8">
-                <div className="mx-auto max-w-2xl space-y-6">
+            <main className="flex-1 py-8 space-y-8">
+                <div className="mx-auto max-w-2xl space-y-6 px-4">
                     <div className="text-center">
                         <h1 className="text-2xl font-bold">
                             {Number(order.amount) === 0 ? "领取成功" : "支付成功"}
@@ -190,13 +190,8 @@ export default async function OrderSuccessPage({ params, searchParams }: PagePro
                             </div>
                         </CardContent>
                     </Card>
-
-                    <div className="flex justify-center">
-                        <Button asChild variant="outline">
-                            <Link href="/">返回首页</Link>
-                        </Button>
-                    </div>
                 </div>
+
                 {crossSellItems.length > 0 && (
                     <CrossSellSection
                         recommendations={crossSellItems}
@@ -204,6 +199,12 @@ export default async function OrderSuccessPage({ params, searchParams }: PagePro
                         ttlMs={ttlMs}
                     />
                 )}
+
+                <div className="flex justify-center px-4">
+                    <Button asChild variant="outline">
+                        <Link href="/">返回首页</Link>
+                    </Button>
+                </div>
             </main>
         </div>
     )
