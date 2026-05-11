@@ -10,6 +10,9 @@ import { OrderSuccessSyncHistory } from "./order-success-sync-history"
 import { resolveCardFields } from "@/lib/card-format"
 import { OrderCardDisplay } from "@/app/components/order-detail/card-display"
 import { OrderAutoFetchSection } from "@/app/components/order-detail/auto-fetch-section"
+import { getCrossSellSetting, getCrossSellRecommendations } from "@/lib/cross-sell"
+import { generateCrossSellToken } from "@/lib/cross-sell-token"
+import { CrossSellSection } from "./cross-sell-section"
 
 type PageProps = {
     params: Promise<{ orderNo: string }>
@@ -115,6 +118,29 @@ export default async function OrderSuccessPage({ params, searchParams }: PagePro
         remainingSwitches > 0 &&
         notExpired
 
+    // Cross-sell section data
+    const crossSellSetting = await getCrossSellSetting()
+    const crossSellRecommendations = crossSellSetting.enabled
+        ? await getCrossSellRecommendations(order.productId)
+        : []
+
+    const ttlMs = crossSellSetting.ttlMinutes * 60_000
+
+    const crossSellItems = crossSellSetting.enabled
+        ? crossSellRecommendations
+            .map((product) => {
+                const csToken = generateCrossSellToken(
+                    { sourceOrderId: order.id, targetProductId: product.id, discountPercent: crossSellSetting.discountPercent },
+                    ttlMs,
+                )
+                if (!csToken) return null
+                const params = new URLSearchParams({ email: order.email, csToken })
+                const href = `/products/${product.id}-${product.slug}?${params}`
+                return { product, href, discountPercent: crossSellSetting.discountPercent }
+            })
+            .filter((x): x is NonNullable<typeof x> => x !== null)
+        : []
+
     return (
         <div className="flex min-h-screen flex-col">
             <OrderSuccessSyncHistory orderNo={orderNo} />
@@ -171,6 +197,13 @@ export default async function OrderSuccessPage({ params, searchParams }: PagePro
                         </Button>
                     </div>
                 </div>
+                {crossSellItems.length > 0 && (
+                    <CrossSellSection
+                        recommendations={crossSellItems}
+                        discountPercent={crossSellSetting.discountPercent}
+                        ttlMs={ttlMs}
+                    />
+                )}
             </main>
         </div>
     )

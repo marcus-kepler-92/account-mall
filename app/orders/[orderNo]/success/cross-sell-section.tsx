@@ -1,0 +1,86 @@
+"use client"
+
+import { useState, useSyncExternalStore } from "react"
+import { Sparkles } from "lucide-react"
+import { Card, CardContent } from "@/components/ui/card"
+import { ProductCard, type ProductCardData } from "@/app/components/product-card"
+import { cn } from "@/lib/utils"
+
+type CrossSellRecommendation = {
+    product: ProductCardData
+    href: string
+    discountPercent: number
+}
+
+type CrossSellSectionProps = {
+    recommendations: CrossSellRecommendation[]
+    discountPercent: number
+    ttlMs: number
+}
+
+function subscribe(callback: () => void) {
+    const id = setInterval(callback, 1000)
+    return () => clearInterval(id)
+}
+
+function useCountdownMs(expiresAt: number): number {
+    return useSyncExternalStore(
+        subscribe,
+        () => Math.max(0, expiresAt - Date.now()),
+        () => Math.max(0, expiresAt - Date.now()),
+    )
+}
+
+export function CrossSellSection({ recommendations, discountPercent, ttlMs }: CrossSellSectionProps) {
+    const [expiresAt] = useState(() => Date.now() + ttlMs)
+    const remainingMs = useCountdownMs(expiresAt)
+    const isExpired = remainingMs <= 0
+    const minutes = Math.floor(remainingMs / 60_000)
+    const seconds = Math.floor((remainingMs % 60_000) / 1000)
+    const countdownStr = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
+    const discountLabel = `${100 - discountPercent} 折`
+
+    return (
+        <section className="mx-auto max-w-4xl px-0">
+            {/* Banner */}
+            <Card className={cn("mb-4 transition-opacity", isExpired ? "opacity-50" : "")}>
+                <CardContent className="py-4">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <p className="font-semibold text-sm sm:text-base">
+                                <Sparkles className="inline size-4 mr-1 text-amber-500" />
+                                为你推荐 · 成功页专享{discountLabel}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                                {isExpired ? "折扣已过期" : `仅本页有效 · ${remainingMs <= 5 * 60_000 ? "即将过期 " : ""}限时专享`}
+                            </p>
+                        </div>
+                        {!isExpired && (
+                            <span className={cn(
+                                "font-mono tabular-nums font-bold text-xl sm:text-2xl",
+                                remainingMs <= 60_000 ? "text-destructive animate-pulse" : "text-foreground"
+                            )}>
+                                {countdownStr}
+                            </span>
+                        )}
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Product grid */}
+            <div className={cn(
+                "grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 transition-opacity",
+                isExpired ? "opacity-50 pointer-events-none" : ""
+            )}>
+                {recommendations.map((rec) => (
+                    <ProductCard
+                        key={rec.product.id}
+                        product={rec.product}
+                        href={rec.href}
+                        discountPercent={rec.discountPercent}
+                    />
+                ))}
+            </div>
+        </section>
+    )
+}

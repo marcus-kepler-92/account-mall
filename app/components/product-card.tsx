@@ -29,12 +29,14 @@ type ProductCardProps = {
     gradientIndex?: number
     className?: string
     code?: string
+    discountPercent?: number
+    href?: string
 }
 
 /**
  * Product card with equal height in grid, cover maintains aspect ratio (1:1).
  */
-export function ProductCard({ product, gradientIndex = 0, className, code }: ProductCardProps) {
+export function ProductCard({ product, gradientIndex = 0, className, code, discountPercent, href }: ProductCardProps) {
     const descriptionFallback = descriptionToPlainText(product.description, 80)
     const briefRaw = product.summary?.trim() || descriptionFallback
     const brief = briefRaw.slice(0, 80)
@@ -51,7 +53,8 @@ export function ProductCard({ product, gradientIndex = 0, className, code }: Pro
         const query = params.toString()
         return `/products/${productSlug}${query ? `?${query}` : ""}`
     }
-    const detailHref = buildDetailHref()
+    const detailHref = href ?? buildDetailHref()
+    const hasDiscount = typeof discountPercent === "number" && discountPercent > 0 && discountPercent <= 99
 
     return (
         <Link href={detailHref} className={cn("group block h-full", className)}>
@@ -117,14 +120,21 @@ export function ProductCard({ product, gradientIndex = 0, className, code }: Pro
                                 </>
                             ) : (
                                 <>
-                                    <span
-                                        className={cn(
-                                            "text-base font-bold tabular-nums sm:text-lg",
-                                            isSoldOut && "text-muted-foreground line-through"
-                                        )}
-                                    >
-                                        ¥{product.price.toFixed(2)}
-                                    </span>
+                                    {!isSoldOut && hasDiscount ? (
+                                        <span className="flex items-baseline gap-0.5">
+                                            <span className="line-through text-muted-foreground text-xs mr-1">¥{product.price.toFixed(2)}</span>
+                                            <span className="font-bold text-destructive">¥{(product.price * (1 - discountPercent! / 100)).toFixed(2)}</span>
+                                        </span>
+                                    ) : (
+                                        <span
+                                            className={cn(
+                                                "text-base font-bold tabular-nums sm:text-lg",
+                                                isSoldOut && "text-muted-foreground line-through"
+                                            )}
+                                        >
+                                            ¥{product.price.toFixed(2)}
+                                        </span>
+                                    )}
                                     {isAutoFetch ? (
                                         <span className="ml-1.5 block text-[11px] text-muted-foreground">
                                             有货
