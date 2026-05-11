@@ -24,7 +24,10 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
         return invalidJsonBody()
     }
 
-    const parsed = crossSellSettingSchema.partial().safeParse(body)
+    const parsed = crossSellSettingSchema.partial().refine(
+        (d) => Object.keys(d).length > 0,
+        { message: "至少需要修改一个字段" },
+    ).safeParse(body)
     if (!parsed.success) return validationError(parsed.error.flatten())
 
     const updated = await prisma.crossSellSetting.upsert({
