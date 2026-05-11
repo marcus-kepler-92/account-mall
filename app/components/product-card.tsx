@@ -55,7 +55,7 @@ export function ProductCard({ product, gradientIndex = 0, className, code, disco
         return `/products/${productSlug}${query ? `?${query}` : ""}`
     }
     const detailHref = href ?? buildDetailHref()
-    const hasDiscount = typeof discountPercent === "number" && discountPercent > 0 && discountPercent <= 99
+    const hasDiscount = typeof discountPercent === "number" && discountPercent > 0 && discountPercent <= 99 && product.price > 0
 
     if (horizontal) {
         return (
