@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
@@ -86,6 +86,11 @@ export function ProductsDataTable({ data, isSuperAdmin = false }: { data: Produc
     const router = useRouter()
     const [dragRows, setDragRows] = useState<ProductRow[] | null>(null)
     const rows = dragRows ?? data
+
+    // Clear optimistic state only after server data refreshes, preventing flash-back to old order
+    useEffect(() => {
+        setDragRows(null)
+    }, [data])
     const [sorting, setSorting] = useState<SortingState>([])
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
@@ -136,7 +141,6 @@ export function ProductsDataTable({ data, isSuperAdmin = false }: { data: Produc
                 body: JSON.stringify({ ids: reordered.map((r) => r.id) }),
             })
             if (!res.ok) throw new Error("reorder failed")
-            setDragRows(null)
             router.refresh()
         } catch {
             toast.error("排序保存失败，已恢复原顺序")
