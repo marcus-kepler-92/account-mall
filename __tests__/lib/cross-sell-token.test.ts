@@ -50,25 +50,25 @@ describe("cross-sell-token", () => {
         // and confirm the payload doesn't match what we expect
         const result = verifyCrossSellToken(token)
         expect(result.valid).toBe(true)
-        // Now tamper the expiry part to get a different HMAC check
-        const [expiry, sig] = token.split(".")
-        const tamperedToken = `${expiry}.${sig.slice(0, -2)}xx`
+        // Now tamper the HMAC signature to get a different HMAC check
+        const [expiry, payloadEnc, sig] = token.split(".")
+        const tamperedToken = `${expiry}.${payloadEnc}.${sig.slice(0, -2)}xx`
         const tamperedResult = verifyCrossSellToken(tamperedToken)
         expect(tamperedResult.valid).toBe(false)
     })
 
     it("verifyCrossSellToken returns invalid for wrong targetProductId (tampered token)", () => {
         const token = generateCrossSellToken(basePayload, 60_000)!
-        const [expiry, sig] = token.split(".")
+        const [expiry, payloadEnc, sig] = token.split(".")
         // Modify signature slightly
-        const tampered = `${expiry}.${sig.slice(0, 5)}XXXXX${sig.slice(10)}`
+        const tampered = `${expiry}.${payloadEnc}.${sig.slice(0, 5)}XXXXX${sig.slice(10)}`
         expect(verifyCrossSellToken(tampered).valid).toBe(false)
     })
 
     it("verifyCrossSellToken returns invalid for tampered signature", () => {
         const token = generateCrossSellToken(basePayload, 60_000)!
-        const [expiry, sig] = token.split(".")
-        const badToken = `${expiry}.${sig.slice(0, -2)}xx`
+        const [expiry, payloadEnc, sig] = token.split(".")
+        const badToken = `${expiry}.${payloadEnc}.${sig.slice(0, -2)}xx`
         expect(verifyCrossSellToken(badToken).valid).toBe(false)
     })
 
