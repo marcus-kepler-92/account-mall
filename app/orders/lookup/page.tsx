@@ -18,68 +18,17 @@ import {
     FormMessage,
 } from "@/components/ui/form"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
 import { Skeleton } from "@/components/ui/skeleton"
 import { SiteHeader } from "@/app/components/site-header"
 import { useSiteName } from "@/app/components/site-name-provider"
-import {
-    Copy, Check, Eye, EyeOff, Loader2, Mail, Hash, Package, Search,
-    Zap, CreditCard, KeyRound, Globe, Clock, Info, RefreshCw, ArrowLeftRight,
-} from "lucide-react"
+import { Copy, Eye, EyeOff, Loader2, Mail, Hash, Package, Search, Zap } from "lucide-react"
 import { toast } from "sonner"
 import { addOrUpdateOrder } from "@/lib/order-history-storage"
-import { formatDateTime, formatDateTimeShort } from "@/lib/utils"
+import { formatDateTime } from "@/lib/utils"
 import { applyFieldErrors } from "@/lib/form-utils"
 import { orderNoLookupSchema, emailLookupSchema, type OrderLookupFormValues } from "@/lib/validations/lookup"
-import { type AutoFetchCardPayload, isAutoFetchCard, formatAutoFetchCardForCopy, toCardContentJson } from "@/lib/auto-fetch-card"
-
-/* ------------------------------------------------------------------ */
-/*  Types                                                              */
-/* ------------------------------------------------------------------ */
-
-type CardItem = { content: string } | (AutoFetchCardPayload & { content: string })
-
-interface OrderResult {
-    orderNo: string
-    productName: string
-    createdAt: string
-    status: "PENDING" | "COMPLETED" | "CLOSED"
-    cards: CardItem[]
-    isPending?: boolean
-    canPay?: boolean
-    /** PENDING 订单的支付截止时间 */
-    expiresAt?: string
-    /** AUTO_FETCH 账号内容有效期 */
-    contentExpiresAt?: string
-    isAutoFetch?: boolean
-    /** AUTO_FETCH：是否可使用一次性换号 */
-    canSwitch?: boolean
-    /** AUTO_FETCH：剩余换号次数 */
-    remainingSwitches?: number
-    /** 成功查询后服务端颁发的临时 token，用于 refresh/switch API 鉴权 */
-    successToken?: string
-}
-
-interface OrderListItem {
-    orderNo: string
-    productName: string
-    createdAt: string
-    status: "PENDING" | "COMPLETED" | "CLOSED"
-    quantity: number
-    amount: number
-}
-
-type LookupMode = "orderNo" | "email"
+import { OrderDetailContent } from "./order-detail-content"
+import type { OrderResult, OrderListItem, LookupMode } from "./types"
 
 /* ------------------------------------------------------------------ */
 /*  Utilities                                                          */
@@ -97,409 +46,17 @@ type ApiOk = { ok: true; data: Record<string, any> }
 type ApiErr = { ok: false; error: string; raw: Record<string, any> }
 type ApiResult = ApiOk | ApiErr
 
-async function fetchApi(endpoint: string, body: Record<string, string>): Promise<ApiResult> {
+async function fetchApi(endpoint: string, body: Record<string, string>, timeoutMs = 15_000): Promise<ApiResult> {
     const { fetchWithTimeout } = await import("@/lib/fetch-with-timeout")
     const res = await fetchWithTimeout(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
-        timeoutMs: 15_000,
+        timeoutMs,
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) return { ok: false, error: data?.error ?? "", raw: data }
     return { ok: true, data }
-}
-
-function useCountdownMs(isoStr: string | null): number | null {
-    const [remaining, setRemaining] = useState<number | null>(null)
-    useEffect(() => {
-        if (!isoStr) return
-        const target = new Date(isoStr).getTime()
-        const update = () => setRemaining(Math.max(0, target - Date.now()))
-        update()
-        const id = setInterval(update, 1000)
-        return () => clearInterval(id)
-    }, [isoStr])
-    return remaining
-}
-
-function formatCountdownMs(ms: number): string {
-    if (ms <= 0) return "已过期"
-    const s = Math.floor(ms / 1000)
-    const h = Math.floor(s / 3600)
-    const m = Math.floor((s % 3600) / 60)
-    const sec = s % 60
-    if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`
-    return `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`
-}
-
-/* ------------------------------------------------------------------ */
-/*  Sub-components                                                     */
-/* ------------------------------------------------------------------ */
-
-
-function AutoFetchCardRow({
-    card, index, copiedId, onCopy,
-}: {
-    card: AutoFetchCardPayload
-    index: number
-    copiedId: string | null
-    onCopy: (content: string, id: string) => void
-}) {
-    const prefix = `card-${index}`
-    return (
-        <div className="rounded-lg border border-border/80 bg-card shadow-sm overflow-hidden">
-            <div className="divide-y divide-border/60">
-                <div className="flex items-center justify-between gap-4 px-4 py-3.5 bg-muted/30">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                        <Mail className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">账号</span>
-                    </div>
-                    <div className="flex items-center gap-2 min-w-0 flex-1 justify-end">
-                        <code className="min-w-0 truncate font-mono text-sm text-foreground" title={card.account}>{card.account}</code>
-                        <Button variant="ghost" size="icon" className="size-8 shrink-0 rounded-full hover:bg-background cursor-pointer"
-                            onClick={() => onCopy(card.account, `${prefix}-account`)} aria-label="复制账号">
-                            {copiedId === `${prefix}-account` ? <Check className="size-4 text-emerald-600" /> : <Copy className="size-4" />}
-                        </Button>
-                    </div>
-                </div>
-                <div className="flex items-center justify-between gap-4 px-4 py-3.5 bg-muted/30">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                        <KeyRound className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">密码</span>
-                    </div>
-                    <div className="flex items-center gap-2 min-w-0 flex-1 justify-end">
-                        <code className="min-w-0 truncate font-mono text-sm text-foreground" title={card.password}>{card.password}</code>
-                        <Button variant="ghost" size="icon" className="size-8 shrink-0 rounded-full hover:bg-background cursor-pointer"
-                            onClick={() => onCopy(card.password, `${prefix}-password`)} aria-label="复制密码">
-                            {copiedId === `${prefix}-password` ? <Check className="size-4 text-emerald-600" /> : <Copy className="size-4" />}
-                        </Button>
-                    </div>
-                </div>
-                <div className="flex items-center justify-between gap-4 px-4 py-3">
-                    <div className="flex items-center gap-2.5">
-                        <Globe className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">地区</span>
-                    </div>
-                    <span className="text-sm font-medium text-foreground">{card.region}</span>
-                </div>
-                {card.lastCheckedAt && card.lastCheckedAt !== "" && (
-                    <div className="flex items-center justify-between gap-4 px-4 py-3">
-                        <div className="flex items-center gap-2.5">
-                            <Clock className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">上次检查</span>
-                        </div>
-                        <span className="text-sm text-muted-foreground tabular-nums">{card.lastCheckedAt}</span>
-                    </div>
-                )}
-            </div>
-            <div className="flex gap-2.5 px-4 py-3 rounded-b-lg bg-amber-500/5 border-t border-amber-500/10 text-xs text-muted-foreground">
-                <Info className="size-4 shrink-0 text-amber-600 dark:text-amber-500 mt-0.5" aria-hidden />
-                <p className="leading-relaxed">
-                    仅用于 App Store，请勿在设置或 iCloud 登录。如密码失效，可在下方获取最新密码。
-                </p>
-            </div>
-        </div>
-    )
-}
-
-function SimpleCardRow({
-    card, index, copiedId, onCopy,
-}: {
-    card: { content: string }
-    index: number
-    copiedId: string | null
-    onCopy: (content: string, id: string) => void
-}) {
-    return (
-        <div className="group flex items-center gap-2 rounded-lg border bg-background p-2 transition-colors hover:bg-muted/50">
-            <code className="flex-1 font-mono text-xs break-all select-all">{card.content}</code>
-            <Button variant="ghost" size="icon" className="size-7 shrink-0 cursor-pointer"
-                onClick={() => onCopy(card.content, `card-${index}`)} aria-label={`复制第 ${index + 1} 条卡密`}>
-                {copiedId === `card-${index}` ? <Check className="size-3.5 text-green-600" /> : <Copy className="size-3.5" />}
-            </Button>
-        </div>
-    )
-}
-
-/* ------------------------------------------------------------------ */
-/*  OrderDetailContent — 订单详情，两种查询方式共用                        */
-/* ------------------------------------------------------------------ */
-
-function OrderDetailContent({
-    result: initialResult,
-    getPassword,
-}: {
-    result: OrderResult
-    /** 从查询表单中取当前填写的密码（用于继续支付） */
-    getPassword: () => string
-}) {
-    const [result, setResult] = useState<OrderResult>(initialResult)
-    const [copiedId, setCopiedId] = useState<string | null>(null)
-    const [refreshLoading, setRefreshLoading] = useState(false)
-    const [switchLoading, setSwitchLoading] = useState(false)
-    const [continuePaymentLoading, setContinuePaymentLoading] = useState(false)
-    const anyLoading = refreshLoading || switchLoading
-    const copiedTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
-
-    // 当外部 result 变化时（切换订单）同步
-    useEffect(() => {
-        setResult(initialResult)
-        setCopiedId(null)
-    }, [initialResult.orderNo, initialResult])
-
-    useEffect(() => () => clearTimeout(copiedTimerRef.current), [])
-
-    const copyCard = useCallback(async (content: string, id: string) => {
-        try {
-            await navigator.clipboard.writeText(content)
-            setCopiedId(id)
-            clearTimeout(copiedTimerRef.current)
-            copiedTimerRef.current = setTimeout(() => setCopiedId(null), 2000)
-            toast.success("已复制")
-        } catch {
-            toast.error("复制失败，请手动复制")
-        }
-    }, [])
-
-    const copyAllCards = useCallback(async () => {
-        if (result.cards.length === 0) return
-        const lines = result.cards.map((card) =>
-            isAutoFetchCard(card) ? formatAutoFetchCardForCopy(card) : card.content
-        )
-        try {
-            await navigator.clipboard.writeText(lines.join("\n\n"))
-            toast.success(`已复制 ${result.cards.length} 条`)
-        } catch {
-            toast.error("复制失败，请手动复制")
-        }
-    }, [result.cards])
-
-    const handleRefresh = useCallback(async () => {
-        if (!result.successToken) return
-        setRefreshLoading(true)
-        try {
-            const res = await fetch(`/api/orders/${encodeURIComponent(result.orderNo)}/refresh`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ token: result.successToken }),
-            })
-            const data = await res.json() as {
-                refreshed?: boolean
-                payload?: AutoFetchCardPayload
-                accountChanged?: boolean
-                error?: string
-            }
-            if (!res.ok) { toast.error(data.error || "获取失败"); return }
-            if (data.refreshed && data.payload) {
-                setResult((prev) => ({
-                    ...prev,
-                    cards: [{ content: toCardContentJson(data.payload!), ...data.payload! }],
-                }))
-                toast.success(data.accountChanged ? "已换新账号" : "已获取最新账号信息")
-            } else {
-                toast.error(data.error || "暂时无法获取，请稍后重试")
-            }
-        } catch { toast.error("网络异常，请稍后重试") }
-        finally { setRefreshLoading(false) }
-    }, [result.orderNo, result.successToken])
-
-    const handleSwitch = useCallback(async () => {
-        if (!result.successToken) return
-        setSwitchLoading(true)
-        try {
-            const res = await fetch(`/api/orders/${encodeURIComponent(result.orderNo)}/switch-account`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ token: result.successToken }),
-            })
-            const data = await res.json() as { switched?: boolean; payload?: AutoFetchCardPayload; error?: string }
-            if (!res.ok) { toast.error(data.error || "切换失败"); return }
-            if (data.switched && data.payload) {
-                setResult((prev) => ({
-                    ...prev,
-                    cards: [{ content: toCardContentJson(data.payload!), ...data.payload! }],
-                    canSwitch: (prev.remainingSwitches ?? 1) - 1 > 0,
-                    remainingSwitches: Math.max(0, (prev.remainingSwitches ?? 1) - 1),
-                }))
-                toast.success("已切换到新账号")
-            }
-        } catch { toast.error("网络异常，请稍后重试") }
-        finally { setSwitchLoading(false) }
-    }, [result.orderNo, result.successToken])
-
-    const handleContinuePayment = useCallback(async () => {
-        const password = getPassword()
-        if (!result.isPending || !result.canPay || !password) return
-        setContinuePaymentLoading(true)
-        try {
-            const res = await fetchApi("/api/orders/get-payment-url", {
-                orderNo: result.orderNo,
-                password: password.trim(),
-            })
-            if (!res.ok) { toast.error(res.error || "无法继续支付"); return }
-            if (res.data.paymentUrl) { window.location.href = res.data.paymentUrl as string; return }
-            toast.error("获取支付链接失败")
-        } catch { toast.error("网络错误，请稍后重试") }
-        finally { setContinuePaymentLoading(false) }
-    }, [result, getPassword])
-
-    const remaining = useCountdownMs(result.contentExpiresAt ?? null)
-    const isContentExpired = !!result.contentExpiresAt && remaining !== null && remaining <= 0
-
-    return (
-        <div className="space-y-4">
-            {/* 基本信息 */}
-            <div className="grid gap-2 rounded-lg border bg-muted/50 p-3 text-sm">
-                <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">商品名称</span>
-                    <span className="font-medium">{result.productName}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">创建时间</span>
-                    <span>{formatDateTime(result.createdAt)}</span>
-                </div>
-                {!result.isPending && result.cards.length > 0 && (
-                    <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">卡密数量</span>
-                        <span className="font-medium">{result.cards.length} 条</span>
-                    </div>
-                )}
-{!result.isPending && result.isAutoFetch && result.status === "COMPLETED" && result.contentExpiresAt && (
-                    <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">可用时间</span>
-                        {isContentExpired ? (
-                            <span className="text-xs font-medium text-destructive">已过期</span>
-                        ) : (
-                            <span className="font-mono font-medium tabular-nums text-sm">
-                                {remaining !== null ? formatCountdownMs(remaining) : "—"}
-                            </span>
-                        )}
-                    </div>
-                )}
-            </div>
-
-            {/* 待支付 — 可继续付款 */}
-            {result.isPending && result.canPay && (
-                <div className="rounded-lg border border-orange-200 bg-orange-50 p-3 text-sm text-orange-900 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-200 space-y-2">
-                    <p className="font-medium">订单待支付</p>
-                    <p className="text-xs">该订单尚未完成支付，完成支付后即可查看账号内容。</p>
-                    {result.expiresAt && (
-                        <p className="text-xs">
-                            请在 {formatDateTimeShort(result.expiresAt)} 前完成支付。
-                        </p>
-                    )}
-                    <Button className="w-full gap-2" onClick={handleContinuePayment} disabled={continuePaymentLoading}>
-                        {continuePaymentLoading
-                            ? <><Loader2 className="size-4 animate-spin" />跳转中...</>
-                            : <><CreditCard className="size-4" />继续支付</>}
-                    </Button>
-                    <p className="text-xs text-muted-foreground">如已完成支付但仍显示此提示，请联系客服处理。</p>
-                </div>
-            )}
-
-            {/* 待支付 — 已超时 */}
-            {result.isPending && !result.canPay && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
-                    <p className="font-medium mb-1">订单已超时</p>
-                    <p className="text-xs">支付时间已过，无法继续支付，请重新下单。</p>
-                </div>
-            )}
-
-            {/* 已关闭 */}
-            {!result.isPending && result.status === "CLOSED" && result.cards.length === 0 && (
-                <div className="rounded-lg border border-muted bg-muted/50 p-3 text-sm text-muted-foreground">
-                    <p className="font-medium mb-0.5">订单已关闭</p>
-                    <p className="text-xs">该订单已关闭，无账号内容。</p>
-                </div>
-            )}
-
-            {/* 完成但无卡密 */}
-            {!result.isPending && result.status !== "CLOSED" && result.cards.length === 0 && (
-                <div className="rounded-lg border border-muted bg-muted/50 p-4 text-center">
-                    <Package className="size-8 mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">暂无账号内容</p>
-                </div>
-            )}
-
-            {/* 账号列表 */}
-            {!result.isPending && result.cards.length > 0 && (
-                <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-semibold">账号内容</h3>
-                        <Button variant="outline" size="sm" onClick={copyAllCards} className="h-7 gap-1.5 text-xs">
-                            <Copy className="size-3" />复制全部
-                        </Button>
-                    </div>
-                    <div className="space-y-1.5">
-                        {result.cards.map((card, index) =>
-                            isAutoFetchCard(card) ? (
-                                <AutoFetchCardRow key={index} card={card} index={index} copiedId={copiedId} onCopy={copyCard} />
-                            ) : (
-                                <SimpleCardRow key={index} card={card} index={index} copiedId={copiedId} onCopy={copyCard} />
-                            )
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {/* AUTO_FETCH：刷新密码 + 换号（token 校验，无需再输密码） */}
-            {!result.isPending && result.isAutoFetch && result.status === "COMPLETED" && !isContentExpired && result.successToken && (
-                <div className="border-t pt-3 space-y-3">
-                    <div className="flex items-center justify-between gap-2">
-                        <p className="text-xs text-muted-foreground flex-1">
-                            {result.canSwitch && "① "}密码登录失败？获取最新密码
-                        </p>
-                        <Button type="button" variant="outline" size="sm" className="shrink-0 gap-1.5"
-                            disabled={anyLoading} onClick={handleRefresh}>
-                            <RefreshCw className={`size-3.5 ${refreshLoading ? "animate-spin" : ""}`} />
-                            {refreshLoading ? "获取中…" : "刷新密码"}
-                        </Button>
-                    </div>
-                    {result.canSwitch && (
-                        <div className="flex items-center justify-between gap-2">
-                            <p className="text-xs text-muted-foreground flex-1">
-                                ② 账号无法使用？更换账号（剩余 {result.remainingSwitches} 次）
-                            </p>
-                            <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                    <Button type="button" variant="outline" size="sm" className="shrink-0 gap-1.5"
-                                        disabled={anyLoading}>
-                                        <ArrowLeftRight className={`size-3.5 ${switchLoading ? "animate-pulse" : ""}`} />
-                                        {switchLoading ? "切换中…" : "更换账号"}
-                                    </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                        <AlertDialogTitle>确认更换账号？</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                            更换后将分配新账号，当前账号将失效。剩余 {result.remainingSwitches} 次更换机会。
-                                        </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                        <AlertDialogCancel>取消</AlertDialogCancel>
-                                        <AlertDialogAction onClick={handleSwitch}>确认更换</AlertDialogAction>
-                                    </AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* 温馨提示 */}
-            {!result.isPending && result.cards.length > 0 && (
-                <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200">
-                    <p className="font-medium mb-1">温馨提示：</p>
-                    <ul className="list-disc list-inside space-y-0.5">
-                        <li>请妥善保管订单号和查询密码</li>
-                        <li>账号内容请及时保存，避免丢失</li>
-                        <li>如有问题，请联系客服</li>
-                    </ul>
-                </div>
-            )}
-        </div>
-    )
 }
 
 /* ------------------------------------------------------------------ */
@@ -557,6 +114,7 @@ function OrderLookupForm({
                 isOrderMode
                     ? { orderNo: data.orderNo.trim(), password: data.password.trim() }
                     : { email: data.email.trim().toLowerCase(), password: data.password.trim() },
+                isOrderMode ? 15_000 : 40_000,
             )
             if (!res.ok) {
                 applyFieldErrors(res.raw, form.setError)
@@ -827,7 +385,7 @@ function OrderLookupPageContent() {
                 </div>
             </footer>
 
-            {/* 订单详情 Sheet — 两种查询方式共用同一个组件 */}
+            {/* 订单详情 Sheet */}
             <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
                 <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto overflow-x-hidden">
                     {sheetLoading ? (

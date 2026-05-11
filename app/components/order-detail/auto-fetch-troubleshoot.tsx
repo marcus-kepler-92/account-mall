@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import {
     AlertDialog,
@@ -16,6 +16,7 @@ import {
 import { RefreshCw, ArrowLeftRight, Clock, AlertCircle, CheckCircle2 } from "lucide-react"
 import { toast } from "sonner"
 import type { AutoFetchCardPayload } from "@/lib/auto-fetch-card"
+import { useCountdown, formatCountdown } from "./use-countdown"
 
 type Props = {
     orderNo: string
@@ -26,30 +27,7 @@ type Props = {
     onSwitched: (payload: AutoFetchCardPayload) => void
 }
 
-function useCountdown(expiresAt: string | null) {
-    const [remaining, setRemaining] = useState<number | null>(null)
-    useEffect(() => {
-        if (!expiresAt) return
-        const target = new Date(expiresAt).getTime()
-        const update = () => setRemaining(Math.max(0, target - Date.now()))
-        update()
-        const id = setInterval(update, 1000)
-        return () => clearInterval(id)
-    }, [expiresAt])
-    return remaining
-}
-
-function formatCountdown(ms: number): string {
-    if (ms <= 0) return "已过期"
-    const s = Math.floor(ms / 1000)
-    const h = Math.floor(s / 3600)
-    const m = Math.floor((s % 3600) / 60)
-    const sec = s % 60
-    if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`
-    return `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`
-}
-
-export function OrderTroubleshootSection({
+export function OrderAutoFetchTroubleshoot({
     orderNo,
     expiresAt,
     token,
@@ -118,7 +96,6 @@ export function OrderTroubleshootSection({
 
     return (
         <div className="border-t pt-4 space-y-3">
-            {/* Countdown */}
             {expiresAt && (
                 isExpired ? (
                     <p className="flex items-center gap-1.5 text-xs text-destructive">
@@ -144,7 +121,6 @@ export function OrderTroubleshootSection({
                 )
             )}
 
-            {/* Step 1: Refresh password */}
             {!isExpired && (
                 <div className="flex items-center justify-between gap-2">
                     <p className="text-xs text-muted-foreground flex-1">
@@ -164,7 +140,6 @@ export function OrderTroubleshootSection({
                 </div>
             )}
 
-            {/* Step 2: Switch account */}
             {!isExpired && showSwitchStep && (
                 <div className="flex items-center justify-between gap-2">
                     <p className="text-xs text-muted-foreground flex-1">

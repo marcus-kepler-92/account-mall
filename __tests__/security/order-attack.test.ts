@@ -10,7 +10,6 @@ import { GET as GETOrder, PATCH, DELETE } from "@/app/api/orders/[orderId]/route
 import { POST as POSTLookup } from "@/app/api/orders/lookup/route"
 import { POST as POSTLookupByEmail } from "@/app/api/orders/lookup-by-email/route"
 import { POST as POSTGetPaymentUrl } from "@/app/api/orders/get-payment-url/route"
-import { POST as POSTByEmail } from "@/app/api/orders/by-email/route"
 import { prismaMock } from "../../__mocks__/prisma"
 
 jest.mock("@/lib/prisma", () => {
@@ -519,14 +518,6 @@ describe("Security: Input length and format", () => {
         expect(res.status).toBe(400)
     })
 
-    it("by-email rejects invalid email format", async () => {
-        const res = await POSTByEmail(
-            createJsonRequest({ email: "not-an-email", password: "secret123" }),
-        )
-        const data = await res.json()
-        expect(res.status).toBe(400)
-        expect(data.error).toMatch(/Validation|validation|email/i)
-    })
 })
 
 describe("Security: Path and parameter abuse", () => {

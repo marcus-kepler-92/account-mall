@@ -33,8 +33,7 @@ export async function POST(request: NextRequest) {
     const { email, password } = parsed.data
 
     try {
-        const MAX_ORDERS_TO_CHECK = 20
-
+        const MAX_ORDERS_TO_CHECK = 30
         const allOrders = await prisma.order.findMany({
             where: {
                 email: email.trim().toLowerCase(),
@@ -56,6 +55,10 @@ export async function POST(request: NextRequest) {
                         productType: true,
                         allowAccountSwitch: true,
                         accountSwitchLimit: true,
+                        cardTemplates: {
+                            orderBy: { sortOrder: "asc" as const },
+                            select: { template: true },
+                        },
                     },
                 },
                 cards: {
@@ -77,23 +80,22 @@ export async function POST(request: NextRequest) {
             return badRequest("Order not found or password incorrect")
         }
 
-        const matchingOrders = []
-        for (const order of allOrders) {
-            if (!order.passwordHash || typeof order.passwordHash !== "string") {
-                continue
-            }
-            try {
-                const passwordOk = await verifyPassword({
-                    hash: order.passwordHash,
-                    password: password.trim(),
-                })
-                if (passwordOk) {
-                    matchingOrders.push(order)
+        const verifyResults = await Promise.allSettled(
+            allOrders.map(async (order) => {
+                if (!order.passwordHash || typeof order.passwordHash !== "string") return null
+                try {
+                    const ok = await verifyPassword({ hash: order.passwordHash, password: password.trim() })
+                    return ok ? order : null
+                } catch {
+                    return null
                 }
-            } catch {
-                // skip orders with corrupt hash
-            }
-        }
+            }),
+        )
+        const matchingOrders = verifyResults
+            .filter((r): r is PromiseFulfilledResult<typeof allOrders[0]> =>
+                r.status === "fulfilled" && r.value !== null,
+            )
+            .map((r) => r.value)
 
         if (matchingOrders.length === 0) {
             return badRequest("Order not found or password incorrect")
@@ -157,6 +159,7 @@ if (result.type === "single") {
                 status: order.status,
                 amount: Number(order.amount),
                 cards,
+                cardTemplates: order.product?.cardTemplates ?? [],
                 ...(successToken && { successToken }),
                 ...(isAutoFetch && { isAutoFetch: true }),
                 ...(isAutoFetch && order.expiresAt && { contentExpiresAt: new Date(order.expiresAt).toISOString() }),
@@ -184,3 +187,4 @@ if (result.type === "single") {
 }
 
 export const runtime = "nodejs"
+export const maxDuration = 60

@@ -122,13 +122,6 @@ describe("Public pages (no auth required)", () => {
     expect(response.status).toBe(200);
   });
 
-  it("should allow access to /orders/by-email", async () => {
-    const request = createRequest("/orders/by-email");
-    const response = await middleware(request);
-
-    expect(response.status).toBe(200);
-  });
-
   it("should allow access to /orders/lookup", async () => {
     const request = createRequest("/orders/lookup");
     const response = await middleware(request);
@@ -179,13 +172,6 @@ describe("Public APIs (no auth required)", () => {
 
   it("should allow GET /api/products/:id", async () => {
     const request = createRequest("/api/products/clx_123");
-    const response = await middleware(request);
-
-    expect(response.status).toBe(200);
-  });
-
-  it("should allow /api/orders/by-email", async () => {
-    const request = createRequest("/api/orders/by-email");
     const response = await middleware(request);
 
     expect(response.status).toBe(200);

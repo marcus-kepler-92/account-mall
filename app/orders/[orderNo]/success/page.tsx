@@ -6,10 +6,10 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Mail, Hash, AlertCircle } from "lucide-react"
 import { SiteHeader } from "@/app/components/site-header"
-import { OrderSuccessCopySection } from "./order-success-copy-section"
 import { OrderSuccessSyncHistory } from "./order-success-sync-history"
-import { OrderSuccessAutoFetchSection } from "./order-success-auto-fetch-section"
 import { resolveCardFields } from "@/lib/card-format"
+import { OrderCardDisplay } from "@/app/components/order-detail/card-display"
+import { OrderAutoFetchSection } from "@/app/components/order-detail/auto-fetch-section"
 
 type PageProps = {
     params: Promise<{ orderNo: string }>
@@ -142,7 +142,7 @@ export default async function OrderSuccessPage({ params, searchParams }: PagePro
                         </CardHeader>
                         <CardContent className="space-y-4">
                             {isAutoFetch ? (
-                                <OrderSuccessAutoFetchSection
+                                <OrderAutoFetchSection
                                     orderNo={orderNo}
                                     expiresAt={expiresAt}
                                     initialCards={cards}
@@ -150,7 +150,7 @@ export default async function OrderSuccessPage({ params, searchParams }: PagePro
                                     remainingSwitches={canSwitch ? remainingSwitches : 0}
                                 />
                             ) : (
-                                <OrderSuccessCopySection cards={resolvedCards} />
+                                <OrderCardDisplay cards={resolvedCards} />
                             )}
                             <div className="rounded-lg border bg-muted/50 p-3 text-sm text-muted-foreground">
                                 <p className="flex items-center gap-2">

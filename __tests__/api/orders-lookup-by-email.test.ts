@@ -177,6 +177,7 @@ expect(data.code).toBe("VALIDATION_FAILED")
         { content: "code-1" },
         { content: "code-2" },
       ],
+      cardTemplates: [],
       successToken: expect.any(String),
     })
   })
@@ -273,6 +274,7 @@ expect(data.code).toBe("VALIDATION_FAILED")
       status: "COMPLETED",
       amount: 50,
       cards: [{ content: "code-1" }],
+      cardTemplates: [],
       successToken: expect.any(String),
     })
   })

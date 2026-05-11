@@ -1,11 +1,10 @@
 "use client"
 
 import { useState } from "react"
-import { OrderSuccessCopySection } from "./order-success-copy-section"
-import { OrderTroubleshootSection } from "./order-troubleshoot-section"
+import { OrderCardDisplay, type CardDisplayItem } from "./card-display"
+import { OrderAutoFetchTroubleshoot } from "./auto-fetch-troubleshoot"
 import type { AutoFetchCardPayload } from "@/lib/auto-fetch-card"
-import { toCardContentJson } from "@/lib/auto-fetch-card"
-import { resolveCardFields } from "@/lib/card-format"
+import { parseAutoFetchCardContent, toCardContentJson } from "@/lib/auto-fetch-card"
 
 type Props = {
     orderNo: string
@@ -15,7 +14,13 @@ type Props = {
     remainingSwitches: number
 }
 
-export function OrderSuccessAutoFetchSection({ orderNo, expiresAt, initialCards, token, remainingSwitches }: Props) {
+function toDisplayItem(content: string): CardDisplayItem {
+    const payload = parseAutoFetchCardContent(content)
+    if (payload) return { type: "autoFetch", payload }
+    return { type: "plain", content }
+}
+
+export function OrderAutoFetchSection({ orderNo, expiresAt, initialCards, token, remainingSwitches }: Props) {
     const [cards, setCards] = useState<string[]>(initialCards)
     const [remaining, setRemaining] = useState(remainingSwitches)
 
@@ -30,8 +35,8 @@ export function OrderSuccessAutoFetchSection({ orderNo, expiresAt, initialCards,
 
     return (
         <>
-            <OrderSuccessCopySection cards={cards.map((c) => resolveCardFields(c, []))} />
-            <OrderTroubleshootSection
+            <OrderCardDisplay cards={cards.map(toDisplayItem)} />
+            <OrderAutoFetchTroubleshoot
                 orderNo={orderNo}
                 expiresAt={expiresAt}
                 token={token}

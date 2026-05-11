@@ -55,6 +55,7 @@ interface LookupResponseCompleted extends LookupResponseBase {
               lastCheckedAt?: string;
           }
     >;
+    cardTemplates: { template: string }[];
     successToken?: string;
     /** AUTO_FETCH 订单的账号有效期 */
     contentExpiresAt?: string;
@@ -99,6 +100,10 @@ export async function POST(request: NextRequest) {
                             productType: true,
                             allowAccountSwitch: true,
                             accountSwitchLimit: true,
+                            cardTemplates: {
+                                orderBy: { sortOrder: "asc" as const },
+                                select: { template: true },
+                            },
                         },
                     },
                     cards: {
@@ -182,6 +187,7 @@ export async function POST(request: NextRequest) {
             status: order.status,
             amount: Number(order.amount),
             cards,
+            cardTemplates: order.product.cardTemplates,
             ...(successToken && { successToken }),
             ...(isAutoFetch && { isAutoFetch: true }),
             ...(isAutoFetch &&

@@ -23,13 +23,6 @@ export const publicOrderLookupByEmailSchema = z.object({
     password: z.string().min(6),
 })
 
-export const orderByEmailPostSchema = z.object({
-    email: z.string().min(1).pipe(z.email()),
-    password: z.string().min(6),
-    page: z.coerce.number().int().min(1).default(1),
-    pageSize: z.coerce.number().int().min(1).max(100).default(20),
-})
-
 export const updateOrderStatusSchema = z.object({
     status: orderStatusSchema,
 })
