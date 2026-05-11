@@ -18,16 +18,23 @@ type CrossSellSectionProps = {
     ttlMs: number
 }
 
+// lastTickTime is only updated when the interval fires, never inside getSnapshot,
+// so the snapshot is stable between ticks and doesn't cause infinite re-renders.
+let lastTickTime = Date.now()
+
 function subscribe(callback: () => void) {
-    const id = setInterval(callback, 1000)
+    const id = setInterval(() => {
+        lastTickTime = Date.now()
+        callback()
+    }, 1000)
     return () => clearInterval(id)
 }
 
 function useCountdownMs(expiresAt: number): number {
     return useSyncExternalStore(
         subscribe,
-        () => Math.max(0, expiresAt - Date.now()),
-        () => Math.max(0, expiresAt - Date.now()),
+        () => Math.max(0, expiresAt - lastTickTime),
+        () => Math.max(0, expiresAt - lastTickTime),
     )
 }
 
