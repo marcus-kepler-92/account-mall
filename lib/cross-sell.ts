@@ -6,7 +6,7 @@ import type { ProductCardData } from "@/app/components/product-card"
 const DEFAULTS = {
     enabled: true,
     discountPercent: 10,
-    ttlMinutes: 10,
+    ttlMinutes: 5,
 } as const
 
 /**
