@@ -7,6 +7,6 @@
     {
       "path": "/api/cron/restore-available-accounts",
       "schedule": "0 * * * *"
-    },
+    }
   ]
 }
