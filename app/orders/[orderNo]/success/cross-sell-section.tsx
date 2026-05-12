@@ -52,21 +52,21 @@ export function CrossSellSection({ recommendations, discountPercent, ttlMs }: Cr
         <section className="mx-auto max-w-4xl px-4">
             {/* Banner — only shown when a discount is configured */}
             {hasDiscount && (
-                <Card className={cn("mb-4 transition-opacity", isExpired ? "opacity-50" : "")}>
-                    <CardContent className="py-4">
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                            <div>
-                                <p className="font-semibold text-sm sm:text-base">
-                                    <Sparkles className="inline size-4 mr-1 text-amber-500" />
-                                    为你推荐 · 成功页专享{discountLabel}
+                <Card className={cn("mb-3 transition-opacity", isExpired ? "opacity-50" : "")}>
+                    <CardContent className="py-2.5 px-3">
+                        <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                                <p className="font-semibold text-sm">
+                                    <Sparkles className="inline size-3.5 mr-1 text-amber-500" />
+                                    为你推荐 · 专享{discountLabel}
                                 </p>
-                                <p className="text-xs text-muted-foreground mt-0.5">
-                                    {isExpired ? "折扣已过期" : `仅本页有效 · ${remainingMs <= 5 * 60_000 ? "即将过期 " : ""}限时专享`}
+                                <p className="text-xs text-muted-foreground">
+                                    {isExpired ? "折扣已过期" : `仅本页有效${remainingMs <= 5 * 60_000 ? " · 即将过期" : ""}`}
                                 </p>
                             </div>
                             {!isExpired && (
                                 <span className={cn(
-                                    "font-mono tabular-nums font-bold text-xl sm:text-2xl",
+                                    "font-mono tabular-nums font-bold text-lg shrink-0",
                                     remainingMs <= 60_000 ? "text-destructive animate-pulse" : "text-foreground"
                                 )}>
                                     {countdownStr}
