@@ -58,17 +58,18 @@ export function ProductCard({ product, gradientIndex = 0, className, code, disco
     const hasDiscount = typeof discountPercent === "number" && discountPercent > 0 && discountPercent <= 99 && product.price > 0
 
     if (horizontal) {
+        const firstTag = product.tags[0]
         return (
             <Link href={detailHref} className={cn("group block", className)}>
-                <div className="flex items-center gap-2.5 rounded-lg border bg-card px-2.5 py-2 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                    {/* 40px thumbnail */}
-                    <div className="relative size-10 shrink-0 overflow-hidden rounded bg-muted">
+                <div className="flex items-center gap-3 rounded-xl bg-card p-2.5 shadow-sm ring-1 ring-black/[0.06] dark:ring-white/[0.08] transition-all duration-200 hover:shadow-md hover:ring-primary/30">
+                    {/* 48px thumbnail */}
+                    <div className="relative size-12 shrink-0 overflow-hidden rounded-lg bg-muted">
                         {product.image ? (
                             <Image
                                 src={product.image}
                                 alt={product.name}
                                 fill
-                                sizes="40px"
+                                sizes="48px"
                                 className={cn("object-fill", isSoldOut && "grayscale")}
                                 priority={gradientIndex === 0}
                             />
@@ -80,28 +81,33 @@ export function ProductCard({ product, gradientIndex = 0, className, code, disco
                         {isSoldOut && <SoldOutOverlay />}
                     </div>
 
-                    {/* Name */}
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium transition-colors group-hover:text-primary">
-                        {product.name}
-                    </span>
+                    {/* Name + tag */}
+                    <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold leading-tight transition-colors group-hover:text-primary">
+                            {product.name}
+                        </p>
+                        {firstTag && (
+                            <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{firstTag.name}</p>
+                        )}
+                    </div>
 
                     {/* Price */}
-                    <span className="shrink-0 text-xs tabular-nums">
+                    <div className="shrink-0 text-right tabular-nums">
                         {isFree ? (
-                            <span className="font-bold text-primary">免费</span>
+                            <span className="text-sm font-bold text-primary">免费</span>
                         ) : !isSoldOut && hasDiscount ? (
-                            <span className="flex items-baseline gap-1">
-                                <span className="line-through text-muted-foreground">¥{product.price.toFixed(2)}</span>
-                                <span className="font-bold text-destructive">¥{(product.price * (1 - discountPercent! / 100)).toFixed(2)}</span>
-                            </span>
+                            <>
+                                <p className="text-[11px] text-muted-foreground line-through leading-tight">¥{product.price.toFixed(2)}</p>
+                                <p className="text-sm font-bold text-destructive leading-tight">¥{(product.price * (1 - discountPercent! / 100)).toFixed(2)}</p>
+                            </>
                         ) : (
-                            <span className={cn("font-bold", isSoldOut && "text-muted-foreground line-through")}>
+                            <span className={cn("text-sm font-bold", isSoldOut && "text-muted-foreground line-through")}>
                                 ¥{product.price.toFixed(2)}
                             </span>
                         )}
-                    </span>
+                    </div>
 
-                    <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />
+                    <ChevronRight className="size-4 shrink-0 text-muted-foreground/40 transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-primary" />
                 </div>
             </Link>
         )
