@@ -41,7 +41,7 @@ describe("getCrossSellSetting", () => {
         const result = await getCrossSellSetting()
         expect(result.enabled).toBe(true)
         expect(result.discountPercent).toBe(10)
-        expect(result.ttlMinutes).toBe(30)
+        expect(result.ttlMinutes).toBe(5)
     })
 
     it("returns DB values when row exists", async () => {
