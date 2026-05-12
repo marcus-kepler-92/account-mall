@@ -47,7 +47,7 @@ const envSchema = z
     yipaySubmitUrl: z.string().optional(),
     yipaySiteName: z.string().optional(),
     cronSecret: z.string().optional(),
-    pendingOrderTimeoutMs: z.coerce.number().int().positive().default(900000),
+    pendingOrderTimeoutMs: z.coerce.number().int().positive().default(1800000),
     orderRateLimitPoints: z.coerce.number().int().positive().default(10),
     orderQueryRateLimitPoints: z.coerce.number().int().positive().default(30),
     maxPendingOrdersPerIp: z.coerce.number().int().positive().default(6),
