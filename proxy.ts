@@ -14,6 +14,7 @@ const PUBLIC_API_EXACT = [
     "/api/orders/lookup",
     "/api/orders/lookup-by-email",
     "/api/orders/get-payment-url",
+    "/api/orders/check-payment",
     "/api/distributor/accept-invite",
 ];
 
@@ -59,6 +60,11 @@ function isPublicApi(pathname: string, method: string): boolean {
 
     // POST /api/orders/:orderNo/switch-account is public (authenticated via success token)
     if (/^\/api\/orders\/[^/]+\/switch-account$/.test(pathname) && method === "POST") {
+        return true;
+    }
+
+    // GET /api/orders/:orderNo/payment-status is public (authenticated via success token)
+    if (/^\/api\/orders\/[^/]+\/payment-status$/.test(pathname) && method === "GET") {
         return true;
     }
 
