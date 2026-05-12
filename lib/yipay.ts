@@ -87,6 +87,45 @@ export function getYipayPagePayUrl(params: {
 }
 
 /**
+ * Query a single order's payment status from Yipay.
+ * Returns { paid: true } when Yipay confirms payment, { paid: false } when unpaid, null on error/unconfigured.
+ */
+export async function queryYipayOrder(
+    orderNo: string,
+    channel?: Pick<YipayChannelConfig, "pid" | "key" | "submitUrl">,
+): Promise<{ paid: boolean } | null> {
+    const pid = channel?.pid ?? config.yipayPid
+    const key = channel?.key ?? config.yipayKey
+    const submitUrl = channel?.submitUrl ?? config.yipaySubmitUrl
+    if (!pid || !key || !submitUrl) return null
+    try {
+        const base = new URL(submitUrl)
+        base.pathname = "/api.php"
+        base.search = ""
+        const url = `${base.toString()}?act=order&pid=${encodeURIComponent(pid)}&key=${encodeURIComponent(key)}&out_trade_no=${encodeURIComponent(orderNo)}`
+        const res = await fetch(url, { cache: "no-store" })
+        if (!res.ok) {
+            console.warn("[yipay-query] orderNo=%s http_status=%d", orderNo, res.status)
+            return null
+        }
+        const data = (await res.json()) as Record<string, unknown>
+        if (data.code !== 1 && data.code !== "1") return null
+        const tradeStatus = data.trade_status as string | undefined
+        const numericStatus = data.status
+        const paid =
+            tradeStatus === "TRADE_SUCCESS" ||
+            tradeStatus === "TRADE_FINISHED" ||
+            tradeStatus === "success" ||
+            numericStatus === 1 ||
+            numericStatus === "1"
+        return { paid }
+    } catch (e) {
+        console.error("[yipay-query] orderNo=%s error=%s", orderNo, e instanceof Error ? e.message : String(e))
+        return null
+    }
+}
+
+/**
  * Verify Yipay async notify sign. Same algorithm as submit: prestr from params (exclude sign/sign_type), mysign = MD5(prestr+key), compare with sign (lowercase).
  */
 export function verifyYipayNotifySign(postData: Record<string, unknown>, key?: string): boolean {

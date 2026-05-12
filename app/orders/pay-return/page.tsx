@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Search } from "lucide-react"
 import { SiteHeader } from "@/app/components/site-header"
+import { prisma } from "@/lib/prisma"
+import { verifyYipayNotifySign } from "@/lib/yipay"
 import { processYipayNotifyAndComplete } from "@/lib/yipay-notify-complete"
 import { createOrderSuccessToken } from "@/lib/order-success-token"
 
@@ -11,8 +13,15 @@ export const dynamic = "force-dynamic"
 
 /**
  * 支付同步返回页（return_url）. 易支付/支付宝支付完成后会跳转至此。
- * 若 URL 带签名参数且为成功状态，在此完成订单（与异步 notify 逻辑一致，幂等）；
- * 成功则重定向到成功页（带一次性 token），由成功页同步本地订单状态，避免暴露未鉴权的状态接口。
+ *
+ * Security: only issues order-success-token when Yipay sign is valid, so the
+ * token capability (poll status + view cards) is gated on a legitimate payment
+ * platform redirect rather than on knowledge of the orderNo alone.
+ *
+ * Flow:
+ *   sign valid + processYipayNotifyAndComplete ok  → success page
+ *   sign valid + not yet completed                 → awaiting-payment (active poll)
+ *   sign invalid / no Yipay params                 → static fallback (order lookup link)
  */
 export default async function PayReturnPage({
     searchParams,
@@ -20,36 +29,55 @@ export default async function PayReturnPage({
     searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
     const params = await searchParams
-    const hasYipayParams = params?.out_trade_no && params?.sign && params?.trade_status
-    if (hasYipayParams && typeof params.out_trade_no === "string" && typeof params.sign === "string") {
-        const postData: Record<string, unknown> = {}
-        for (const [k, v] of Object.entries(params)) {
-            const val = Array.isArray(v) ? v[0] : v
-            postData[k] = val ?? ""
-        }
-        const result = await processYipayNotifyAndComplete(postData).catch(() => ({ ok: false }))
-        const orderNo =
-            typeof params.out_trade_no === "string"
-                ? params.out_trade_no
-                : Array.isArray(params.out_trade_no)
-                  ? params.out_trade_no[0]
-                  : undefined
-        if (result?.ok && orderNo) {
-            const token = createOrderSuccessToken(orderNo)
-            if (token) {
-                redirect(`/orders/${encodeURIComponent(orderNo)}/success?token=${encodeURIComponent(token)}`)
-            }
-            redirect(`/orders/lookup?orderNo=${encodeURIComponent(orderNo)}&fromPay=1`)
-        }
+
+    const rawOrderNo = params?.out_trade_no
+    const orderNo =
+        typeof rawOrderNo === "string"
+            ? rawOrderNo
+            : Array.isArray(rawOrderNo)
+              ? rawOrderNo[0]
+              : undefined
+
+    const hasYipayParams = !!(params?.out_trade_no && params?.sign && params?.trade_status)
+
+    // Build postData for sign verification and processYipayNotifyAndComplete
+    const postData: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(params ?? {})) {
+        const val = Array.isArray(v) ? v[0] : v
+        postData[k] = val ?? ""
     }
 
-    const orderNo =
-        typeof params?.out_trade_no === "string"
-            ? params.out_trade_no
-            : Array.isArray(params?.out_trade_no)
-              ? params.out_trade_no[0]
-              : undefined
-    const lookupHref = orderNo ? `/orders/lookup?orderNo=${encodeURIComponent(orderNo)}` : "/orders/lookup"
+    // Security gate: verify Yipay signature independently before issuing any token.
+    // Token capability (poll status + view cards) must be anchored to a legitimate
+    // return_url from the payment platform, not just knowledge of an orderNo.
+    let signValid = false
+    if (hasYipayParams && orderNo) {
+        const order = await prisma.order
+            .findFirst({
+                where: { orderNo },
+                include: { paymentChannel: { select: { key: true } } },
+            })
+            .catch(() => null)
+        const channelKey = order?.paymentChannel?.key ?? undefined
+        signValid = verifyYipayNotifySign(postData, channelKey)
+    }
+
+    if (signValid && orderNo) {
+        // Fire-and-forget: attempt order completion via return_url params (idempotent with notify).
+        // Does not gate routing — awaiting-payment polls for final status.
+        void processYipayNotifyAndComplete(postData).catch(() => null)
+        const token = createOrderSuccessToken(orderNo)
+        if (token) {
+            redirect(`/orders/${encodeURIComponent(orderNo)}/awaiting-payment?token=${encodeURIComponent(token)}`)
+        }
+        // Secret not configured: fall through to static fallback
+    }
+
+    // Static fallback: sign invalid, missing params, or secret not configured.
+    // No token is issued — user must authenticate via order lookup (orderNo + password).
+    const lookupHref = orderNo
+        ? `/orders/lookup?orderNo=${encodeURIComponent(orderNo)}`
+        : "/orders/lookup"
 
     return (
         <div className="flex min-h-screen flex-col">

@@ -33,10 +33,38 @@ type Props = {
 export function OrderDetailContent({ result: initialResult, getPassword }: Props) {
     const [result, setResult] = useState<OrderResult>(initialResult)
     const [continuePaymentLoading, setContinuePaymentLoading] = useState(false)
+    const [checkingPayment, setCheckingPayment] = useState(false)
 
     useEffect(() => {
         setResult(initialResult)
     }, [initialResult.orderNo, initialResult])
+
+    const handleCheckPayment = useCallback(async () => {
+        const password = getPassword()
+        if (!result.isPending || !password) return
+        setCheckingPayment(true)
+        try {
+            const res = await fetchApi("/api/orders/check-payment", {
+                orderNo: result.orderNo,
+                password: password.trim(),
+            })
+            if (!res.ok) { toast.error(res.error || "查询失败，请稍后重试"); return }
+            const status = res.data.status as string
+            if (status === "COMPLETED") {
+                toast.success("支付已确认，正在加载卡密…")
+                const lookupRes = await fetchApi("/api/orders/lookup", {
+                    orderNo: result.orderNo,
+                    password: password.trim(),
+                })
+                if (lookupRes.ok) setResult(lookupRes.data as OrderResult)
+            } else if (status === "CLOSED") {
+                toast.error("订单已关闭")
+            } else {
+                toast("尚未查询到支付，请稍后再试")
+            }
+        } catch { toast.error("网络错误，请稍后重试") }
+        finally { setCheckingPayment(false) }
+    }, [result, getPassword])
 
     const handleContinuePayment = useCallback(async () => {
         const password = getPassword()
@@ -105,12 +133,16 @@ export function OrderDetailContent({ result: initialResult, getPassword }: Props
                             请在 {formatDateTimeShort(result.expiresAt)} 前完成支付。
                         </p>
                     )}
-                    <Button className="w-full gap-2" onClick={handleContinuePayment} disabled={continuePaymentLoading}>
+                    <Button className="w-full gap-2" onClick={handleContinuePayment} disabled={continuePaymentLoading || checkingPayment}>
                         {continuePaymentLoading
                             ? <><Loader2 className="size-4 animate-spin" />跳转中...</>
                             : <><CreditCard className="size-4" />继续支付</>}
                     </Button>
-                    <p className="text-xs text-muted-foreground">如已完成支付但仍显示此提示，请联系客服处理。</p>
+                    <Button variant="outline" className="w-full gap-2" onClick={handleCheckPayment} disabled={checkingPayment || continuePaymentLoading}>
+                        {checkingPayment
+                            ? <><Loader2 className="size-4 animate-spin" />查询中...</>
+                            : "我已付款"}
+                    </Button>
                 </div>
             )}
 

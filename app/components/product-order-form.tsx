@@ -252,10 +252,10 @@ export function ProductOrderForm({
                     )
                     return
                 }
-                if (responseData.paymentUrl) {
+                if (responseData.paymentUrl && responseData.orderNo) {
                     toast.success("订单已创建，正在跳转至支付页面…")
                     willRedirect = true
-                    window.location.href = responseData.paymentUrl
+                    window.location.href = responseData.paymentUrl as string
                     return
                 }
                 if (responseData.orderNo) {
