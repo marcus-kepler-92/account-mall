@@ -654,6 +654,7 @@ export async function POST(request: NextRequest) {
     if (crossSellDiscountPercent != null) {
         distributorDiscountPercent = null
         exitDiscountPercent = null
+        exitDiscountPayload = null   // prevent ExitDiscountUsage from being written
     }
 
     const originalAmount = Number(product.price) * quantity

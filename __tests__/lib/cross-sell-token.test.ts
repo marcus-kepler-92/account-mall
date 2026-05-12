@@ -87,6 +87,50 @@ describe("cross-sell-token", () => {
         expect(verifyCrossSellToken("1234567890.").valid).toBe(false)
     })
 
+    it("verifyCrossSellToken rejects token with tampered discountPercent in payload", () => {
+        // Generate a valid token for 10% discount
+        const token = generateCrossSellToken(basePayload, 60_000)!
+        const [expiryStr, payloadEnc, sig] = token.split(".")
+
+        // Decode payload, change discountPercent to 99, re-encode
+        const decoded = Buffer.from(
+            payloadEnc.replace(/-/g, "+").replace(/_/g, "/"),
+            "base64",
+        ).toString("utf8")
+        // payload is "sourceOrderId\ntargetProductId\ndiscountPercent"
+        const parts = decoded.split("\n")
+        parts[2] = "99"
+        const tamperedPayload = Buffer.from(parts.join("\n"), "utf8")
+            .toString("base64")
+            .replace(/\+/g, "-")
+            .replace(/\//g, "_")
+            .replace(/=+$/, "")
+
+        // Re-use original signature — HMAC won't match tampered payload
+        const tamperedToken = `${expiryStr}.${tamperedPayload}.${sig}`
+        const result = verifyCrossSellToken(tamperedToken)
+        expect(result.valid).toBe(false)
+    })
+
+    it("verifyCrossSellToken rejects token with tampered expiry", () => {
+        const token = generateCrossSellToken(basePayload, 60_000)!
+        const [, payloadEnc, sig] = token.split(".")
+        // Extend expiry by 1 hour
+        const newExpiry = String(Date.now() + 3_600_000)
+        const tamperedToken = `${newExpiry}.${payloadEnc}.${sig}`
+        expect(verifyCrossSellToken(tamperedToken).valid).toBe(false)
+    })
+
+    it("token payload binds sourceOrderId — different source produces different token", () => {
+        const t1 = generateCrossSellToken(basePayload, 60_000)!
+        const t2 = generateCrossSellToken({ ...basePayload, sourceOrderId: "order-999" }, 60_000)!
+        expect(t1).not.toBe(t2)
+        const r1 = verifyCrossSellToken(t1)
+        const r2 = verifyCrossSellToken(t2)
+        expect(r1.payload?.sourceOrderId).toBe("order-001")
+        expect(r2.payload?.sourceOrderId).toBe("order-999")
+    })
+
     it("generateCrossSellToken returns null when secret is not configured", () => {
         const cfg = require("@/lib/config").config
         const origCross = cfg.crossSellTokenSecret
