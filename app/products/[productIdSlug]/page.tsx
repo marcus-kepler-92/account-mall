@@ -18,11 +18,12 @@ import { descriptionToPlainText } from "@/lib/description";
 import { buildProductDetailRedirectPath } from "@/lib/product-canonical-url";
 import { MarkdownViewClient } from "@/app/components/markdown-view-client";
 import { RiskWarningDialog } from "./risk-warning-dialog";
+import { verifyCrossSellToken } from "@/lib/cross-sell-token";
 export const dynamic = "force-dynamic";
 
 type PageProps = {
   params: Promise<{ productIdSlug: string }>;
-  searchParams: Promise<{ promoCode?: string }>;
+  searchParams: Promise<{ promoCode?: string; email?: string; csToken?: string }>;
 };
 
 function parseProductIdSlug(
@@ -106,15 +107,25 @@ export default async function ProductDetailPage({
     notFound();
   }
 
-  // Redirect to canonical URL if slug mismatch; preserve promoCode
+  // Redirect to canonical URL if slug mismatch; preserve promoCode + cross-sell params
   if (product.slug !== slug) {
-    redirect(
-      buildProductDetailRedirectPath(
-        product.id,
-        product.slug,
-        resolvedParams.promoCode,
-      ),
-    );
+    const base = buildProductDetailRedirectPath(product.id, product.slug, resolvedParams.promoCode)
+    const extra: Record<string, string> = {}
+    if (resolvedParams.email) extra.email = resolvedParams.email
+    if (resolvedParams.csToken) extra.csToken = resolvedParams.csToken
+    const extraStr = new URLSearchParams(extra).toString()
+    redirect(extraStr ? `${base}${base.includes("?") ? "&" : "?"}${extraStr}` : base)
+  }
+
+  const prefilledEmail = resolvedParams.email?.trim() || null
+  let crossSellToken: string | null = null
+  let crossSellDiscountPercent: number | null = null
+  if (resolvedParams.csToken) {
+    const csVerify = verifyCrossSellToken(resolvedParams.csToken)
+    if (csVerify.valid && csVerify.payload?.targetProductId === productId) {
+      crossSellToken = resolvedParams.csToken
+      crossSellDiscountPercent = csVerify.payload.discountPercent
+    }
   }
 
   const productWithImage = product as typeof product & { image: string | null };
@@ -297,6 +308,9 @@ export default async function ProductDetailPage({
                 validityHours={product.validityHours}
                 couponEnabled={product.couponEnabled}
                 requireTurnstile={requireTurnstile}
+                prefilledEmail={prefilledEmail ?? undefined}
+                crossSellToken={crossSellToken}
+                crossSellDiscountPercent={crossSellDiscountPercent}
               />
             </section>
 

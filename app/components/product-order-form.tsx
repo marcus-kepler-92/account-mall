@@ -79,9 +79,12 @@ type ProductOrderFormProps = {
     productType?: "NORMAL" | "AUTO_FETCH"
     couponEnabled?: boolean
     requireTurnstile: boolean
+    prefilledEmail?: string
     exitDiscountToken?: string | null
     exitDiscountPercent?: number | null
     onExitDiscountConsumed?: () => void
+    crossSellToken?: string | null
+    crossSellDiscountPercent?: number | null
 }
 
 export function ProductOrderForm({
@@ -94,9 +97,12 @@ export function ProductOrderForm({
     productType = "NORMAL",
     couponEnabled = false,
     requireTurnstile,
+    prefilledEmail,
     exitDiscountToken = null,
     exitDiscountPercent = null,
     onExitDiscountConsumed,
+    crossSellToken = null,
+    crossSellDiscountPercent = null,
 }: ProductOrderFormProps) {
     const [showOrderPassword, setShowOrderPassword] = useState(false)
     const [discountCode, setDiscountCode] = useState("")
@@ -132,7 +138,7 @@ export function ProductOrderForm({
     const form = useForm<OrderFormSchema>({
         resolver: zodResolver(createOrderFormSchema(maxQuantity)),
         mode: "onTouched",
-        defaultValues: { email: "", orderPassword: "", quantity: 1, paymentMethod: "alipay" as PaymentMethod },
+        defaultValues: { email: prefilledEmail ?? "", orderPassword: "", quantity: 1, paymentMethod: "alipay" as PaymentMethod },
     })
 
     // 指纹就绪时写入表单，保持所有字段数据来源统一
@@ -166,6 +172,11 @@ export function ProductOrderForm({
             ? exitDiscountPercent
             : null
 
+    const activeCrossSellDiscount =
+        crossSellToken && crossSellDiscountPercent != null
+            ? crossSellDiscountPercent
+            : null
+
     const totalPrice = isFree
         ? "0.00"
         : (() => {
@@ -173,15 +184,17 @@ export function ProductOrderForm({
             const promo = promoValidation?.valid ? promoValidation.discountPercent : null
             if (promo != null) amt = amt * (1 - promo / 100)
             if (activeExitDiscount != null) amt = amt * (1 - activeExitDiscount / 100)
+            if (activeCrossSellDiscount != null) amt = amt * (1 - activeCrossSellDiscount / 100)
             return amt.toFixed(2)
         })()
 
     const activeDiscountPercent = (() => {
         const promo = promoValidation?.valid ? promoValidation.discountPercent : null
-        if (promo != null && activeExitDiscount != null) {
-            return Math.round((1 - (1 - promo / 100) * (1 - activeExitDiscount / 100)) * 100)
+        const discount = activeCrossSellDiscount ?? activeExitDiscount
+        if (promo != null && discount != null) {
+            return Math.round((1 - (1 - promo / 100) * (1 - discount / 100)) * 100)
         }
-        return promo ?? activeExitDiscount
+        return promo ?? discount
     })()
 
     useEffect(() => {
@@ -210,6 +223,8 @@ export function ProductOrderForm({
             }
             if (codeTrimmed && isValidDiscountCodeFormat(codeTrimmed)) {
                 payload.promoCode = codeTrimmed
+            } else if (activeCrossSellDiscount != null && crossSellToken) {
+                payload.crossSellToken = crossSellToken
             } else if (exitDiscountToken && activeExitDiscount != null) {
                 payload.exitDiscountToken = exitDiscountToken
             }
@@ -347,10 +362,16 @@ export function ProductOrderForm({
                         )}
                     />
 
+                    {activeCrossSellDiscount != null && (
+                        <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400">
+                            ✓ 已应用成功页专享 {activeCrossSellDiscount}% 折扣
+                        </div>
+                    )}
+
                     <ProductOrderQuantityPicker
                         isAutoFetch={isAutoFetch}
                         isFree={isFree}
-                        couponEnabled={couponEnabled}
+                        couponEnabled={activeCrossSellDiscount != null ? false : couponEnabled}
                         maxQuantity={maxQuantity}
                         inStock={inStock}
                         discountCode={discountCode}

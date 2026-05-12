@@ -10,6 +10,9 @@ import { OrderSuccessSyncHistory } from "./order-success-sync-history"
 import { resolveCardFields } from "@/lib/card-format"
 import { OrderCardDisplay } from "@/app/components/order-detail/card-display"
 import { OrderAutoFetchSection } from "@/app/components/order-detail/auto-fetch-section"
+import { getCrossSellSetting, getCrossSellRecommendations } from "@/lib/cross-sell"
+import { generateCrossSellToken } from "@/lib/cross-sell-token"
+import { CrossSellSection } from "./cross-sell-section"
 
 type PageProps = {
     params: Promise<{ orderNo: string }>
@@ -115,12 +118,44 @@ export default async function OrderSuccessPage({ params, searchParams }: PagePro
         remainingSwitches > 0 &&
         notExpired
 
+    // Cross-sell section data
+    const crossSellSetting = await getCrossSellSetting()
+    const crossSellRecommendations = crossSellSetting.enabled
+        ? await getCrossSellRecommendations(order.productId)
+        : []
+
+    const ttlMs = crossSellSetting.ttlMinutes * 60_000
+
+    const hasDiscount = crossSellSetting.discountPercent > 0
+
+    const crossSellItems = crossSellSetting.enabled
+        ? crossSellRecommendations
+            .map((product) => {
+                let href: string
+                if (hasDiscount) {
+                    const csToken = generateCrossSellToken(
+                        { sourceOrderId: order.id, targetProductId: product.id, discountPercent: crossSellSetting.discountPercent },
+                        ttlMs,
+                    )
+                    if (!csToken) return null
+                    const params = new URLSearchParams({ email: order.email, csToken })
+                    href = `/products/${product.id}-${product.slug}?${params}`
+                } else {
+                    // No discount — plain link with email prefill only
+                    const params = new URLSearchParams({ email: order.email })
+                    href = `/products/${product.id}-${product.slug}?${params}`
+                }
+                return { product, href, discountPercent: crossSellSetting.discountPercent }
+            })
+            .filter((x): x is NonNullable<typeof x> => x !== null)
+        : []
+
     return (
         <div className="flex min-h-screen flex-col">
             <OrderSuccessSyncHistory orderNo={orderNo} />
             <SiteHeader />
-            <main className="flex-1 px-4 py-8">
-                <div className="mx-auto max-w-2xl space-y-6">
+            <main className="flex-1 py-8 space-y-8">
+                <div className="mx-auto max-w-2xl space-y-6 px-4">
                     <div className="text-center">
                         <h1 className="text-2xl font-bold">
                             {Number(order.amount) === 0 ? "领取成功" : "支付成功"}
@@ -164,12 +199,20 @@ export default async function OrderSuccessPage({ params, searchParams }: PagePro
                             </div>
                         </CardContent>
                     </Card>
+                </div>
 
-                    <div className="flex justify-center">
-                        <Button asChild variant="outline">
-                            <Link href="/">返回首页</Link>
-                        </Button>
-                    </div>
+                {crossSellItems.length > 0 && (
+                    <CrossSellSection
+                        recommendations={crossSellItems}
+                        discountPercent={crossSellSetting.discountPercent}
+                        ttlMs={ttlMs}
+                    />
+                )}
+
+                <div className="flex justify-center px-4">
+                    <Button asChild variant="outline">
+                        <Link href="/">返回首页</Link>
+                    </Button>
                 </div>
             </main>
         </div>

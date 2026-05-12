@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { config } from "@/lib/config"
 import { ProductForm } from "@/app/components/product-form"
 import { DeactivateProductButton } from "./product-actions"
+import { CrossSellTargetsForm } from "./cross-sell-targets-form"
 
 export const dynamic = "force-dynamic"
 
@@ -13,7 +14,7 @@ type PageProps = {
 export default async function AdminEditProductPage({ params }: PageProps) {
     const { productId } = await params
 
-    const [product, tags, cardTemplates] = await Promise.all([
+    const [product, tags, cardTemplates, crossSellTargets, otherProducts] = await Promise.all([
         prisma.product.findUnique({
             where: { id: productId },
             include: {
@@ -33,11 +34,23 @@ export default async function AdminEditProductPage({ params }: PageProps) {
             select: { id: true, name: true, template: true },
             orderBy: { sortOrder: "asc" },
         }),
+        prisma.productCrossSell.findMany({
+            where: { sourceProductId: productId },
+            include: { target: { select: { id: true, name: true } } },
+            orderBy: { sortOrder: "asc" },
+        }),
+        prisma.product.findMany({
+            where: { status: "ACTIVE", NOT: { id: productId } },
+            select: { id: true, name: true },
+            orderBy: { name: "asc" },
+        }),
     ])
 
     if (!product) {
         notFound()
     }
+
+    const initialTargets = crossSellTargets.map((cs) => ({ id: cs.target.id, name: cs.target.name }))
 
     return (
         <div className="space-y-6">
@@ -49,6 +62,12 @@ export default async function AdminEditProductPage({ params }: PageProps) {
                 allTags={tags}
                 allCardTemplates={cardTemplates}
                 sourceUrlOptions={config.autoFetchSourceUrls}
+            />
+
+            <CrossSellTargetsForm
+                productId={productId}
+                initialTargets={initialTargets}
+                allProducts={otherProducts}
             />
 
             {/* Danger zone */}

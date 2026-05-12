@@ -21,6 +21,7 @@ import {
     ShieldCheck,
     LayoutTemplate,
     Trophy,
+    Sparkles,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { authClient } from "@/lib/auth-client"
@@ -51,6 +52,7 @@ const allNavItems = [
     { title: "卡密管理", href: "/admin/cards", icon: CreditCard },
     { title: "卡密模版", href: "/admin/card-templates", icon: LayoutTemplate },
     { title: "自动获取验证", href: "/admin/auto-fetch", icon: FlaskConical },
+    { title: "联推折扣", href: "/admin/settings/cross-sell", icon: Sparkles },
     // 数据
     { title: "订单管理", href: "/admin/orders", icon: ShoppingCart },
     // 提现

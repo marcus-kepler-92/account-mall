@@ -153,6 +153,8 @@ model Product {
   exitDiscountUsages   ExitDiscountUsage[]
   accountBlacklist     AccountBlacklist[]
   cardTemplates        CardTemplate[]
+  crossSellTargets     ProductCrossSell[] @relation("CrossSellSource")
+  crossSellSources     ProductCrossSell[] @relation("CrossSellTarget")
 
   @@index([sortOrder])
 }
@@ -228,6 +230,8 @@ model Order {
   cards                   Card[]
   commissions             Commission[]
   exitDiscountUsage       ExitDiscountUsage?
+  crossSellUsageAsSource  CrossSellUsage[] @relation("CrossSellSource")
+  crossSellUsageAsTarget  CrossSellUsage?  @relation("CrossSellTarget")
 
   @@index([email])
   @@index([status, createdAt])
@@ -530,4 +534,48 @@ model EmailCampaign {
 
   @@index([status])
   @@index([createdAt])
+}
+
+// ─── Cross-sell ──────────────────────────────────────────────────────────────
+
+// Admin-configured product recommendation bindings (source → target)
+model ProductCrossSell {
+  id              String   @id @default(cuid())
+  sourceProductId String
+  targetProductId String
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  source Product @relation("CrossSellSource", fields: [sourceProductId], references: [id], onDelete: Cascade)
+  target Product @relation("CrossSellTarget", fields: [targetProductId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceProductId, targetProductId])
+  @@index([sourceProductId, sortOrder])
+}
+
+// Singleton configuration table for cross-sell global settings
+model CrossSellSetting {
+  id              String   @id @default("singleton")
+  enabled         Boolean  @default(true)
+  discountPercent Decimal  @db.Decimal(5, 2) @default(10)
+  ttlMinutes      Int      @default(30)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// One-time usage record — enforces a source order can only use the cross-sell discount for a given target product once
+model CrossSellUsage {
+  id              String   @id @default(cuid())
+  sourceOrderId   String
+  targetOrderId   String   @unique
+  targetProductId String
+  discountPercent Decimal  @db.Decimal(5, 2)
+  createdAt       DateTime @default(now())
+
+  sourceOrder Order @relation("CrossSellSource", fields: [sourceOrderId], references: [id], onDelete: Cascade)
+  targetOrder Order @relation("CrossSellTarget", fields: [targetOrderId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceOrderId, targetProductId])
+  @@index([sourceOrderId])
+  @@index([targetProductId])
 }
