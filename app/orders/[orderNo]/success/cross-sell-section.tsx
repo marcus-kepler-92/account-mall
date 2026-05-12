@@ -43,6 +43,8 @@ export function CrossSellSection({ recommendations, discountPercent, ttlMs }: Cr
     const [expiresAt] = useState(() => Date.now() + ttlMs)
     const remainingMs = useCountdownMs(expiresAt)
     const isExpired = hasDiscount && remainingMs <= 0
+    const isUrgent = hasDiscount && remainingMs <= 2 * 60_000 && !isExpired   // < 2 min
+    const isCritical = hasDiscount && remainingMs <= 60_000 && !isExpired     // < 1 min
     const minutes = Math.floor(remainingMs / 60_000)
     const seconds = Math.floor((remainingMs % 60_000) / 1000)
     const countdownStr = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
@@ -52,22 +54,41 @@ export function CrossSellSection({ recommendations, discountPercent, ttlMs }: Cr
         <section className="mx-auto max-w-4xl px-4">
             {/* Banner — only shown when a discount is configured */}
             {hasDiscount && (
-                <Card className={cn("mb-3 transition-opacity", isExpired ? "opacity-50" : "")}>
+                <Card className={cn(
+                    "mb-3 transition-all duration-500",
+                    isExpired && "opacity-50",
+                    isCritical && "border-destructive/60 bg-destructive/5",
+                    isUrgent && !isCritical && "border-orange-400/60 bg-orange-50/50 dark:bg-orange-950/20",
+                )}>
                     <CardContent className="py-2.5 px-3">
                         <div className="flex items-center justify-between gap-3">
                             <div className="min-w-0">
-                                <p className="font-semibold text-sm">
+                                <p className={cn(
+                                    "font-semibold text-sm",
+                                    isCritical && "text-destructive",
+                                    isUrgent && !isCritical && "text-orange-600 dark:text-orange-400",
+                                )}>
                                     <Sparkles className="inline size-3.5 mr-1 text-amber-500" />
                                     为你推荐 · 专享{discountLabel}
                                 </p>
-                                <p className="text-xs text-muted-foreground">
-                                    {isExpired ? "折扣已过期" : `仅本页有效${remainingMs <= 5 * 60_000 ? " · 即将过期" : ""}`}
+                                <p className={cn(
+                                    "text-xs",
+                                    isCritical ? "text-destructive/80 font-medium" :
+                                    isUrgent ? "text-orange-500 dark:text-orange-400" :
+                                    "text-muted-foreground"
+                                )}>
+                                    {isExpired ? "折扣已过期" :
+                                     isCritical ? "⚠ 即将过期，抓紧下单！" :
+                                     isUrgent ? "即将过期，仅剩最后几秒" :
+                                     "仅本页有效 · 限时专享"}
                                 </p>
                             </div>
                             {!isExpired && (
                                 <span className={cn(
-                                    "font-mono tabular-nums font-bold text-lg shrink-0",
-                                    remainingMs <= 60_000 ? "text-destructive animate-pulse" : "text-foreground"
+                                    "font-mono tabular-nums font-bold text-lg shrink-0 transition-colors duration-500",
+                                    isCritical ? "text-destructive animate-pulse" :
+                                    isUrgent ? "text-orange-500 dark:text-orange-400" :
+                                    "text-foreground"
                                 )}>
                                     {countdownStr}
                                 </span>

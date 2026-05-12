@@ -23,7 +23,7 @@ import { z } from "zod"
 const formSchema = z.object({
     enabled: z.boolean(),
     discountPercent: z.number().min(0).max(50),
-    ttlMinutes: z.number().int().min(5).max(180),
+    ttlMinutes: z.number().int().min(5).max(60),
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -132,13 +132,13 @@ export function CrossSellSettingsForm({ setting }: Props) {
                                         <Input
                                             type="number"
                                             min={5}
-                                            max={180}
+                                            max={60}
                                             {...field}
                                             onChange={(e) => field.onChange(e.target.valueAsNumber)}
                                         />
                                     </FormControl>
                                     <FormDescription>
-                                        从用户打开成功页开始计时，范围 5-180 分钟
+                                        从用户打开成功页开始计时，范围 5-60 分钟
                                     </FormDescription>
                                     <FormMessage />
                                 </FormItem>
