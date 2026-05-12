@@ -111,7 +111,10 @@ export function CrossSellSettingsForm({ setting }: Props) {
                                             min={0}
                                             max={50}
                                             {...field}
-                                            onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                                            onChange={(e) => {
+                                                const v = e.target.valueAsNumber
+                                                field.onChange(Number.isNaN(v) ? "" : v)
+                                            }}
                                         />
                                     </FormControl>
                                     <FormDescription>
@@ -134,7 +137,10 @@ export function CrossSellSettingsForm({ setting }: Props) {
                                             min={5}
                                             max={60}
                                             {...field}
-                                            onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                                            onChange={(e) => {
+                                                const v = e.target.valueAsNumber
+                                                field.onChange(Number.isNaN(v) ? "" : v)
+                                            }}
                                         />
                                     </FormControl>
                                     <FormDescription>

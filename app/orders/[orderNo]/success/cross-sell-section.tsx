@@ -45,6 +45,7 @@ export function CrossSellSection({ recommendations, discountPercent, ttlMs }: Cr
     const isExpired = hasDiscount && remainingMs <= 0
     const isUrgent = hasDiscount && remainingMs <= 3 * 60_000 && !isExpired   // < 3 min
     const isCritical = hasDiscount && remainingMs <= 60_000 && !isExpired     // < 1 min
+    const pulseStyle = isCritical ? { animationDuration: "0.55s" } : isUrgent ? { animationDuration: "1.4s" } : undefined
     const progressPct = Math.max(0, (remainingMs / ttlMs) * 100)
     const minutes = Math.floor(remainingMs / 60_000)
     const seconds = Math.floor((remainingMs % 60_000) / 1000)
@@ -86,12 +87,15 @@ export function CrossSellSection({ recommendations, discountPercent, ttlMs }: Cr
                             </p>
                         </div>
                         {!isExpired && (
-                            <span className={cn(
-                                "font-mono tabular-nums font-black text-2xl shrink-0 tracking-tight transition-colors duration-500",
-                                isCritical ? "text-destructive animate-pulse" :
-                                isUrgent ? "text-orange-500 dark:text-orange-400" :
-                                "text-amber-600 dark:text-amber-400",
-                            )}>
+                            <span
+                                className={cn(
+                                    "font-mono tabular-nums font-black text-2xl shrink-0 tracking-tight transition-colors duration-500",
+                                    isCritical ? "text-destructive animate-pulse" :
+                                    isUrgent ? "text-orange-500 dark:text-orange-400 animate-pulse" :
+                                    "text-amber-600 dark:text-amber-400",
+                                )}
+                                style={pulseStyle}
+                            >
                                 {countdownStr}
                             </span>
                         )}
@@ -102,11 +106,11 @@ export function CrossSellSection({ recommendations, discountPercent, ttlMs }: Cr
                             <div
                                 className={cn(
                                     "h-full transition-[width] duration-1000 ease-linear",
-                                    isCritical ? "bg-destructive" :
-                                    isUrgent ? "bg-orange-400" :
+                                    isCritical ? "bg-destructive animate-pulse" :
+                                    isUrgent ? "bg-orange-400 animate-pulse" :
                                     "bg-amber-400",
                                 )}
-                                style={{ width: `${progressPct}%` }}
+                                style={{ width: `${progressPct}%`, ...pulseStyle }}
                             />
                         </div>
                     )}
