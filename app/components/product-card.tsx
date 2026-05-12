@@ -5,7 +5,7 @@ import Image from "next/image"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Package, Bell } from "lucide-react"
+import { Package, Bell, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { descriptionToPlainText } from "@/lib/description"
 import { SoldOutOverlay } from "@/app/components/sold-out-overlay"
@@ -60,61 +60,49 @@ export function ProductCard({ product, gradientIndex = 0, className, code, disco
     if (horizontal) {
         return (
             <Link href={detailHref} className={cn("group block", className)}>
-                <Card className="relative flex flex-row gap-0 overflow-hidden border p-0 shadow-sm transition-all duration-200 hover:shadow-md hover:border-primary/20 group-focus-within:ring-2 group-focus-within:ring-ring">
-                    {/* Square thumbnail on the left */}
-                    <div className="relative size-20 shrink-0 overflow-hidden rounded-l-xl bg-muted sm:size-24">
+                <div className="flex items-center gap-2.5 rounded-lg border bg-card px-2.5 py-2 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    {/* 40px thumbnail */}
+                    <div className="relative size-10 shrink-0 overflow-hidden rounded bg-muted">
                         {product.image ? (
                             <Image
                                 src={product.image}
                                 alt={product.name}
                                 fill
-                                sizes="96px"
-                                className={cn("object-fill transition-transform duration-200 group-hover:scale-105", isSoldOut && "grayscale")}
+                                sizes="40px"
+                                className={cn("object-fill", isSoldOut && "grayscale")}
                                 priority={gradientIndex === 0}
                             />
                         ) : (
                             <div className="flex size-full items-center justify-center">
-                                <Package className="size-6 text-muted-foreground/40" />
+                                <Package className="size-4 text-muted-foreground/40" />
                             </div>
                         )}
                         {isSoldOut && <SoldOutOverlay />}
                     </div>
 
-                    {/* Right: name + price + button */}
-                    <div className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2 sm:px-4 sm:py-3">
-                        <div className="min-w-0 flex-1">
-                            <h3 className="line-clamp-2 text-sm font-semibold leading-tight transition-colors group-hover:text-primary">
-                                {product.name}
-                            </h3>
-                            <div className="mt-1">
-                                {isFree ? (
-                                    <span className="text-sm font-bold text-primary">免费</span>
-                                ) : !isSoldOut && hasDiscount ? (
-                                    <span className="flex items-baseline gap-1">
-                                        <span className="line-through text-muted-foreground text-xs">¥{product.price.toFixed(2)}</span>
-                                        <span className="text-sm font-bold text-destructive">¥{(product.price * (1 - discountPercent! / 100)).toFixed(2)}</span>
-                                    </span>
-                                ) : (
-                                    <span className={cn("text-sm font-bold tabular-nums", isSoldOut && "text-muted-foreground line-through")}>
-                                        ¥{product.price.toFixed(2)}
-                                    </span>
-                                )}
-                            </div>
-                        </div>
-                        <Button size="sm" className="shrink-0" disabled={false}>
-                            {isSoldOut ? (
-                                <>
-                                    <Bell className="size-3.5" />
-                                    <span className="text-xs">催货</span>
-                                </>
-                            ) : isFree ? (
-                                <span className="text-xs">领取</span>
-                            ) : (
-                                <span className="text-xs">购买</span>
-                            )}
-                        </Button>
-                    </div>
-                </Card>
+                    {/* Name */}
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium transition-colors group-hover:text-primary">
+                        {product.name}
+                    </span>
+
+                    {/* Price */}
+                    <span className="shrink-0 text-xs tabular-nums">
+                        {isFree ? (
+                            <span className="font-bold text-primary">免费</span>
+                        ) : !isSoldOut && hasDiscount ? (
+                            <span className="flex items-baseline gap-1">
+                                <span className="line-through text-muted-foreground">¥{product.price.toFixed(2)}</span>
+                                <span className="font-bold text-destructive">¥{(product.price * (1 - discountPercent! / 100)).toFixed(2)}</span>
+                            </span>
+                        ) : (
+                            <span className={cn("font-bold", isSoldOut && "text-muted-foreground line-through")}>
+                                ¥{product.price.toFixed(2)}
+                            </span>
+                        )}
+                    </span>
+
+                    <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />
+                </div>
             </Link>
         )
     }
