@@ -190,7 +190,7 @@ describe("/api/restock-subscriptions POST", () => {
 
     expect(res.status).toBe(400)
     expect(data.error).toContain("50")
-    expect(data.error).toContain("订阅")
+    expect(data.error).toContain("催货")
     expect(prismaMock.restockSubscription.upsert).not.toHaveBeenCalled()
   })
 

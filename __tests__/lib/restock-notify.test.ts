@@ -72,7 +72,7 @@ describe("notifyRestockSubscribers", () => {
       expect(sendMail).toHaveBeenCalledWith(
         expect.objectContaining({
           to: sub.email,
-          subject: "[Account Mall] 你关注的商品已补货",
+          subject: "[Account Mall] 你催货的商品已到货",
         }),
       )
     }
