@@ -172,6 +172,13 @@ export class InviteTokenUsedError extends Error {
   }
 }
 
+export class InviteTokenExhaustedError extends Error {
+  constructor() {
+    super("邀请名额已满")
+    this.name = "InviteTokenExhaustedError"
+  }
+}
+
 export class InviteTokenExpiredError extends Error {
   constructor() {
     super("邀请链接已过期")

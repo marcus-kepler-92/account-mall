@@ -17,6 +17,8 @@ jest.mock("@/lib/config", () => {
         nodeEnv: "test" as const,
         pendingOrderTimeoutMs: 900_000,
         basePromoDiscountPercent: 5,
+        inviteLinkDefaultCount: 1,
+        inviteLinkMaxCount: 50,
     }
     return { config: mock, getConfig: () => mock }
 })

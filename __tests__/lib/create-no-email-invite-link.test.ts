@@ -10,6 +10,8 @@ jest.mock("@/lib/config", () => ({
     config: {
         distributorInviteTtlDays: 7,
         siteUrl: "https://example.com",
+        inviteLinkDefaultCount: 1,
+        inviteLinkMaxCount: 50,
     },
 }))
 
@@ -29,7 +31,48 @@ describe("createNoEmailInviteLink", () => {
                 data: expect.objectContaining({
                     email: null,
                     inviterId: "inv_1",
+                    maxUses: 1,
                 }),
+            })
+        )
+    })
+
+    it("defaults maxUses to 1 when not specified", async () => {
+        prismaMock.distributorInvitation.create.mockResolvedValue({} as any)
+        await createNoEmailInviteLink({ inviterId: "inv_1" })
+        expect(prismaMock.distributorInvitation.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({ maxUses: 1 }),
+            })
+        )
+    })
+
+    it("passes maxUses to invitation record", async () => {
+        prismaMock.distributorInvitation.create.mockResolvedValue({} as any)
+        await createNoEmailInviteLink({ inviterId: "inv_1", maxUses: 20 })
+        expect(prismaMock.distributorInvitation.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({ maxUses: 20 }),
+            })
+        )
+    })
+
+    it("clamps maxUses to 50 when over limit", async () => {
+        prismaMock.distributorInvitation.create.mockResolvedValue({} as any)
+        await createNoEmailInviteLink({ inviterId: "inv_1", maxUses: 999 })
+        expect(prismaMock.distributorInvitation.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({ maxUses: 50 }),
+            })
+        )
+    })
+
+    it("clamps maxUses to 1 when below minimum", async () => {
+        prismaMock.distributorInvitation.create.mockResolvedValue({} as any)
+        await createNoEmailInviteLink({ inviterId: "inv_1", maxUses: 0 })
+        expect(prismaMock.distributorInvitation.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({ maxUses: 1 }),
             })
         )
     })

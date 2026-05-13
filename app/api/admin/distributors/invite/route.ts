@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getAdminSession } from "@/lib/auth-guard"
 import { badRequest, unauthorized, validationError } from "@/lib/api-response"
 import { distributorInviteSchema, sendInvite, createNoEmailInviteLink } from "@/lib/domains/distributors"
+import { config } from "@/lib/config"
 
 export async function POST(request: NextRequest) {
   const session = await getAdminSession()
@@ -17,7 +18,12 @@ export async function POST(request: NextRequest) {
     (body as { email: string }).email.length > 0
 
   if (!hasEmail) {
-    const result = await createNoEmailInviteLink({ inviterId: admin.id })
+    const rawMaxUses = (body as { maxUses?: unknown }).maxUses
+    const maxUses =
+      typeof rawMaxUses === "number" && Number.isInteger(rawMaxUses)
+        ? Math.max(1, Math.min(config.inviteLinkMaxCount, rawMaxUses))
+        : config.inviteLinkDefaultCount
+    const result = await createNoEmailInviteLink({ inviterId: admin.id, maxUses })
     return NextResponse.json({ success: true, link: result.link })
   }
 

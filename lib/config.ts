@@ -127,6 +127,10 @@ const envSchema = z
     level2CommissionRatePercent: z.coerce.number().min(0).max(50).default(20),
     /** 分销员邀请链接有效期（天），默认 7 天 */
     distributorInviteTtlDays: z.coerce.number().int().min(1).max(30).default(7),
+    /** 邀请链接：UI 默认注册人数，默认 1 */
+    inviteLinkDefaultCount: z.coerce.number().int().min(1).default(1),
+    /** 邀请链接：单条链接最大注册人数上限，默认 50 */
+    inviteLinkMaxCount: z.coerce.number().int().min(1).default(50),
     /** Exit Intent 折扣：HMAC 签名密钥，生产环境必填 */
     exitDiscountSecret: z.string().optional(),
     /** Exit Intent 折扣：折扣比例（百分比），默认 5 表示 95 折 */
@@ -284,6 +288,8 @@ function getEnvInput() {
     withdrawalFeePercent: e.WITHDRAWAL_FEE_PERCENT,
     level2CommissionRatePercent: e.LEVEL2_COMMISSION_RATE_PERCENT,
     distributorInviteTtlDays: e.DISTRIBUTOR_INVITE_TTL_DAYS,
+    inviteLinkDefaultCount: e.INVITE_LINK_DEFAULT_COUNT,
+    inviteLinkMaxCount: e.INVITE_LINK_MAX_COUNT,
     exitDiscountSecret: e.EXIT_DISCOUNT_SECRET,
     exitDiscountPercent: e.EXIT_DISCOUNT_PERCENT,
     exitDiscountTtlMs: e.EXIT_DISCOUNT_TTL_MS,

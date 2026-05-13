@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
     useReactTable,
     getCoreRowModel,
@@ -34,10 +34,11 @@ interface InviteesDataTableProps {
 export function InviteesDataTable({ data, level2RatePercent, milestoneSummary }: InviteesDataTableProps) {
     const [sorting, setSorting] = useState<SortingState>([])
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
-    const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
-        if (typeof window === "undefined") return {} as VisibilityState
-        return window.innerWidth < 768 ? { email: false } : {} as VisibilityState
-    })
+    const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
+
+    useEffect(() => {
+        if (window.innerWidth < 768) setColumnVisibility({ email: false })
+    }, [])
 
     const table = useReactTable({
         data,

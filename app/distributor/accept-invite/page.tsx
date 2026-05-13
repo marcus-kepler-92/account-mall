@@ -25,19 +25,19 @@ export default async function AcceptInvitePage({ searchParams }: AcceptInvitePag
 
   const invitation = await prisma.distributorInvitation.findUnique({
     where: { token },
-    select: { email: true, expiresAt: true, acceptedAt: true },
+    select: { email: true, expiresAt: true, maxUses: true, usedCount: true },
   })
 
   if (!invitation) {
     return <InvalidInvite reason="notfound" />
   }
 
-  if (invitation.acceptedAt) {
-    return <InvalidInvite reason="used" />
-  }
-
   if (invitation.expiresAt < new Date()) {
     return <InvalidInvite reason="expired" />
+  }
+
+  if (invitation.usedCount >= invitation.maxUses) {
+    return <InvalidInvite reason="exhausted" />
   }
 
   const isNoEmail = invitation.email === null
@@ -69,11 +69,11 @@ export default async function AcceptInvitePage({ searchParams }: AcceptInvitePag
   )
 }
 
-function InvalidInvite({ reason }: { reason: "missing" | "notfound" | "used" | "expired" }) {
+function InvalidInvite({ reason }: { reason: "missing" | "notfound" | "exhausted" | "expired" }) {
   const messages = {
     missing: "邀请链接无效，缺少必要参数。",
     notfound: "邀请链接无效或不存在。",
-    used: "此邀请链接已被使用，每个邀请链接只能使用一次。",
+    exhausted: "此邀请链接的注册名额已满，请联系邀请人重新生成链接。",
     expired: "邀请链接已过期，请联系邀请人重新发送邀请。",
   }
 

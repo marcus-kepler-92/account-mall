@@ -30,6 +30,9 @@ const yipayDisabledPaymentTypes = rawDisabledTypes
     .map((s) => s.trim())
     .filter((s): s is typeof VALID_PAYMENT_TYPES[number] => (VALID_PAYMENT_TYPES as readonly string[]).includes(s))
 
+const rawInviteLinkDefaultCount = Number(process.env.NEXT_PUBLIC_INVITE_LINK_DEFAULT_COUNT)
+const rawInviteLinkMaxCount = Number(process.env.NEXT_PUBLIC_INVITE_LINK_MAX_COUNT)
+
 const supportTelegram = (process.env.NEXT_PUBLIC_SUPPORT_TELEGRAM ?? "@Marcus_Kepler").trim()
 const supportWechat = (process.env.NEXT_PUBLIC_SUPPORT_WECHAT ?? "Mashangbang0").trim()
 const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? ""
@@ -58,4 +61,8 @@ export const configClient = {
     supportWechat,
     /** Cloudflare Turnstile 站点密钥（客户端），空字符串表示未启用 */
     turnstileSiteKey,
+    /** 邀请链接：UI 默认注册人数，默认 1 */
+    inviteLinkDefaultCount: Number.isInteger(rawInviteLinkDefaultCount) && rawInviteLinkDefaultCount >= 1 ? rawInviteLinkDefaultCount : 1,
+    /** 邀请链接：单条链接最大注册人数上限，默认 50 */
+    inviteLinkMaxCount: Number.isInteger(rawInviteLinkMaxCount) && rawInviteLinkMaxCount >= 1 ? rawInviteLinkMaxCount : 50,
 }

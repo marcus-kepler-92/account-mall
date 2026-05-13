@@ -49,7 +49,7 @@ import {
   WithdrawalOverBalanceError,
   TierRangeError,
   InviteTokenNotFoundError,
-  InviteTokenUsedError,
+  InviteTokenExhaustedError,
   InviteTokenExpiredError,
   InviteTokenConcurrentAcceptError,
 } from "../types"
@@ -298,18 +298,20 @@ describe("acceptInvite", () => {
     ).rejects.toThrow(InviteTokenNotFoundError)
   })
 
-  it("throws InviteTokenUsedError when already accepted", async () => {
+  it("throws InviteTokenExhaustedError when invite link is exhausted", async () => {
     ;(repo.findInvitationByToken as jest.Mock).mockResolvedValue({
       token: "tok",
       acceptedAt: new Date(),
       expiresAt: new Date(Date.now() + 1000),
+      maxUses: 1,
+      usedCount: 1,
       email: "a@b.com",
       inviterId: "admin1",
       inviter: { role: "ADMIN" },
     })
     await expect(
       acceptInvite("tok", { token: "tok", name: "Alice", password: "pass1234" }),
-    ).rejects.toThrow(InviteTokenUsedError)
+    ).rejects.toThrow(InviteTokenExhaustedError)
   })
 
   it("throws InviteTokenExpiredError when past expiry", async () => {
@@ -317,6 +319,8 @@ describe("acceptInvite", () => {
       token: "tok",
       acceptedAt: null,
       expiresAt: new Date(Date.now() - 1000),
+      maxUses: 1,
+      usedCount: 0,
       email: "a@b.com",
       inviterId: "admin1",
       inviter: { role: "ADMIN" },
@@ -326,11 +330,34 @@ describe("acceptInvite", () => {
     ).rejects.toThrow(InviteTokenExpiredError)
   })
 
+  it("proceeds when maxUses=2 and usedCount=1 (slot still available)", async () => {
+    ;(repo.findInvitationByToken as jest.Mock).mockResolvedValue({
+      token: "tok",
+      acceptedAt: new Date(),
+      expiresAt: new Date(Date.now() + 10000),
+      maxUses: 2,
+      usedCount: 1,
+      email: "a@b.com",
+      inviterId: "admin1",
+      inviter: { role: "ADMIN" },
+    })
+    ;(repo.findUserByEmail as jest.Mock).mockResolvedValue(null)
+    ;(repo.claimInvitation as jest.Mock).mockResolvedValue(1)
+    ;(repo.createDistributorUser as jest.Mock).mockResolvedValue({ id: "new_user" })
+
+    await expect(
+      acceptInvite("tok", { token: "tok", name: "Alice", password: "pass1234" }),
+    ).resolves.not.toThrow()
+    expect(repo.claimInvitation).toHaveBeenCalled()
+  })
+
   it("throws InviteTokenConcurrentAcceptError when token already claimed by concurrent request", async () => {
     ;(repo.findInvitationByToken as jest.Mock).mockResolvedValue({
       token: "tok",
       acceptedAt: null,
       expiresAt: new Date(Date.now() + 10000),
+      maxUses: 1,
+      usedCount: 0,
       email: "a@b.com",
       inviterId: "inviter1",
       inviter: { role: "DISTRIBUTOR" },

@@ -106,4 +106,5 @@ export {
   CommissionAlreadyPaidOutError,
   UsernameRequiredError,
   InviteTokenConcurrentAcceptError,
+  InviteTokenExhaustedError,
 } from "./types"

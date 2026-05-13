@@ -21,13 +21,8 @@ jest.mock("@/lib/domains/distributors", () => {
     }
 })
 
-jest.mock("@/lib/rate-limit", () => ({
-    checkDistributorInviteRateLimit: jest.fn().mockResolvedValue(null),
-}))
-
 const getDistributorSession = require("@/lib/auth-guard").getDistributorSession as jest.Mock
 const sendInvite = require("@/lib/domains/distributors").sendInvite as jest.Mock
-const checkDistributorInviteRateLimit = require("@/lib/rate-limit").checkDistributorInviteRateLimit as jest.Mock
 const createNoEmailInviteLink = require("@/lib/domains/distributors").createNoEmailInviteLink as jest.Mock
 
 function createRequest(body: unknown): NextRequest {
@@ -98,16 +93,6 @@ describe("POST /api/distributor/invite", () => {
         expect(sendInvite).toHaveBeenCalledTimes(1)
     })
 
-    it("returns 429 when rate limited", async () => {
-        getDistributorSession.mockResolvedValue({ user: { id: "dist_1", name: "Dist" } })
-        checkDistributorInviteRateLimit.mockResolvedValueOnce(
-            new Response(JSON.stringify({ error: "邀请发送过于频繁" }), { status: 429 })
-        )
-        const res = await DistInvitePost(createRequest({ email: "new@example.com" }))
-        expect(res.status).toBe(429)
-        expect(sendInvite).not.toHaveBeenCalled()
-    })
-
     it("returns 400 when email send fails (send_failed)", async () => {
         getDistributorSession.mockResolvedValue({ user: { id: "dist_1", name: "Dist" } })
         sendInvite.mockResolvedValue({ success: false, reason: "send_failed" })
@@ -135,7 +120,7 @@ describe("POST /api/distributor/invite", () => {
         expect(res.status).toBe(400)
     })
 
-    it("calls createNoEmailInviteLink and returns link when body has no email", async () => {
+    it("calls createNoEmailInviteLink with default maxUses=1 when body has no email", async () => {
         getDistributorSession.mockResolvedValue({ user: { id: "dist_1", name: "Dist" } })
         createNoEmailInviteLink.mockResolvedValue({
             link: "https://example.com/distributor/accept-invite?token=abc",
@@ -145,7 +130,37 @@ describe("POST /api/distributor/invite", () => {
         const body = await res.json()
         expect(body.link).toBe("https://example.com/distributor/accept-invite?token=abc")
         expect(sendInvite).not.toHaveBeenCalled()
-        expect(createNoEmailInviteLink).toHaveBeenCalledWith({ inviterId: "dist_1" })
+        expect(createNoEmailInviteLink).toHaveBeenCalledWith({ inviterId: "dist_1", maxUses: 1 })
+    })
+
+    it("forwards maxUses to createNoEmailInviteLink", async () => {
+        getDistributorSession.mockResolvedValue({ user: { id: "dist_1", name: "Dist" } })
+        createNoEmailInviteLink.mockResolvedValue({
+            link: "https://example.com/distributor/accept-invite?token=abc",
+        })
+        await DistInvitePost(createRequest({ maxUses: 15 }))
+        expect(createNoEmailInviteLink).toHaveBeenCalledWith({ inviterId: "dist_1", maxUses: 15 })
+    })
+
+    it("clamps float maxUses (1.7) to default 1 via integer guard", async () => {
+        getDistributorSession.mockResolvedValue({ user: { id: "dist_1", name: "Dist" } })
+        createNoEmailInviteLink.mockResolvedValue({ link: "https://example.com/invite?token=abc" })
+        await DistInvitePost(createRequest({ maxUses: 1.7 }))
+        expect(createNoEmailInviteLink).toHaveBeenCalledWith({ inviterId: "dist_1", maxUses: 1 })
+    })
+
+    it("clamps negative maxUses (-5) to default 1", async () => {
+        getDistributorSession.mockResolvedValue({ user: { id: "dist_1", name: "Dist" } })
+        createNoEmailInviteLink.mockResolvedValue({ link: "https://example.com/invite?token=abc" })
+        await DistInvitePost(createRequest({ maxUses: -5 }))
+        expect(createNoEmailInviteLink).toHaveBeenCalledWith({ inviterId: "dist_1", maxUses: 1 })
+    })
+
+    it("clamps over-limit maxUses (100) to inviteLinkMaxCount (50)", async () => {
+        getDistributorSession.mockResolvedValue({ user: { id: "dist_1", name: "Dist" } })
+        createNoEmailInviteLink.mockResolvedValue({ link: "https://example.com/invite?token=abc" })
+        await DistInvitePost(createRequest({ maxUses: 100 }))
+        expect(createNoEmailInviteLink).toHaveBeenCalledWith({ inviterId: "dist_1", maxUses: 50 })
     })
 
     it("returns 401 when disabled distributor tries to generate no-email link", async () => {

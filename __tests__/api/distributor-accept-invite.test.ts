@@ -28,10 +28,25 @@ function makeInvitation(overrides?: Record<string, unknown>) {
         email: "invitee@example.com",
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         acceptedAt: null,
+        maxUses: 1,
+        usedCount: 0,
         inviter: { role: "DISTRIBUTOR" },
         inviterId: "dist_A",
         ...overrides,
     } as any
+}
+
+// Builds a tx mock that succeeds the $executeRaw claim (count=1 by default)
+function makeTxMock(executeRawResult = 1, extraOverrides: Record<string, unknown> = {}) {
+    return async (fn: (tx: any) => Promise<void>) => {
+        await fn({
+            ...prismaMock,
+            $executeRaw: jest.fn().mockResolvedValue(executeRawResult),
+            user: { create: jest.fn().mockResolvedValue({ id: "new_user" }) },
+            account: { create: jest.fn().mockResolvedValue({}) },
+            ...extraOverrides,
+        })
+    }
 }
 
 describe("POST /api/distributor/accept-invite", () => {
@@ -76,14 +91,14 @@ describe("POST /api/distributor/accept-invite", () => {
         expect(res.status).toBe(404)
     })
 
-    it("returns 400 when token is already accepted", async () => {
+    it("returns 400 when invite link is exhausted (usedCount >= maxUses)", async () => {
         prismaMock.distributorInvitation.findUnique.mockResolvedValue(
-            makeInvitation({ acceptedAt: new Date("2025-01-01") })
+            makeInvitation({ usedCount: 1, maxUses: 1 })
         )
         const res = await AcceptInvitePost(createRequest({ token: "used-token", name: "Alice", password: "password123" }))
         expect(res.status).toBe(400)
         const body = await res.json()
-        expect(body.code).toBe("INVITE_USED")
+        expect(body.code).toBe("INVITE_EXHAUSTED")
     })
 
     it("returns 400 when token is expired", async () => {
@@ -106,16 +121,7 @@ describe("POST /api/distributor/accept-invite", () => {
     it("creates user with inviterId when invited by distributor", async () => {
         prismaMock.distributorInvitation.findUnique.mockResolvedValue(makeInvitation())
         prismaMock.user.findUnique.mockResolvedValue(null)
-        ;(prismaMock.$transaction as any).mockImplementation(async (fn: (tx: any) => Promise<void>) => {
-            await fn({
-                ...prismaMock,
-                distributorInvitation: {
-                    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-                },
-                user: { create: jest.fn().mockResolvedValue({ id: "new_user" }) },
-                account: { create: jest.fn().mockResolvedValue({}) },
-            })
-        })
+        ;(prismaMock.$transaction as any).mockImplementation(makeTxMock())
 
         const res = await AcceptInvitePost(createRequest({ token: "valid-token", name: "Alice", password: "password123" }))
         expect(res.status).toBe(200)
@@ -130,9 +136,7 @@ describe("POST /api/distributor/accept-invite", () => {
             const userCreateMock = jest.fn().mockResolvedValue({ id: "new_user" })
             await fn({
                 ...prismaMock,
-                distributorInvitation: {
-                    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-                },
+                $executeRaw: jest.fn().mockResolvedValue(1),
                 user: { create: userCreateMock },
                 account: { create: jest.fn().mockResolvedValue({}) },
             })
@@ -155,9 +159,7 @@ describe("POST /api/distributor/accept-invite", () => {
             const userCreateMock = jest.fn().mockResolvedValue({ id: "new_user" })
             await fn({
                 ...prismaMock,
-                distributorInvitation: {
-                    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-                },
+                $executeRaw: jest.fn().mockResolvedValue(1),
                 user: { create: userCreateMock },
                 account: { create: jest.fn().mockResolvedValue({}) },
             })
@@ -169,19 +171,10 @@ describe("POST /api/distributor/accept-invite", () => {
         expect(userCreateArgs.data.inviterId).toBeNull()
     })
 
-    it("returns 409 when concurrent accept detected (acceptedAt set inside transaction)", async () => {
+    it("returns 409 when concurrent accept detected ($executeRaw returns 0)", async () => {
         prismaMock.distributorInvitation.findUnique.mockResolvedValue(makeInvitation())
         prismaMock.user.findUnique.mockResolvedValue(null)
-        ;(prismaMock.$transaction as any).mockImplementation(async (fn: (tx: any) => Promise<void>) => {
-            await fn({
-                ...prismaMock,
-                distributorInvitation: {
-                    updateMany: jest.fn().mockResolvedValue({ count: 0 }),
-                },
-                user: { create: jest.fn() },
-                account: { create: jest.fn() },
-            })
-        })
+        ;(prismaMock.$transaction as any).mockImplementation(makeTxMock(0))
 
         const res = await AcceptInvitePost(createRequest({ token: "valid-token", name: "Alice", password: "password123" }))
         expect(res.status).toBe(409)
@@ -213,16 +206,7 @@ describe("POST /api/distributor/accept-invite", () => {
     it("accepts password at exact min length (8 chars)", async () => {
         prismaMock.distributorInvitation.findUnique.mockResolvedValue(makeInvitation())
         prismaMock.user.findUnique.mockResolvedValue(null)
-        ;(prismaMock.$transaction as any).mockImplementation(async (fn: (tx: any) => Promise<void>) => {
-            await fn({
-                ...prismaMock,
-                distributorInvitation: {
-                    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-                },
-                user: { create: jest.fn().mockResolvedValue({ id: "new_user" }) },
-                account: { create: jest.fn().mockResolvedValue({}) },
-            })
-        })
+        ;(prismaMock.$transaction as any).mockImplementation(makeTxMock())
 
         const res = await AcceptInvitePost(createRequest({ token: "valid-token", name: "Alice", password: "12345678" }))
         expect(res.status).toBe(200)
@@ -237,16 +221,7 @@ describe("POST /api/distributor/accept-invite", () => {
     it("accepts password at exact max length (128 chars)", async () => {
         prismaMock.distributorInvitation.findUnique.mockResolvedValue(makeInvitation())
         prismaMock.user.findUnique.mockResolvedValue(null)
-        ;(prismaMock.$transaction as any).mockImplementation(async (fn: (tx: any) => Promise<void>) => {
-            await fn({
-                ...prismaMock,
-                distributorInvitation: {
-                    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-                },
-                user: { create: jest.fn().mockResolvedValue({ id: "new_user" }) },
-                account: { create: jest.fn().mockResolvedValue({}) },
-            })
-        })
+        ;(prismaMock.$transaction as any).mockImplementation(makeTxMock())
 
         const res = await AcceptInvitePost(createRequest({ token: "valid-token", name: "Alice", password: "a".repeat(128) }))
         expect(res.status).toBe(200)
@@ -260,16 +235,7 @@ describe("POST /api/distributor/accept-invite", () => {
     it("accepts name at exact max length (50 chars)", async () => {
         prismaMock.distributorInvitation.findUnique.mockResolvedValue(makeInvitation())
         prismaMock.user.findUnique.mockResolvedValue(null)
-        ;(prismaMock.$transaction as any).mockImplementation(async (fn: (tx: any) => Promise<void>) => {
-            await fn({
-                ...prismaMock,
-                distributorInvitation: {
-                    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-                },
-                user: { create: jest.fn().mockResolvedValue({ id: "new_user" }) },
-                account: { create: jest.fn().mockResolvedValue({}) },
-            })
-        })
+        ;(prismaMock.$transaction as any).mockImplementation(makeTxMock())
 
         const res = await AcceptInvitePost(createRequest({ token: "valid-token", name: "a".repeat(50), password: "password123" }))
         expect(res.status).toBe(200)
@@ -321,9 +287,7 @@ describe("POST /api/distributor/accept-invite", () => {
             const userCreateMock = jest.fn().mockResolvedValue({ id: "new_user" })
             await fn({
                 ...prismaMock,
-                distributorInvitation: {
-                    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-                },
+                $executeRaw: jest.fn().mockResolvedValue(1),
                 user: { create: userCreateMock },
                 account: { create: jest.fn().mockResolvedValue({}) },
             })
@@ -344,16 +308,7 @@ describe("POST /api/distributor/accept-invite", () => {
             makeInvitation({ email: null })
         )
         prismaMock.user.findUnique.mockResolvedValue(null)
-        ;(prismaMock.$transaction as any).mockImplementation(async (fn: (tx: any) => Promise<void>) => {
-            await fn({
-                ...prismaMock,
-                distributorInvitation: {
-                    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-                },
-                user: { create: jest.fn().mockResolvedValue({ id: "new_user" }) },
-                account: { create: jest.fn().mockResolvedValue({}) },
-            })
-        })
+        ;(prismaMock.$transaction as any).mockImplementation(makeTxMock())
 
         const res = await AcceptInvitePost(
             createRequest({ token: "valid-token", name: "Alice", username: "alice_123", password: "password123" })
@@ -378,9 +333,7 @@ describe("POST /api/distributor/accept-invite", () => {
             const userCreateMock = jest.fn().mockResolvedValue({ id: "new_user" })
             await fn({
                 ...prismaMock,
-                distributorInvitation: {
-                    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-                },
+                $executeRaw: jest.fn().mockResolvedValue(1),
                 user: { create: userCreateMock },
                 account: { create: jest.fn().mockResolvedValue({}) },
             })

@@ -5,7 +5,7 @@ import {
   acceptNoEmailInviteSchema,
   acceptInvite,
   InviteTokenNotFoundError,
-  InviteTokenUsedError,
+  InviteTokenExhaustedError,
   InviteTokenExpiredError,
   InviteTokenConcurrentAcceptError,
   UsernameConflictError,
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     await acceptInvite(parsed.data.token, { ...parsed.data, username })
   } catch (err) {
     if (err instanceof InviteTokenNotFoundError) return notFound("邀请链接无效")
-    if (err instanceof InviteTokenUsedError) return badRequest("此邀请链接已被使用", { code: "INVITE_USED" })
+    if (err instanceof InviteTokenExhaustedError) return badRequest("邀请名额已满，请联系邀请人重新生成链接", { code: "INVITE_EXHAUSTED" })
     if (err instanceof InviteTokenConcurrentAcceptError) return conflict("此邀请链接已被使用")
     if (err instanceof InviteTokenExpiredError) return badRequest("邀请链接已过期", { code: "INVITE_EXPIRED" })
     if (err instanceof UsernameRequiredError) return validationError({ username: ["用户名不能为空"] })

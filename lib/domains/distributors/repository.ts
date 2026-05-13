@@ -275,17 +275,10 @@ export async function findInvitationByToken(token: string, tx?: Tx) {
 }
 
 export async function createInvitation(
-  data: { email: string | null; token: string; inviterId: string; expiresAt: Date },
+  data: { email: string | null; token: string; inviterId: string; expiresAt: Date; maxUses?: number },
   tx?: Tx,
 ) {
   return (tx ?? prisma).distributorInvitation.create({ data })
-}
-
-export async function markInvitationAccepted(token: string, acceptedAt: Date, tx?: Tx) {
-  return (tx ?? prisma).distributorInvitation.update({
-    where: { token },
-    data: { acceptedAt },
-  })
 }
 
 export async function findUserByEmail(email: string, tx?: Tx) {
@@ -413,12 +406,18 @@ export async function aggregateMilestoneBonusSum(distributorId: string, tx?: Tx)
   return Number(r._sum.amount ?? 0)
 }
 
-export async function claimInvitation(token: string, acceptedAt: Date, tx?: Tx) {
-  const r = await (tx ?? prisma).distributorInvitation.updateMany({
-    where: { token, acceptedAt: null },
-    data: { acceptedAt },
-  })
-  return r.count
+export async function claimInvitation(token: string, firstUsedAt: Date, tx?: Tx) {
+  // Atomic: increment usedCount only when a slot is still available and link not expired.
+  // Returns 1 if slot claimed, 0 if exhausted/expired (concurrent race detected).
+  return (tx ?? prisma).$executeRaw`
+    UPDATE "DistributorInvitation"
+    SET
+      "usedCount"  = "usedCount" + 1,
+      "acceptedAt" = COALESCE("acceptedAt", ${firstUsedAt})
+    WHERE token = ${token}
+      AND "usedCount" < "maxUses"
+      AND "expiresAt" > NOW()
+  `
 }
 
 export async function findWeeklyCompletedOrders(

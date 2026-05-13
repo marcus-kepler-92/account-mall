@@ -103,7 +103,7 @@ describe("POST /api/admin/distributors/invite", () => {
         expect(body.error).toMatch(/邮件发送失败/)
     })
 
-    it("calls createNoEmailInviteLink and returns link when body has no email", async () => {
+    it("calls createNoEmailInviteLink with default maxUses=1 when body has no email", async () => {
         getAdminSession.mockResolvedValue({ user: { id: "admin_1", name: "Admin" } })
         createNoEmailInviteLink.mockResolvedValue({
             link: "https://example.com/distributor/accept-invite?token=abc",
@@ -113,7 +113,37 @@ describe("POST /api/admin/distributors/invite", () => {
         const body = await res.json()
         expect(body.link).toBe("https://example.com/distributor/accept-invite?token=abc")
         expect(sendInvite).not.toHaveBeenCalled()
-        expect(createNoEmailInviteLink).toHaveBeenCalledWith({ inviterId: "admin_1" })
+        expect(createNoEmailInviteLink).toHaveBeenCalledWith({ inviterId: "admin_1", maxUses: 1 })
+    })
+
+    it("forwards maxUses to createNoEmailInviteLink", async () => {
+        getAdminSession.mockResolvedValue({ user: { id: "admin_1", name: "Admin" } })
+        createNoEmailInviteLink.mockResolvedValue({
+            link: "https://example.com/distributor/accept-invite?token=abc",
+        })
+        await AdminInvitePost(createRequest({ maxUses: 20 }))
+        expect(createNoEmailInviteLink).toHaveBeenCalledWith({ inviterId: "admin_1", maxUses: 20 })
+    })
+
+    it("clamps float maxUses (1.7) to default 1 via integer guard", async () => {
+        getAdminSession.mockResolvedValue({ user: { id: "admin_1", name: "Admin" } })
+        createNoEmailInviteLink.mockResolvedValue({ link: "https://example.com/invite?token=abc" })
+        await AdminInvitePost(createRequest({ maxUses: 1.7 }))
+        expect(createNoEmailInviteLink).toHaveBeenCalledWith({ inviterId: "admin_1", maxUses: 1 })
+    })
+
+    it("clamps negative maxUses (-5) to default 1", async () => {
+        getAdminSession.mockResolvedValue({ user: { id: "admin_1", name: "Admin" } })
+        createNoEmailInviteLink.mockResolvedValue({ link: "https://example.com/invite?token=abc" })
+        await AdminInvitePost(createRequest({ maxUses: -5 }))
+        expect(createNoEmailInviteLink).toHaveBeenCalledWith({ inviterId: "admin_1", maxUses: 1 })
+    })
+
+    it("clamps over-limit maxUses (100) to inviteLinkMaxCount (50)", async () => {
+        getAdminSession.mockResolvedValue({ user: { id: "admin_1", name: "Admin" } })
+        createNoEmailInviteLink.mockResolvedValue({ link: "https://example.com/invite?token=abc" })
+        await AdminInvitePost(createRequest({ maxUses: 100 }))
+        expect(createNoEmailInviteLink).toHaveBeenCalledWith({ inviterId: "admin_1", maxUses: 50 })
     })
 
     it("returns 401 when unauthenticated admin tries no-email invite", async () => {

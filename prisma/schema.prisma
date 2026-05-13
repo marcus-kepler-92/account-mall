@@ -359,7 +359,9 @@ model DistributorInvitation {
   token      String    @unique
   inviterId  String    // 邀请人 ID（可以是 ADMIN 或 DISTRIBUTOR）
   expiresAt  DateTime
-  acceptedAt DateTime?
+  acceptedAt DateTime? // first use timestamp (audit)
+  maxUses    Int       @default(1) // max registrations allowed per link
+  usedCount  Int       @default(0) // current registration count
   createdAt  DateTime  @default(now())
   inviter    User      @relation("DistributorInvitationInviter", fields: [inviterId], references: [id])
 

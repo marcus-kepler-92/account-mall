@@ -14,28 +14,69 @@ function setup(open: boolean, onOpenChange = jest.fn()) {
     return render(<GenerateInviteLinkDialog open={open} onOpenChange={onOpenChange} />)
 }
 
+async function openAndGenerate(maxUses?: number) {
+    setup(true)
+    if (maxUses !== undefined) {
+        const input = screen.getByLabelText(/可注册人数/)
+        fireEvent.change(input, { target: { value: String(maxUses) } })
+    }
+    fireEvent.click(screen.getByRole("button", { name: "生成链接" }))
+}
+
 describe("GenerateInviteLinkDialog", () => {
     beforeEach(() => {
         jest.clearAllMocks()
     })
 
-    it("auto-generates link immediately when dialog opens", async () => {
+    // ── Config state ────────────────────────────────────────────────────────────
+
+    it("shows config state with input and generate button on open", () => {
+        global.fetch = jest.fn()
+        setup(true)
+        expect(screen.getByLabelText(/可注册人数/)).toBeInTheDocument()
+        expect(screen.getByRole("button", { name: "生成链接" })).toBeInTheDocument()
+        expect(global.fetch).not.toHaveBeenCalled()
+    })
+
+    it("does not fetch when dialog is closed", () => {
+        global.fetch = jest.fn()
+        setup(false)
+        expect(global.fetch).not.toHaveBeenCalled()
+    })
+
+    // ── Generate flow ───────────────────────────────────────────────────────────
+
+    it("fetches and shows link when generate button is clicked", async () => {
         global.fetch = jest.fn().mockResolvedValueOnce({
             ok: true,
             json: async () => ({ link: "https://example.com/invite/abc" }),
         } as Response)
 
-        setup(true)
+        await openAndGenerate()
 
-        await waitFor(() => {
-            expect(global.fetch).toHaveBeenCalledWith(
-                "/api/distributor/invite",
-                expect.objectContaining({ method: "POST" })
-            )
-        })
         await waitFor(() => {
             expect(screen.getByDisplayValue("https://example.com/invite/abc")).toBeInTheDocument()
         })
+        expect(global.fetch).toHaveBeenCalledWith(
+            "/api/distributor/invite",
+            expect.objectContaining({
+                method: "POST",
+                body: expect.stringContaining('"maxUses":1'),
+            })
+        )
+    })
+
+    it("sends the correct maxUses value in request body", async () => {
+        global.fetch = jest.fn().mockResolvedValueOnce({
+            ok: true,
+            json: async () => ({ link: "https://example.com/invite/abc" }),
+        } as Response)
+
+        await openAndGenerate(20)
+
+        await waitFor(() => expect(global.fetch).toHaveBeenCalled())
+        const body = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body)
+        expect(body.maxUses).toBe(20)
     })
 
     it("shows loading spinner while generating", async () => {
@@ -45,6 +86,7 @@ describe("GenerateInviteLinkDialog", () => {
         )
 
         setup(true)
+        fireEvent.click(screen.getByRole("button", { name: "生成链接" }))
 
         expect(screen.getByText("生成中...")).toBeInTheDocument()
 
@@ -56,17 +98,20 @@ describe("GenerateInviteLinkDialog", () => {
         })
     })
 
-    it("shows error toast when API returns error", async () => {
+    // ── Error handling ──────────────────────────────────────────────────────────
+
+    it("shows error toast and returns to config when API returns error", async () => {
         global.fetch = jest.fn().mockResolvedValueOnce({
             ok: false,
             json: async () => ({ error: "生成失败" }),
         } as Response)
 
-        setup(true)
+        await openAndGenerate()
 
         await waitFor(() => {
             expect(toast.error).toHaveBeenCalledWith("生成失败")
         })
+        expect(screen.getByRole("button", { name: "生成链接" })).toBeInTheDocument()
     })
 
     it("shows fallback error toast when API error has no message", async () => {
@@ -75,7 +120,7 @@ describe("GenerateInviteLinkDialog", () => {
             json: async () => ({}),
         } as Response)
 
-        setup(true)
+        await openAndGenerate()
 
         await waitFor(() => {
             expect(toast.error).toHaveBeenCalledWith("生成失败，请稍后重试")
@@ -85,57 +130,39 @@ describe("GenerateInviteLinkDialog", () => {
     it("shows error toast when fetch throws", async () => {
         global.fetch = jest.fn().mockRejectedValueOnce(new Error("network"))
 
-        setup(true)
+        await openAndGenerate()
 
         await waitFor(() => {
             expect(toast.error).toHaveBeenCalledWith("生成失败，请稍后重试")
         })
     })
 
-    it("does not show error toast when request is aborted", async () => {
-        global.fetch = jest.fn().mockRejectedValueOnce(new DOMException("Aborted", "AbortError"))
+    // ── Reset on reopen ─────────────────────────────────────────────────────────
 
-        setup(true)
-
-        await waitFor(() => expect(global.fetch).toHaveBeenCalled())
-        await new Promise((r) => setTimeout(r, 50))
-        expect(toast.error).not.toHaveBeenCalled()
-    })
-
-    it("does not generate when dialog is closed", () => {
-        global.fetch = jest.fn()
-        setup(false)
-        expect(global.fetch).not.toHaveBeenCalled()
-    })
-
-    it("generates a fresh link each time dialog reopens", async () => {
-        global.fetch = jest.fn()
-            .mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({ link: "https://example.com/invite/first" }),
-            } as Response)
-            .mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({ link: "https://example.com/invite/second" }),
-            } as Response)
+    it("resets to config state when dialog closes and reopens", async () => {
+        global.fetch = jest.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({ link: "https://example.com/invite/abc" }),
+        } as Response)
 
         const onOpenChange = jest.fn()
         const { rerender } = render(
             <GenerateInviteLinkDialog open={true} onOpenChange={onOpenChange} />
         )
 
+        fireEvent.click(screen.getByRole("button", { name: "生成链接" }))
         await waitFor(() => {
-            expect(screen.getByDisplayValue("https://example.com/invite/first")).toBeInTheDocument()
+            expect(screen.getByDisplayValue("https://example.com/invite/abc")).toBeInTheDocument()
         })
 
         rerender(<GenerateInviteLinkDialog open={false} onOpenChange={onOpenChange} />)
         rerender(<GenerateInviteLinkDialog open={true} onOpenChange={onOpenChange} />)
 
-        await waitFor(() => {
-            expect(screen.getByDisplayValue("https://example.com/invite/second")).toBeInTheDocument()
-        })
-        expect(global.fetch).toHaveBeenCalledTimes(2)
+        expect(screen.getByRole("button", { name: "生成链接" })).toBeInTheDocument()
+        expect(screen.queryByDisplayValue("https://example.com/invite/abc")).not.toBeInTheDocument()
     })
+
+    // ── Copy ────────────────────────────────────────────────────────────────────
 
     it("copies link to clipboard and shows success toast", async () => {
         global.fetch = jest.fn().mockResolvedValueOnce({
@@ -146,14 +173,13 @@ describe("GenerateInviteLinkDialog", () => {
             clipboard: { writeText: jest.fn().mockResolvedValue(undefined) },
         })
 
-        setup(true)
+        await openAndGenerate()
 
         await waitFor(() => {
             expect(screen.getByDisplayValue("https://example.com/invite/abc")).toBeInTheDocument()
         })
 
-        const [copyBtn] = screen.getAllByRole("button")
-        fireEvent.click(copyBtn)
+        fireEvent.click(screen.getByRole("button", { name: "复制链接" }))
         await waitFor(() => {
             expect(navigator.clipboard.writeText).toHaveBeenCalledWith("https://example.com/invite/abc")
             expect(toast.success).toHaveBeenCalledWith("链接已复制")
@@ -169,14 +195,13 @@ describe("GenerateInviteLinkDialog", () => {
             clipboard: { writeText: jest.fn().mockRejectedValue(new Error("denied")) },
         })
 
-        setup(true)
+        await openAndGenerate()
 
         await waitFor(() => {
             expect(screen.getByDisplayValue("https://example.com/invite/abc")).toBeInTheDocument()
         })
 
-        const [copyBtn] = screen.getAllByRole("button")
-        fireEvent.click(copyBtn)
+        fireEvent.click(screen.getByRole("button", { name: "复制链接" }))
         await waitFor(() => {
             expect(toast.error).toHaveBeenCalledWith("复制失败，请手动复制")
         })
@@ -191,7 +216,7 @@ describe("GenerateInviteLinkDialog", () => {
             clipboard: { writeText: jest.fn().mockResolvedValue(undefined) },
         })
 
-        setup(true)
+        await openAndGenerate()
 
         await waitFor(() => {
             expect(screen.getByDisplayValue("https://example.com/invite/abc")).toBeInTheDocument()
@@ -200,8 +225,7 @@ describe("GenerateInviteLinkDialog", () => {
         expect(document.querySelector(".lucide-copy")).toBeInTheDocument()
         expect(document.querySelector(".lucide-check")).not.toBeInTheDocument()
 
-        const [copyBtn] = screen.getAllByRole("button")
-        fireEvent.click(copyBtn)
+        fireEvent.click(screen.getByRole("button", { name: "复制链接" }))
         await waitFor(() => {
             expect(document.querySelector(".lucide-check")).toBeInTheDocument()
             expect(document.querySelector(".lucide-copy")).not.toBeInTheDocument()

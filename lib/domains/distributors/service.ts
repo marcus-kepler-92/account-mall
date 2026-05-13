@@ -31,7 +31,6 @@ import {
   CommissionTierNotFoundError,
   TierRangeError,
   InviteTokenNotFoundError,
-  InviteTokenUsedError,
   InviteTokenExpiredError,
   UsernameConflictError,
   EmailAlreadyRegisteredError,
@@ -42,6 +41,7 @@ import {
   CommissionAlreadyPaidOutError,
   UsernameRequiredError,
   InviteTokenConcurrentAcceptError,
+  InviteTokenExhaustedError,
 } from "./types"
 import type { UpdateDistributorInput, CreateTierInput, UpdateTierInput, UpdateWithdrawalInput, AcceptInviteInput } from "./validators"
 
@@ -212,7 +212,7 @@ export async function sendInvite({
   const ttlDays = config.distributorInviteTtlDays
   const expiresAt = new Date(Date.now() + ttlDays * 24 * 60 * 60 * 1000)
   const token = crypto.randomUUID()
-  await repo.createInvitation({ email, token, inviterId, expiresAt })
+  await repo.createInvitation({ email, token, inviterId, expiresAt, maxUses: 1 })
   const acceptUrl = `${config.siteUrl}/distributor/accept-invite?token=${token}`
   if (config.nodeEnv === "development") {
     console.log(`\n[invite] → ${email}\n[invite] ${acceptUrl}\n`)
@@ -237,20 +237,27 @@ export async function sendInvite({
   return { success: true }
 }
 
-export async function createNoEmailInviteLink({ inviterId }: { inviterId: string }): Promise<{ link: string }> {
+export async function createNoEmailInviteLink({
+  inviterId,
+  maxUses,
+}: {
+  inviterId: string
+  maxUses?: number
+}): Promise<{ link: string }> {
+  const max = config.inviteLinkMaxCount
+  const safeMax = Math.max(1, Math.min(max, Math.floor(maxUses ?? config.inviteLinkDefaultCount)))
   const ttlDays = config.distributorInviteTtlDays
   const expiresAt = new Date(Date.now() + ttlDays * 24 * 60 * 60 * 1000)
   const token = crypto.randomUUID()
-  await repo.createInvitation({ email: null, token, inviterId, expiresAt })
-  const link = `${config.siteUrl}/distributor/accept-invite?token=${token}`
-  return { link }
+  await repo.createInvitation({ email: null, token, inviterId, expiresAt, maxUses: safeMax })
+  return { link: `${config.siteUrl}/distributor/accept-invite?token=${token}` }
 }
 
 export async function acceptInvite(token: string, data: AcceptInviteInput & { username?: string }): Promise<void> {
   const invitation = await repo.findInvitationByToken(token)
   if (!invitation) throw new InviteTokenNotFoundError()
-  if (invitation.acceptedAt) throw new InviteTokenUsedError()
   if (invitation.expiresAt < new Date()) throw new InviteTokenExpiredError()
+  if (invitation.usedCount >= invitation.maxUses) throw new InviteTokenExhaustedError()
 
   const isNoEmail = invitation.email === null
 
