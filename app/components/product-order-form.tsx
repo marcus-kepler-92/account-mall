@@ -31,6 +31,7 @@ import { ProductOrderQuantityPicker } from "./product-order-quantity-picker"
 import { ProductOrderTurnstile } from "./product-order-turnstile"
 import { useFingerprint } from "@/hooks/use-fingerprint"
 import { SiAlipay, SiWechat, SiQq } from "react-icons/si"
+import { trackEvent } from "@/lib/analytics"
 
 const PAYMENT_METHOD_CONFIG: Record<PaymentMethod, { label: string; icon: typeof SiAlipay; color: string }> = {
     alipay: { label: "支付宝", icon: SiAlipay, color: "#1677FF" },
@@ -255,6 +256,11 @@ export function ProductOrderForm({
                 if (responseData.paymentUrl && responseData.orderNo) {
                     toast.success("订单已创建，正在跳转至支付页面…")
                     willRedirect = true
+                    trackEvent("payment_initiated", {
+                        productName: productName ?? "",
+                        amount: Number(responseData.amount ?? 0),
+                        paymentMethod: data.paymentMethod,
+                    })
                     window.location.href = responseData.paymentUrl as string
                     return
                 }

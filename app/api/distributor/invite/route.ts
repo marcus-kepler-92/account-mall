@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server"
 import { getDistributorSession } from "@/lib/auth-guard"
 import { badRequest, unauthorized, validationError } from "@/lib/api-response"
 import { distributorInviteSchema, sendInvite, createNoEmailInviteLink } from "@/lib/domains/distributors"
-import { checkDistributorInviteRateLimit } from "@/lib/rate-limit"
 
 export async function POST(request: NextRequest) {
   const session = await getDistributorSession()
@@ -12,9 +11,6 @@ export async function POST(request: NextRequest) {
   if (user.disabledAt) {
     return unauthorized("账号已停用，无法发送邀请")
   }
-
-  const rateLimitRes = await checkDistributorInviteRateLimit(user.id)
-  if (rateLimitRes) return rateLimitRes
 
   let body: unknown
   try {

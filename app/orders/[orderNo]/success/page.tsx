@@ -13,6 +13,7 @@ import {
 import { Mail, Hash, AlertCircle } from "lucide-react";
 import { SiteHeader } from "@/app/components/site-header";
 import { OrderSuccessSyncHistory } from "./order-success-sync-history";
+import { OrderCompletedTracker } from "./order-completed-tracker";
 import { resolveCardFields } from "@/lib/card-format";
 import { OrderCardDisplay } from "@/app/components/order-detail/card-display";
 import { OrderAutoFetchSection } from "@/app/components/order-detail/auto-fetch-section";
@@ -180,6 +181,13 @@ export default async function OrderSuccessPage({
   return (
     <div className="flex min-h-screen flex-col">
       <OrderSuccessSyncHistory orderNo={orderNo} />
+      <OrderCompletedTracker
+        orderId={order.id}
+        orderNo={orderNo}
+        productName={productName}
+        amount={Number(order.amount)}
+        isFree={Number(order.amount) === 0}
+      />
       <SiteHeader />
       <main className="flex-1 py-8">
         <div className="mx-auto max-w-2xl space-y-4 px-4 pb-8">
