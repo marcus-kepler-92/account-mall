@@ -221,10 +221,10 @@ export function ProductOrderForm({
                 fingerprintHash: data.fingerprintHash,
                 ...(turnstileToken && { turnstileToken }),
             }
-            if (codeTrimmed && isValidDiscountCodeFormat(codeTrimmed)) {
-                payload.promoCode = codeTrimmed
-            } else if (activeCrossSellDiscount != null && crossSellToken) {
+            if (activeCrossSellDiscount != null && crossSellToken) {
                 payload.crossSellToken = crossSellToken
+            } else if (codeTrimmed && isValidDiscountCodeFormat(codeTrimmed)) {
+                payload.promoCode = codeTrimmed
             } else if (exitDiscountToken && activeExitDiscount != null) {
                 payload.exitDiscountToken = exitDiscountToken
             }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { PrismaClient } from "@prisma/client"
+import type { PrismaClient } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { publicOrderLookupSchema } from "@/lib/validations/order"
 import type { z } from "zod"

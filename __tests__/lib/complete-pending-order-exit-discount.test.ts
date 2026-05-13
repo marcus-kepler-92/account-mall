@@ -43,7 +43,7 @@ describe("completePendingOrder -- ExitDiscountUsage write", () => {
   beforeEach(() => {
     prismaMock.order.findFirst.mockReset();
     prismaMock.$transaction.mockReset();
-    prismaMock.exitDiscountUsage.create.mockReset();
+    prismaMock.exitDiscountUsage.upsert.mockReset();
     prismaMock.order.updateMany.mockResolvedValue({ count: 1 });
     prismaMock.$transaction.mockImplementation(
       (async (fn: (tx: any) => Promise<void>) => {
@@ -52,29 +52,31 @@ describe("completePendingOrder -- ExitDiscountUsage write", () => {
     );
   });
 
-  it("calls exitDiscountUsage.create with correct data when exitDiscountMeta is present on PENDING order", async () => {
+  it("calls exitDiscountUsage.upsert with correct data when exitDiscountMeta is present on PENDING order", async () => {
     prismaMock.order.findFirst.mockResolvedValue(
       makePendingOrderWithMeta(validMeta),
     );
-    prismaMock.exitDiscountUsage.create.mockResolvedValue({} as any);
+    prismaMock.exitDiscountUsage.upsert.mockResolvedValue({} as any);
 
     await completePendingOrder("order-1");
 
     // Fire-and-forget: wait for the promise to settle
     await new Promise((r) => setTimeout(r, 10));
 
-    expect(prismaMock.exitDiscountUsage.create).toHaveBeenCalledWith({
-      data: {
+    expect(prismaMock.exitDiscountUsage.upsert).toHaveBeenCalledWith({
+      where: { orderId: "ord_1" },
+      create: {
         productId: "prod_1",
         orderId: "ord_1",
         visitorId: "visitor-abc",
         fingerprintHash: "fp-xyz",
         ip: "127.0.0.1",
       },
+      update: {},
     });
   });
 
-  it("does not call exitDiscountUsage.create when exitDiscountMeta is null", async () => {
+  it("does not call exitDiscountUsage.upsert when exitDiscountMeta is null", async () => {
     prismaMock.order.findFirst.mockResolvedValue(
       makePendingOrderWithMeta(null),
     );
@@ -82,14 +84,14 @@ describe("completePendingOrder -- ExitDiscountUsage write", () => {
     await completePendingOrder("order-1");
     await new Promise((r) => setTimeout(r, 10));
 
-    expect(prismaMock.exitDiscountUsage.create).not.toHaveBeenCalled();
+    expect(prismaMock.exitDiscountUsage.upsert).not.toHaveBeenCalled();
   });
 
-  it("does not block order completion when exitDiscountUsage.create throws", async () => {
+  it("does not block order completion when exitDiscountUsage.upsert throws", async () => {
     prismaMock.order.findFirst.mockResolvedValue(
       makePendingOrderWithMeta(validMeta),
     );
-    prismaMock.exitDiscountUsage.create.mockRejectedValue(
+    prismaMock.exitDiscountUsage.upsert.mockRejectedValue(
       new Error("DB write failed"),
     );
 
@@ -98,10 +100,9 @@ describe("completePendingOrder -- ExitDiscountUsage write", () => {
     await new Promise((r) => setTimeout(r, 10));
 
     expect(result).toEqual({ done: true, orderNo: "order-1" });
-    // console.error should have been called (but it's suppressed globally in jest.setup.ts)
   });
 
-  it("does not call exitDiscountUsage.create when order is already COMPLETED (idempotent path)", async () => {
+  it("does not call exitDiscountUsage.upsert when order is already COMPLETED (idempotent path)", async () => {
     prismaMock.order.findFirst.mockResolvedValue({
       ...makePendingOrderWithMeta(validMeta),
       status: "COMPLETED",
@@ -112,6 +113,50 @@ describe("completePendingOrder -- ExitDiscountUsage write", () => {
 
     // COMPLETED path returns early, no transaction runs, no usage record
     expect(prismaMock.$transaction).not.toHaveBeenCalled();
-    expect(prismaMock.exitDiscountUsage.create).not.toHaveBeenCalled();
+    expect(prismaMock.exitDiscountUsage.upsert).not.toHaveBeenCalled();
+  });
+
+  it("calling completePendingOrder twice on same order does not throw (upsert is idempotent)", async () => {
+    // First call: transaction succeeds, upsert succeeds
+    prismaMock.order.findFirst.mockResolvedValue(
+      makePendingOrderWithMeta(validMeta),
+    );
+    prismaMock.exitDiscountUsage.upsert.mockResolvedValue({} as any);
+
+    await completePendingOrder("order-1");
+    await new Promise((r) => setTimeout(r, 10));
+
+    // Second call: order is now COMPLETED, early return — no upsert
+    prismaMock.order.findFirst.mockResolvedValue({
+      ...makePendingOrderWithMeta(validMeta),
+      status: "COMPLETED",
+    });
+
+    const result = await completePendingOrder("order-1");
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(result).toEqual({ done: true, orderNo: "order-1" });
+    // upsert called exactly once (first call only)
+    expect(prismaMock.exitDiscountUsage.upsert).toHaveBeenCalledTimes(1);
+  });
+
+  it("upsert called concurrently on same order does not throw (P2002 safe)", async () => {
+    prismaMock.order.findFirst.mockResolvedValue(
+      makePendingOrderWithMeta(validMeta),
+    );
+    // Simulate the second concurrent call hitting a unique constraint
+    prismaMock.exitDiscountUsage.upsert
+      .mockResolvedValueOnce({} as any)
+      .mockRejectedValueOnce(Object.assign(new Error("Unique constraint"), { code: "P2002" }));
+
+    // Both calls complete without throwing
+    const [r1, r2] = await Promise.all([
+      completePendingOrder("order-1"),
+      completePendingOrder("order-1"),
+    ]);
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(r1).toEqual({ done: true, orderNo: "order-1" });
+    expect(r2).toEqual({ done: true, orderNo: "order-1" });
   });
 });

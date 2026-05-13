@@ -107,14 +107,16 @@ async function writeExitDiscountUsage(
       fingerprintHash: string;
       ip: string;
     };
-    await prisma.exitDiscountUsage.create({
-      data: {
+    await prisma.exitDiscountUsage.upsert({
+      where: { orderId },
+      create: {
         productId: meta.productId,
         orderId,
         visitorId: meta.visitorId,
         fingerprintHash: meta.fingerprintHash,
         ip: meta.ip,
       },
+      update: {},
     });
   } catch (err) {
     console.error("[exit-discount-usage] Failed to write usage record:", err);

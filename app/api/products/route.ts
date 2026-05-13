@@ -68,45 +68,49 @@ export async function GET(request: NextRequest) {
                 ? [{ createdAt: "desc" as const }]
                 : [{ sortOrder: "asc" as const }]
 
-    const [products, total] = await Promise.all([
+    const [products, total, stockCounts] = await Promise.all([
         prisma.product.findMany({
             where,
-            include: {
-                tags: {
-                    select: { id: true, name: true, slug: true },
-                },
-                _count: {
-                    select: { cards: true },
-                },
+            select: {
+                id: true,
+                name: true,
+                slug: true,
+                description: true,
+                summary: true,
+                image: true,
+                price: true,
+                productType: true,
+                status: true,
+                sortOrder: true,
+                sourceUrl: true,
+                tags: { select: { id: true, name: true, slug: true } },
             },
             orderBy,
             skip: (page - 1) * pageSize,
             take: pageSize,
         }),
         prisma.product.count({ where }),
+        prisma.card.groupBy({
+            by: ["productId"],
+            where: { status: "UNSOLD" },
+            _count: { id: true },
+        }),
     ]);
 
-    // Also get unsold card counts for stock display (AUTO_FETCH 无预存卡密，stock 仅用于展示，前端按 productType 判断可领取)
-    const productsWithStock = await Promise.all(
-        products.map(async (product) => {
-            const unsoldCount = await prisma.card.count({
-                where: {
-                    productId: product.id,
-                    status: "UNSOLD",
-                },
-            });
-            const isAutoFetch = product.productType === "AUTO_FETCH";
-            return {
-                ...product,
-                price: Number(product.price),
-                stock: unsoldCount,
-                productType: product.productType ?? "NORMAL",
-                sourceUrl: product.sourceUrl ?? null,
-                // AUTO_FETCH 在列表里按「有货」展示，不依赖库存数
-                ...(isAutoFetch && { stock: 1 }),
-            };
-        })
-    );
+    const stockMap = new Map(stockCounts.map((s) => [s.productId, s._count.id]));
+
+    const productsWithStock = products.map((product) => {
+        const { sourceUrl, ...productRest } = product;
+        const isAutoFetch = product.productType === "AUTO_FETCH";
+        return {
+            ...productRest,
+            price: Number(product.price),
+            productType: product.productType ?? "NORMAL",
+            // AUTO_FETCH 在列表里按「有货」展示，不依赖库存数
+            stock: isAutoFetch ? 1 : (stockMap.get(product.id) ?? 0),
+            ...(isAdmin && { sourceUrl: sourceUrl ?? null }),
+        };
+    });
 
     return NextResponse.json({
         data: productsWithStock,

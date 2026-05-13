@@ -34,6 +34,8 @@ describe("GET /api/products", () => {
 
     beforeEach(() => {
         adminSessionMock.mockReset()
+        // groupBy is called in every GET request; default to empty (no stock data)
+        prismaMock.card.groupBy.mockResolvedValue([] as any)
     })
 
     it("returns only ACTIVE products for public request (no admin param)", async () => {
@@ -45,12 +47,13 @@ describe("GET /api/products", () => {
                 status: "ACTIVE",
                 price: new Prisma.Decimal("100"),
                 tags: [],
-                _count: { cards: 5 },
             },
         ]
         prismaMock.product.findMany.mockResolvedValueOnce(products as any)
         prismaMock.product.count.mockResolvedValueOnce(1)
-        prismaMock.card.count.mockResolvedValueOnce(3)
+        prismaMock.card.groupBy.mockResolvedValueOnce([
+            { productId: "p1", _count: { id: 3 } },
+        ] as any)
 
         const res = await GET(createUrlRequest("http://localhost/api/products"))
         const data = await res.json()
