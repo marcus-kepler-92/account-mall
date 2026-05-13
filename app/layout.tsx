@@ -54,6 +54,9 @@ export const metadata: Metadata = {
     title: siteTitle,
     description: siteDescription,
   },
+  other: {
+    "impact-site-verification": "49105e07-921c-4d39-9af0-71cfacab416d",
+  },
 };
 
 export default function RootLayout({
