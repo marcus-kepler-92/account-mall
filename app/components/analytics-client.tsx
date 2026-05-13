@@ -1,12 +1,16 @@
 "use client"
 
-import dynamic from "next/dynamic"
-
-const Analytics = dynamic(
-  () => import("@vercel/analytics/next").then((m) => m.Analytics),
-  { ssr: false }
-)
+import { Analytics, type BeforeSendEvent } from "@vercel/analytics/next"
 
 export function AnalyticsClient() {
-  return <Analytics />
+  return (
+    <Analytics
+      beforeSend={(event: BeforeSendEvent) => {
+        if (event.url.includes("/admin") || event.url.includes("/distributor")) {
+          return null
+        }
+        return event
+      }}
+    />
+  )
 }
