@@ -121,15 +121,22 @@ export function DistributorMandatoryAnnouncements() {
                             <span className="text-xs text-muted-foreground">
                                 {safeIndex + 1} / {total}
                             </span>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                disabled={safeIndex === total - 1}
-                                onClick={() => setCurrentIndex((i) => i + 1)}
-                                aria-label="下一条公告"
-                            >
-                                <ChevronRight className="size-4" />
-                            </Button>
+                            <div className="flex items-center gap-1">
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    disabled={safeIndex === total - 1}
+                                    onClick={() => setCurrentIndex((i) => i + 1)}
+                                    aria-label="下一条公告"
+                                >
+                                    <ChevronRight className="size-4" />
+                                </Button>
+                                {safeIndex === total - 1 && (
+                                    <Button size="sm" onClick={handleClose}>
+                                        我已阅读
+                                    </Button>
+                                )}
+                            </div>
                         </>
                     ) : (
                         <div className="flex-1 flex justify-end">
