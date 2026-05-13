@@ -35,6 +35,7 @@ const row: DistributorRow = {
         { id: "u4", name: "Dave", distributorCode: null },
     ],
     inviter: { id: "u2", name: "Bob", distributorCode: "D002" },
+    milestoneSummary: null,
 }
 
 const tiers = [
@@ -99,5 +100,52 @@ describe("DistributorDetailSheet", () => {
     it("renders nothing when row is null", () => {
         const { container } = render(<DistributorDetailSheet row={null} open={true} onOpenChange={jest.fn()} onSuccess={jest.fn()} tiers={tiers} />)
         expect(container).toBeEmptyDOMElement()
+    })
+})
+
+describe("DistributorDetailSheet — 邀请里程碑", () => {
+    it("hides milestone section when milestoneSummary is null", () => {
+        render(<DistributorDetailSheet row={row} open={true} onOpenChange={jest.fn()} onSuccess={jest.fn()} tiers={tiers} />)
+        expect(screen.queryByText("邀请里程碑")).not.toBeInTheDocument()
+    })
+
+    it("shows triggered count and next milestone target", () => {
+        const r = {
+            ...row,
+            milestoneSummary: {
+                triggeredCount: 1,
+                nextMilestone: { thresholdAmount: 5000, thresholdCount: 3, bonusAmount: 200 },
+            },
+        }
+        render(<DistributorDetailSheet row={r} open={true} onOpenChange={jest.fn()} onSuccess={jest.fn()} tiers={tiers} />)
+        expect(screen.getByText("邀请里程碑")).toBeInTheDocument()
+        expect(screen.getByText("1 个")).toBeInTheDocument()
+        expect(screen.getByText(/3 人各满 ¥5000/)).toBeInTheDocument()
+        expect(screen.getByText("¥200")).toBeInTheDocument()
+    })
+
+    it("shows '已完成所有里程碑' when nextMilestone is null", () => {
+        const r = {
+            ...row,
+            milestoneSummary: { triggeredCount: 3, nextMilestone: null },
+        }
+        render(<DistributorDetailSheet row={r} open={true} onOpenChange={jest.fn()} onSuccess={jest.fn()} tiers={tiers} />)
+        expect(screen.getByText("邀请里程碑")).toBeInTheDocument()
+        expect(screen.getByText("3 个")).toBeInTheDocument()
+        expect(screen.getByText("已完成所有里程碑")).toBeInTheDocument()
+        expect(screen.queryByText(/各满/)).not.toBeInTheDocument()
+    })
+
+    it("shows triggered count 0 with next milestone when not started", () => {
+        const r = {
+            ...row,
+            milestoneSummary: {
+                triggeredCount: 0,
+                nextMilestone: { thresholdAmount: 1000, thresholdCount: 2, bonusAmount: 100 },
+            },
+        }
+        render(<DistributorDetailSheet row={r} open={true} onOpenChange={jest.fn()} onSuccess={jest.fn()} tiers={tiers} />)
+        expect(screen.getByText("0 个")).toBeInTheDocument()
+        expect(screen.getByText(/2 人各满 ¥1000/)).toBeInTheDocument()
     })
 })

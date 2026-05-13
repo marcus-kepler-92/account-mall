@@ -309,6 +309,37 @@ export function DistributorDetailSheet({
                             </div>
                         </div>
 
+                        {row.milestoneSummary && (
+                            <>
+                                <Separator />
+                                <div>
+                                    <h4 className="text-sm font-medium mb-3">邀请里程碑</h4>
+                                    <div className="space-y-2 text-sm">
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">已触发</span>
+                                            <span>{row.milestoneSummary.triggeredCount} 个</span>
+                                        </div>
+                                        {row.milestoneSummary.nextMilestone ? (
+                                            <>
+                                                <div className="flex justify-between">
+                                                    <span className="text-muted-foreground">下一档目标</span>
+                                                    <span>
+                                                        {row.milestoneSummary.nextMilestone.thresholdCount} 人各满 ¥{row.milestoneSummary.nextMilestone.thresholdAmount.toFixed(0)}
+                                                    </span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-muted-foreground">达标奖励</span>
+                                                    <span className="font-medium tabular-nums">¥{row.milestoneSummary.nextMilestone.bonusAmount.toFixed(0)}</span>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <p className="text-xs text-muted-foreground">已完成所有里程碑</p>
+                                        )}
+                                    </div>
+                                </div>
+                            </>
+                        )}
+
                         <Separator />
 
                         {/* 优惠码 */}

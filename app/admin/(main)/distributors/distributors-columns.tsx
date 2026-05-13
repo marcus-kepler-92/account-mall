@@ -36,6 +36,10 @@ export type DistributorRow = {
     inviteeCount: number
     invitees: { id: string; name: string; distributorCode: string | null }[]
     inviter: { id: string; name: string; distributorCode: string | null } | null
+    milestoneSummary: {
+        triggeredCount: number
+        nextMilestone: { thresholdAmount: number; thresholdCount: number; bonusAmount: number } | null
+    } | null
 }
 
 export function DistributorIdentityCell({ row }: { row: DistributorRow }) {

@@ -29,6 +29,7 @@ const baseRow: DistributorRow = {
   inviteeCount: 2,
   invitees: [{ id: "3", name: "Carol", distributorCode: "D003" }],
   inviter: { id: "2", name: "Bob", distributorCode: "D002" },
+  milestoneSummary: null,
 }
 
 describe("DistributorIdentityCell", () => {
@@ -131,6 +132,7 @@ describe("DistributorRow type includes salesTotal", () => {
       inviteeCount: 2,
       invitees: [],
       inviter: null,
+      milestoneSummary: null,
     }
     expect(row.salesTotal).toBe(500)
   })

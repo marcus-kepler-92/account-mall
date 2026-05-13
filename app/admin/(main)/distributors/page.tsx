@@ -150,6 +150,23 @@ export default async function AdminDistributorsPage({
     }
 
     const ids = distributors.map((d) => d.id)
+    const [milestones, triggeredBonuses] = await Promise.all([
+        prisma.invitationMilestone.findMany({ orderBy: { thresholdAmount: "asc" } }),
+        ids.length > 0
+            ? prisma.invitationMilestoneBonus.findMany({
+                  where: { inviterId: { in: ids } },
+                  select: { inviterId: true, milestoneId: true },
+              })
+            : [],
+    ])
+
+    const triggeredByDistributor = new Map<string, Set<string>>()
+    for (const b of triggeredBonuses) {
+        const set = triggeredByDistributor.get(b.inviterId) ?? new Set<string>()
+        set.add(b.milestoneId)
+        triggeredByDistributor.set(b.inviterId, set)
+    }
+
     const [
         orderCounts,
         weeklyOrders,
@@ -302,6 +319,22 @@ export default async function AdminDistributorsPage({
                       name: d.inviter.name,
                       distributorCode: d.inviter.distributorCode,
                   }
+                : null,
+            milestoneSummary: milestones.length > 0
+                ? (() => {
+                      const triggered = triggeredByDistributor.get(d.id) ?? new Set<string>()
+                      const next = milestones.find((m) => !triggered.has(m.id)) ?? null
+                      return {
+                          triggeredCount: triggered.size,
+                          nextMilestone: next
+                              ? {
+                                    thresholdAmount: Number(next.thresholdAmount),
+                                    thresholdCount: next.thresholdCount,
+                                    bonusAmount: Number(next.bonusAmount),
+                                }
+                              : null,
+                      }
+                  })()
                 : null,
         }
     })
