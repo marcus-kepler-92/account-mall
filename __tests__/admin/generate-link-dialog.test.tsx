@@ -22,7 +22,9 @@ async function openAndGenerate(maxUses?: number) {
         const input = screen.getByLabelText(/可注册人数/)
         fireEvent.change(input, { target: { value: String(maxUses) } })
     }
-    fireEvent.click(screen.getByRole("button", { name: "生成链接" }))
+    await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "生成链接" }))
+    })
 }
 
 describe("GenerateLinkDialog (admin)", () => {
@@ -83,7 +85,9 @@ describe("GenerateLinkDialog (admin)", () => {
         global.fetch = jest.fn().mockReturnValueOnce(new Promise((r) => { resolve = r }))
 
         setup(true)
-        fireEvent.click(screen.getByRole("button", { name: "生成链接" }))
+        await act(async () => {
+            fireEvent.click(screen.getByRole("button", { name: "生成链接" }))
+        })
 
         expect(screen.getByText("生成中...")).toBeInTheDocument()
 
