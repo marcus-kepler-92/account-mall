@@ -55,7 +55,7 @@ export const metadata: Metadata = {
     description: siteDescription,
   },
   other: {
-    "impact-site-verification": "49105e07-921c-4d39-9af0-71cfacab416d",
+    "impact-site-verification": "54ebfbbe-aa0f-48e0-b628-c96303509e9f",
   },
 };
 
