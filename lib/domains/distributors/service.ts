@@ -37,7 +37,6 @@ import {
   EmailAlreadyRegisteredError,
   InviterCodeInvalidError,
   SelfInviterError,
-  CommissionWithdrawnError,
   PendingWithdrawalBlocksReassignError,
   CommissionAlreadyPaidOutError,
   UsernameRequiredError,
@@ -652,9 +651,6 @@ export async function reassignOrderDistributor(
     if (!user || user.role !== "DISTRIBUTOR") throw new Error("INVALID_DISTRIBUTOR")
   }
 
-  const withdrawnCount = await repo.countWithdrawnCommissions(orderId)
-  if (withdrawnCount > 0) throw new CommissionWithdrawnError()
-
   const existingCommissions = await repo.findOrderCommissions(orderId, ["SETTLED", "PENDING"])
 
   if (existingCommissions.length > 0) {
@@ -695,31 +691,33 @@ export async function reassignOrderDistributor(
 
 export async function getDistributorReport(startUTC: Date, endUTC: Date) {
   const [
-    pendingAmount,
+    unpaidBalance,
     distributorCount,
     settledAmount,
+    periodBonus,
     ordersByDistributor,
     newDistributors,
   ] = await Promise.all([
-    repo.aggregateCommissionsByStatusAndPeriod("PENDING", startUTC, endUTC),
+    repo.computeGlobalUnpaidBalance(),
     repo.countTotalDistributors(),
-    repo.aggregateCommissionsByStatusAndPeriod("SETTLED", startUTC, endUTC),
+    repo.aggregateCommissionsByStatusAndPeriod(["SETTLED", "WITHDRAWN"], startUTC, endUTC),
+    repo.aggregateMilestoneBonusByPeriod(startUTC, endUTC),
     repo.groupOrdersByDistributor(startUTC, endUTC),
     repo.findNewDistributors(startUTC, endUTC),
   ])
 
   const distributorIds = ordersByDistributor.map((r) => r.distributorId as string)
-  const [distributors, pendingCommissions] =
+  const [distributors, periodCommissions] =
     distributorIds.length > 0
       ? await Promise.all([
           repo.findDistributorsByIds(distributorIds),
-          repo.groupPendingCommissionsByDistributor(distributorIds),
+          repo.groupCommissionsByDistributorAndPeriod(distributorIds, startUTC, endUTC),
         ])
       : [[], []]
 
   const nameMap = new Map(distributors.map((d) => [d.id, { name: d.name, email: d.email }]))
-  const pendingMap = new Map(
-    (pendingCommissions as { distributorId: string; _sum: { amount: unknown } }[]).map((c) => [
+  const commissionMap = new Map(
+    (periodCommissions as { distributorId: string; _sum: { amount: unknown } }[]).map((c) => [
       c.distributorId,
       toNumber(c._sum.amount),
     ]),
@@ -734,15 +732,15 @@ export async function getDistributorReport(startUTC: Date, endUTC: Date) {
         email: info?.email ?? "",
         revenue: toNumber(r._sum.amount),
         orderCount: r._count.id,
-        pendingCommission: pendingMap.get(r.distributorId as string) ?? 0,
+        periodCommission: commissionMap.get(r.distributorId as string) ?? 0,
       }
     })
     .sort((a, b) => b.revenue - a.revenue)
 
   return {
     summary: {
-      pendingCommissionAmount: pendingAmount,
-      settledCommission: settledAmount,
+      unpaidBalance,
+      settledCommission: Math.round((settledAmount + periodBonus) * 100) / 100,
       distributorCount,
       newDistributorCount: newDistributors.length,
     },

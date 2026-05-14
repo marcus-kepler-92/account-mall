@@ -37,6 +37,7 @@ export type SalesReportResponse = {
         orderCount: number
         totalQuantity: number
         revenue: number
+        milestoneBonus: number
         profit: number
     }
     products: SalesReportProduct[]
@@ -65,21 +66,29 @@ export async function GET(request: Request): Promise<NextResponse> {
 
     const { startUTC, endUTC } = parseHKTRange(fy, fm, fd, ty, tm, td)
 
-    const orders = await prisma.order.findMany({
-        where: { status: "COMPLETED", paidAt: { gte: startUTC, lt: endUTC } },
-        select: {
-            id: true,
-            productId: true,
-            productNameSnapshot: true,
-            quantity: true,
-            amount: true,
-            product: { select: { name: true } },
-        },
-    })
+    const [orders, milestoneBonusRow] = await Promise.all([
+        prisma.order.findMany({
+            where: { status: "COMPLETED", paidAt: { gte: startUTC, lt: endUTC } },
+            select: {
+                id: true,
+                productId: true,
+                productNameSnapshot: true,
+                quantity: true,
+                amount: true,
+                product: { select: { name: true } },
+            },
+        }),
+        prisma.invitationMilestoneBonus.aggregate({
+            where: { createdAt: { gte: startUTC, lt: endUTC } },
+            _sum: { amount: true },
+        }),
+    ])
+
+    const milestoneBonus = Number(milestoneBonusRow._sum.amount ?? 0)
 
     if (orders.length === 0) {
         return NextResponse.json<SalesReportResponse>({
-            summary: { orderCount: 0, totalQuantity: 0, revenue: 0, profit: 0 },
+            summary: { orderCount: 0, totalQuantity: 0, revenue: 0, milestoneBonus, profit: 0 },
             products: [],
         })
     }
@@ -87,7 +96,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     const orderIds = orders.map((o) => o.id)
     const commissionRows = await prisma.commission.groupBy({
         by: ["orderId"],
-        where: { orderId: { in: orderIds }, status: "SETTLED" },
+        where: { orderId: { in: orderIds }, status: { not: "CANCELLED" } },
         _sum: { amount: true },
     })
 
@@ -141,7 +150,8 @@ export async function GET(request: Request): Promise<NextResponse> {
             orderCount: orders.length,
             totalQuantity: products.reduce((s, p) => s + p.quantity, 0),
             revenue: totalRevenue,
-            profit: totalRevenue - totalCommission,
+            milestoneBonus,
+            profit: totalRevenue - totalCommission - milestoneBonus,
         },
         products,
     })

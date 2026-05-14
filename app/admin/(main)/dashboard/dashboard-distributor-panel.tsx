@@ -11,21 +11,7 @@ import { formatCurrency } from "@/lib/utils"
 import { TrendingDown, BadgeDollarSign, Users, UserPlus } from "lucide-react"
 import type { DistributorReportResponse } from "@/app/api/admin/distributor-report/route"
 
-const HKT_TZ = "Asia/Hong_Kong"
-
-function todayHKT(): string {
-  return new Date().toLocaleDateString("en-CA", { timeZone: HKT_TZ })
-}
-
-function offsetDaysHKT(days: number): string {
-  const d = new Date()
-  d.setTime(d.getTime() + days * 24 * 60 * 60 * 1000)
-  return d.toLocaleDateString("en-CA", { timeZone: HKT_TZ })
-}
-
-function firstDayOfMonthHKT(): string {
-  return todayHKT().slice(0, 8) + "01"
-}
+import { todayHKT, offsetDaysHKT, firstDayOfMonthHKT } from "./dashboard-hkt"
 
 async function fetchDistributorReport(from: string, to: string): Promise<DistributorReportResponse> {
   const res = await fetch(`/api/admin/distributor-report?from=${from}&to=${to}`)
@@ -118,17 +104,17 @@ export function DashboardDistributorPanel() {
                 <Link href="/admin/distributors" className="block h-full">
                   <div className="h-full cursor-pointer rounded-lg border bg-card p-3 transition-colors hover:bg-accent/50">
                     <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <TrendingDown className="size-3" /> 待结算佣金
+                      <TrendingDown className="size-3" /> 待支付佣金
                     </p>
                     <p className="mt-1 text-lg font-bold text-amber-600">
-                      {formatCurrency(summary?.pendingCommissionAmount ?? 0)}
+                      {formatCurrency(summary?.unpaidBalance ?? 0)}
                     </p>
                   </div>
                 </Link>
                 <Link href="/admin/distributors" className="block h-full">
                   <div className="h-full cursor-pointer rounded-lg border bg-card p-3 transition-colors hover:bg-accent/50">
                     <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <BadgeDollarSign className="size-3" /> 已结佣金
+                      <BadgeDollarSign className="size-3" /> 期间已结佣金
                     </p>
                     <p className="mt-1 text-lg font-bold">
                       {formatCurrency(summary?.settledCommission ?? 0)}
@@ -138,7 +124,7 @@ export function DashboardDistributorPanel() {
                 <Link href="/admin/distributors" className="block h-full">
                   <div className="h-full cursor-pointer rounded-lg border bg-card p-3 transition-colors hover:bg-accent/50">
                     <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <Users className="size-3" /> 分销员
+                      <Users className="size-3" /> 累计分销员
                     </p>
                     <p className="mt-1 text-lg font-bold">
                       {summary?.distributorCount ?? 0} 人
@@ -165,7 +151,7 @@ export function DashboardDistributorPanel() {
                     <th className="px-3 py-2 text-left font-medium">分销员</th>
                     <th className="px-3 py-2 text-right font-medium">贡献营收</th>
                     <th className="px-3 py-2 text-right font-medium">订单数</th>
-                    <th className="px-3 py-2 text-right font-medium">待结算佣金</th>
+                    <th className="px-3 py-2 text-right font-medium">期间佣金</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -183,7 +169,7 @@ export function DashboardDistributorPanel() {
                       </td>
                       <td className="px-3 py-2 text-right">{d.orderCount}</td>
                       <td className="px-3 py-2 text-right text-amber-600">
-                        {formatCurrency(d.pendingCommission)}
+                        {formatCurrency(d.periodCommission)}
                       </td>
                     </tr>
                   ))}

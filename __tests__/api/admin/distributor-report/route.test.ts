@@ -54,7 +54,7 @@ describe("GET /api/admin/distributor-report", () => {
     ;(getAdminSession as jest.Mock).mockResolvedValue(mockSession)
     ;(distributorsModule.getDistributorReport as jest.Mock).mockResolvedValue({
       summary: {
-        pendingCommissionAmount: 0,
+        unpaidBalance: 0,
         settledCommission: 0,
         distributorCount: 5,
         newDistributorCount: 0,
@@ -74,7 +74,7 @@ describe("GET /api/admin/distributor-report", () => {
     ;(getAdminSession as jest.Mock).mockResolvedValue(mockSession)
     ;(distributorsModule.getDistributorReport as jest.Mock).mockResolvedValue({
       summary: {
-        pendingCommissionAmount: 300,
+        unpaidBalance: 300,
         settledCommission: 150,
         distributorCount: 3,
         newDistributorCount: 0,
@@ -86,7 +86,7 @@ describe("GET /api/admin/distributor-report", () => {
           email: "alice@test.com",
           revenue: 2000,
           orderCount: 10,
-          pendingCommission: 60,
+          periodCommission: 60,
         },
         {
           distributorId: "d2",
@@ -94,7 +94,7 @@ describe("GET /api/admin/distributor-report", () => {
           email: "bob@test.com",
           revenue: 800,
           orderCount: 4,
-          pendingCommission: 0,
+          periodCommission: 0,
         },
       ],
       newDistributors: [],
@@ -104,7 +104,7 @@ describe("GET /api/admin/distributor-report", () => {
     expect(res.status).toBe(200)
     const body = await res.json()
 
-    expect(body.summary.pendingCommissionAmount).toBe(300)
+    expect(body.summary.unpaidBalance).toBe(300)
     expect(body.summary.settledCommission).toBe(150)
     expect(body.summary.distributorCount).toBe(3)
 
@@ -112,10 +112,10 @@ describe("GET /api/admin/distributor-report", () => {
     expect(body.leaderboard[0].distributorId).toBe("d1")
     expect(body.leaderboard[0].revenue).toBe(2000)
     expect(body.leaderboard[0].orderCount).toBe(10)
-    expect(body.leaderboard[0].pendingCommission).toBe(60)
+    expect(body.leaderboard[0].periodCommission).toBe(60)
     expect(body.leaderboard[0].name).toBe("Alice")
     expect(body.leaderboard[1].distributorId).toBe("d2")
-    expect(body.leaderboard[1].pendingCommission).toBe(0)
+    expect(body.leaderboard[1].periodCommission).toBe(0)
     expect(body.leaderboard[1].name).toBeNull()
   })
 })

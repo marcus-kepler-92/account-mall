@@ -1,6 +1,6 @@
 // lib/domains/distributors/repository.ts
 import { prisma } from "@/lib/prisma"
-import type { PrismaClient } from "@prisma/client"
+import type { PrismaClient, CommissionStatus } from "@prisma/client"
 
 type Tx = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">
 
@@ -328,13 +328,16 @@ export async function countTotalDistributors(tx?: Tx) {
 }
 
 export async function aggregateCommissionsByStatusAndPeriod(
-  status: "PENDING" | "SETTLED",
+  status: CommissionStatus | CommissionStatus[],
   startUTC: Date,
   endUTC: Date,
   tx?: Tx,
 ) {
   const r = await (tx ?? prisma).commission.aggregate({
-    where: { status, createdAt: { gte: startUTC, lt: endUTC } },
+    where: {
+      status: Array.isArray(status) ? { in: status } : status,
+      createdAt: { gte: startUTC, lt: endUTC },
+    },
     _sum: { amount: true },
   })
   return Number(r._sum.amount ?? 0)
@@ -374,12 +377,44 @@ export async function findDistributorsByIds(ids: string[], tx?: Tx) {
   })
 }
 
-export async function groupPendingCommissionsByDistributor(ids: string[], tx?: Tx) {
+export async function groupCommissionsByDistributorAndPeriod(
+  ids: string[],
+  startUTC: Date,
+  endUTC: Date,
+  tx?: Tx,
+) {
   return (tx ?? prisma).commission.groupBy({
     by: ["distributorId"],
-    where: { distributorId: { in: ids }, status: "PENDING" },
+    where: {
+      distributorId: { in: ids },
+      status: { not: "CANCELLED" },
+      createdAt: { gte: startUTC, lt: endUTC },
+    },
     _sum: { amount: true },
   })
+}
+
+export async function computeGlobalUnpaidBalance(tx?: Tx) {
+  const [settled, paid, pendingW, bonuses] = await Promise.all([
+    (tx ?? prisma).commission.aggregate({ where: { status: "SETTLED" }, _sum: { amount: true } }),
+    (tx ?? prisma).withdrawal.aggregate({ where: { status: "PAID" }, _sum: { amount: true } }),
+    (tx ?? prisma).withdrawal.aggregate({ where: { status: "PENDING" }, _sum: { amount: true } }),
+    (tx ?? prisma).invitationMilestoneBonus.aggregate({ _sum: { amount: true } }),
+  ])
+  const total =
+    Number(settled._sum.amount ?? 0) +
+    Number(bonuses._sum.amount ?? 0) -
+    Number(paid._sum.amount ?? 0) -
+    Number(pendingW._sum.amount ?? 0)
+  return Math.max(0, Math.round(total * 100) / 100)
+}
+
+export async function aggregateMilestoneBonusByPeriod(startUTC: Date, endUTC: Date, tx?: Tx) {
+  const r = await (tx ?? prisma).invitationMilestoneBonus.aggregate({
+    where: { createdAt: { gte: startUTC, lt: endUTC } },
+    _sum: { amount: true },
+  })
+  return Number(r._sum.amount ?? 0)
 }
 
 export async function findOrderById(orderId: string, tx?: Tx) {

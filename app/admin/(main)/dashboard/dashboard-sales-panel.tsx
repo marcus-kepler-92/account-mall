@@ -9,30 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { formatCurrency } from "@/lib/utils"
 import type { SalesReportResponse } from "@/app/api/admin/sales-report/route"
 
-const HKT_TZ = "Asia/Hong_Kong"
-
-// en-CA locale produces ISO YYYY-MM-DD format
-function todayHKT(): string {
-  return new Date().toLocaleDateString("en-CA", { timeZone: HKT_TZ })
-}
-
-function offsetDaysHKT(days: number): string {
-  const d = new Date()
-  d.setTime(d.getTime() + days * 24 * 60 * 60 * 1000)
-  return d.toLocaleDateString("en-CA", { timeZone: HKT_TZ })
-}
-
-function mondayOfCurrentWeekHKT(): string {
-  const today = todayHKT() // "YYYY-MM-DD" in HKT — timezone-safe via Intl
-  const [y, m, d] = today.split("-").map(Number)
-  const day = new Date(y, m - 1, d).getDay() // day-of-week for a known date is timezone-independent
-  const diff = day === 0 ? -6 : 1 - day
-  return offsetDaysHKT(diff)
-}
-
-function firstDayOfMonthHKT(): string {
-  return todayHKT().slice(0, 8) + "01" // "YYYY-MM-01"
-}
+import { todayHKT, offsetDaysHKT, firstDayOfMonthHKT, mondayOfCurrentWeekHKT } from "./dashboard-hkt"
 
 async function fetchSalesReport(from: string, to: string): Promise<SalesReportResponse> {
   const res = await fetch(`/api/admin/sales-report?from=${from}&to=${to}`)
@@ -191,7 +168,7 @@ export function DashboardSalesPanel() {
                       {formatCurrency(totalCommission)}
                     </td>
                     <td className="px-3 py-2 text-right text-green-600">
-                      {formatCurrency(totalProfit)}
+                      {formatCurrency(summary?.profit ?? 0)}
                     </td>
                   </tr>
                 </tfoot>

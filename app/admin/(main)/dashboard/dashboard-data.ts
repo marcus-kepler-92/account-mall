@@ -5,6 +5,7 @@ import {
   type TopProductRow,
   type InventoryRow,
   type RestockPendingRow,
+  LOW_STOCK_THRESHOLD,
 } from "./types"
 import { getDaysForTrend } from "./dashboard-utils"
 import { ADMIN_DASHBOARD_RECENT_ORDERS_LIMIT, ADMIN_DASHBOARD_TOP_PRODUCTS_LIMIT } from "@/app/admin/constants"
@@ -16,21 +17,22 @@ export async function getDashboardTrend(days: number): Promise<DashboardTrendPoi
   const now = new Date()
   const todayStart = getHKTDayStart(now)
   const start = new Date(todayStart)
-  start.setDate(todayStart.getDate() - days)
+  start.setDate(todayStart.getDate() - (days - 1))
 
-  type AmountGroupRow = { createdAt: Date; _sum: { amount: unknown } }
+  type PaidAtGroupRow = { paidAt: Date | null; _sum: { amount: unknown }; _count: { id: number } }
+  type CommissionGroupRow = { createdAt: Date; _sum: { amount: unknown } }
 
   const dayList = getDaysForTrend(days)
   const [chartRaw, commissionRaw] = await Promise.all([
     prisma.order.groupBy({
-      by: ["createdAt"],
-      where: { createdAt: { gte: start }, status: "COMPLETED" },
+      by: ["paidAt"],
+      where: { paidAt: { gte: start }, status: "COMPLETED" },
       _sum: { amount: true },
       _count: { id: true },
     }),
     (prisma as any).commission.groupBy({
       by: ["createdAt"],
-      where: { createdAt: { gte: start }, status: "SETTLED" },
+      where: { createdAt: { gte: start }, status: { not: "CANCELLED" } },
       _sum: { amount: true },
     }),
   ])
@@ -38,12 +40,14 @@ export async function getDashboardTrend(days: number): Promise<DashboardTrendPoi
   return dayList.map((d) => {
     const next = new Date(d)
     next.setDate(next.getDate() + 1)
-    const inDay = chartRaw.filter((r) => r.createdAt >= d && r.createdAt < next)
+    const inDay = (chartRaw as PaidAtGroupRow[]).filter(
+      (r) => r.paidAt && r.paidAt >= d && r.paidAt < next,
+    )
     const dayRevenue = inDay.reduce((s: number, r) => s + Number(r._sum?.amount ?? 0), 0)
     const dayOrders = inDay.reduce((s: number, r) => s + r._count.id, 0)
     const dayCommission = commissionRaw
-      .filter((r: AmountGroupRow) => r.createdAt >= d && r.createdAt < next)
-      .reduce((s: number, r: AmountGroupRow) => s + Number(r._sum.amount ?? 0), 0)
+      .filter((r: CommissionGroupRow) => r.createdAt >= d && r.createdAt < next)
+      .reduce((s: number, r: CommissionGroupRow) => s + Number(r._sum.amount ?? 0), 0)
     const dayNetIncome = Math.round((dayRevenue - dayCommission) * 100) / 100
     return {
       date: d.toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" }),
@@ -102,7 +106,7 @@ export async function getInventoryByProduct(): Promise<InventoryRow[]> {
     productId: r.productId,
     productName: nameMap.get(r.productId) ?? "",
     unsoldCount: r._count.id,
-    isLowStock: r._count.id < 3,
+    isLowStock: r._count.id < LOW_STOCK_THRESHOLD,
   }))
 }
 

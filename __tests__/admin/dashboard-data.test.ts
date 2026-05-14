@@ -44,10 +44,25 @@ describe("dashboard-data", () => {
       ).toBe(true)
     })
 
+    it("queries all non-CANCELLED commissions for 净收入 calculation", async () => {
+      prismaMock.order.groupBy.mockResolvedValueOnce([])
+      prismaMock.commission.groupBy.mockResolvedValueOnce([])
+
+      await getDashboardTrend(7)
+
+      expect(prismaMock.commission.groupBy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            status: { not: "CANCELLED" },
+          }),
+        }),
+      )
+    })
+
     it("calculates 净收入 as revenue minus commission for each day", async () => {
       const testDay = new Date("2024-02-13T12:00:00.000Z")
       prismaMock.order.groupBy.mockResolvedValueOnce([
-        { createdAt: testDay, _sum: { amount: 100 }, _count: { id: 1 } } as any,
+        { paidAt: testDay, _sum: { amount: 100 }, _count: { id: 1 } } as any,
       ])
       prismaMock.commission.groupBy.mockResolvedValueOnce([
         { createdAt: testDay, _sum: { amount: 20 } } as any,

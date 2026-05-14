@@ -6,7 +6,9 @@ import { getDistributorReport } from "@/lib/domains/distributors"
 
 export type DistributorReportResponse = {
   summary: {
-    pendingCommissionAmount: number
+    /** 全局待支付余额 = 所有 SETTLED 佣金 + 奖金 - 已审批提现 - 待审提现 */
+    unpaidBalance: number
+    /** 期间已结佣金（含里程碑奖金） */
     settledCommission: number
     distributorCount: number
     newDistributorCount: number
@@ -17,7 +19,8 @@ export type DistributorReportResponse = {
     email: string
     revenue: number
     orderCount: number
-    pendingCommission: number
+    /** 期间产生的佣金（不含已取消） */
+    periodCommission: number
   }>
   newDistributors: Array<{
     id: string
