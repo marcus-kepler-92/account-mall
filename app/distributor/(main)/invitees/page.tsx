@@ -12,6 +12,8 @@ import { Users, Coins } from "lucide-react";
 import { InviteesDataTable } from "./invitees-data-table";
 import type { InviteeRow } from "./invitees-columns";
 import { buildMilestoneCumulativeMap } from "@/lib/milestone-cumulative";
+import { computeInviteeTierInfo } from "./invitees-utils";
+import { getWeekStart } from "@/lib/domains/distributors";
 
 export const dynamic = "force-dynamic";
 
@@ -31,26 +33,65 @@ export default async function DistributorInviteesPage() {
 
   const inviteeIds = invitees.map((u) => u.id);
 
-  const level2CommissionsBySource =
+  const weekStart = getWeekStart(new Date())
+  const weekEnd = new Date(weekStart)
+  weekEnd.setUTCDate(weekEnd.getUTCDate() + 7)
+
+  const tiers = await prisma.commissionTier.findMany({ orderBy: { sortOrder: "asc" } })
+
+  const [level2CommissionsBySource, weeklyOrderGroups, totalOrderGroups] =
     inviteeIds.length > 0
-      ? await prisma.commission.groupBy({
-          by: ["sourceDistributorId"],
-          where: {
-            distributorId: user.id,
-            level: 2,
-            sourceDistributorId: { in: inviteeIds },
-            status: "SETTLED",
-          },
-          _sum: { amount: true },
-        })
-      : [];
+      ? await Promise.all([
+          prisma.commission.groupBy({
+            by: ["sourceDistributorId"],
+            where: {
+              distributorId: user.id,
+              level: 2,
+              sourceDistributorId: { in: inviteeIds },
+              status: "SETTLED",
+            },
+            _sum: { amount: true },
+          }),
+          prisma.order.groupBy({
+            by: ["distributorId"],
+            where: {
+              distributorId: { in: inviteeIds },
+              status: "COMPLETED",
+              paidAt: { gte: weekStart, lt: weekEnd },
+            },
+            _sum: { amount: true },
+          }),
+          prisma.order.groupBy({
+            by: ["distributorId"],
+            where: { distributorId: { in: inviteeIds }, status: "COMPLETED" },
+            _sum: { amount: true },
+            _count: { _all: true },
+          }),
+        ])
+      : [[], [], []]
 
   const level2Map = new Map(
     level2CommissionsBySource.map((r) => [
       r.sourceDistributorId as string,
       Number(r._sum.amount ?? 0),
     ]),
-  );
+  )
+
+  const weeklyMap = new Map(
+    weeklyOrderGroups.map((g) => [g.distributorId as string, Number(g._sum.amount ?? 0)])
+  )
+  const salesMap = new Map(
+    totalOrderGroups.map((g) => [g.distributorId as string, Number(g._sum.amount ?? 0)])
+  )
+  const orderCountMap = new Map(
+    totalOrderGroups.map((g) => [g.distributorId as string, g._count._all])
+  )
+
+  const tiersNormalized = tiers.map((t) => ({
+    minAmount: Number(t.minAmount),
+    maxAmount: Number(t.maxAmount),
+    ratePercent: Number(t.ratePercent),
+  }))
 
   const totalLevel2 = level2CommissionsBySource.reduce(
     (sum, r) => sum + Number(r._sum.amount ?? 0),
@@ -86,26 +127,23 @@ export default async function DistributorInviteesPage() {
     ? invitees.filter((u) => !u.disabledAt && (cumulativeMap.get(u.id) ?? 0) >= Number(nextMilestone.thresholdAmount)).length
     : 0
 
-  const inviteeProgressMap = new Map(
-    invitees.map((u) => [
-      u.id,
-      {
-        nextMilestone: cumulativeMap
-          ? { thresholdAmount: Number(nextMilestone!.thresholdAmount), bonusAmount: Number(nextMilestone!.bonusAmount), cumulative: cumulativeMap.get(u.id) ?? 0 }
-          : null,
-      },
-    ])
-  )
-
-  const rows: InviteeRow[] = invitees.map((u) => ({
-    id: u.id,
-    name: u.name,
-    email: u.email,
-    username: u.username,
-    createdAt: u.createdAt.toISOString(),
-    level2CommissionTotal: level2Map.get(u.id) ?? 0,
-    ...(inviteeProgressMap.get(u.id) ?? { nextMilestone: null }),
-  }));
+  const rows: InviteeRow[] = invitees.map((u) => {
+    const weeklySalesTotal = weeklyMap.get(u.id) ?? 0
+    const { tierLabel, nextTierMinAmount } = computeInviteeTierInfo(weeklySalesTotal, tiersNormalized)
+    return {
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      username: u.username,
+      createdAt: u.createdAt.toISOString(),
+      level2CommissionTotal: level2Map.get(u.id) ?? 0,
+      weeklySalesTotal,
+      salesTotal: salesMap.get(u.id) ?? 0,
+      completedOrderCount: orderCountMap.get(u.id) ?? 0,
+      tierLabel,
+      nextTierMinAmount,
+    }
+  })
 
   return (
     <div className="space-y-6">

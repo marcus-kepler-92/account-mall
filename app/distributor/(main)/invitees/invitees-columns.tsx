@@ -2,6 +2,8 @@
 
 import type { ColumnDef } from "@tanstack/react-table"
 import { DataTableColumnHeader } from "@/app/admin/components/data-table-column-header"
+import { Badge } from "@/components/ui/badge"
+import { cn } from "@/lib/utils"
 
 export type InviteeRow = {
     id: string
@@ -10,75 +12,78 @@ export type InviteeRow = {
     username: string | null
     createdAt: string
     level2CommissionTotal: number
-    nextMilestone: { thresholdAmount: number; bonusAmount: number; cumulative: number } | null
+    weeklySalesTotal: number
+    salesTotal: number
+    completedOrderCount: number
+    tierLabel: string | null
+    nextTierMinAmount: number | null
 }
 
 export const inviteesColumns: ColumnDef<InviteeRow>[] = [
     {
         accessorKey: "name",
         header: ({ column }) => (
-            <DataTableColumnHeader column={column} title="昵称" />
+            <DataTableColumnHeader column={column} title="成员" />
         ),
-        cell: ({ row }) => (
-            <span className="font-medium">{row.original.name}</span>
-        ),
-    },
-    {
-        accessorKey: "email",
-        header: "邮箱",
-        cell: ({ row }) => (
-            <span className="text-muted-foreground text-sm">
-                {row.original.email ?? row.original.username ?? "—"}
-            </span>
-        ),
-    },
-    {
-        accessorKey: "createdAt",
-        header: ({ column }) => (
-            <DataTableColumnHeader column={column} title="加入时间" />
-        ),
-        cell: ({ row }) => (
-            <span className="text-muted-foreground text-sm">
-                {new Date(row.original.createdAt).toLocaleDateString("zh-CN")}
-            </span>
-        ),
-    },
-    {
-        accessorKey: "level2CommissionTotal",
-        header: ({ column }) => (
-            <DataTableColumnHeader column={column} title="为我创造团队奖金" className="justify-end" />
-        ),
-        cell: ({ row }) => (
-            <div className="text-right font-medium">
-                ¥{row.original.level2CommissionTotal.toFixed(2)}
-            </div>
-        ),
-    },
-    {
-        id: "milestoneProgress",
-        header: "个人达标",
         cell: ({ row }) => {
-            const { nextMilestone } = row.original
-            if (!nextMilestone) return null
-            const qualified = nextMilestone.cumulative >= nextMilestone.thresholdAmount
-            if (qualified) {
-                return <span className="text-xs font-medium text-green-600">已达标 ✓</span>
-            }
+            const { name, email, username, weeklySalesTotal } = row.original
+            const active = weeklySalesTotal > 0
+            const initial = name.charAt(0).toUpperCase()
+            const contact = email ?? username ?? "—"
             return (
-                <div className="space-y-0.5 min-w-[140px]">
-                    <p className="text-xs text-muted-foreground">
-                        还差 ¥{(nextMilestone.thresholdAmount - nextMilestone.cumulative).toFixed(2)}
-                    </p>
-                    <div className="h-1.5 rounded-full bg-muted overflow-hidden w-28">
-                        <div
-                            className="h-full rounded-full bg-primary transition-all"
-                            style={{
-                                width: `${Math.min(100, (nextMilestone.cumulative / nextMilestone.thresholdAmount) * 100).toFixed(1)}%`,
-                            }}
-                        />
+                <div className="flex items-center gap-2.5">
+                    <div className="relative shrink-0">
+                        <div className="size-8 rounded-full bg-muted flex items-center justify-center text-xs font-semibold select-none">
+                            {initial}
+                        </div>
+                        <span className={cn(
+                            "absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-background",
+                            active ? "bg-green-500" : "bg-muted-foreground/30"
+                        )} />
+                    </div>
+                    <div className="min-w-0">
+                        <p className="font-medium leading-tight truncate">{name}</p>
+                        <p className="text-xs text-muted-foreground truncate">{contact}</p>
                     </div>
                 </div>
             )
         },
+    },
+    {
+        id: "tier",
+        header: "档位",
+        cell: ({ row }) => (
+            row.original.tierLabel
+                ? <Badge variant="secondary" className="font-normal whitespace-nowrap">{row.original.tierLabel}</Badge>
+                : <span className="text-muted-foreground text-sm">—</span>
+        ),
+    },
+    {
+        id: "weeklyProgress",
+        header: "本周销售",
+        cell: ({ row }) => {
+            const { weeklySalesTotal, nextTierMinAmount } = row.original
+            return (
+                <div className="space-y-0.5 min-w-[100px]">
+                    <p className="font-semibold tabular-nums">¥{weeklySalesTotal.toFixed(2)}</p>
+                    {nextTierMinAmount !== null && weeklySalesTotal < nextTierMinAmount && (
+                        <p className="text-xs text-muted-foreground">
+                            差¥{(nextTierMinAmount - weeklySalesTotal).toFixed(2)} 升档
+                        </p>
+                    )}
+                </div>
+            )
+        },
+    },
+    {
+        accessorKey: "level2CommissionTotal",
+        header: ({ column }) => (
+            <DataTableColumnHeader column={column} title="为我创造奖金" className="justify-end" />
+        ),
+        cell: ({ row }) => (
+            <div className="text-right">
+                <p className="font-semibold tabular-nums">¥{row.original.level2CommissionTotal.toFixed(2)}</p>
+            </div>
+        ),
     },
 ]

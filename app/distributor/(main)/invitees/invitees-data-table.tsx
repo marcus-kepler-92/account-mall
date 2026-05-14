@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import {
     useReactTable,
     getCoreRowModel,
@@ -14,6 +14,7 @@ import { DataTable } from "@/app/admin/components"
 import { Input } from "@/components/ui/input"
 import { inviteesColumns, type InviteeRow } from "./invitees-columns"
 import { InviteSubDistributorButton } from "../invite-sub-distributor-button"
+import { InviteeDetailSheet } from "./invitee-detail-sheet"
 
 interface MilestoneSummary {
     triggeredCount: number
@@ -35,10 +36,8 @@ export function InviteesDataTable({ data, level2RatePercent, milestoneSummary }:
     const [sorting, setSorting] = useState<SortingState>([])
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
-
-    useEffect(() => {
-        if (window.innerWidth < 768) setColumnVisibility({ email: false })
-    }, [])
+    const [selectedRow, setSelectedRow] = useState<InviteeRow | null>(null)
+    const [sheetOpen, setSheetOpen] = useState(false)
 
     const table = useReactTable({
         data,
@@ -90,6 +89,15 @@ export function InviteesDataTable({ data, level2RatePercent, milestoneSummary }:
                 table={table}
                 columns={inviteesColumns}
                 emptyMessage="暂无团队成员，发送邀请后将在此展示。"
+                onRowClick={(row) => {
+                    setSelectedRow(row)
+                    setSheetOpen(true)
+                }}
+            />
+            <InviteeDetailSheet
+                row={selectedRow}
+                open={sheetOpen}
+                onOpenChange={setSheetOpen}
             />
         </div>
     )
