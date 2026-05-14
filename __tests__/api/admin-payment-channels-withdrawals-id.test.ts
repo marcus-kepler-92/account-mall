@@ -83,6 +83,22 @@ describe("PATCH /api/admin/payment-channels/[id]/withdrawals/[withdrawalId]", ()
     expect(json.data.id).toBe("wd-1")
   })
 
+  it("修改金额为恰好等于余额（小数）时不因浮点误差拒绝", async () => {
+    // existing withdrawal amount = 89.7
+    const withdrawal = { ...baseWithdrawal, amount: 89.7 }
+    prismaMock.channelWithdrawal.findUnique.mockResolvedValue(withdrawal as any)
+    // income = 100, total withdrawn = 89.7
+    // currentBalanceCents = 10000 - 8970 = 1030
+    // balanceIfUpdated = 1030 + 8970 - 1030 = 8970 cents → positive → ok
+    prismaMock.order.aggregate.mockResolvedValueOnce({ _sum: { amount: 100 } } as any)
+    prismaMock.channelWithdrawal.aggregate.mockResolvedValueOnce({ _sum: { amount: 89.7 } } as any)
+    prismaMock.channelWithdrawal.update.mockResolvedValue({ ...withdrawal, amount: 10.3 } as any)
+
+    const req = makeRequest("PATCH", { amount: 10.3 })
+    const res = await PATCH(req as any, makeContext("chan-1", "wd-1"))
+    expect(res.status).toBe(200)
+  })
+
   it("只修改 note 时不触发余额校验，直接成功", async () => {
     prismaMock.channelWithdrawal.findUnique.mockResolvedValue(baseWithdrawal)
     prismaMock.channelWithdrawal.update.mockResolvedValue({ ...baseWithdrawal, note: "updated note" })

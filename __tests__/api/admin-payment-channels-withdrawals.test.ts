@@ -138,6 +138,18 @@ describe("POST /api/admin/payment-channels/[id]/withdrawals", () => {
     expect(json.data.id).toBe("wd-1")
   })
 
+  it("余额恰好等于提现金额（小数）时不因浮点误差拒绝（income=100, withdrawn=89.7, 余额=10.30, 提现 10.30）", async () => {
+    prismaMock.paymentChannel.findUnique.mockResolvedValue(baseChannel as any)
+    // 100 - 89.7 in raw JS float = 10.299999999999997 — old code would reject 10.30
+    prismaMock.order.aggregate.mockResolvedValueOnce({ _sum: { amount: 100 } } as any)
+    prismaMock.channelWithdrawal.aggregate.mockResolvedValueOnce({ _sum: { amount: 89.7 } } as any)
+    prismaMock.channelWithdrawal.create.mockResolvedValue({ ...baseWithdrawal, amount: 10.3 } as any)
+
+    const req = makePostRequest({ amount: 10.3 })
+    const res = await POST(req as any, makeContext("chan-1"))
+    expect(res.status).toBe(201)
+  })
+
   it("余额恰好等于提现金额时也成功（income=5000, withdrawn=4000, 余额=1000, 提现 1000）", async () => {
     prismaMock.paymentChannel.findUnique.mockResolvedValue(baseChannel)
     prismaMock.order.aggregate.mockResolvedValueOnce({ _sum: { amount: 5000 } })

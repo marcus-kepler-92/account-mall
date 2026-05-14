@@ -21,6 +21,7 @@ import {
     FormMessage,
 } from "@/components/ui/form"
 import { Loader2, CheckCircle2, Wallet, ImagePlus, X } from "lucide-react"
+import { toCents } from "@/lib/utils"
 
 function buildWithdrawalSchema(maxAmount: number) {
     return z.object({
@@ -29,7 +30,7 @@ function buildWithdrawalSchema(maxAmount: number) {
             .min(1, "请输入提现金额")
             .refine((v) => !Number.isNaN(parseFloat(v)), "请输入有效金额")
             .refine((v) => parseFloat(v) > 0, "请输入有效金额")
-            .refine((v) => parseFloat(v) <= maxAmount, "不能超过可提现余额"),
+            .refine((v) => toCents(parseFloat(v)) <= toCents(maxAmount), "不能超过可提现余额"),
     })
 }
 

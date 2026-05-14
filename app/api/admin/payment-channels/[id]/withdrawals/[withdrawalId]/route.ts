@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma"
 import { getAdminSession } from "@/lib/auth-guard"
 import { unauthorized, notFound, invalidJsonBody, validationError, badRequest } from "@/lib/api-response"
 import { updateChannelWithdrawalSchema } from "@/lib/validations/payment-channel"
+import { toCents } from "@/lib/utils"
+import { getChannelBalanceCents } from "@/lib/domains/payment-channels"
 
 type RouteContext = { params: Promise<{ id: string; withdrawalId: string }> }
 
@@ -29,21 +31,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     // If amount changes, re-validate balance
     if (parsed.data.amount !== undefined) {
-        const [incomeAgg, withdrawnAgg] = await Promise.all([
-            prisma.order.aggregate({
-                where: { paymentChannelId: id, status: "COMPLETED" },
-                _sum: { amount: true },
-            }),
-            prisma.channelWithdrawal.aggregate({
-                where: { channelId: id },
-                _sum: { amount: true },
-            }),
-        ])
-        const totalIncome = Number(incomeAgg._sum.amount ?? 0)
-        const totalWithdrawn = Number(withdrawnAgg._sum.amount ?? 0)
-        // Current balance adds back the old amount, subtracts the new amount
-        const balanceIfUpdated = totalIncome - totalWithdrawn + Number(withdrawal.amount) - parsed.data.amount
-        if (balanceIfUpdated < 0) {
+        const currentBalanceCents = await getChannelBalanceCents(id)
+        const oldAmountCents = toCents(Number(withdrawal.amount))
+        const newAmountCents = toCents(parsed.data.amount)
+        if (currentBalanceCents + oldAmountCents - newAmountCents < 0) {
             return badRequest(`余额不足（更新后余额将为负）`)
         }
     }

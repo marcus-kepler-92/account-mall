@@ -2,7 +2,7 @@
  * Unit tests for lib/utils: cn and generateSlug.
  */
 
-import { cn, generateSlug, parseVoidloginsSourceUrl, buildVoidloginsSourceUrl } from "@/lib/utils"
+import { cn, generateSlug, parseVoidloginsSourceUrl, buildVoidloginsSourceUrl, toCents } from "@/lib/utils"
 
 describe("cn", () => {
     it("merges class names", () => {
@@ -86,5 +86,27 @@ describe("buildVoidloginsSourceUrl", () => {
     it("round-trips with special characters", () => {
         const url = buildVoidloginsSourceUrl("my code", "my@pass")
         expect(parseVoidloginsSourceUrl(url)).toEqual({ code: "my code", password: "my@pass" })
+    })
+})
+
+describe("toCents", () => {
+    it("converts whole numbers correctly", () => {
+        expect(toCents(0)).toBe(0)
+        expect(toCents(1)).toBe(100)
+        expect(toCents(100)).toBe(10000)
+    })
+
+    it("converts decimal amounts correctly", () => {
+        expect(toCents(0.01)).toBe(1)
+        expect(toCents(0.1)).toBe(10)
+        expect(toCents(10.3)).toBe(1030)
+        expect(toCents(89.7)).toBe(8970)
+    })
+
+    it("avoids the float precision error introduced by raw subtraction", () => {
+        // 100 - 89.7 in raw JS float arithmetic = 10.299999999999997 (less than 10.3)
+        // which would incorrectly reject a withdrawal of exactly 10.3
+        // toCents handles each operand independently so the error doesn't accumulate
+        expect(toCents(100) - toCents(89.7)).toBe(toCents(10.3))
     })
 })

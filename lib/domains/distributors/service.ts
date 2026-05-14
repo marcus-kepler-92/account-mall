@@ -9,6 +9,7 @@ import React from "react"
 import { DistributorInvitation as DistributorInvitationEmail } from "@/app/emails/distributor-invitation"
 import { hashPassword } from "better-auth/crypto"
 import * as repo from "./repository"
+import { toCents } from "@/lib/utils"
 import { checkAndIssueMilestoneBonuses } from "./milestone-service"
 import type {
   TierRow,
@@ -371,6 +372,7 @@ export async function getDistributorTierSummary(
 
   const hasInviter = !!selfUser?.inviterId
   const weeklySalesTotal = weekOrders.reduce((sum, o) => sum + toNumber(o.amount), 0)
+  const weeklySalesCents = toCents(weeklySalesTotal)
   const tiersList: TierSummaryItem[] = tiers.map((t) => ({
     minAmount: toNumber(t.minAmount),
     maxAmount: toNumber(t.maxAmount),
@@ -380,7 +382,7 @@ export async function getDistributorTierSummary(
 
   let currentTier: TierSummaryItem | null = null
   for (const t of tiers) {
-    if (weeklySalesTotal >= toNumber(t.minAmount) && weeklySalesTotal < toNumber(t.maxAmount)) {
+    if (weeklySalesCents >= toCents(toNumber(t.minAmount)) && weeklySalesCents < toCents(toNumber(t.maxAmount))) {
       currentTier = { minAmount: toNumber(t.minAmount), maxAmount: toNumber(t.maxAmount), ratePercent: toNumber(t.ratePercent), sortOrder: t.sortOrder }
       break
     }
@@ -439,11 +441,12 @@ export async function createOrderCommissions(
     select: { amount: true },
   })
   const weekTotal = weekOrders.reduce((sum, o) => sum + toNumber(o.amount), 0)
+  const weekTotalCents = toCents(weekTotal)
 
   const tiers = await tx.commissionTier.findMany({ orderBy: { sortOrder: "asc" } })
   let ratePercent: number | null = null
   for (const tier of tiers) {
-    if (weekTotal >= toNumber(tier.minAmount) && weekTotal < toNumber(tier.maxAmount)) {
+    if (weekTotalCents >= toCents(toNumber(tier.minAmount)) && weekTotalCents < toCents(toNumber(tier.maxAmount))) {
       ratePercent = toNumber(tier.ratePercent)
       break
     }
@@ -555,8 +558,8 @@ export async function createWithdrawal(
         repo.aggregateWithdrawalSum(distributorId, "PENDING", tx),
         repo.aggregateMilestoneBonusSum(distributorId, tx),
       ])
-      const balance = Math.round((settled + bonuses - paid - pending) * 100) / 100
-      if (amount > balance) throw new WithdrawalOverBalanceError()
+      const balanceCents = toCents(settled) + toCents(bonuses) - toCents(paid) - toCents(pending)
+      if (toCents(amount) > balanceCents) throw new WithdrawalOverBalanceError()
       return repo.createWithdrawalRecord({ distributorId, amount, feePercent, feeAmount, receiptImageUrl }, tx)
     },
     { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
@@ -604,8 +607,8 @@ export async function processWithdrawal(id: string, data: UpdateWithdrawalInput)
           repo.aggregateWithdrawalSum(existing.distributorId, "PAID", tx),
           repo.aggregateMilestoneBonusSum(existing.distributorId, tx),
         ])
-        const available = Math.round((settled + bonuses - paid) * 100) / 100
-        if (toNumber(existing.amount) > available) throw new WithdrawalOverBalanceError()
+        const availableCents = toCents(settled) + toCents(bonuses) - toCents(paid)
+        if (toCents(toNumber(existing.amount)) > availableCents) throw new WithdrawalOverBalanceError()
       }
 
       return repo.updateWithdrawalRecord(id, {
@@ -658,16 +661,16 @@ export async function reassignOrderDistributor(
     const amountByDistributor = new Map<string, number>()
     for (const c of existingCommissions) {
       const prev = amountByDistributor.get(c.distributorId) ?? 0
-      amountByDistributor.set(c.distributorId, prev + toNumber(c.amount))
+      amountByDistributor.set(c.distributorId, prev + toCents(toNumber(c.amount)))
     }
-    for (const [distId, cancelAmount] of amountByDistributor) {
+    for (const [distId, cancelAmountCents] of amountByDistributor) {
       const pendingCount = await repo.countPendingWithdrawalsByDistributor(distId)
       if (pendingCount > 0) throw new PendingWithdrawalBlocksReassignError()
       const [settled, paid] = await Promise.all([
         repo.aggregateCommissionSum(distId, "SETTLED"),
         repo.aggregateWithdrawalSum(distId, "PAID"),
       ])
-      if (settled - cancelAmount - paid < 0) throw new CommissionAlreadyPaidOutError()
+      if (toCents(settled) - cancelAmountCents - toCents(paid) < 0) throw new CommissionAlreadyPaidOutError()
     }
   }
 

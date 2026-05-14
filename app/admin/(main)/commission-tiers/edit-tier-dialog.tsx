@@ -19,6 +19,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { DialogFooter } from "@/components/ui/dialog"
 import { ModalForm } from "@/app/admin/components"
+import { toCents } from "@/lib/utils"
 
 const schema = z
     .object({
@@ -36,7 +37,7 @@ const schema = z
             .refine((v) => parseFloat(v) >= 0, "不能为负数")
             .refine((v) => parseFloat(v) <= 100, "最大 100"),
     })
-    .refine((d) => parseFloat(d.minAmount) < parseFloat(d.maxAmount), {
+    .refine((d) => toCents(parseFloat(d.minAmount)) < toCents(parseFloat(d.maxAmount)), {
         message: "销售额下限必须小于上限",
         path: ["minAmount"],
     })

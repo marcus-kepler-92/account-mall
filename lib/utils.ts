@@ -73,6 +73,11 @@ export function formatCurrency(amount: number): string {
   return `¥${amount.toFixed(2)}`
 }
 
+/** Convert a decimal amount to integer cents to avoid IEEE 754 floating-point errors. */
+export function toCents(amount: number): number {
+  return Math.round(amount * 100)
+}
+
 export const VOIDLOGINS_SCHEME = "voidlogins://"
 
 /**
