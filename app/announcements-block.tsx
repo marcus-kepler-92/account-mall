@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import dynamic from "next/dynamic";
 import {
   Collapsible,
@@ -37,18 +37,7 @@ function ContentSkeleton({ lines = 5 }: { lines?: number }) {
 }
 
 function CollapsibleMarkdownContent({ content }: { content: string }) {
-  const [showSkeleton, setShowSkeleton] = useState(true);
-
-  useEffect(() => {
-    const t = setTimeout(() => setShowSkeleton(false), 400);
-    return () => clearTimeout(t);
-  }, []);
-
-  return showSkeleton ? (
-    <ContentSkeleton lines={3} />
-  ) : (
-    <MarkdownViewClient content={content} />
-  );
+  return <MarkdownViewClient content={content} />;
 }
 
 const ModalMarkdownView = dynamic(
@@ -78,18 +67,9 @@ function formatDate(iso: string | null) {
 }
 
 function ModalContent({ announcement }: { announcement: FrontAnnouncement }) {
-  const [showSkeleton, setShowSkeleton] = useState(true);
-
-  useEffect(() => {
-    const t = setTimeout(() => setShowSkeleton(false), 400);
-    return () => clearTimeout(t);
-  }, []);
-
   return (
     <div className="max-h-96 overflow-y-auto text-sm">
-      {showSkeleton ? (
-        <ContentSkeleton />
-      ) : announcement.content?.trim() ? (
+      {announcement.content?.trim() ? (
         <ModalMarkdownView content={announcement.content} />
       ) : (
         <p className="text-muted-foreground text-center py-4">此公告无详细内容</p>
@@ -98,10 +78,23 @@ function ModalContent({ announcement }: { announcement: FrontAnnouncement }) {
   );
 }
 
+// useSyncExternalStore pattern: server snapshot = false, client snapshot = true
+// This ensures the dialog is never open in SSR output, so it doesn't affect LCP.
+function useIsClient() {
+  return useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+}
+
 export function AnnouncementsBlock({ announcements }: AnnouncementsBlockProps) {
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [modalOpen, setModalOpen] = useState(true);
+  const [dismissed, setDismissed] = useState(false);
+  const isClient = useIsClient();
+
+  const modalOpen = isClient && !dismissed && announcements.length > 0;
 
   const toggleExpanded = (id: string, open: boolean) => {
     setExpandedIds((prev) =>
@@ -116,7 +109,7 @@ export function AnnouncementsBlock({ announcements }: AnnouncementsBlockProps) {
 
   return (
     <>
-      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+      <Dialog open={modalOpen} onOpenChange={(open) => { if (!open) setDismissed(true) }}>
         <DialogContent
           className="max-w-lg"
           onInteractOutside={(e) => e.preventDefault()}

@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getAdminSession } from "@/lib/auth-guard";
 import { createTagSchema } from "@/lib/validations/product";
@@ -10,24 +9,16 @@ import { unauthorized, invalidJsonBody, validationError, conflict } from "@/lib/
  * Public: returns all tags with product counts (ACTIVE products only).
  */
 export async function GET(_request: NextRequest) {
-    const productWhere = { status: "ACTIVE" as const } as unknown as Prisma.ProductWhereInput;
-
     const tags = await prisma.tag.findMany({
         include: {
-            products: {
-                where: productWhere,
-                select: { id: true },
+            _count: {
+                select: { products: { where: { status: "ACTIVE" } } },
             },
         },
         orderBy: { name: "asc" },
     });
 
-    return NextResponse.json(
-        tags.map(({ products, ...tag }) => ({
-            ...tag,
-            _count: { products: products.length },
-        }))
-    );
+    return NextResponse.json(tags);
 }
 
 /**

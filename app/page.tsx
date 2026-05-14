@@ -1,27 +1,17 @@
 import type { Metadata } from "next"
-import { Suspense } from "react"
 import { prisma } from "@/lib/prisma"
 import { ProductCatalog } from "@/app/components/product-catalog"
-import { ProductCardSkeleton } from "@/app/components/product-card"
 import { SiteHeader } from "@/app/components/site-header"
 import { SiteFooter } from "@/app/components/site-footer"
 import { AnnouncementsBlock } from "./announcements-block"
 import { config } from "@/lib/config"
 import { DEFAULT_SEO_TITLE, DEFAULT_SEO_DESCRIPTION, KEYWORDS_META } from "@/lib/seo-keywords"
+import type { ProductCardData } from "@/app/components/product-card"
 
-function ProductCatalogSkeleton() {
-    return (
-        <div className="grid grid-cols-1 items-stretch gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 min-[1600px]:grid-cols-6">
-            {Array.from({ length: 6 }).map((_, i) => (
-                <ProductCardSkeleton key={i} />
-            ))}
-        </div>
-    )
-}
-
+const PAGE_SIZE = 18
 const ANNOUNCEMENTS_LIMIT = 20
 
-/** 首页需每次请求拉取最新公告与数据，避免生产环境静态化后公告不更新 */
+// force-dynamic ensures useSearchParams() works without Suspense wrapping
 export const dynamic = "force-dynamic"
 
 export const metadata: Metadata = {
@@ -36,14 +26,86 @@ export const metadata: Metadata = {
   alternates: { canonical: config.siteUrl },
 }
 
-export default async function HomePage() {
-    const announcements = await prisma.announcement.findMany({
-        where: { status: "PUBLISHED", audience: { in: ["CUSTOMER", "ALL"] } },
-        orderBy: [{ sortOrder: "desc" }, { publishedAt: "desc" }, { createdAt: "desc" }],
-        take: ANNOUNCEMENTS_LIMIT,
-    })
+export default async function HomePage({
+    searchParams,
+}: {
+    searchParams: Promise<Record<string, string>>
+}) {
+    const params = await searchParams
+    const tagParam = params.tag ?? ""
+    const tagSlugs = tagParam ? tagParam.split(",").map(s => s.trim()).filter(Boolean) : []
 
-    const frontAnnouncements = announcements.map((a) => ({
+    // ProductCatalog uses local state for sort/page, so server always fetches defaults
+    const where = {
+        status: "ACTIVE" as const,
+        ...(tagSlugs.length > 0 && { tags: { some: { slug: { in: tagSlugs } } } }),
+    }
+
+    const [announcements, tags, products, total] = await Promise.all([
+        prisma.announcement.findMany({
+            where: { status: "PUBLISHED", audience: { in: ["CUSTOMER", "ALL"] } },
+            orderBy: [{ sortOrder: "desc" }, { publishedAt: "desc" }, { createdAt: "desc" }],
+            take: ANNOUNCEMENTS_LIMIT,
+        }),
+        prisma.tag.findMany({
+            include: {
+                _count: { select: { products: { where: { status: "ACTIVE" } } } },
+            },
+            orderBy: { name: "asc" },
+        }),
+        prisma.product.findMany({
+            where,
+            select: {
+                id: true,
+                name: true,
+                slug: true,
+                description: true,
+                summary: true,
+                image: true,
+                price: true,
+                productType: true,
+                tags: { select: { id: true, name: true, slug: true } },
+            },
+            orderBy: [{ sortOrder: "asc" }],
+            take: PAGE_SIZE,
+        }),
+        prisma.product.count({ where }),
+    ])
+
+    const productIds = products.map(p => p.id)
+    const stockCounts = productIds.length > 0
+        ? await prisma.card.groupBy({
+              by: ["productId"],
+              where: { status: "UNSOLD", productId: { in: productIds } },
+              _count: { id: true },
+          })
+        : []
+
+    const stockMap = new Map(stockCounts.map(s => [s.productId, s._count.id]))
+    const productsWithStock: ProductCardData[] = products.map(product => ({
+        id: product.id,
+        name: product.name,
+        slug: product.slug,
+        description: product.description,
+        summary: product.summary ?? null,
+        image: product.image,
+        price: Number(product.price),
+        productType: (product.productType ?? "NORMAL") as "NORMAL" | "AUTO_FETCH",
+        stock: product.productType === "AUTO_FETCH" ? 1 : (stockMap.get(product.id) ?? 0),
+        tags: product.tags,
+    }))
+
+    const initialData = {
+        tags,
+        products: {
+            data: productsWithStock,
+            meta: {
+                totalPages: Math.ceil(total / PAGE_SIZE) || 1,
+            },
+        },
+    }
+
+    const frontAnnouncements = announcements.map(a => ({
         id: a.id,
         title: a.title,
         content: a.content,
@@ -54,10 +116,8 @@ export default async function HomePage() {
         <div className="flex min-h-screen flex-col">
             <SiteHeader />
 
-            {/* Main content */}
             <main className="flex-1">
                 <div className="mx-auto max-w-6xl px-4 py-5 sm:py-8 xl:max-w-7xl 2xl:max-w-[90rem]">
-                    {/* Hero */}
                     <section className="mb-6 sm:mb-12 text-center">
                         <h1 className="text-2xl font-bold tracking-tight sm:text-4xl">
                             {config.siteTagline}
@@ -67,9 +127,7 @@ export default async function HomePage() {
                         </p>
                     </section>
                     <AnnouncementsBlock announcements={frontAnnouncements} />
-                    <Suspense fallback={<ProductCatalogSkeleton />}>
-                        <ProductCatalog />
-                    </Suspense>
+                    <ProductCatalog initialData={initialData} />
                 </div>
             </main>
 

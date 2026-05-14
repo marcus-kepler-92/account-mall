@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
                 ? [{ createdAt: "desc" as const }]
                 : [{ sortOrder: "asc" as const }]
 
-    const [products, total, stockCounts] = await Promise.all([
+    const [products, total] = await Promise.all([
         prisma.product.findMany({
             where,
             select: {
@@ -90,12 +90,16 @@ export async function GET(request: NextRequest) {
             take: pageSize,
         }),
         prisma.product.count({ where }),
-        prisma.card.groupBy({
-            by: ["productId"],
-            where: { status: "UNSOLD" },
-            _count: { id: true },
-        }),
     ]);
+
+    const productIds = products.map(p => p.id)
+    const stockCounts = productIds.length > 0
+        ? await prisma.card.groupBy({
+              by: ["productId"],
+              where: { status: "UNSOLD", productId: { in: productIds } },
+              _count: { id: true },
+          })
+        : []
 
     const stockMap = new Map(stockCounts.map((s) => [s.productId, s._count.id]));
 

@@ -22,6 +22,11 @@ import { ProductCatalogGrid } from "./product-catalog-grid"
 type TagItem = { id: string; name: string; slug: string; _count?: { products: number } }
 type SortOption = "default" | "price-asc" | "price-desc" | "newest"
 
+type InitialData = {
+    tags: TagItem[]
+    products: { data: ProductCardData[]; meta: { totalPages: number } }
+}
+
 const PAGE_SIZE = 18
 
 function parseTagFromUrl(tagParam: string | null): string[] {
@@ -39,7 +44,7 @@ async function fetchJson<T>(url: string): Promise<T> {
 }
 
 /** URL 为单一数据源，仅在用户操作时更新 query（router.replace），不做 effect 双向同步。 */
-export function ProductCatalog() {
+export function ProductCatalog({ initialData }: { initialData?: InitialData }) {
     const pathname = usePathname()
     const router = useRouter()
     const searchParams = useSearchParams()
@@ -57,6 +62,8 @@ export function ProductCatalog() {
     const { data: tags = [] } = useQuery<TagItem[]>({
         queryKey: ["tags", codeParam],
         queryFn: () => fetchJson(tagsUrl),
+        initialData: initialData?.tags,
+        staleTime: 5 * 60 * 1000,
     })
 
     const productsParams = new URLSearchParams()
@@ -76,6 +83,8 @@ export function ProductCatalog() {
     } = useQuery<{ data: ProductCardData[]; meta: { totalPages: number } }>({
         queryKey: ["products", search, tagParam, codeParam, sort, currentPage],
         queryFn: () => fetchJson(`/api/products?${productsParams}`),
+        initialData: initialData?.products,
+        staleTime: 60 * 1000,
         placeholderData: keepPreviousData,
     })
 
