@@ -9,6 +9,7 @@ import type { CreateMilestoneInput, UpdateMilestoneInput } from "./validators"
 
 function serializeMilestone(m: {
   id: string
+  type: string
   thresholdAmount: unknown
   thresholdCount: number
   bonusAmount: unknown
@@ -18,6 +19,7 @@ function serializeMilestone(m: {
 }): MilestoneRow {
   return {
     id: m.id,
+    type: m.type as "INVITATION" | "SALES",
     thresholdAmount: Number(m.thresholdAmount),
     thresholdCount: m.thresholdCount,
     bonusAmount: Number(m.bonusAmount),
@@ -40,7 +42,7 @@ export async function createInvitationMilestone(
   const maxSort = await prisma.invitationMilestone.aggregate({ _max: { sortOrder: true } })
   const nextSort = (maxSort._max.sortOrder ?? -1) + 1
   const row = await prisma.invitationMilestone.create({
-    data: { thresholdAmount: data.thresholdAmount, thresholdCount: data.thresholdCount, bonusAmount: data.bonusAmount, sortOrder: nextSort },
+    data: { type: data.type, thresholdAmount: data.thresholdAmount, thresholdCount: data.thresholdCount, bonusAmount: data.bonusAmount, sortOrder: nextSort },
   })
   return serializeMilestone(row)
 }
@@ -54,6 +56,7 @@ export async function updateInvitationMilestone(
   const row = await prisma.invitationMilestone.update({
     where: { id },
     data: {
+      ...(data.type !== undefined && { type: data.type }),
       ...(data.thresholdAmount !== undefined && { thresholdAmount: data.thresholdAmount }),
       ...(data.thresholdCount !== undefined && { thresholdCount: data.thresholdCount }),
       ...(data.bonusAmount !== undefined && { bonusAmount: data.bonusAmount }),

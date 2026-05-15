@@ -78,12 +78,25 @@ export type ReassignDistributorInput = z.infer<typeof reassignDistributorSchema>
 
 // ── Invitation milestones ─────────────────────────────────────────────────────
 export const createMilestoneSchema = z.object({
-  thresholdAmount: z.number().positive("门槛金额必须大于 0"),
-  thresholdCount: z.number().int().min(1, "达标人数至少为 1"),
+  type: z.enum(["INVITATION", "SALES"]),
+  thresholdCount: z.number().int().min(0).default(0),
+  thresholdAmount: z.number().min(0).default(0),
   bonusAmount: z.number().positive("奖励金额必须大于 0"),
+}).superRefine((data, ctx) => {
+  if (data.type === "INVITATION" && data.thresholdCount < 1) {
+    ctx.addIssue({ code: "custom", message: "邀请人数至少为 1", path: ["thresholdCount"] })
+  }
+  if (data.type === "SALES" && data.thresholdAmount <= 0) {
+    ctx.addIssue({ code: "custom", message: "门槛销售额必须大于 0", path: ["thresholdAmount"] })
+  }
 })
 
-export const updateMilestoneSchema = createMilestoneSchema.partial()
+export const updateMilestoneSchema = z.object({
+  type: z.enum(["INVITATION", "SALES"]).optional(),
+  thresholdCount: z.number().int().min(0).optional(),
+  thresholdAmount: z.number().min(0).optional(),
+  bonusAmount: z.number().positive("奖励金额必须大于 0").optional(),
+})
 
 export type CreateMilestoneInput = z.infer<typeof createMilestoneSchema>
 export type UpdateMilestoneInput = z.infer<typeof updateMilestoneSchema>

@@ -227,6 +227,7 @@ describe("createInvitationMilestone", () => {
       updatedAt: new Date(),
     } as never)
     const row = await createInvitationMilestone({
+      type: "INVITATION",
       thresholdAmount: 500,
       thresholdCount: 3,
       bonusAmount: 20,

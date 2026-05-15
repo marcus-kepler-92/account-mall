@@ -251,6 +251,7 @@ export class CommissionAlreadyPaidOutError extends Error {
 
 export type MilestoneRow = {
   id: string
+  type: "INVITATION" | "SALES"
   thresholdAmount: number
   thresholdCount: number
   bonusAmount: number
