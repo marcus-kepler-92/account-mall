@@ -10,7 +10,7 @@ import { DistributorInvitation as DistributorInvitationEmail } from "@/app/email
 import { hashPassword } from "better-auth/crypto"
 import * as repo from "./repository"
 import { toCents } from "@/lib/utils"
-import { checkAndIssueMilestoneBonuses, checkAndIssueInvitationMilestoneBonuses } from "./milestone-service"
+import { checkAndIssueMilestoneBonuses } from "./milestone-service"
 import type {
   TierRow,
   DistributorRow,
@@ -308,12 +308,6 @@ export async function acceptInvite(token: string, data: AcceptInviteInput & { us
       tx as Parameters<typeof repo.createAccountRecord>[1],
     )
 
-    if (newUserInviterId) {
-      await checkAndIssueInvitationMilestoneBonuses(
-        tx as Prisma.TransactionClient,
-        user.id,
-      )
-    }
   })
 }
 

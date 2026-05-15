@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sendOrderCompletionEmail } from "@/lib/order-completion-email";
 import { createOrderCommissions } from "@/lib/calculate-order-commission";
@@ -12,6 +13,10 @@ export type CompletePendingOrderResult =
  * Idempotent for already COMPLETED orders (returns done: true without updating).
  * Returns { done: false, error } when order not found or not PENDING.
  * Throws when the transaction fails (e.g. DB error).
+ *
+ * Cost snapshot: aggregates Card.unitCost across RESERVED cards bound to this order and writes
+ * the total into Order.costTotalSnapshot. Null unitCost values (pre-rollout cards) are treated
+ * as 0, which biases profit upward on legacy data — accepted trade-off until backfill runs.
  */
 export async function completePendingOrder(
   orderNo: string,
@@ -20,9 +25,9 @@ export async function completePendingOrder(
     where: { orderNo },
     include: {
       product: {
-        select: { name: true, productType: true, validityHours: true, costPerUnit: true },
+        select: { name: true, productType: true, validityHours: true },
       },
-      cards: { select: { id: true, status: true } },
+      cards: { select: { id: true, status: true, unitCost: true } },
     },
   });
   if (!order) {
@@ -46,6 +51,17 @@ export async function completePendingOrder(
       ? new Date(paidAt.getTime() + validityHours * 60 * 60 * 1000)
       : null;
 
+  // Sum unitCost across the RESERVED cards this order is about to consume.
+  // Done in integer cents to avoid floating-point drift across many rows.
+  const costTotalCents = order.cards
+    .filter((c) => c.status === "RESERVED")
+    .reduce((sum, c) => {
+      if (c.unitCost == null) return sum;
+      const cents = Math.round(Number(c.unitCost) * 100);
+      return sum + cents;
+    }, 0);
+  const costTotalSnapshot = new Prisma.Decimal(costTotalCents).div(100);
+
   let didUpdate = false;
   await prisma.$transaction(async (tx) => {
     const updateResult = await tx.order.updateMany({
@@ -53,7 +69,7 @@ export async function completePendingOrder(
       data: {
         status: "COMPLETED",
         paidAt,
-        costSnapshot: order.product?.costPerUnit ?? null,
+        costTotalSnapshot,
         ...(expiresAt && { expiresAt }),
       },
     });

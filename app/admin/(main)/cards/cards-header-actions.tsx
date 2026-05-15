@@ -4,6 +4,8 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import {
     Dialog,
@@ -33,6 +35,7 @@ type ProductOption = {
     slug: string
     productType?: string
     price?: number
+    costPerUnit?: number | null
 }
 
 export function CardsHeaderActions() {
@@ -43,7 +46,23 @@ export function CardsHeaderActions() {
     const [selectedProductId, setSelectedProductId] = useState<string | undefined>()
     const [loading, setLoading] = useState(false)
     const [text, setText] = useState("")
+    const [unitCostInput, setUnitCostInput] = useState("")
+    const [unitCostTouched, setUnitCostTouched] = useState(false)
     const [importLoading, setImportLoading] = useState(false)
+
+    const selectedProduct = products.find((p) => p.id === selectedProductId)
+
+    // Reset touched flag whenever the user switches product, so the next prefill kicks in.
+    useEffect(() => {
+        setUnitCostTouched(false)
+    }, [selectedProductId])
+
+    // Prefill unitCost from the selected product's costPerUnit until the user edits the field.
+    useEffect(() => {
+        if (unitCostTouched) return
+        const cost = selectedProduct?.costPerUnit
+        setUnitCostInput(cost == null ? "" : cost.toString())
+    }, [selectedProduct, unitCostTouched])
 
     const lines = text
         .split(/\r?\n/)
@@ -51,7 +70,15 @@ export function CardsHeaderActions() {
         .filter(Boolean)
     const uniqueCount = new Set(lines).size
     const totalCount = lines.length
-    const importValid = totalCount > 0 && totalCount <= MAX_LINES
+    const parsedUnitCost =
+        unitCostInput.trim() === "" ? null : Number(unitCostInput)
+    const unitCostValid =
+        parsedUnitCost === null ||
+        (Number.isFinite(parsedUnitCost) &&
+            parsedUnitCost >= 0 &&
+            Math.round(parsedUnitCost * 100) / 100 === parsedUnitCost)
+    const importValid =
+        totalCount > 0 && totalCount <= MAX_LINES && unitCostValid
 
     useEffect(() => {
         if (!open) return
@@ -73,6 +100,7 @@ export function CardsHeaderActions() {
                         id: p.id,
                         name: p.name,
                         slug: p.slug,
+                        costPerUnit: p.costPerUnit ?? null,
                     }))
 
                 setProducts(items)
@@ -96,7 +124,11 @@ export function CardsHeaderActions() {
     }, [open, selectedProductId])
 
     const handleOpenChange = (next: boolean) => {
-        if (!next) setText("")
+        if (!next) {
+            setText("")
+            setUnitCostInput("")
+            setUnitCostTouched(false)
+        }
         setOpen(next)
     }
 
@@ -113,7 +145,10 @@ export function CardsHeaderActions() {
             const res = await fetch(`/api/products/${selectedProductId}/cards`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ contents: lines }),
+                body: JSON.stringify({
+                    contents: lines,
+                    unitCost: parsedUnitCost,
+                }),
             })
             const data = await res.json()
             if (!res.ok) {
@@ -128,6 +163,8 @@ export function CardsHeaderActions() {
                 },
             })
             setText("")
+            setUnitCostInput("")
+            setUnitCostTouched(false)
             setOpen(false)
             router.refresh()
         } catch {
@@ -221,23 +258,51 @@ export function CardsHeaderActions() {
                         </div>
 
                         {selectedProductId && (
-                            <div className="space-y-2">
-                                <Textarea
-                                    placeholder={`每行一条卡密，例如：\n账号1|密码1\n账号2|密码2`}
-                                    value={text}
-                                    onChange={(e) => setText(e.target.value)}
-                                    className="min-h-[160px] font-mono text-sm max-h-[50vh]"
-                                    disabled={importLoading}
-                                />
-                                <div className="flex justify-between text-sm text-muted-foreground">
-                                    <span>共 {totalCount} 条，去重后 {uniqueCount} 条</span>
-                                    {totalCount > MAX_LINES && (
-                                        <span className="text-destructive">
-                                            请减少至 {MAX_LINES} 条以内
-                                        </span>
+                            <>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="bulk-import-unit-cost">
+                                        采购成本（每张，可选）
+                                    </Label>
+                                    <Input
+                                        id="bulk-import-unit-cost"
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        placeholder="留空表示不记录成本（按 0 计入利润）"
+                                        value={unitCostInput}
+                                        onChange={(e) => {
+                                            setUnitCostInput(e.target.value)
+                                            setUnitCostTouched(true)
+                                        }}
+                                        disabled={importLoading}
+                                    />
+                                    <p className="text-xs text-muted-foreground">
+                                        本批卡密统一进货成本，订单完成后计入利润快照。默认带出商品配置的采购成本。
+                                    </p>
+                                    {!unitCostValid && (
+                                        <p className="text-xs text-destructive">
+                                            请输入非负数且最多 2 位小数
+                                        </p>
                                     )}
                                 </div>
-                            </div>
+                                <div className="space-y-2">
+                                    <Textarea
+                                        placeholder={`每行一条卡密，例如：\n账号1|密码1\n账号2|密码2`}
+                                        value={text}
+                                        onChange={(e) => setText(e.target.value)}
+                                        className="min-h-[160px] font-mono text-sm max-h-[50vh]"
+                                        disabled={importLoading}
+                                    />
+                                    <div className="flex justify-between text-sm text-muted-foreground">
+                                        <span>共 {totalCount} 条，去重后 {uniqueCount} 条</span>
+                                        {totalCount > MAX_LINES && (
+                                            <span className="text-destructive">
+                                                请减少至 {MAX_LINES} 条以内
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            </>
                         )}
                     </div>
                     <DialogFooter>

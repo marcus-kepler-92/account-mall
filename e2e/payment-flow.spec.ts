@@ -8,6 +8,7 @@ import {
     cleanupTestProduct,
     cleanupOrdersByEmail,
     disconnectPrisma,
+    getOrderCostSnapshot,
     type TestProduct,
 } from "./helpers/test-data"
 
@@ -15,12 +16,19 @@ const baseURL = process.env.PLAYWRIGHT_TEST_BASE_URL ?? "http://localhost:3000"
 
 const SLUG = "e2e-payment"
 const CARD_COUNT = 5
+// Per-card procurement cost — used by the full-flow test to assert costTotalSnapshot.
+const CARD_UNIT_COST = 0.5
 const TEST_EMAILS = ["e2e@example.com", "e2e-getpay@example.com", "e2e-full@example.com"]
 
 let product: TestProduct
 
 test.beforeAll(async () => {
-    product = await createTestProduct({ slug: SLUG, name: "E2E Payment 测试商品", cardCount: CARD_COUNT })
+    product = await createTestProduct({
+        slug: SLUG,
+        name: "E2E Payment 测试商品",
+        cardCount: CARD_COUNT,
+        cardUnitCost: CARD_UNIT_COST,
+    })
 })
 
 test.afterAll(async () => {
@@ -214,5 +222,13 @@ test.describe.serial("Payment flow", () => {
         await expect(page.getByText("账号内容", { exact: true })).toBeVisible({ timeout: 5_000 })
         const cardLocator = page.locator("code").filter({ hasText: new RegExp(`${SLUG}-card-\\d+`) })
         await expect(cardLocator.first()).toBeVisible({ timeout: 5_000 })
+
+        // Cost-on-card: completed order should carry costTotalSnapshot = quantity × CARD_UNIT_COST.
+        // Legacy per-unit costSnapshot must not be written for new orders.
+        const snapshot = await getOrderCostSnapshot(orderNo)
+        expect(snapshot).not.toBeNull()
+        expect(snapshot!.status).toBe("COMPLETED")
+        expect(snapshot!.costTotalSnapshot).toBeCloseTo(CARD_UNIT_COST, 2)
+        expect(snapshot!.costSnapshot).toBeNull()
     })
 })

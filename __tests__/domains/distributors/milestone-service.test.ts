@@ -27,7 +27,7 @@ function makeTx(overrides: Partial<Record<string, unknown>> = {}) {
     user: { findUnique: jest.fn(), findMany: jest.fn() },
     invitationMilestone: { findMany: jest.fn() },
     invitationMilestoneBonus: { findMany: jest.fn(), create: jest.fn() },
-    order: { aggregate: jest.fn() },
+    order: { groupBy: jest.fn() },
     ...overrides,
   } as unknown as Prisma.TransactionClient
 }
@@ -43,19 +43,26 @@ const BASE_MILESTONE = {
 }
 
 const THREE_INVITEES = [{ id: "inv1" }, { id: "inv2" }, { id: "inv3" }]
-// Aggregate result when total sales >= thresholdAmount (500)
-const ABOVE_THRESHOLD_AGGREGATE = { _sum: { amount: 600 } }
-// Aggregate result when total sales < thresholdAmount (500)
-const BELOW_THRESHOLD_AGGREGATE = { _sum: { amount: 400 } }
+// groupBy results where all 3 invitees individually meet thresholdAmount (500)
+const ABOVE_THRESHOLD_GROUP_BY = [
+  { distributorId: "inv1", _sum: { amount: 600 } },
+  { distributorId: "inv2", _sum: { amount: 550 } },
+  { distributorId: "inv3", _sum: { amount: 520 } },
+]
+// groupBy results where only 2 of 3 invitees meet threshold (qualifiedCount=2 < thresholdCount=3)
+const BELOW_THRESHOLD_GROUP_BY = [
+  { distributorId: "inv1", _sum: { amount: 600 } },
+  { distributorId: "inv2", _sum: { amount: 550 } },
+]
 
-function setupFullMocks(tx: ReturnType<typeof makeTx>, aggregateResult = ABOVE_THRESHOLD_AGGREGATE) {
+function setupFullMocks(tx: ReturnType<typeof makeTx>, groupByResult = ABOVE_THRESHOLD_GROUP_BY) {
   ;(tx.user.findUnique as jest.Mock)
     .mockResolvedValueOnce({ inviterId: "inviter1" })
     .mockResolvedValueOnce({ role: "DISTRIBUTOR", disabledAt: null })
   ;(tx.invitationMilestone.findMany as jest.Mock).mockResolvedValue([BASE_MILESTONE])
   ;(tx.invitationMilestoneBonus.findMany as jest.Mock).mockResolvedValue([])
   ;(tx.user.findMany as jest.Mock).mockResolvedValue(THREE_INVITEES)
-  ;(tx.order.aggregate as jest.Mock).mockResolvedValue(aggregateResult)
+  ;(tx.order.groupBy as jest.Mock).mockResolvedValue(groupByResult)
 }
 
 // ── checkAndIssueMilestoneBonuses ─────────────────────────────────────────────
@@ -119,17 +126,17 @@ describe("checkAndIssueMilestoneBonuses", () => {
     ;(tx.invitationMilestoneBonus.findMany as jest.Mock).mockResolvedValue([])
     ;(tx.user.findMany as jest.Mock).mockResolvedValue([])
     await checkAndIssueMilestoneBonuses(tx, "invitee1")
-    expect(tx.order.aggregate).not.toHaveBeenCalled()
+    expect(tx.order.groupBy).not.toHaveBeenCalled()
   })
 
-  it("does not trigger when total sales amount < thresholdAmount", async () => {
+  it("does not trigger when qualifiedCount < thresholdCount", async () => {
     const tx = makeTx()
-    setupFullMocks(tx, BELOW_THRESHOLD_AGGREGATE)
+    setupFullMocks(tx, BELOW_THRESHOLD_GROUP_BY)
     await checkAndIssueMilestoneBonuses(tx, "invitee1")
     expect(tx.invitationMilestoneBonus.create).not.toHaveBeenCalled()
   })
 
-  it("triggers bonus when total sales amount >= thresholdAmount", async () => {
+  it("triggers bonus when qualifiedCount >= thresholdCount", async () => {
     const tx = makeTx()
     setupFullMocks(tx)
     ;(tx.invitationMilestoneBonus.create as jest.Mock).mockResolvedValue({})
@@ -147,7 +154,7 @@ describe("checkAndIssueMilestoneBonuses", () => {
     })
   })
 
-  it("calls order.aggregate with correct where clause including paidAt >= milestone.createdAt", async () => {
+  it("calls order.groupBy with correct where clause including paidAt >= milestone.createdAt", async () => {
     const tx = makeTx()
     ;(tx.user.findUnique as jest.Mock)
       .mockResolvedValueOnce({ inviterId: "inviter1" })
@@ -155,11 +162,12 @@ describe("checkAndIssueMilestoneBonuses", () => {
     ;(tx.invitationMilestone.findMany as jest.Mock).mockResolvedValue([BASE_MILESTONE])
     ;(tx.invitationMilestoneBonus.findMany as jest.Mock).mockResolvedValue([])
     ;(tx.user.findMany as jest.Mock).mockResolvedValue([{ id: "inv1" }])
-    ;(tx.order.aggregate as jest.Mock).mockResolvedValue({ _sum: { amount: null } })
+    ;(tx.order.groupBy as jest.Mock).mockResolvedValue([])
 
     await checkAndIssueMilestoneBonuses(tx, "invitee1")
 
-    expect(tx.order.aggregate).toHaveBeenCalledWith({
+    expect(tx.order.groupBy).toHaveBeenCalledWith({
+      by: ["distributorId"],
       where: {
         distributorId: { in: ["inv1"] },
         status: "COMPLETED",
@@ -171,7 +179,7 @@ describe("checkAndIssueMilestoneBonuses", () => {
 
   it("ignores P2002 error (concurrent safety)", async () => {
     const tx = makeTx()
-    setupFullMocks(tx, ABOVE_THRESHOLD_AGGREGATE)
+    setupFullMocks(tx, ABOVE_THRESHOLD_GROUP_BY)
     ;(tx.invitationMilestoneBonus.create as jest.Mock).mockRejectedValue({ code: "P2002" })
 
     await expect(checkAndIssueMilestoneBonuses(tx, "invitee1")).resolves.toBeUndefined()
@@ -179,7 +187,7 @@ describe("checkAndIssueMilestoneBonuses", () => {
 
   it("rethrows non-P2002 errors", async () => {
     const tx = makeTx()
-    setupFullMocks(tx, ABOVE_THRESHOLD_AGGREGATE)
+    setupFullMocks(tx, ABOVE_THRESHOLD_GROUP_BY)
     ;(tx.invitationMilestoneBonus.create as jest.Mock).mockRejectedValue(new Error("DB error"))
 
     await expect(checkAndIssueMilestoneBonuses(tx, "invitee1")).rejects.toThrow("DB error")
@@ -224,7 +232,6 @@ describe("createInvitationMilestone", () => {
       updatedAt: new Date(),
     } as never)
     const row = await createInvitationMilestone({
-      type: "INVITATION",
       thresholdAmount: 500,
       thresholdCount: 3,
       bonusAmount: 20,

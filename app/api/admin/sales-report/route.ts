@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getAdminSession } from "@/lib/auth-guard"
 import { unauthorized, badRequest } from "@/lib/api-response"
+import { resolveOrderCost } from "@/lib/profit"
 import { fromZonedTime } from "date-fns-tz"
 
 const HKT = "Asia/Hong_Kong"
@@ -81,6 +82,7 @@ export async function GET(request: Request): Promise<NextResponse> {
                 quantity: true,
                 amount: true,
                 costSnapshot: true,
+                costTotalSnapshot: true,
                 product: { select: { name: true } },
             },
         }),
@@ -122,10 +124,8 @@ export async function GET(request: Request): Promise<NextResponse> {
         const name = order.productNameSnapshot ?? order.product.name
         const revenue = Number(order.amount)
         const commission = commissionByOrder.get(order.id) ?? 0
-        const orderCost = order.costSnapshot !== null
-            ? Number(order.costSnapshot) * order.quantity
-            : 0
-        const orderHasMissingCost = order.costSnapshot === null
+        const { cost: orderCost, hasCost } = resolveOrderCost(order)
+        const orderHasMissingCost = !hasCost
 
         if (existing) {
             existing.quantity += order.quantity

@@ -35,6 +35,7 @@ export default async function AdminProductCardsPage({ params, searchParams }: Pa
             id: true,
             name: true,
             slug: true,
+            costPerUnit: true,
             cardTemplates: {
                 orderBy: { sortOrder: "asc" },
                 select: { template: true },
@@ -141,7 +142,11 @@ export default async function AdminProductCardsPage({ params, searchParams }: Pa
                 statusCounts={stats}
                 actions={<>
                     <ExportCards productId={productId} statusCounts={stats} />
-                    <BulkImportCards productId={productId} defaultOpen={rawParams.action === "import"} />
+                    <BulkImportCards
+                        productId={productId}
+                        defaultUnitCost={product.costPerUnit == null ? null : Number(product.costPerUnit)}
+                        defaultOpen={rawParams.action === "import"}
+                    />
                 </>}
             />
         </div>

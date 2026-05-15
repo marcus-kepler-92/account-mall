@@ -55,7 +55,14 @@ export function MarkdownView({ content }: MarkdownViewProps) {
             data-color-mode={colorMode}
             className="wmde-markdown-var wmde-theme-bridge"
         >
-            <MarkdownPreview source={content} />
+            <MarkdownPreview
+                source={content}
+                components={{
+                    img: ({ src, alt, ...props }) =>
+                        // eslint-disable-next-line @next/next/no-img-element
+                        src ? <img src={src} alt={alt || ""} {...props} /> : null,
+                }}
+            />
         </div>
     )
 }

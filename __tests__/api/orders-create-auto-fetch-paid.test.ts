@@ -322,6 +322,63 @@ describe("POST /api/orders — paid AUTO_FETCH product", () => {
         })
     })
 
+    describe("AUTO_FETCH 卡密 unitCost", () => {
+        it("收费 AUTO_FETCH RESERVED 卡密 unitCost=0（爬取所得，无进货成本）", async () => {
+            prismaMock.product.findUnique.mockResolvedValue(makePaidAutoFetchProduct())
+
+            let capturedCardData: Record<string, unknown> | undefined
+            ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: Function) => {
+                const tx = {
+                    order: {
+                        create: jest.fn().mockResolvedValue({ id: "ord_1", orderNo: "uuid-paid" }),
+                    },
+                    card: {
+                        create: jest.fn().mockImplementation(async (args: { data: Record<string, unknown> }) => {
+                            capturedCardData = args.data
+                            return { id: "card_1" }
+                        }),
+                    },
+                }
+                await fn(tx)
+                return { orderNo: "uuid-paid", orderId: "ord_1" }
+            })
+
+            await POST(createJsonRequest(ORDER_BODY))
+
+            expect(capturedCardData?.unitCost).toBe(0)
+            expect(capturedCardData?.status).toBe("RESERVED")
+        })
+
+        it("免费 AUTO_FETCH SOLD 卡密 unitCost=0", async () => {
+            prismaMock.product.findUnique.mockResolvedValue(
+                makePaidAutoFetchProduct({ price: new Prisma.Decimal("0") }),
+            )
+            getConfigMock().nodeEnv = "development"
+
+            let capturedCardData: Record<string, unknown> | undefined
+            ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: Function) => {
+                const tx = {
+                    order: {
+                        create: jest.fn().mockResolvedValue({ id: "ord_1", orderNo: "uuid-free" }),
+                    },
+                    card: {
+                        create: jest.fn().mockImplementation(async (args: { data: Record<string, unknown> }) => {
+                            capturedCardData = args.data
+                            return { id: "card_1" }
+                        }),
+                    },
+                }
+                await fn(tx)
+                return { orderNo: "uuid-free" }
+            })
+
+            await POST(createJsonRequest(ORDER_BODY))
+
+            expect(capturedCardData?.unitCost).toBe(0)
+            expect(capturedCardData?.status).toBe("SOLD")
+        })
+    })
+
     describe("fingerprintHash 写入收费 AUTO_FETCH 订单", () => {
         it("有指纹 → fingerprintHash 存入 PENDING 订单 data", async () => {
             prismaMock.product.findUnique.mockResolvedValue(makePaidAutoFetchProduct())

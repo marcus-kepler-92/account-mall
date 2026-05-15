@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
+import { AlertTriangle } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -304,22 +305,23 @@ export function DashboardProfitTab() {
 }
 
 function PendingWithdrawalsBanner() {
-  const { data } = useQuery<{ count: number } | null>({
+  const { data } = useQuery<{ pending: number } | null>({
     queryKey: ["pending-withdrawals-count"],
     queryFn: async () => {
       const res = await fetch("/api/admin/withdrawals/count")
       if (!res.ok) return null
-      return res.json() as Promise<{ count: number }>
+      return res.json() as Promise<{ pending: number }>
     },
     staleTime: 30_000,
   })
 
-  if (!data || data.count === 0) return null
+  if (!data || data.pending === 0) return null
 
   return (
     <div className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-      <span>
-        ⚠ 待处理提现 <strong>{data.count} 笔</strong>，请及时审核
+      <span className="flex items-center gap-2">
+        <AlertTriangle className="size-4" />
+        待处理提现 <strong>{data.pending} 笔</strong>，请及时审核
       </span>
       <Link href="/admin/withdrawals" className="underline hover:no-underline">
         去处理

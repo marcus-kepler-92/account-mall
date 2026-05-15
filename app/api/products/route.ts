@@ -83,6 +83,8 @@ export async function GET(request: NextRequest) {
                 status: true,
                 sortOrder: true,
                 sourceUrl: true,
+                // Admin-only: prefill source for the bulk card import dialog's unitCost field.
+                ...(isAdmin && { costPerUnit: true }),
                 tags: { select: { id: true, name: true, slug: true } },
             },
             orderBy,
@@ -104,7 +106,9 @@ export async function GET(request: NextRequest) {
     const stockMap = new Map(stockCounts.map((s) => [s.productId, s._count.id]));
 
     const productsWithStock = products.map((product) => {
-        const { sourceUrl, ...productRest } = product;
+        const { sourceUrl, costPerUnit, ...productRest } = product as typeof product & {
+            costPerUnit?: unknown
+        };
         const isAutoFetch = product.productType === "AUTO_FETCH";
         return {
             ...productRest,
@@ -112,7 +116,10 @@ export async function GET(request: NextRequest) {
             productType: product.productType ?? "NORMAL",
             // AUTO_FETCH 在列表里按「有货」展示，不依赖库存数
             stock: isAutoFetch ? 1 : (stockMap.get(product.id) ?? 0),
-            ...(isAdmin && { sourceUrl: sourceUrl ?? null }),
+            ...(isAdmin && {
+                sourceUrl: sourceUrl ?? null,
+                costPerUnit: costPerUnit == null ? null : Number(costPerUnit),
+            }),
         };
     });
 

@@ -18,11 +18,8 @@ export type MilestoneLeaderboardEntry = {
   inviterId: string
   name: string | null
   email: string
-  value: number
-  currentTierId: string | null
-  nextTierId: string | null
-  nextTierGap: number
-  isCapped: boolean
+  qualifiedCount: number        // invitees who individually spent >= lowest thresholdAmount
+  triggeredMilestoneIds: string[]
 }
 
 export type MilestoneReportResponse = {
@@ -32,18 +29,13 @@ export type MilestoneReportResponse = {
     totalBonusPaid: number
     totalTriggerCount: number
   }
-  invitation: {
-    tiers: MilestoneTierStat[]
-    leaderboard: MilestoneLeaderboardEntry[]
-  }
-  sales: {
-    tiers: MilestoneTierStat[]
-    leaderboard: MilestoneLeaderboardEntry[]
-  }
+  tiers: MilestoneTierStat[]
+  leaderboard: MilestoneLeaderboardEntry[]
   newDistributors: Array<{
     id: string
     name: string | null
     email: string
+    inviterId: string | null
     inviterName: string | null
     inviterEmail: string | null
     createdAt: string
@@ -65,8 +57,7 @@ export async function GET(): Promise<NextResponse> {
     newThisMonth,
     totalBonusRow,
     totalTriggerCount,
-    invitationMilestones,
-    salesMilestones,
+    milestones,
     allBonuses,
     newDistributorRows,
     allDistributors,
@@ -75,15 +66,14 @@ export async function GET(): Promise<NextResponse> {
     prisma.user.count({ where: { role: "DISTRIBUTOR", createdAt: { gte: monthStart } } }),
     prisma.invitationMilestoneBonus.aggregate({ _sum: { amount: true } }),
     prisma.invitationMilestoneBonus.count(),
-    prisma.invitationMilestone.findMany({ where: { type: "INVITATION" }, orderBy: { thresholdCount: "asc" } }),
-    prisma.invitationMilestone.findMany({ where: { type: "SALES" }, orderBy: { thresholdAmount: "asc" } }),
+    prisma.invitationMilestone.findMany({ orderBy: { thresholdCount: "asc" } }),
     prisma.invitationMilestoneBonus.findMany({ select: { inviterId: true, milestoneId: true } }),
     prisma.user.findMany({
       where: { role: "DISTRIBUTOR", createdAt: { gte: monthStart } },
       orderBy: { createdAt: "desc" },
       select: {
         id: true, name: true, email: true, createdAt: true,
-        inviter: { select: { name: true, email: true } },
+        inviter: { select: { id: true, name: true, email: true } },
       },
     }),
     prisma.user.findMany({
@@ -103,91 +93,64 @@ export async function GET(): Promise<NextResponse> {
     triggeredCountById.set(b.milestoneId, (triggeredCountById.get(b.milestoneId) ?? 0) + 1)
   }
 
-  const toTierStat = (m: {
-    id: string
-    thresholdCount: number
-    thresholdAmount: unknown
-    bonusAmount: unknown
-  }): MilestoneTierStat => ({
+  const tiers: MilestoneTierStat[] = milestones.map((m) => ({
     id: m.id,
     thresholdCount: m.thresholdCount,
     thresholdAmount: Number(m.thresholdAmount),
     bonusAmount: Number(m.bonusAmount),
     triggeredCount: triggeredCountById.get(m.id) ?? 0,
-  })
+  }))
 
-  const inviterIds = [...new Set(allDistributors.map(d => d.inviterId).filter((id): id is string => id !== null))]
+  // For leaderboard: use the lowest milestone's thresholdAmount as qualification threshold
+  // Each distributor's "qualifiedCount" = invitees who have individually spent >= that threshold
+  const minThreshold = milestones.length > 0 ? Number(milestones[0].thresholdAmount) : 0
+  const minCreatedAt = milestones.length > 0 ? milestones[0].createdAt : new Date(0)
 
-  const inviteeCounts = await Promise.all(
-    inviterIds.map(inviterId =>
-      prisma.user.count({ where: { inviterId, role: "DISTRIBUTOR", disabledAt: null } })
-        .then(count => ({ inviterId, count }))
+  const inviterIds = [...new Set(
+    allDistributors.map((d) => d.inviterId).filter((id): id is string => id !== null),
+  )]
+
+  const leaderboard: MilestoneLeaderboardEntry[] = []
+
+  if (milestones.length > 0 && inviterIds.length > 0) {
+    await Promise.all(
+      inviterIds.map(async (inviterId) => {
+        const user = allDistributors.find((d) => d.id === inviterId)
+        if (!user) return
+
+        const inviteeIds = allDistributors
+          .filter((d) => d.inviterId === inviterId)
+          .map((d) => d.id)
+        if (inviteeIds.length === 0) return
+
+        // Count invitees who have each individually spent >= minThreshold since earliest milestone
+        const salesByInvitee = await prisma.order.groupBy({
+          by: ["distributorId"],
+          where: {
+            distributorId: { in: inviteeIds },
+            status: "COMPLETED",
+            paidAt: { gte: minCreatedAt },
+          },
+          _sum: { amount: true },
+        })
+        const qualifiedCount = salesByInvitee.filter(
+          (g) => Number(g._sum.amount ?? 0) >= minThreshold,
+        ).length
+
+        const triggered = bonusByInviter.get(inviterId) ?? new Set()
+
+        leaderboard.push({
+          inviterId,
+          name: user.name,
+          email: user.email ?? "",
+          qualifiedCount,
+          triggeredMilestoneIds: [...triggered],
+        })
+      }),
     )
-  )
-  const inviteeCountMap = new Map(inviteeCounts.map(r => [r.inviterId, r.count]))
 
-  const buildInvitationLeaderboard = (): MilestoneLeaderboardEntry[] => {
-    if (invitationMilestones.length === 0) return []
-    const entries: MilestoneLeaderboardEntry[] = []
-    for (const inviterId of inviterIds) {
-      const user = allDistributors.find(d => d.id === inviterId)
-      if (!user) continue
-      const count = inviteeCountMap.get(inviterId) ?? 0
-      const triggered = bonusByInviter.get(inviterId) ?? new Set()
-      const highest = [...invitationMilestones].reverse().find(m => triggered.has(m.id))
-      const next = invitationMilestones.find(m => !triggered.has(m.id) && m.thresholdCount > count)
-      const isCapped = invitationMilestones.every(m => triggered.has(m.id))
-      entries.push({
-        inviterId,
-        name: user.name,
-        email: user.email ?? "",
-        value: count,
-        currentTierId: highest?.id ?? null,
-        nextTierId: next?.id ?? null,
-        nextTierGap: next ? next.thresholdCount - count : 0,
-        isCapped,
-      })
-    }
-    return entries.sort((a, b) => b.value - a.value).slice(0, 20)
-  }
-
-  const salesByInviter = await Promise.all(
-    inviterIds.map(async inviterId => {
-      const invitees = allDistributors.filter(d => d.inviterId === inviterId).map(d => d.id)
-      if (invitees.length === 0) return { inviterId, revenue: 0 }
-      const minCreatedAt = salesMilestones[0]?.createdAt ?? new Date(0)
-      const result = await prisma.order.aggregate({
-        where: { distributorId: { in: invitees }, status: "COMPLETED", paidAt: { gte: minCreatedAt } },
-        _sum: { amount: true },
-      })
-      return { inviterId, revenue: Number(result._sum.amount ?? 0) }
-    })
-  )
-  const salesRevenueMap = new Map(salesByInviter.map(r => [r.inviterId, r.revenue]))
-
-  const buildSalesLeaderboard = (): MilestoneLeaderboardEntry[] => {
-    if (salesMilestones.length === 0) return []
-    const entries: MilestoneLeaderboardEntry[] = []
-    for (const inviterId of inviterIds) {
-      const user = allDistributors.find(d => d.id === inviterId)
-      if (!user) continue
-      const revenue = salesRevenueMap.get(inviterId) ?? 0
-      const triggered = bonusByInviter.get(inviterId) ?? new Set()
-      const highest = [...salesMilestones].reverse().find(m => triggered.has(m.id))
-      const next = salesMilestones.find(m => !triggered.has(m.id) && Number(m.thresholdAmount) > revenue)
-      const isCapped = salesMilestones.every(m => triggered.has(m.id))
-      entries.push({
-        inviterId,
-        name: user.name,
-        email: user.email ?? "",
-        value: revenue,
-        currentTierId: highest?.id ?? null,
-        nextTierId: next?.id ?? null,
-        nextTierGap: next ? Number(next.thresholdAmount) - revenue : 0,
-        isCapped,
-      })
-    }
-    return entries.sort((a, b) => b.value - a.value).slice(0, 20)
+    leaderboard.sort((a, b) => b.qualifiedCount - a.qualifiedCount)
+    leaderboard.splice(20)
   }
 
   return NextResponse.json<MilestoneReportResponse>({
@@ -197,18 +160,13 @@ export async function GET(): Promise<NextResponse> {
       totalBonusPaid: Number(totalBonusRow._sum.amount ?? 0),
       totalTriggerCount,
     },
-    invitation: {
-      tiers: invitationMilestones.map(toTierStat),
-      leaderboard: buildInvitationLeaderboard(),
-    },
-    sales: {
-      tiers: salesMilestones.map(toTierStat),
-      leaderboard: buildSalesLeaderboard(),
-    },
-    newDistributors: newDistributorRows.map(d => ({
+    tiers,
+    leaderboard,
+    newDistributors: newDistributorRows.map((d) => ({
       id: d.id,
       name: d.name,
       email: d.email ?? "",
+      inviterId: d.inviter?.id ?? null,
       inviterName: d.inviter?.name ?? null,
       inviterEmail: d.inviter?.email ?? null,
       createdAt: d.createdAt.toISOString(),

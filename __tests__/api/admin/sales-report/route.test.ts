@@ -74,6 +74,7 @@ describe("GET /api/admin/sales-report", () => {
         quantity: 2,
         amount: "129.60" as any,
         costSnapshot: null,
+        costTotalSnapshot: null,
         product: { name: "王者荣耀点券" },
       },
       {
@@ -83,6 +84,7 @@ describe("GET /api/admin/sales-report", () => {
         quantity: 1,
         amount: "64.80" as any,
         costSnapshot: null,
+        costTotalSnapshot: null,
         product: { name: "王者荣耀点券" },
       },
       {
@@ -92,6 +94,7 @@ describe("GET /api/admin/sales-report", () => {
         quantity: 1,
         amount: "38.00" as any,
         costSnapshot: null,
+        costTotalSnapshot: null,
         product: { name: "网易云会员" },
       },
     ] as any)
@@ -130,7 +133,7 @@ describe("GET /api/admin/sales-report", () => {
   it("deducts milestone bonuses from summary profit", async () => {
     ;(getAdminSession as jest.Mock).mockResolvedValue(mockSession)
     prismaMock.order.findMany.mockResolvedValue([
-      { id: "o1", productId: "p1", productNameSnapshot: "商品A", quantity: 1, amount: "200.00" as any, costSnapshot: null, product: { name: "商品A" } },
+      { id: "o1", productId: "p1", productNameSnapshot: "商品A", quantity: 1, amount: "200.00" as any, costSnapshot: null, costTotalSnapshot: null, product: { name: "商品A" } },
     ] as any)
     prismaMock.commission.groupBy.mockResolvedValue([
       { orderId: "o1", _sum: { amount: "10.00" as any } },
@@ -151,7 +154,7 @@ describe("GET /api/admin/sales-report", () => {
   it("includes PENDING and WITHDRAWN commissions in profit deduction", async () => {
     ;(getAdminSession as jest.Mock).mockResolvedValue(mockSession)
     prismaMock.order.findMany.mockResolvedValue([
-      { id: "o1", productId: "p1", productNameSnapshot: "商品A", quantity: 1, amount: "100.00" as any, costSnapshot: null, product: { name: "商品A" } },
+      { id: "o1", productId: "p1", productNameSnapshot: "商品A", quantity: 1, amount: "100.00" as any, costSnapshot: null, costTotalSnapshot: null, product: { name: "商品A" } },
     ] as any)
     prismaMock.commission.groupBy.mockResolvedValue([
       { orderId: "o1", _sum: { amount: "15.00" as any } },
@@ -172,8 +175,8 @@ describe("GET /api/admin/sales-report", () => {
   it("sorts products by profit descending", async () => {
     ;(getAdminSession as jest.Mock).mockResolvedValue(mockSession)
     prismaMock.order.findMany.mockResolvedValue([
-      { id: "o1", productId: "p1", productNameSnapshot: "A", quantity: 1, amount: "10.00" as any, costSnapshot: null, product: { name: "A" } },
-      { id: "o2", productId: "p2", productNameSnapshot: "B", quantity: 1, amount: "50.00" as any, costSnapshot: null, product: { name: "B" } },
+      { id: "o1", productId: "p1", productNameSnapshot: "A", quantity: 1, amount: "10.00" as any, costSnapshot: null, costTotalSnapshot: null, product: { name: "A" } },
+      { id: "o2", productId: "p2", productNameSnapshot: "B", quantity: 1, amount: "50.00" as any, costSnapshot: null, costTotalSnapshot: null, product: { name: "B" } },
     ] as any)
     prismaMock.commission.groupBy.mockResolvedValue([])
     prismaMock.invitationMilestoneBonus.aggregate.mockResolvedValue(NO_BONUS)
@@ -182,5 +185,88 @@ describe("GET /api/admin/sales-report", () => {
     const body = await res.json()
     expect(body.products[0].productId).toBe("p2")
     expect(body.products[1].productId).toBe("p1")
+  })
+
+  it("uses costTotalSnapshot directly (no quantity multiplier) for new orders", async () => {
+    ;(getAdminSession as jest.Mock).mockResolvedValue(mockSession)
+    prismaMock.order.findMany.mockResolvedValue([
+      {
+        id: "o1",
+        productId: "p1",
+        productNameSnapshot: "A",
+        quantity: 3,
+        amount: "30.00" as any,
+        costSnapshot: null,
+        costTotalSnapshot: "9.00" as any, // total cost for 3 cards, NOT multiplied by quantity
+        product: { name: "A" },
+      },
+    ] as any)
+    prismaMock.commission.groupBy.mockResolvedValue([])
+    prismaMock.invitationMilestoneBonus.aggregate.mockResolvedValue(NO_BONUS)
+
+    const res = await GET(makeRequest({ from: "2025-03-17", to: "2025-03-17" }))
+    const body = await res.json()
+
+    expect(body.summary.cost).toBeCloseTo(9, 2)
+    expect(body.summary.profit).toBeCloseTo(21, 2) // 30 - 9
+    expect(body.summary.hasMissingCost).toBe(false)
+  })
+
+  it("falls back to costSnapshot * quantity for legacy orders without costTotalSnapshot", async () => {
+    ;(getAdminSession as jest.Mock).mockResolvedValue(mockSession)
+    prismaMock.order.findMany.mockResolvedValue([
+      {
+        id: "o_legacy",
+        productId: "p1",
+        productNameSnapshot: "A",
+        quantity: 3,
+        amount: "30.00" as any,
+        costSnapshot: "3.00" as any, // legacy per-unit
+        costTotalSnapshot: null,
+        product: { name: "A" },
+      },
+    ] as any)
+    prismaMock.commission.groupBy.mockResolvedValue([])
+    prismaMock.invitationMilestoneBonus.aggregate.mockResolvedValue(NO_BONUS)
+
+    const res = await GET(makeRequest({ from: "2025-03-17", to: "2025-03-17" }))
+    const body = await res.json()
+
+    expect(body.summary.cost).toBeCloseTo(9, 2) // 3 × 3
+    expect(body.summary.profit).toBeCloseTo(21, 2)
+    expect(body.summary.hasMissingCost).toBe(false)
+  })
+
+  it("flags hasMissingCost only when both snapshots are null", async () => {
+    ;(getAdminSession as jest.Mock).mockResolvedValue(mockSession)
+    prismaMock.order.findMany.mockResolvedValue([
+      {
+        id: "o_missing",
+        productId: "p1",
+        productNameSnapshot: "A",
+        quantity: 1,
+        amount: "10.00" as any,
+        costSnapshot: null,
+        costTotalSnapshot: null,
+        product: { name: "A" },
+      },
+      {
+        id: "o_zero",
+        productId: "p1",
+        productNameSnapshot: "A",
+        quantity: 1,
+        amount: "10.00" as any,
+        costSnapshot: null,
+        costTotalSnapshot: "0" as any, // AUTO_FETCH: cost explicitly 0, not missing
+        product: { name: "A" },
+      },
+    ] as any)
+    prismaMock.commission.groupBy.mockResolvedValue([])
+    prismaMock.invitationMilestoneBonus.aggregate.mockResolvedValue(NO_BONUS)
+
+    const res = await GET(makeRequest({ from: "2025-03-17", to: "2025-03-17" }))
+    const body = await res.json()
+
+    expect(body.summary.hasMissingCost).toBe(true)
   })
 })

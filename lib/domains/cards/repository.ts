@@ -65,6 +65,7 @@ export async function findCardsById(
 export async function createManyCards(
   productId: string,
   contents: string[],
+  unitCost: number | null,
   tx?: Tx,
 ) {
   return (tx ?? prisma).card.createMany({
@@ -72,6 +73,7 @@ export async function createManyCards(
       productId,
       content,
       status: "UNSOLD" as const,
+      unitCost,
     })),
   })
 }

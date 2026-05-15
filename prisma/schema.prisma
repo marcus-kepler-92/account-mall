@@ -121,6 +121,8 @@ model Product {
   description      String?
   image            String?       @db.Text
   price            Decimal       @db.Decimal(10, 2)
+  /// Default unit cost prefilled into the bulk card import dialog for NORMAL products.
+  /// Not consumed by the order completion logic anymore — use Card.unitCost instead.
   costPerUnit      Decimal?      @db.Decimal(10, 2)
   maxQuantity      Int           @default(10)
   status           ProductStatus @default(ACTIVE)
@@ -176,6 +178,10 @@ model Card {
   content             String
   status              CardStatus           @default(UNSOLD)
   orderId             String?
+  /// Per-card procurement cost. Captured at card import time for NORMAL products.
+  /// AUTO_FETCH cards are written with 0 (scraped at runtime, no procurement cost).
+  /// Legacy cards prior to this column rollout remain NULL and are treated as 0 at aggregation.
+  unitCost            Decimal?             @db.Decimal(10, 2)
   /// AUTO_FETCH：上次刷新时间，用于限流（1 分钟/次）
   lastRefreshedAt     DateTime?
   createdAt           DateTime             @default(now())
@@ -211,7 +217,14 @@ model Order {
   discountPercentApplied    Decimal?     @db.Decimal(5, 2) // 下单时若使用分销员优惠码，记录当时应用的折扣比例
   productNameSnapshot       String?     @db.VarChar(500) // 下单时商品名称快照，便于历史订单展示
   unitPriceSnapshot         Decimal?    @db.Decimal(10, 2) // 下单时商品单价快照（不含折扣）
+  /// @deprecated Legacy per-unit cost snapshot copied from Product.costPerUnit at completion time.
+  /// New orders no longer write this field; readers must fall back to (costSnapshot * quantity)
+  /// only when costTotalSnapshot is NULL (historical rows). To be dropped in a future migration
+  /// after data backfill (see plan).
   costSnapshot              Decimal?    @db.Decimal(10, 2)
+  /// Sum of unitCost across cards consumed by this order, written when the order transitions
+  /// to COMPLETED. Authoritative cost field; legacy costSnapshot only used as fallback.
+  costTotalSnapshot         Decimal?    @db.Decimal(10, 2)
   status                    OrderStatus @default(PENDING)
   paidAt                  DateTime?
   /// AUTO_FETCH：订单有效期截止时间；免费=创建时+validityHours，收费=支付时+validityHours
@@ -370,15 +383,9 @@ model DistributorInvitation {
   @@index([token])
 }
 
-enum MilestoneType {
-  INVITATION
-  SALES
-}
-
 model InvitationMilestone {
-  id              String        @id @default(cuid())
-  type            MilestoneType @default(INVITATION)
-  thresholdAmount Decimal       @db.Decimal(12, 2)
+  id              String  @id @default(cuid())
+  thresholdAmount Decimal @db.Decimal(12, 2)
   thresholdCount  Int
   bonusAmount     Decimal  @db.Decimal(10, 2)
   sortOrder       Int      @default(0)

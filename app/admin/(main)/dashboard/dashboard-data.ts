@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { getHKTDayStart } from "@/lib/utils"
+import { resolveOrderCost } from "@/lib/profit"
 import {
   type DashboardTrendPoint,
   type TopProductRow,
@@ -136,7 +137,7 @@ export async function getRestockPending(): Promise<RestockPendingRow[]> {
  * Recent orders list
  */
 export async function getRecentOrders(limit: number = ADMIN_DASHBOARD_RECENT_ORDERS_LIMIT) {
-  return prisma.order.findMany({
+  const rows = await prisma.order.findMany({
     take: limit,
     orderBy: { createdAt: "desc" },
     select: {
@@ -150,6 +151,7 @@ export async function getRecentOrders(limit: number = ADMIN_DASHBOARD_RECENT_ORD
       product: { select: { id: true, name: true } },
     },
   })
+  return rows.map((r) => ({ ...r, amount: Number(r.amount) }))
 }
 
 export type DashboardData = {
@@ -194,7 +196,7 @@ export async function getGlobalKPI(): Promise<GlobalKPI> {
   const [orders, commissions, milestoneBonus, lowStock] = await Promise.all([
     prisma.order.findMany({
       where: { status: "COMPLETED", paidAt: { gte: todayStart, lt: tomorrowStart } },
-      select: { amount: true, quantity: true, costSnapshot: true },
+      select: { amount: true, quantity: true, costSnapshot: true, costTotalSnapshot: true },
     }),
     prisma.commission.aggregate({
       where: {
@@ -216,11 +218,9 @@ export async function getGlobalKPI(): Promise<GlobalKPI> {
   ])
 
   const todayRevenue = orders.reduce((s, o) => s + Number(o.amount), 0)
-  const todayCost = orders.reduce(
-    (s, o) => (o.costSnapshot !== null ? s + Number(o.costSnapshot) * o.quantity : s),
-    0,
-  )
-  const hasMissingCost = orders.some((o) => o.costSnapshot === null)
+  const costResolutions = orders.map((o) => resolveOrderCost(o))
+  const todayCost = costResolutions.reduce((s, r) => s + r.cost, 0)
+  const hasMissingCost = costResolutions.some((r) => !r.hasCost)
   const todayCommission = Number(commissions._sum.amount ?? 0)
   const todayMilestoneBonus = Number(milestoneBonus._sum.amount ?? 0)
 

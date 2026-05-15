@@ -5,9 +5,9 @@ import {
     type DistributorFiltersInput,
 } from "./distributors-filters"
 import { DistributorsDataTable } from "./distributors-data-table"
-import type { DistributorRow } from "./distributors-columns"
 import { PageHeader } from "@/app/admin/components"
 import { parseServerSort } from "@/lib/table-sort"
+import { buildDistributorViewRows } from "./distributor-rows-data"
 
 export const dynamic = "force-dynamic"
 
@@ -54,15 +54,6 @@ export default async function AdminDistributorsPage({
             { distributorCode: { contains: term, mode: "insensitive" } },
         ]
     }
-
-    const now = new Date()
-    const dayOfWeek = now.getUTCDay()
-    const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
-    const weekStart = new Date(now)
-    weekStart.setUTCDate(now.getUTCDate() + diff)
-    weekStart.setUTCHours(0, 0, 0, 0)
-    const weekEnd = new Date(weekStart)
-    weekEnd.setUTCDate(weekStart.getUTCDate() + 7)
 
     const distributorSelect = {
         id: true,
@@ -149,195 +140,7 @@ export default async function AdminDistributorsPage({
         ])
     }
 
-    const ids = distributors.map((d) => d.id)
-    const [milestones, triggeredBonuses] = await Promise.all([
-        prisma.invitationMilestone.findMany({ orderBy: { thresholdAmount: "asc" } }),
-        ids.length > 0
-            ? prisma.invitationMilestoneBonus.findMany({
-                  where: { inviterId: { in: ids } },
-                  select: { inviterId: true, milestoneId: true },
-              })
-            : [],
-    ])
-
-    const triggeredByDistributor = new Map<string, Set<string>>()
-    for (const b of triggeredBonuses) {
-        const set = triggeredByDistributor.get(b.inviterId) ?? new Set<string>()
-        set.add(b.milestoneId)
-        triggeredByDistributor.set(b.inviterId, set)
-    }
-
-    const [
-        orderCounts,
-        weeklyOrders,
-        commissionAll,
-        level1Settled,
-        level2Settled,
-        withdrawalPaid,
-        withdrawalPending,
-        inviteeCounts,
-        inviteeList,
-    ] =
-        ids.length > 0
-            ? await Promise.all([
-                  prisma.order.groupBy({
-                      by: ["distributorId"],
-                      where: { distributorId: { in: ids }, status: "COMPLETED" },
-                      _count: { id: true },
-                      _sum: { amount: true },
-                  }),
-                  prisma.order.groupBy({
-                      by: ["distributorId"],
-                      where: { distributorId: { in: ids }, status: "COMPLETED", paidAt: { gte: weekStart, lt: weekEnd } },
-                      _sum: { amount: true },
-                  }),
-                  prisma.commission.groupBy({
-                      by: ["distributorId"],
-                      where: { distributorId: { in: ids }, status: "SETTLED" },
-                      _sum: { amount: true },
-                  }),
-                  prisma.commission.groupBy({
-                      by: ["distributorId"],
-                      where: { distributorId: { in: ids }, level: 1, status: "SETTLED" },
-                      _sum: { amount: true },
-                  }),
-                  prisma.commission.groupBy({
-                      by: ["distributorId"],
-                      where: { distributorId: { in: ids }, level: 2, status: "SETTLED" },
-                      _sum: { amount: true },
-                  }),
-                  prisma.withdrawal.groupBy({
-                      by: ["distributorId"],
-                      where: { distributorId: { in: ids }, status: "PAID" },
-                      _sum: { amount: true },
-                  }),
-                  prisma.withdrawal.groupBy({
-                      by: ["distributorId"],
-                      where: { distributorId: { in: ids }, status: "PENDING" },
-                      _sum: { amount: true },
-                  }),
-                  prisma.user.groupBy({
-                      by: ["inviterId"],
-                      where: { inviterId: { in: ids } },
-                      _count: { id: true },
-                  }),
-                  prisma.user.findMany({
-                      where: { inviterId: { in: ids }, role: "DISTRIBUTOR" },
-                      select: { id: true, name: true, distributorCode: true, inviterId: true },
-                      orderBy: { name: "asc" },
-                  }),
-              ])
-            : [[], [], [], [], [], [], [], [], []]
-
-    const orderCountMap = new Map(
-        orderCounts.map((o) => [o.distributorId, o._count.id])
-    )
-    const salesTotalMap = new Map(
-        orderCounts.map((o) => [o.distributorId, Number(o._sum.amount ?? 0)])
-    )
-    const weeklyTotalMap = new Map(
-        weeklyOrders.map((o) => [o.distributorId, Number(o._sum.amount ?? 0)])
-    )
-    const commissionAllMap = new Map(
-        commissionAll.map((c) => [c.distributorId, Number(c._sum.amount ?? 0)])
-    )
-    const level1SettledMap = new Map(
-        level1Settled.map((c) => [c.distributorId, Number(c._sum.amount ?? 0)])
-    )
-    const level2SettledMap = new Map(
-        level2Settled.map((c) => [c.distributorId, Number(c._sum.amount ?? 0)])
-    )
-    const paidMap = new Map(
-        withdrawalPaid.map((w) => [w.distributorId, Number(w._sum.amount ?? 0)])
-    )
-    const pendingMap = new Map(
-        withdrawalPending.map((w) => [w.distributorId, Number(w._sum.amount ?? 0)])
-    )
-    const inviteeCountMap = new Map(
-        inviteeCounts.map((u) => [u.inviterId as string, u._count.id])
-    )
-    const inviteeListMap = new Map<string, { id: string; name: string; distributorCode: string | null }[]>()
-    for (const u of inviteeList) {
-        if (!u.inviterId) continue
-        const arr = inviteeListMap.get(u.inviterId) ?? []
-        arr.push({ id: u.id, name: u.name, distributorCode: u.distributorCode })
-        inviteeListMap.set(u.inviterId, arr)
-    }
-
-    // Split totalCommission into level1 + level2 for display
-    const level1AllMap = new Map<string, number>()
-    const level2AllMap = new Map<string, number>()
-    if (ids.length > 0) {
-        const [l1All, l2All] = await Promise.all([
-            prisma.commission.groupBy({
-                by: ["distributorId"],
-                where: { distributorId: { in: ids }, level: 1, status: "SETTLED" },
-                _sum: { amount: true },
-            }),
-            prisma.commission.groupBy({
-                by: ["distributorId"],
-                where: { distributorId: { in: ids }, level: 2, status: "SETTLED" },
-                _sum: { amount: true },
-            }),
-        ])
-        l1All.forEach((c) => level1AllMap.set(c.distributorId, Number(c._sum.amount ?? 0)))
-        l2All.forEach((c) => level2AllMap.set(c.distributorId, Number(c._sum.amount ?? 0)))
-    }
-
-    const data: DistributorRow[] = distributors.map((d) => {
-        const l1Settled = level1SettledMap.get(d.id) ?? 0
-        const l2Settled = level2SettledMap.get(d.id) ?? 0
-        const paid = paidMap.get(d.id) ?? 0
-        const pending = pendingMap.get(d.id) ?? 0
-        const withdrawableBalance = l1Settled + l2Settled - paid - pending
-        return {
-            id: d.id,
-            email: d.email,
-            username: d.username,
-            name: d.name,
-            distributorCode: d.distributorCode,
-            discountCodeEnabled: d.discountCodeEnabled,
-            discountPercent: d.discountPercent != null ? Number(d.discountPercent) : null,
-            disabledAt: d.disabledAt?.toISOString() ?? null,
-            createdAt: d.createdAt.toISOString(),
-            completedOrderCount: orderCountMap.get(d.id) ?? 0,
-            salesTotal: salesTotalMap.get(d.id) ?? 0,
-            weeklySalesTotal: weeklyTotalMap.get(d.id) ?? 0,
-            totalCommission: commissionAllMap.get(d.id) ?? 0,
-            level1CommissionTotal: level1AllMap.get(d.id) ?? 0,
-            level2CommissionTotal: level2AllMap.get(d.id) ?? 0,
-            level1Settled: l1Settled,
-            level2Settled: l2Settled,
-            paidTotal: paid,
-            pendingTotal: pending,
-            withdrawableBalance,
-            inviteeCount: inviteeCountMap.get(d.id) ?? 0,
-            invitees: inviteeListMap.get(d.id) ?? [],
-            inviter: d.inviter
-                ? {
-                      id: d.inviter.id,
-                      name: d.inviter.name,
-                      distributorCode: d.inviter.distributorCode,
-                  }
-                : null,
-            milestoneSummary: milestones.length > 0
-                ? (() => {
-                      const triggered = triggeredByDistributor.get(d.id) ?? new Set<string>()
-                      const next = milestones.find((m) => !triggered.has(m.id)) ?? null
-                      return {
-                          triggeredCount: triggered.size,
-                          nextMilestone: next
-                              ? {
-                                    thresholdAmount: Number(next.thresholdAmount),
-                                    thresholdCount: next.thresholdCount,
-                                    bonusAmount: Number(next.bonusAmount),
-                                }
-                              : null,
-                      }
-                  })()
-                : null,
-        }
-    })
+    const data = await buildDistributorViewRows(distributors)
 
     const statusCounts = { enabled: enabledCount, disabled: disabledCount }
     const tiers = tiersRaw.map((t) => ({

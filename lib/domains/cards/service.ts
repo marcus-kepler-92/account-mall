@@ -71,7 +71,7 @@ export async function bulkImportCards(
   if (contents.length === 0) throw new Error("No valid card contents to import")
 
   const oldUnsoldCount = await countUnsoldCards(productId)
-  const { count } = await createManyCards(productId, contents)
+  const { count } = await createManyCards(productId, contents, input.unitCost)
 
   if (oldUnsoldCount === 0 && count > 0) {
     notifyRestockSubscribers({

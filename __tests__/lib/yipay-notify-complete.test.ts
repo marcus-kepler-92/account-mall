@@ -136,7 +136,14 @@ describe("processYipayNotifyAndComplete", () => {
         expect(result).toEqual({ ok: true })
         expect(prismaMock.order.updateMany).toHaveBeenCalledWith({
             where: { id: "ord_1", status: "PENDING" },
-            data: { status: "COMPLETED", paidAt: expect.any(Date), costSnapshot: null },
+            data: {
+                status: "COMPLETED",
+                paidAt: expect.any(Date),
+                // Aggregated cost: card lacks unitCost in this fixture, so total is 0.
+                costTotalSnapshot: expect.objectContaining({
+                    toString: expect.any(Function),
+                }),
+            },
         })
         expect(prismaMock.card.updateMany).toHaveBeenCalledWith({
             where: { orderId: "ord_1", status: "RESERVED" },

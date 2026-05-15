@@ -174,14 +174,14 @@ describe("bulkImportCards", () => {
   it("deduplicates contents before import", async () => {
     ;(countUnsoldCards as jest.Mock).mockResolvedValue(1)
     ;(createManyCards as jest.Mock).mockResolvedValue({ count: 1 })
-    await bulkImportCards("prod_1", product, { contents: ["code1", "code1", "code1"] })
-    expect(createManyCards).toHaveBeenCalledWith("prod_1", ["code1"])
+    await bulkImportCards("prod_1", product, { contents: ["code1", "code1", "code1"], unitCost: null })
+    expect(createManyCards).toHaveBeenCalledWith("prod_1", ["code1"], null)
   })
 
   it("triggers restock notify when stock goes from 0 to non-zero", async () => {
     ;(countUnsoldCards as jest.Mock).mockResolvedValue(0)
     ;(createManyCards as jest.Mock).mockResolvedValue({ count: 2 })
-    await bulkImportCards("prod_1", product, { contents: ["code1", "code2"] })
+    await bulkImportCards("prod_1", product, { contents: ["code1", "code2"], unitCost: null })
     expect(notifyRestockSubscribers).toHaveBeenCalledWith({
       id: "prod_1",
       name: "Test Product",
@@ -193,15 +193,68 @@ describe("bulkImportCards", () => {
   it("does not trigger restock notify when stock was already non-zero", async () => {
     ;(countUnsoldCards as jest.Mock).mockResolvedValue(5)
     ;(createManyCards as jest.Mock).mockResolvedValue({ count: 2 })
-    await bulkImportCards("prod_1", product, { contents: ["code1", "code2"] })
+    await bulkImportCards("prod_1", product, { contents: ["code1", "code2"], unitCost: null })
     expect(notifyRestockSubscribers).not.toHaveBeenCalled()
   })
 
   it("returns imported count and total", async () => {
     ;(countUnsoldCards as jest.Mock).mockResolvedValue(0)
     ;(createManyCards as jest.Mock).mockResolvedValue({ count: 2 })
-    const result = await bulkImportCards("prod_1", product, { contents: ["code1", "code2"] })
+    const result = await bulkImportCards("prod_1", product, { contents: ["code1", "code2"], unitCost: null })
     expect(result).toEqual({ imported: 2, total: 2 })
+  })
+
+  it("passes unitCost through to createManyCards when provided", async () => {
+    ;(countUnsoldCards as jest.Mock).mockResolvedValue(0)
+    ;(createManyCards as jest.Mock).mockResolvedValue({ count: 2 })
+    await bulkImportCards("prod_1", product, { contents: ["code1", "code2"], unitCost: 5.5 })
+    expect(createManyCards).toHaveBeenCalledWith("prod_1", ["code1", "code2"], 5.5)
+  })
+
+  it("passes unitCost=0 (e.g. free batch) through to createManyCards", async () => {
+    ;(countUnsoldCards as jest.Mock).mockResolvedValue(0)
+    ;(createManyCards as jest.Mock).mockResolvedValue({ count: 1 })
+    await bulkImportCards("prod_1", product, { contents: ["code1"], unitCost: 0 })
+    expect(createManyCards).toHaveBeenCalledWith("prod_1", ["code1"], 0)
+  })
+})
+
+// ── bulkImportCardsSchema validation ──────────────────────────────────────────
+
+describe("bulkImportCardsSchema", () => {
+  const { bulkImportCardsSchema } = require("../validators") as {
+    bulkImportCardsSchema: import("zod").ZodType<{ contents: string[]; unitCost: number | null }>
+  }
+
+  it("accepts payload without unitCost (defaults to null)", () => {
+    const parsed = bulkImportCardsSchema.parse({ contents: ["c1"] })
+    expect(parsed).toEqual({ contents: ["c1"], unitCost: null })
+  })
+
+  it("accepts non-negative unitCost with 2 decimals", () => {
+    const parsed = bulkImportCardsSchema.parse({ contents: ["c1"], unitCost: 12.34 })
+    expect(parsed.unitCost).toBe(12.34)
+  })
+
+  it("rejects negative unitCost", () => {
+    expect(() => bulkImportCardsSchema.parse({ contents: ["c1"], unitCost: -1 })).toThrow()
+  })
+
+  it("rejects unitCost with more than 2 decimal places", () => {
+    expect(() => bulkImportCardsSchema.parse({ contents: ["c1"], unitCost: 0.123 })).toThrow()
+  })
+
+  it("rejects unitCost exceeding Decimal(10, 2) max", () => {
+    expect(() =>
+      bulkImportCardsSchema.parse({ contents: ["c1"], unitCost: 99999999999 }),
+    ).toThrow()
+  })
+
+  it("rejects NaN / Infinity unitCost", () => {
+    expect(() => bulkImportCardsSchema.parse({ contents: ["c1"], unitCost: Number.NaN })).toThrow()
+    expect(() =>
+      bulkImportCardsSchema.parse({ contents: ["c1"], unitCost: Number.POSITIVE_INFINITY }),
+    ).toThrow()
   })
 })
 

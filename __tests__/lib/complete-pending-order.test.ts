@@ -94,7 +94,14 @@ describe("completePendingOrder", () => {
     expect(result).toEqual({ done: true, orderNo: "order-1" });
     expect(prismaMock.order.updateMany).toHaveBeenCalledWith({
       where: { id: "ord_1", status: "PENDING" },
-      data: { status: "COMPLETED", paidAt: expect.any(Date), costSnapshot: null },
+      data: {
+        status: "COMPLETED",
+        paidAt: expect.any(Date),
+        // Aggregated cost across consumed cards; legacy fixture has no unitCost → 0.
+        costTotalSnapshot: expect.objectContaining({
+          toString: expect.any(Function),
+        }),
+      },
     });
     expect(prismaMock.card.updateMany).toHaveBeenCalledWith({
       where: { orderId: "ord_1", status: "RESERVED" },

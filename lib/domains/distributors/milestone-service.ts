@@ -9,7 +9,6 @@ import type { CreateMilestoneInput, UpdateMilestoneInput } from "./validators"
 
 function serializeMilestone(m: {
   id: string
-  type: string
   thresholdAmount: unknown
   thresholdCount: number
   bonusAmount: unknown
@@ -19,7 +18,6 @@ function serializeMilestone(m: {
 }): MilestoneRow {
   return {
     id: m.id,
-    type: m.type as "INVITATION" | "SALES",
     thresholdAmount: Number(m.thresholdAmount),
     thresholdCount: m.thresholdCount,
     bonusAmount: Number(m.bonusAmount),
@@ -31,7 +29,7 @@ function serializeMilestone(m: {
 
 export async function listInvitationMilestones(): Promise<MilestoneRow[]> {
   const rows = await prisma.invitationMilestone.findMany({
-    orderBy: { thresholdAmount: "asc" },
+    orderBy: { thresholdCount: "asc" },
   })
   return rows.map(serializeMilestone)
 }
@@ -42,7 +40,7 @@ export async function createInvitationMilestone(
   const maxSort = await prisma.invitationMilestone.aggregate({ _max: { sortOrder: true } })
   const nextSort = (maxSort._max.sortOrder ?? -1) + 1
   const row = await prisma.invitationMilestone.create({
-    data: { type: data.type, thresholdAmount: data.thresholdAmount, thresholdCount: data.thresholdCount, bonusAmount: data.bonusAmount, sortOrder: nextSort },
+    data: { thresholdAmount: data.thresholdAmount, thresholdCount: data.thresholdCount, bonusAmount: data.bonusAmount, sortOrder: nextSort },
   })
   return serializeMilestone(row)
 }
@@ -56,7 +54,6 @@ export async function updateInvitationMilestone(
   const row = await prisma.invitationMilestone.update({
     where: { id },
     data: {
-      ...(data.type !== undefined && { type: data.type }),
       ...(data.thresholdAmount !== undefined && { thresholdAmount: data.thresholdAmount }),
       ...(data.thresholdCount !== undefined && { thresholdCount: data.thresholdCount }),
       ...(data.bonusAmount !== undefined && { bonusAmount: data.bonusAmount }),
@@ -100,7 +97,10 @@ export async function listDistributorMilestoneBonuses(
   }
 }
 
-/** Called at order completion — checks SALES milestones for the invitee's inviter */
+/**
+ * Called at order completion.
+ * Triggers bonus when N invitees have each individually spent >= thresholdAmount since milestone creation.
+ */
 export async function checkAndIssueMilestoneBonuses(
   tx: Prisma.TransactionClient,
   distributorId: string,
@@ -119,10 +119,7 @@ export async function checkAndIssueMilestoneBonuses(
   if (!inviter || inviter.role !== "DISTRIBUTOR" || inviter.disabledAt !== null) return
 
   const [milestones, triggered] = await Promise.all([
-    tx.invitationMilestone.findMany({
-      where: { type: "SALES" },
-      orderBy: { thresholdAmount: "asc" },
-    }),
+    tx.invitationMilestone.findMany({ orderBy: { thresholdCount: "asc" } }),
     tx.invitationMilestoneBonus.findMany({
       where: { inviterId },
       select: { milestoneId: true },
@@ -141,7 +138,9 @@ export async function checkAndIssueMilestoneBonuses(
   if (inviteeIds.length === 0) return
 
   for (const milestone of untriggered) {
-    const result = await tx.order.aggregate({
+    // Count invitees who have each individually spent >= thresholdAmount since milestone creation
+    const salesByInvitee = await tx.order.groupBy({
+      by: ["distributorId"],
       where: {
         distributorId: { in: inviteeIds },
         status: "COMPLETED",
@@ -149,7 +148,10 @@ export async function checkAndIssueMilestoneBonuses(
       },
       _sum: { amount: true },
     })
-    if (Number(result._sum.amount ?? 0) < Number(milestone.thresholdAmount)) continue
+    const qualifiedCount = salesByInvitee.filter(
+      (g) => Number(g._sum.amount ?? 0) >= Number(milestone.thresholdAmount),
+    ).length
+    if (qualifiedCount < milestone.thresholdCount) continue
 
     try {
       await tx.invitationMilestoneBonus.create({
@@ -157,63 +159,7 @@ export async function checkAndIssueMilestoneBonuses(
           inviterId,
           milestoneId: milestone.id,
           thresholdSnapshot: milestone.thresholdAmount,
-          countSnapshot: inviteeIds.length,
-          amount: milestone.bonusAmount,
-        },
-      })
-    } catch (e) {
-      if ((e as { code?: string }).code === "P2002") continue
-      throw e
-    }
-  }
-}
-
-/** Called at distributor registration — checks INVITATION milestones for the new user's inviter */
-export async function checkAndIssueInvitationMilestoneBonuses(
-  tx: Prisma.TransactionClient,
-  newUserId: string,
-): Promise<void> {
-  const newUser = await tx.user.findUnique({
-    where: { id: newUserId },
-    select: { inviterId: true },
-  })
-  if (!newUser?.inviterId) return
-  const inviterId = newUser.inviterId
-
-  const inviter = await tx.user.findUnique({
-    where: { id: inviterId },
-    select: { role: true, disabledAt: true },
-  })
-  if (!inviter || inviter.role !== "DISTRIBUTOR" || inviter.disabledAt !== null) return
-
-  const [milestones, triggered] = await Promise.all([
-    tx.invitationMilestone.findMany({
-      where: { type: "INVITATION" },
-      orderBy: { thresholdCount: "asc" },
-    }),
-    tx.invitationMilestoneBonus.findMany({
-      where: { inviterId },
-      select: { milestoneId: true },
-    }),
-  ])
-  if (milestones.length === 0) return
-  const triggeredSet = new Set(triggered.map((b) => b.milestoneId))
-  const untriggered = milestones.filter((m) => !triggeredSet.has(m.id))
-  if (untriggered.length === 0) return
-
-  const inviteeCount = await tx.user.count({
-    where: { inviterId, role: "DISTRIBUTOR", disabledAt: null },
-  })
-
-  for (const milestone of untriggered) {
-    if (inviteeCount < milestone.thresholdCount) continue
-    try {
-      await tx.invitationMilestoneBonus.create({
-        data: {
-          inviterId,
-          milestoneId: milestone.id,
-          thresholdSnapshot: 0,
-          countSnapshot: inviteeCount,
+          countSnapshot: qualifiedCount,
           amount: milestone.bonusAmount,
         },
       })

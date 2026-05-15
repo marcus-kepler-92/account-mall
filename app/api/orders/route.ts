@@ -164,6 +164,8 @@ async function createAutoFetchOrder(params: {
                         content: cardContent,
                         status: "SOLD",
                         orderId: newOrder.id,
+                        // AUTO_FETCH accounts are scraped at runtime; there is no procurement cost.
+                        unitCost: 0,
                     },
                 })
                 if (crossSellPayload) {
@@ -226,6 +228,8 @@ async function createAutoFetchOrder(params: {
                         content: cardContent,
                         status: "RESERVED",
                         orderId: newOrder.id,
+                        // AUTO_FETCH accounts are scraped at runtime; there is no procurement cost.
+                        unitCost: 0,
                     },
                 })
                 if (crossSellPayload) {

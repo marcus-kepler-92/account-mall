@@ -1,21 +1,43 @@
 "use client"
 
-import { useQuery } from "@tanstack/react-query"
+import { useState } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { Check } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
-import { formatCurrency } from "@/lib/utils"
+import { cn, formatCurrency } from "@/lib/utils"
 import type {
   MilestoneReportResponse,
   MilestoneTierStat,
   MilestoneLeaderboardEntry,
 } from "@/app/api/admin/milestone-report/route"
+import { DistributorDetailSheet } from "@/app/admin/(main)/distributors/distributor-detail-sheet"
+import type { DistributorDetailResponse } from "@/app/api/admin/distributors/[id]/detail/route"
 
 export function DashboardMilestoneTab() {
+  const queryClient = useQueryClient()
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+
   const { data, isLoading, isError } = useQuery<MilestoneReportResponse>({
     queryKey: ["milestone-report"],
     queryFn: () => fetch("/api/admin/milestone-report").then((r) => r.json()),
     staleTime: 60_000,
   })
+
+  const detailQuery = useQuery<DistributorDetailResponse>({
+    queryKey: ["distributor-detail", selectedId],
+    queryFn: () =>
+      fetch(`/api/admin/distributors/${selectedId}/detail`).then((r) => r.json()),
+    enabled: !!selectedId,
+    staleTime: 30_000,
+  })
+
+  const handleSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ["milestone-report"] })
+    if (selectedId) {
+      queryClient.invalidateQueries({ queryKey: ["distributor-detail", selectedId] })
+    }
+  }
 
   if (isError) {
     return <p className="py-8 text-center text-sm text-muted-foreground">加载失败，请刷新重试</p>
@@ -51,25 +73,42 @@ export function DashboardMilestoneTab() {
           )}
       </div>
 
-      {/* Invitation milestones */}
-      <MilestoneSectionCard
-        title="邀请里程碑"
-        description="邀请 N 人即触发，与销售额无关"
-        tiers={data?.invitation.tiers ?? []}
-        leaderboard={data?.invitation.leaderboard ?? []}
-        type="INVITATION"
-        isLoading={isLoading}
-      />
+      {/* Tier config */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">档位配置</CardTitle>
+          <p className="text-xs text-muted-foreground">N 位下线各自消费满指定金额即触发，每档每人仅发放一次</p>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <Skeleton className="h-32 w-full" />
+          ) : !data?.tiers.length ? (
+            <p className="py-4 text-center text-sm text-muted-foreground">暂未配置里程碑</p>
+          ) : (
+            <TierTable tiers={data.tiers} />
+          )}
+        </CardContent>
+      </Card>
 
-      {/* Sales milestones */}
-      <MilestoneSectionCard
-        title="销售里程碑"
-        description="被邀团队累计销售额达到门槛即触发"
-        tiers={data?.sales.tiers ?? []}
-        leaderboard={data?.sales.leaderboard ?? []}
-        type="SALES"
-        isLoading={isLoading}
-      />
+      {/* Progress matrix */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">分销员里程碑进度</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            ✓ 已发放奖励 &nbsp;·&nbsp; 数字 = 已达标人数 / 目标人数
+            {data?.tiers[0] ? `（达标：各自消费满 ${formatCurrency(data.tiers[0].thresholdAmount)}）` : ""}
+          </p>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <Skeleton className="h-48 w-full" />
+          ) : !data?.leaderboard.length ? (
+            <p className="py-4 text-center text-sm text-muted-foreground">暂无数据</p>
+          ) : (
+            <ProgressMatrix tiers={data.tiers} leaderboard={data.leaderboard} onSelectId={setSelectedId} />
+          )}
+        </CardContent>
+      </Card>
 
       {/* New distributors this month */}
       <Card>
@@ -94,9 +133,23 @@ export function DashboardMilestoneTab() {
                 <tbody>
                   {data.newDistributors.map((d) => (
                     <tr key={d.id} className="border-b last:border-0">
-                      <td className="px-3 py-2">{d.name ?? d.email}</td>
+                      <td className="px-3 py-2">
+                        <button
+                          onClick={() => setSelectedId(d.id)}
+                          className="hover:underline underline-offset-2 text-left"
+                        >
+                          {d.name ?? d.email}
+                        </button>
+                      </td>
                       <td className="px-3 py-2 text-xs text-muted-foreground">
-                        {d.inviterName ?? d.inviterEmail ?? (
+                        {d.inviterId ? (
+                          <button
+                            onClick={() => setSelectedId(d.inviterId!)}
+                            className="hover:underline underline-offset-2 text-left"
+                          >
+                            {d.inviterName ?? d.inviterEmail}
+                          </button>
+                        ) : (
                           <span className="italic">直接注册</span>
                         )}
                       </td>
@@ -117,136 +170,105 @@ export function DashboardMilestoneTab() {
           )}
         </CardContent>
       </Card>
+
+      <DistributorDetailSheet
+        row={detailQuery.data?.row ?? null}
+        tiers={detailQuery.data?.tiers ?? []}
+        open={!!selectedId && !!detailQuery.data}
+        onOpenChange={(o) => { if (!o) setSelectedId(null) }}
+        onSuccess={handleSuccess}
+      />
     </div>
   )
 }
 
-function MilestoneSectionCard({
-  title,
-  description,
-  tiers,
-  leaderboard,
-  type,
-  isLoading,
-}: {
-  title: string
-  description: string
-  tiers: MilestoneTierStat[]
-  leaderboard: MilestoneLeaderboardEntry[]
-  type: "INVITATION" | "SALES"
-  isLoading: boolean
-}) {
+function TierTable({ tiers }: { tiers: MilestoneTierStat[] }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">{title}</CardTitle>
-        <p className="text-xs text-muted-foreground">{description}</p>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {isLoading ? (
-          <Skeleton className="h-24 w-full" />
-        ) : tiers.length === 0 ? (
-          <p className="text-sm text-muted-foreground">暂未配置该类型里程碑</p>
-        ) : (
-          <>
-            {/* Tier overview table */}
-            <div className="overflow-x-auto rounded-md border">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/50 text-xs text-muted-foreground">
-                    <th className="px-3 py-2 text-left">门槛</th>
-                    <th className="px-3 py-2 text-right">奖金</th>
-                    <th className="px-3 py-2 text-right">已触发人数</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tiers.map((t) => (
-                    <tr key={t.id} className="border-b last:border-0">
-                      <td className="px-3 py-2">
-                        {type === "INVITATION"
-                          ? `邀请 ${t.thresholdCount} 人`
-                          : formatCurrency(t.thresholdAmount)}
-                      </td>
-                      <td className="px-3 py-2 text-right font-medium text-green-600">
-                        +{formatCurrency(t.bonusAmount)}
-                      </td>
-                      <td className="px-3 py-2 text-right font-semibold">{t.triggeredCount} 人</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Leaderboard with progress bars */}
-            {leaderboard.length > 0 && (
-              <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  {type === "INVITATION" ? "邀请排行榜" : "销售排行榜"} · 进度
-                </p>
-                <div className="space-y-2">
-                  {leaderboard.map((entry) => (
-                    <LeaderboardRow key={entry.inviterId} entry={entry} type={type} />
-                  ))}
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </CardContent>
-    </Card>
+    <div className="overflow-x-auto rounded-md border">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b bg-muted/50 text-xs text-muted-foreground">
+            <th className="px-3 py-2 text-right">达标人数</th>
+            <th className="px-3 py-2 text-right">每人消费</th>
+            <th className="px-3 py-2 text-right">奖励</th>
+            <th className="px-3 py-2 text-right">已触发</th>
+          </tr>
+        </thead>
+        <tbody>
+          {tiers.map((t) => (
+            <tr key={t.id} className="border-b last:border-0">
+              <td className="px-3 py-2 text-right font-medium">{t.thresholdCount} 人</td>
+              <td className="px-3 py-2 text-right text-muted-foreground">{formatCurrency(t.thresholdAmount)}</td>
+              <td className="px-3 py-2 text-right font-medium text-green-600">+{formatCurrency(t.bonusAmount)}</td>
+              <td className="px-3 py-2 text-right text-muted-foreground">{t.triggeredCount} 次</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }
 
-function LeaderboardRow({
-  entry,
-  type,
+function ProgressMatrix({
+  tiers,
+  leaderboard,
+  onSelectId,
 }: {
-  entry: MilestoneLeaderboardEntry
-  type: "INVITATION" | "SALES"
+  tiers: MilestoneTierStat[]
+  leaderboard: MilestoneLeaderboardEntry[]
+  onSelectId: (id: string) => void
 }) {
-  const isNearTrigger =
-    !entry.isCapped &&
-    entry.nextTierId !== null &&
-    (type === "INVITATION"
-      ? entry.nextTierGap <= 2
-      : entry.nextTierGap / (entry.value + entry.nextTierGap) <= 0.2)
-
-  const progressPct =
-    entry.nextTierId !== null
-      ? Math.min(100, Math.round((entry.value / (entry.value + entry.nextTierGap)) * 100))
-      : 0
-
   return (
-    <div className="flex items-center gap-3 text-sm">
-      <span className="w-28 truncate font-medium">{entry.name ?? entry.email}</span>
-      <span className="w-24 text-right tabular-nums">
-        {type === "INVITATION" ? `${entry.value} 人` : formatCurrency(entry.value)}
-      </span>
-      <div className="min-w-[80px] flex-1">
-        {entry.isCapped ? (
-          <span className="inline-block rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
-            已满档
-          </span>
-        ) : entry.nextTierId ? (
-          <div className="space-y-0.5">
-            <div className="h-1.5 w-full rounded-full bg-muted">
-              <div
-                className="h-1.5 rounded-full bg-foreground"
-                style={{ width: `${progressPct}%` }}
-              />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              差{" "}
-              {type === "INVITATION"
-                ? `${entry.nextTierGap} 人`
-                : formatCurrency(entry.nextTierGap)}
-            </p>
-          </div>
-        ) : null}
-      </div>
-      {isNearTrigger && (
-        <span className="text-xs font-medium text-amber-600">即将触发</span>
-      )}
+    <div className="overflow-x-auto rounded-md border">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b bg-muted/50 text-xs text-muted-foreground">
+            <th className="sticky left-0 z-10 border-r bg-muted/50 px-3 py-2 text-left">分销员</th>
+            <th className="px-3 py-2 text-right">达标</th>
+            {tiers.map((t) => (
+              <th key={t.id} className="whitespace-nowrap px-2 py-2 text-center">
+                {t.thresholdCount}人
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {leaderboard.map((entry) => (
+            <tr key={entry.inviterId} className="border-b last:border-0">
+              <td className="sticky left-0 z-10 border-r bg-card px-3 py-2 font-medium">
+                <button
+                  onClick={() => onSelectId(entry.inviterId)}
+                  className="block max-w-28 truncate text-left hover:underline underline-offset-2 sm:max-w-40"
+                >
+                  {entry.name ?? entry.email}
+                </button>
+              </td>
+              <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                {entry.qualifiedCount}
+              </td>
+              {tiers.map((t) => {
+                const triggered = entry.triggeredMilestoneIds.includes(t.id)
+                return (
+                  <td key={t.id} className="px-2 py-2 text-center">
+                    {triggered ? (
+                      <Check className="mx-auto size-3.5 text-green-600" />
+                    ) : (
+                      <span
+                        className={cn(
+                          "tabular-nums text-xs",
+                          entry.qualifiedCount > 0 ? "text-foreground" : "text-muted-foreground",
+                        )}
+                      >
+                        {entry.qualifiedCount}/{t.thresholdCount}
+                      </span>
+                    )}
+                  </td>
+                )
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }

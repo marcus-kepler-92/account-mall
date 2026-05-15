@@ -28,6 +28,10 @@ export type TestProduct = {
 /**
  * 创建 E2E 测试专用商品和卡密。
  * 每个测试文件应在 beforeAll 中调用，传入唯一 slug。
+ *
+ * `cardUnitCost` (optional): persisted on every UNSOLD card created here. Use this in
+ * cost/profit related E2E flows to assert that costTotalSnapshot aggregates correctly
+ * once an order completes.
  */
 export async function createTestProduct(opts: {
     slug: string
@@ -35,8 +39,9 @@ export async function createTestProduct(opts: {
     price?: number
     maxQuantity?: number
     cardCount: number
+    cardUnitCost?: number | null
 }): Promise<TestProduct> {
-    const { slug, name, price = 0.01, maxQuantity = 5, cardCount } = opts
+    const { slug, name, price = 0.01, maxQuantity = 5, cardCount, cardUnitCost = null } = opts
 
     // 幂等：已存在则复用
     let product = await prisma.product.findUnique({ where: { slug } })
@@ -64,11 +69,33 @@ export async function createTestProduct(opts: {
                 productId: product!.id,
                 content: `${slug}-card-${Date.now()}-${i}`,
                 status: "UNSOLD" as const,
+                unitCost: cardUnitCost,
             })),
         })
     }
 
     return { id: product.id, slug: product.slug, path: `/products/${product.id}-${product.slug}` }
+}
+
+/**
+ * Fetch an order's authoritative cost snapshot fields. Used by cost-tracking E2E
+ * assertions to verify completePendingOrder's aggregation.
+ */
+export async function getOrderCostSnapshot(orderNo: string): Promise<{
+    costTotalSnapshot: number | null
+    costSnapshot: number | null
+    status: string
+} | null> {
+    const order = await prisma.order.findFirst({
+        where: { orderNo },
+        select: { costTotalSnapshot: true, costSnapshot: true, status: true },
+    })
+    if (!order) return null
+    return {
+        costTotalSnapshot: order.costTotalSnapshot == null ? null : Number(order.costTotalSnapshot),
+        costSnapshot: order.costSnapshot == null ? null : Number(order.costSnapshot),
+        status: order.status,
+    }
 }
 
 /**

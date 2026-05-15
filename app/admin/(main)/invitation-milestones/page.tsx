@@ -12,7 +12,6 @@ export default async function InvitationMilestonesPage() {
 
     const data: MilestoneRow[] = milestones.map((m) => ({
         id: m.id,
-        type: m.type,
         thresholdAmount: m.thresholdAmount,
         thresholdCount: m.thresholdCount,
         bonusAmount: m.bonusAmount,
@@ -32,7 +31,7 @@ export default async function InvitationMilestonesPage() {
                 <CardHeader>
                     <CardTitle>里程碑档位</CardTitle>
                     <CardDescription>
-                        创建时间即为该档位的销售额起算日，此前的历史销售不计入。
+                        当 N 位下线各自累计消费满指定金额时触发。创建时间为起算日，此前消费不计入。
                     </CardDescription>
                 </CardHeader>
                 <CardContent>

@@ -122,7 +122,7 @@ export function DashboardSalesTab({
       {/* KPI row */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Card>
-          <CardContent className="pt-4">
+          <CardContent >
             <p className="text-xs text-muted-foreground">订单数</p>
             {isLoading ? (
               <Skeleton className="mt-1 h-7 w-16" />

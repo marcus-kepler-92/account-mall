@@ -1,7 +1,6 @@
 jest.mock("../repository")
 jest.mock("../milestone-service", () => ({
   checkAndIssueMilestoneBonuses: jest.fn().mockResolvedValue(undefined),
-  checkAndIssueInvitationMilestoneBonuses: jest.fn().mockResolvedValue(undefined),
 }))
 jest.mock("@/lib/prisma", () => {
   const { prismaMock } = require("../../../../__mocks__/prisma")
@@ -29,7 +28,7 @@ jest.mock("@/app/emails/distributor-invitation", () => ({ DistributorInvitation:
 jest.mock("better-auth/crypto", () => ({ hashPassword: jest.fn().mockResolvedValue("hashed") }))
 
 import * as repo from "../repository"
-import { checkAndIssueMilestoneBonuses, checkAndIssueInvitationMilestoneBonuses } from "../milestone-service"
+import { checkAndIssueMilestoneBonuses } from "../milestone-service"
 import { prismaMock } from "../../../../__mocks__/prisma"
 import {
   updateDistributor,
@@ -56,7 +55,6 @@ import {
 } from "../types"
 
 const checkMilestoneMock = checkAndIssueMilestoneBonuses as jest.Mock
-const checkInvitationMilestoneMock = checkAndIssueInvitationMilestoneBonuses as jest.Mock
 
 beforeEach(() => {
   jest.clearAllMocks()
@@ -396,23 +394,10 @@ describe("acceptInvite - invitation milestone check", () => {
     ;(repo.createAccountRecord as jest.Mock).mockResolvedValue({})
   })
 
-  it("calls checkAndIssueInvitationMilestoneBonuses with inviterId when inviter is a DISTRIBUTOR", async () => {
+  it("does NOT call checkAndIssueMilestoneBonuses on acceptInvite (milestone check happens at order completion)", async () => {
     await acceptInvite("tok", { token: "tok", name: "Alice", password: "pass1234" })
 
-    expect(checkInvitationMilestoneMock).toHaveBeenCalledTimes(1)
-    expect(checkInvitationMilestoneMock).toHaveBeenCalledWith(prismaMock, "new_user")
-  })
-
-  it("does NOT call checkAndIssueInvitationMilestoneBonuses when inviter is an ADMIN", async () => {
-    ;(repo.findInvitationByToken as jest.Mock).mockResolvedValue({
-      ...validInvitation,
-      inviterId: "admin1",
-      inviter: { role: "ADMIN" },
-    })
-
-    await acceptInvite("tok", { token: "tok", name: "Alice", password: "pass1234" })
-
-    expect(checkInvitationMilestoneMock).not.toHaveBeenCalled()
+    expect(checkMilestoneMock).not.toHaveBeenCalled()
   })
 })
 
