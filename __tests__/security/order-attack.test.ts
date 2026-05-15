@@ -290,6 +290,11 @@ describe("Security: Injection and malicious input", () => {
             riskWarningCountdown: null,
             riskWarningConfirmText: null,
             sortOrder: 0,
+            costPerUnit: null,
+            couponEnabled: false,
+            purchaseLimitEnabled: false,
+            purchaseLimitQuantity: 1,
+            excludeFromAttribution: false,
             createdAt: new Date(),
             updatedAt: new Date(),
         })
@@ -398,6 +403,11 @@ describe("Security: Mass assignment and privilege", () => {
             riskWarningCountdown: null,
             riskWarningConfirmText: null,
             sortOrder: 0,
+            costPerUnit: null,
+            couponEnabled: false,
+            purchaseLimitEnabled: false,
+            purchaseLimitQuantity: 1,
+            excludeFromAttribution: false,
             createdAt: new Date(),
             updatedAt: new Date(),
         })

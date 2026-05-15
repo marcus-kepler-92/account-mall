@@ -35,6 +35,11 @@ describe("Product model", () => {
     riskWarningCountdown: null,
     riskWarningConfirmText: null,
     sortOrder: 0,
+    costPerUnit: null,
+    couponEnabled: false,
+    purchaseLimitEnabled: false,
+    purchaseLimitQuantity: 1,
+    excludeFromAttribution: false,
     createdAt: new Date("2026-01-01"),
     updatedAt: new Date("2026-01-01"),
   };
@@ -336,6 +341,9 @@ describe("Order model", () => {
     fingerprintHash: null,
     exitDiscountMeta: null,
     switchAccountCount: 0,
+    unitPriceSnapshot: null,
+    costSnapshot: null,
+    paymentChannelId: null,
     createdAt: new Date("2026-01-01"),
     updatedAt: new Date("2026-01-01"),
   };
@@ -476,6 +484,7 @@ describe("Enum default values", () => {
       riskWarningCountdown: null,
       riskWarningConfirmText: null,
       sortOrder: 0,
+      costPerUnit: null,
       couponEnabled: false,
       purchaseLimitEnabled: false,
       purchaseLimitQuantity: 1,
@@ -531,6 +540,9 @@ describe("Enum default values", () => {
       fingerprintHash: null,
       exitDiscountMeta: null,
       switchAccountCount: 0,
+      unitPriceSnapshot: null,
+      costSnapshot: null,
+      paymentChannelId: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -788,6 +800,8 @@ describe("DistributorInvitation model", () => {
     inviterId: "dist_A",
     expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     acceptedAt: null,
+    maxUses: 1,
+    usedCount: 0,
     createdAt: new Date(),
   };
 
