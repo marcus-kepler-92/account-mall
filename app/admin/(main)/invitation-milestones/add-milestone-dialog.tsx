@@ -18,23 +18,28 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { DialogFooter } from "@/components/ui/dialog"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { ModalForm } from "@/app/admin/components"
 
 const schema = z.object({
-    thresholdAmount: z
-        .string()
-        .min(1, "请输入门槛金额")
-        .refine((v) => !Number.isNaN(Number(v)), "请输入有效数字")
-        .refine((v) => Number(v) > 0, "必须大于 0"),
-    thresholdCount: z
-        .string()
-        .min(1, "请输入达标人数")
-        .refine((v) => Number.isInteger(Number(v)) && Number(v) >= 1, "至少 1 人（整数）"),
+    type: z.enum(["INVITATION", "SALES"]),
+    thresholdCount: z.string().optional(),
+    thresholdAmount: z.string().optional(),
     bonusAmount: z
         .string()
         .min(1, "请输入奖励金额")
-        .refine((v) => !Number.isNaN(Number(v)), "请输入有效数字")
-        .refine((v) => Number(v) > 0, "必须大于 0"),
+        .refine((v) => !Number.isNaN(Number(v)) && Number(v) > 0, "必须大于 0"),
+}).superRefine((data, ctx) => {
+    if (data.type === "INVITATION") {
+        if (!data.thresholdCount || !Number.isInteger(Number(data.thresholdCount)) || Number(data.thresholdCount) < 1) {
+            ctx.addIssue({ code: "custom", message: "邀请人数至少为 1（整数）", path: ["thresholdCount"] })
+        }
+    }
+    if (data.type === "SALES") {
+        if (!data.thresholdAmount || isNaN(Number(data.thresholdAmount)) || Number(data.thresholdAmount) <= 0) {
+            ctx.addIssue({ code: "custom", message: "门槛金额必须大于 0", path: ["thresholdAmount"] })
+        }
+    }
 })
 type FormValues = z.infer<typeof schema>
 
@@ -43,8 +48,9 @@ export function AddMilestoneDialog() {
     const [open, setOpen] = useState(false)
     const form = useForm<FormValues>({
         resolver: zodResolver(schema),
-        defaultValues: { thresholdAmount: "", thresholdCount: "", bonusAmount: "" },
+        defaultValues: { type: "INVITATION" as const, thresholdCount: "", thresholdAmount: "", bonusAmount: "" },
     })
+    const watchedType = form.watch("type")
 
     const onSubmit = async (values: FormValues) => {
         try {
@@ -52,8 +58,9 @@ export function AddMilestoneDialog() {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    thresholdAmount: parseFloat(values.thresholdAmount),
-                    thresholdCount: parseInt(values.thresholdCount),
+                    type: values.type,
+                    thresholdCount: values.type === "INVITATION" ? parseInt(values.thresholdCount!) : 0,
+                    thresholdAmount: values.type === "SALES" ? parseFloat(values.thresholdAmount!) : 0,
                     bonusAmount: parseFloat(values.bonusAmount),
                 }),
             })
@@ -91,30 +98,60 @@ export function AddMilestoneDialog() {
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                     <FormField
                         control={form.control}
-                        name="thresholdAmount"
+                        name="type"
                         render={({ field }) => (
                             <FormItem>
-                                <FormLabel>累计销售额门槛（元）</FormLabel>
+                                <FormLabel>里程碑类型</FormLabel>
                                 <FormControl>
-                                    <Input type="number" min={0} step="0.01" placeholder="500" {...field} />
+                                    <RadioGroup
+                                        value={field.value}
+                                        onValueChange={field.onChange}
+                                        className="flex gap-4"
+                                    >
+                                        <div className="flex items-center gap-1.5">
+                                            <RadioGroupItem value="INVITATION" id="add-type-invitation" />
+                                            <label htmlFor="add-type-invitation" className="text-sm cursor-pointer">邀请里程碑</label>
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                            <RadioGroupItem value="SALES" id="add-type-sales" />
+                                            <label htmlFor="add-type-sales" className="text-sm cursor-pointer">销售里程碑</label>
+                                        </div>
+                                    </RadioGroup>
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
                         )}
                     />
-                    <FormField
-                        control={form.control}
-                        name="thresholdCount"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>达标人数</FormLabel>
-                                <FormControl>
-                                    <Input type="number" min={1} step={1} placeholder="3" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
+                    {watchedType === "INVITATION" && (
+                        <FormField
+                            control={form.control}
+                            name="thresholdCount"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>达标人数</FormLabel>
+                                    <FormControl>
+                                        <Input type="number" min={1} step={1} placeholder="3" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    )}
+                    {watchedType === "SALES" && (
+                        <FormField
+                            control={form.control}
+                            name="thresholdAmount"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>累计销售额门槛（元）</FormLabel>
+                                    <FormControl>
+                                        <Input type="number" min={0} step="0.01" placeholder="500" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    )}
                     <FormField
                         control={form.control}
                         name="bonusAmount"

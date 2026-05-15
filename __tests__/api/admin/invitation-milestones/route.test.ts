@@ -70,10 +70,10 @@ describe("POST /api/admin/invitation-milestones", () => {
 
   it("creates milestone and returns 201", async () => {
     ;(createInvitationMilestone as jest.Mock).mockResolvedValue(mockMilestone)
-    const res = await POST(makeReq({ thresholdAmount: 1000, bonusAmount: 50, thresholdCount: 3 }))
+    const res = await POST(makeReq({ type: "INVITATION", thresholdAmount: 1000, bonusAmount: 50, thresholdCount: 3 }))
     expect(res.status).toBe(201)
     const body = await res.json()
     expect(body.id).toBe("m1")
-    expect(createInvitationMilestone).toHaveBeenCalledWith({ thresholdAmount: 1000, bonusAmount: 50, thresholdCount: 3 })
+    expect(createInvitationMilestone).toHaveBeenCalledWith({ type: "INVITATION", thresholdAmount: 1000, bonusAmount: 50, thresholdCount: 3 })
   })
 })

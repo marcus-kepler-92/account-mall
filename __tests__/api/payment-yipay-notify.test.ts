@@ -160,7 +160,7 @@ describe("POST /api/payment/yipay/notify", () => {
         expect(prismaMock.order.updateMany).toHaveBeenCalledWith(
             expect.objectContaining({
                 where: { id: "ord_1", status: "PENDING" },
-                data: { status: "COMPLETED", paidAt: expect.any(Date) },
+                data: expect.objectContaining({ status: "COMPLETED", paidAt: expect.any(Date) }),
             }),
         )
         expect(prismaMock.card.updateMany).toHaveBeenCalledWith(

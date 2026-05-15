@@ -24,9 +24,9 @@ import {
 } from "@/components/ui/alert-dialog"
 import { EditMilestoneDialog } from "./edit-milestone-dialog"
 
-type Props = { id: string; thresholdAmount: number; thresholdCount: number; bonusAmount: number }
+type Props = { id: string; type: "INVITATION" | "SALES"; thresholdAmount: number; thresholdCount: number; bonusAmount: number }
 
-export function InvitationMilestoneRowActions({ id, thresholdAmount, thresholdCount, bonusAmount }: Props) {
+export function InvitationMilestoneRowActions({ id, type, thresholdAmount, thresholdCount, bonusAmount }: Props) {
     const router = useRouter()
     const [editOpen, setEditOpen] = useState(false)
     const [deleteOpen, setDeleteOpen] = useState(false)
@@ -75,6 +75,7 @@ export function InvitationMilestoneRowActions({ id, thresholdAmount, thresholdCo
 
             <EditMilestoneDialog
                 id={id}
+                type={type}
                 thresholdAmount={thresholdAmount}
                 thresholdCount={thresholdCount}
                 bonusAmount={bonusAmount}

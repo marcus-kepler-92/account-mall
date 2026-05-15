@@ -36,7 +36,7 @@ describe("GET /api/tags", () => {
                 slug: "game",
                 createdAt: new Date(),
                 updatedAt: new Date(),
-                products: [{ id: "p1" }, { id: "p2" }, { id: "p3" }],
+                _count: { products: 3 },
             },
         ]
         prismaMock.tag.findMany.mockResolvedValueOnce(tags)
@@ -54,9 +54,8 @@ describe("GET /api/tags", () => {
         })
         expect(prismaMock.tag.findMany).toHaveBeenCalledWith({
             include: {
-                products: {
-                    where: { status: "ACTIVE" },
-                    select: { id: true },
+                _count: {
+                    select: { products: { where: { status: "ACTIVE" } } },
                 },
             },
             orderBy: { name: "asc" },

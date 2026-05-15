@@ -7,6 +7,7 @@ import { InvitationMilestoneRowActions } from "./invitation-milestones-row-actio
 
 export type MilestoneRow = {
     id: string
+    type: "INVITATION" | "SALES"
     thresholdAmount: number
     thresholdCount: number
     bonusAmount: number
@@ -15,6 +16,19 @@ export type MilestoneRow = {
 }
 
 export const invitationMilestonesColumns: ColumnDef<MilestoneRow>[] = [
+    {
+        accessorKey: "type",
+        header: () => <div>类型</div>,
+        cell: ({ row }) => (
+            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                row.original.type === "INVITATION"
+                    ? "bg-blue-50 text-blue-700"
+                    : "bg-purple-50 text-purple-700"
+            }`}>
+                {row.original.type === "INVITATION" ? "邀请" : "销售"}
+            </span>
+        ),
+    },
     {
         accessorKey: "thresholdAmount",
         header: ({ column }) => (
@@ -60,6 +74,7 @@ export const invitationMilestonesColumns: ColumnDef<MilestoneRow>[] = [
         cell: ({ row }) => (
             <InvitationMilestoneRowActions
                 id={row.original.id}
+                type={row.original.type}
                 thresholdAmount={row.original.thresholdAmount}
                 thresholdCount={row.original.thresholdCount}
                 bonusAmount={row.original.bonusAmount}

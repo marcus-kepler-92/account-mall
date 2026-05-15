@@ -42,8 +42,14 @@ function makeTxMock(executeRawResult = 1, extraOverrides: Record<string, unknown
         await fn({
             ...prismaMock,
             $executeRaw: jest.fn().mockResolvedValue(executeRawResult),
-            user: { create: jest.fn().mockResolvedValue({ id: "new_user" }) },
+            user: {
+                create: jest.fn().mockResolvedValue({ id: "new_user" }),
+                // checkAndIssueInvitationMilestoneBonuses looks up inviterId; return null to short-circuit
+                findUnique: jest.fn().mockResolvedValue({ inviterId: null }),
+            },
             account: { create: jest.fn().mockResolvedValue({}) },
+            invitationMilestone: { findMany: jest.fn().mockResolvedValue([]) },
+            invitationMilestoneBonus: { findMany: jest.fn().mockResolvedValue([]) },
             ...extraOverrides,
         })
     }
@@ -137,8 +143,10 @@ describe("POST /api/distributor/accept-invite", () => {
             await fn({
                 ...prismaMock,
                 $executeRaw: jest.fn().mockResolvedValue(1),
-                user: { create: userCreateMock },
+                user: { create: userCreateMock, findUnique: jest.fn().mockResolvedValue({ inviterId: null }) },
                 account: { create: jest.fn().mockResolvedValue({}) },
+                invitationMilestone: { findMany: jest.fn().mockResolvedValue([]) },
+                invitationMilestoneBonus: { findMany: jest.fn().mockResolvedValue([]) },
             })
             userCreateArgs = userCreateMock.mock.calls[0][0]
         })
@@ -160,8 +168,10 @@ describe("POST /api/distributor/accept-invite", () => {
             await fn({
                 ...prismaMock,
                 $executeRaw: jest.fn().mockResolvedValue(1),
-                user: { create: userCreateMock },
+                user: { create: userCreateMock, findUnique: jest.fn().mockResolvedValue({ inviterId: null }) },
                 account: { create: jest.fn().mockResolvedValue({}) },
+                invitationMilestone: { findMany: jest.fn().mockResolvedValue([]) },
+                invitationMilestoneBonus: { findMany: jest.fn().mockResolvedValue([]) },
             })
             userCreateArgs = userCreateMock.mock.calls[0][0]
         })
@@ -288,8 +298,10 @@ describe("POST /api/distributor/accept-invite", () => {
             await fn({
                 ...prismaMock,
                 $executeRaw: jest.fn().mockResolvedValue(1),
-                user: { create: userCreateMock },
+                user: { create: userCreateMock, findUnique: jest.fn().mockResolvedValue({ inviterId: null }) },
                 account: { create: jest.fn().mockResolvedValue({}) },
+                invitationMilestone: { findMany: jest.fn().mockResolvedValue([]) },
+                invitationMilestoneBonus: { findMany: jest.fn().mockResolvedValue([]) },
             })
             userCreateArgs = userCreateMock.mock.calls[0][0]
         })
@@ -334,8 +346,10 @@ describe("POST /api/distributor/accept-invite", () => {
             await fn({
                 ...prismaMock,
                 $executeRaw: jest.fn().mockResolvedValue(1),
-                user: { create: userCreateMock },
+                user: { create: userCreateMock, findUnique: jest.fn().mockResolvedValue({ inviterId: null }) },
                 account: { create: jest.fn().mockResolvedValue({}) },
+                invitationMilestone: { findMany: jest.fn().mockResolvedValue([]) },
+                invitationMilestoneBonus: { findMany: jest.fn().mockResolvedValue([]) },
             })
             userCreateArgs = userCreateMock.mock.calls[0][0]
         })

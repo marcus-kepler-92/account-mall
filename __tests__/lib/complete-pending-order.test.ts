@@ -94,7 +94,7 @@ describe("completePendingOrder", () => {
     expect(result).toEqual({ done: true, orderNo: "order-1" });
     expect(prismaMock.order.updateMany).toHaveBeenCalledWith({
       where: { id: "ord_1", status: "PENDING" },
-      data: { status: "COMPLETED", paidAt: expect.any(Date) },
+      data: { status: "COMPLETED", paidAt: expect.any(Date), costSnapshot: null },
     });
     expect(prismaMock.card.updateMany).toHaveBeenCalledWith({
       where: { orderId: "ord_1", status: "RESERVED" },

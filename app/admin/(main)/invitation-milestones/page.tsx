@@ -12,6 +12,7 @@ export default async function InvitationMilestonesPage() {
 
     const data: MilestoneRow[] = milestones.map((m) => ({
         id: m.id,
+        type: m.type,
         thresholdAmount: m.thresholdAmount,
         thresholdCount: m.thresholdCount,
         bonusAmount: m.bonusAmount,
