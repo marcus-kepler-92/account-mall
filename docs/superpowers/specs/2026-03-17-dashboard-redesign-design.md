@@ -77,8 +77,11 @@ costSnapshot: product.costPerUnit ?? null,
 真实利润 = 营收 − Σ(quantity × costSnapshot) − 分销佣金 − 里程碑奖金
 ```
 
-- 订单 `costSnapshot` 为 null → 该订单不计入成本，利润行显示「未设成本」
-- 任意商品成本未设置 → 利润总计旁加 ⚠ 标注「部分成本未录入，利润偏高」
+**null 处理（partial sum，行业惯例）**：Shopify、QuickBooks 等财务工具的标准做法是计算有据可查的部分、标注缺失部分，而非因部分缺失就隐藏全部数字。
+
+- 订单 `costSnapshot` 为 null → 该订单跳过（不计入成本累加），其余正常求和
+- 任何一笔订单 costSnapshot 为 null → 成本合计和净利润旁显示 ⚠「部分商品未设成本，实际成本偏低」
+- 全部订单 costSnapshot 均为 null → 成本格显示「—」，净利润不含成本项，标注说明
 
 ### 2.4 Product 表单
 
@@ -138,7 +141,7 @@ SSR 渲染（`page.tsx` 直接查 Prisma），今日 HKT 范围，不受 Tab 时
 | 指标 | 计算 |
 |------|------|
 | 总营收 | `sum(order.amount)` COMPLETED |
-| 采购成本 | `sum(order.quantity × costSnapshot)`，null → 显示「—」 |
+| 采购成本 | `sum(quantity × costSnapshot)`（跳过 null 项），全为 null 时显示「—」，部分 null 加 ⚠ |
 | 佣金支出 | 期间 commission 总额（status ≠ CANCELLED） |
 | 里程碑奖金 | 期间 `invitationMilestoneBonus.amount` 总额 |
 | 净利润 | 营收 − 成本 − 佣金 − 奖金，有 null costSnapshot → 加 ⚠ |
@@ -245,12 +248,15 @@ model Order {
 
 // 3. 里程碑类型枚举
 enum MilestoneType {
-  INVITATION   // 以邀请人数为门槛
-  SALES        // 以团队累计销售额为门槛
+  INVITATION   // 以邀请人数为门槛，使用 thresholdCount
+  SALES        // 以团队累计销售额为门槛，使用 thresholdAmount
 }
 
 model InvitationMilestone {
-  type  MilestoneType  @default(INVITATION)
+  type            MilestoneType  @default(INVITATION)
+  // thresholdCount：INVITATION 类型必填，SALES 类型传 0（业务层校验）
+  // thresholdAmount：SALES 类型必填，INVITATION 类型传 0（业务层校验）
+  // 两字段均保持 non-nullable，Zod schema 按 type 做条件校验
 }
 ```
 
@@ -273,9 +279,15 @@ const inviteeCount = await tx.user.count({
 if (inviteeCount >= milestone.thresholdCount) { /* issue bonus */ }
 
 // SALES 类型
-// 条件：sum(invitees 的 COMPLETED order amount) >= milestone.thresholdAmount
+// 条件：invitees 自里程碑创建后的累计销售额 >= milestone.thresholdAmount
+// 时间窗口从 milestone.createdAt 起算（行业惯例：ShareASale 等联盟平台标准做法）
+// 原因：若计入历史订单，新建档位会立刻触发大批存量分销员，产生意外大额支出
 const result = await tx.order.aggregate({
-  where: { distributorId: { in: inviteeIds }, status: "COMPLETED" },
+  where: {
+    distributorId: { in: inviteeIds },
+    status: "COMPLETED",
+    paidAt: { gte: milestone.createdAt },  // 与现有代码保持一致，有意保留
+  },
   _sum: { amount: true }
 })
 if (result._sum.amount >= milestone.thresholdAmount) { /* issue bonus */ }
@@ -303,6 +315,7 @@ if (result._sum.amount >= milestone.thresholdAmount) { /* issue bonus */ }
 | `app/admin/(main)/dashboard/dashboard-data.ts` | 加全局 KPI 查询，成本计算 |
 | `app/api/admin/sales-report/route.ts` | 返回 totalCost / cost / margin 字段 |
 | `app/components/product-form.tsx` | 加 costPerUnit 字段 |
+| `lib/validations/product.ts`（或同层 Zod schema 文件） | 加 `costPerUnit: z.number().min(0).nullable().optional()` |
 | `app/admin/(main)/invitation-milestones/` | CRUD 表单加 type 选择器；列表加 type 列 |
 | `lib/complete-pending-order.ts` | 写入 `costSnapshot`；调用 SALES 里程碑触发 |
 | `lib/domains/distributors/milestone-service.ts` | 分支触发逻辑；新增 INVITATION 专用触发函数 |
@@ -315,11 +328,35 @@ if (result._sum.amount >= milestone.thresholdAmount) { /* issue bonus */ }
 |------|------|
 | `app/admin/(main)/dashboard/dashboard-sales-panel.tsx` | 拆入 sales-tab + profit-tab |
 | `app/admin/(main)/dashboard/dashboard-distributor-panel.tsx` | 拆入 profit-tab + milestone-tab |
+| `app/admin/(main)/dashboard/dashboard-pending-withdrawals.tsx` | 逻辑迁入 profit-tab |
+
+### 测试更新
+| 文件 | 改动内容 |
+|------|---------|
+| `__tests__/lib/complete-pending-order-milestone.test.ts` | 触发逻辑分支后，原 mock 需按 INVITATION/SALES 两路补充用例 |
+| `lib/domains/distributors/__tests__/service.test.ts` | `acceptInvite` 新增调用点需补测试；SALES 触发逻辑单独用例 |
 
 ---
 
-## 十、已知限制
+## 十、补充设计说明
+
+### 趋势图时间维度
+销量 Tab 的"近 30 日订单趋势"和利润 Tab 的"近 30 日趋势图"均**固定展示 30 天**，与 KPI 时段选择器无关。这是 Shopify、Stripe Dashboard 等产品的标准做法——趋势图提供宏观背景，时段选择器控制 KPI 数字，两者分工不同。
+
+### 自定义时段的环比
+环比基准 = 等长时段向前偏移（如选 2026-03-01 ~ 2026-03-15，对比期为 2026-02-14 ~ 2026-02-28）。自定义时段超过 90 天时，环比查询跳过（不显示 ↑↓%），避免全表扫描。
+
+### 已满档分销员在排行榜中的展示
+邀请/销售排行榜中已触发最高档位的分销员，"距下一档"列显示「已满档」badge，进度条填满，不显示差值数字。
+
+### INVITATION 里程碑不回溯历史（有意设计）
+`acceptInvite` 触发点只处理新注册事件，已存在的 inviter+invitees 关系不做 backfill。这是有意为之：上线前存量数据不产生意外奖金支出，业务行为可预期。若日后需要 backfill，作为独立的运维脚本处理，不在本次范围内。
+
+---
+
+## 十一、已知限制
 
 - **历史订单无成本数据**：`costSnapshot` 仅从现在起记录，历史订单利润计算不含成本，利润看板对历史时段会标注「历史数据无采购成本」
 - **成本粒度**：按商品 SKU 维度，不支持同一商品不同批次的成本差异
 - **排行榜实时性**：`milestone-report` 不做缓存，数据量大时查询耗时可能增加，后续可按需加缓存
+- **销售里程碑时间窗口**：从 `milestone.createdAt` 起算，创建里程碑前的历史销售额不计入（行业惯例，防止意外发奖）
