@@ -176,3 +176,59 @@ export async function getDashboardData(): Promise<DashboardData> {
     ])
   return { trend7, trend30, topProducts, inventory, restockPending, recentOrders }
 }
+
+export type GlobalKPI = {
+  todayRevenue: number
+  todayProfit: number
+  todayOrders: number
+  lowStockCount: number
+  hasMissingCost: boolean
+}
+
+export async function getGlobalKPI(): Promise<GlobalKPI> {
+  const now = new Date()
+  const todayStart = getHKTDayStart(now)
+  const tomorrowStart = new Date(todayStart)
+  tomorrowStart.setDate(tomorrowStart.getDate() + 1)
+
+  const [orders, commissions, milestoneBonus, lowStock] = await Promise.all([
+    prisma.order.findMany({
+      where: { status: "COMPLETED", paidAt: { gte: todayStart, lt: tomorrowStart } },
+      select: { amount: true, quantity: true, costSnapshot: true },
+    }),
+    prisma.commission.aggregate({
+      where: {
+        status: { not: "CANCELLED" },
+        createdAt: { gte: todayStart, lt: tomorrowStart },
+      },
+      _sum: { amount: true },
+    }),
+    prisma.invitationMilestoneBonus.aggregate({
+      where: { createdAt: { gte: todayStart, lt: tomorrowStart } },
+      _sum: { amount: true },
+    }),
+    prisma.card.groupBy({
+      by: ["productId"],
+      where: { status: "UNSOLD" },
+      _count: { id: true },
+      having: { id: { _count: { lt: LOW_STOCK_THRESHOLD } } },
+    }),
+  ])
+
+  const todayRevenue = orders.reduce((s, o) => s + Number(o.amount), 0)
+  const todayCost = orders.reduce(
+    (s, o) => (o.costSnapshot !== null ? s + Number(o.costSnapshot) * o.quantity : s),
+    0,
+  )
+  const hasMissingCost = orders.some((o) => o.costSnapshot === null)
+  const todayCommission = Number(commissions._sum.amount ?? 0)
+  const todayMilestoneBonus = Number(milestoneBonus._sum.amount ?? 0)
+
+  return {
+    todayRevenue,
+    todayProfit: todayRevenue - todayCost - todayCommission - todayMilestoneBonus,
+    todayOrders: orders.length,
+    lowStockCount: lowStock.length,
+    hasMissingCost,
+  }
+}
