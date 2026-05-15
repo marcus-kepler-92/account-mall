@@ -27,7 +27,7 @@ export function DashboardGlobalKPI({ kpi }: { kpi: GlobalKPI }) {
           {kpi.lowStockCount > 0 ? `${kpi.lowStockCount} 款` : "正常"}
         </p>
         <p className="mt-0.5 text-[10px] leading-tight text-muted-foreground">
-          缺货或低于预警线
+          仅普通商品，不含自动获取
         </p>
       </div>
     </div>

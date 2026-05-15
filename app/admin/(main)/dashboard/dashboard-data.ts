@@ -11,6 +11,9 @@ import {
 import { getDaysForTrend } from "./dashboard-utils"
 import { ADMIN_DASHBOARD_RECENT_ORDERS_LIMIT, ADMIN_DASHBOARD_TOP_PRODUCTS_LIMIT } from "@/app/admin/constants"
 
+/** Card pool KPIs: manual import only; AUTO_FETCH has no meaningful UNSOLD pool here. */
+const INVENTORY_PRODUCT_WHERE = { productType: "NORMAL" as const }
+
 /**
  * Daily aggregated order count, revenue, net income (for trend chart)
  */
@@ -95,11 +98,12 @@ export async function getInventoryByProduct(): Promise<InventoryRow[]> {
   const [byProduct, products] = await Promise.all([
     prisma.card.groupBy({
       by: ["productId"],
-      where: { status: "UNSOLD" },
+      where: { status: "UNSOLD", product: INVENTORY_PRODUCT_WHERE },
       _count: { id: true },
     }),
     prisma.product.findMany({
       select: { id: true, name: true },
+      where: INVENTORY_PRODUCT_WHERE,
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     }),
   ])
@@ -215,10 +219,10 @@ export async function getGlobalKPI(): Promise<GlobalKPI> {
     }),
     prisma.card.groupBy({
       by: ["productId"],
-      where: { status: "UNSOLD" },
+      where: { status: "UNSOLD", product: INVENTORY_PRODUCT_WHERE },
       _count: { id: true },
     }),
-    prisma.product.findMany({ select: { id: true } }),
+    prisma.product.findMany({ select: { id: true }, where: INVENTORY_PRODUCT_WHERE }),
   ])
   const unsoldMap = new Map(unsoldByProduct.map((r) => [r.productId, r._count.id]))
   const lowStockCount = allProducts.filter(

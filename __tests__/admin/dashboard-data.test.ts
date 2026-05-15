@@ -111,7 +111,13 @@ describe("dashboard-data", () => {
       expect(result.find((r) => r.productId === "p2")?.isLowStock).toBe(false)
       expect(prismaMock.product.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
+          where: { productType: "NORMAL" },
           orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+        }),
+      )
+      expect(prismaMock.card.groupBy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { status: "UNSOLD", product: { productType: "NORMAL" } },
         }),
       )
     })
