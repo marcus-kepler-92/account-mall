@@ -1,6 +1,7 @@
 jest.mock("../repository")
 jest.mock("../milestone-service", () => ({
   checkAndIssueMilestoneBonuses: jest.fn().mockResolvedValue(undefined),
+  checkAndIssueInvitationMilestoneBonuses: jest.fn().mockResolvedValue(undefined),
 }))
 jest.mock("@/lib/prisma", () => {
   const { prismaMock } = require("../../../../__mocks__/prisma")
@@ -28,7 +29,7 @@ jest.mock("@/app/emails/distributor-invitation", () => ({ DistributorInvitation:
 jest.mock("better-auth/crypto", () => ({ hashPassword: jest.fn().mockResolvedValue("hashed") }))
 
 import * as repo from "../repository"
-import { checkAndIssueMilestoneBonuses } from "../milestone-service"
+import { checkAndIssueMilestoneBonuses, checkAndIssueInvitationMilestoneBonuses } from "../milestone-service"
 import { prismaMock } from "../../../../__mocks__/prisma"
 import {
   updateDistributor,
@@ -55,6 +56,7 @@ import {
 } from "../types"
 
 const checkMilestoneMock = checkAndIssueMilestoneBonuses as jest.Mock
+const checkInvitationMilestoneMock = checkAndIssueInvitationMilestoneBonuses as jest.Mock
 
 beforeEach(() => {
   jest.clearAllMocks()
@@ -369,6 +371,48 @@ describe("acceptInvite", () => {
       acceptInvite("tok", { token: "tok", name: "Alice", password: "pass1234" }),
     ).rejects.toThrow(InviteTokenConcurrentAcceptError)
     expect(repo.createDistributorUser).not.toHaveBeenCalled()
+  })
+})
+
+// ── acceptInvite — invitation milestone check ─────────────────────────────────
+
+describe("acceptInvite - invitation milestone check", () => {
+  const validInvitation = {
+    token: "tok",
+    acceptedAt: null,
+    expiresAt: new Date(Date.now() + 10000),
+    maxUses: 1,
+    usedCount: 0,
+    email: "newuser@b.com",
+    inviterId: "inviter1",
+    inviter: { role: "DISTRIBUTOR" },
+  }
+
+  beforeEach(() => {
+    ;(repo.findInvitationByToken as jest.Mock).mockResolvedValue(validInvitation)
+    ;(repo.findUserByEmail as jest.Mock).mockResolvedValue(null)
+    ;(repo.claimInvitation as jest.Mock).mockResolvedValue(1)
+    ;(repo.createDistributorUser as jest.Mock).mockResolvedValue({ id: "new_user" })
+    ;(repo.createAccountRecord as jest.Mock).mockResolvedValue({})
+  })
+
+  it("calls checkAndIssueInvitationMilestoneBonuses with inviterId when inviter is a DISTRIBUTOR", async () => {
+    await acceptInvite("tok", { token: "tok", name: "Alice", password: "pass1234" })
+
+    expect(checkInvitationMilestoneMock).toHaveBeenCalledTimes(1)
+    expect(checkInvitationMilestoneMock).toHaveBeenCalledWith(prismaMock, "inviter1")
+  })
+
+  it("does NOT call checkAndIssueInvitationMilestoneBonuses when inviter is an ADMIN", async () => {
+    ;(repo.findInvitationByToken as jest.Mock).mockResolvedValue({
+      ...validInvitation,
+      inviterId: "admin1",
+      inviter: { role: "ADMIN" },
+    })
+
+    await acceptInvite("tok", { token: "tok", name: "Alice", password: "pass1234" })
+
+    expect(checkInvitationMilestoneMock).not.toHaveBeenCalled()
   })
 })
 
