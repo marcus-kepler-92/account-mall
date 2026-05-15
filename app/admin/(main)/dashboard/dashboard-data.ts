@@ -89,7 +89,7 @@ export async function getTopProductsByRevenue(
 }
 
 /**
- * UNSOLD card count per product, for inventory alerts
+ * UNSOLD card count per product (including 0), for inventory overview
  */
 export async function getInventoryByProduct(): Promise<InventoryRow[]> {
   const [byProduct, products] = await Promise.all([
@@ -100,15 +100,19 @@ export async function getInventoryByProduct(): Promise<InventoryRow[]> {
     }),
     prisma.product.findMany({
       select: { id: true, name: true },
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     }),
   ])
-  const nameMap = new Map(products.map((p) => [p.id, p.name]))
-  return byProduct.map((r) => ({
-    productId: r.productId,
-    productName: nameMap.get(r.productId) ?? "",
-    unsoldCount: r._count.id,
-    isLowStock: r._count.id < LOW_STOCK_THRESHOLD,
-  }))
+  const countMap = new Map(byProduct.map((r) => [r.productId, r._count.id]))
+  return products.map((p) => {
+    const unsoldCount = countMap.get(p.id) ?? 0
+    return {
+      productId: p.id,
+      productName: p.name,
+      unsoldCount,
+      isLowStock: unsoldCount < LOW_STOCK_THRESHOLD,
+    }
+  })
 }
 
 /**
@@ -193,7 +197,7 @@ export async function getGlobalKPI(): Promise<GlobalKPI> {
   const tomorrowStart = new Date(todayStart)
   tomorrowStart.setDate(tomorrowStart.getDate() + 1)
 
-  const [orders, commissions, milestoneBonus, lowStock] = await Promise.all([
+  const [orders, commissions, milestoneBonus, unsoldByProduct, allProducts] = await Promise.all([
     prisma.order.findMany({
       where: { status: "COMPLETED", paidAt: { gte: todayStart, lt: tomorrowStart } },
       select: { amount: true, quantity: true, costSnapshot: true, costTotalSnapshot: true },
@@ -213,9 +217,13 @@ export async function getGlobalKPI(): Promise<GlobalKPI> {
       by: ["productId"],
       where: { status: "UNSOLD" },
       _count: { id: true },
-      having: { id: { _count: { lt: LOW_STOCK_THRESHOLD } } },
     }),
+    prisma.product.findMany({ select: { id: true } }),
   ])
+  const unsoldMap = new Map(unsoldByProduct.map((r) => [r.productId, r._count.id]))
+  const lowStockCount = allProducts.filter(
+    (p) => (unsoldMap.get(p.id) ?? 0) < LOW_STOCK_THRESHOLD,
+  ).length
 
   const todayRevenue = orders.reduce((s, o) => s + Number(o.amount), 0)
   const costResolutions = orders.map((o) => resolveOrderCost(o))
@@ -228,7 +236,7 @@ export async function getGlobalKPI(): Promise<GlobalKPI> {
     todayRevenue,
     todayProfit: todayRevenue - todayCost - todayCommission - todayMilestoneBonus,
     todayOrders: orders.length,
-    lowStockCount: lowStock.length,
+    lowStockCount,
     hasMissingCost,
   }
 }

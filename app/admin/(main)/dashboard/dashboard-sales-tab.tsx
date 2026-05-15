@@ -122,7 +122,7 @@ export function DashboardSalesTab({
       {/* KPI row */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Card>
-          <CardContent >
+          <CardContent className="pt-4">
             <p className="text-xs text-muted-foreground">订单数</p>
             {isLoading ? (
               <Skeleton className="mt-1 h-7 w-16" />
@@ -153,11 +153,14 @@ export function DashboardSalesTab({
         </Card>
         <Card className={lowStockCount > 0 ? "border-red-200 bg-red-50/50" : ""}>
           <CardContent className="pt-4">
-            <p className="text-xs text-muted-foreground">库存预警商品</p>
+            <p className="text-xs text-muted-foreground">库存需关注</p>
             <p
               className={`mt-1 text-xl font-bold ${lowStockCount > 0 ? "text-red-500" : ""}`}
             >
               {lowStockCount > 0 ? `${lowStockCount} 款` : "正常"}
+            </p>
+            <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+              含缺货与低于预警线的可售库存
             </p>
           </CardContent>
         </Card>

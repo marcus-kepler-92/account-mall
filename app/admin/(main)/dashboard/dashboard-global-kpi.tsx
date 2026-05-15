@@ -22,9 +22,12 @@ export function DashboardGlobalKPI({ kpi }: { kpi: GlobalKPI }) {
         <p className="mt-1 text-xl font-bold">{kpi.todayOrders}</p>
       </div>
       <div className={`rounded-lg border bg-card p-3 ${kpi.lowStockCount > 0 ? "border-red-200 bg-red-50/50" : ""}`}>
-        <p className="text-xs text-muted-foreground">库存预警</p>
+        <p className="text-xs text-muted-foreground">库存需关注</p>
         <p className={`mt-1 text-xl font-bold ${kpi.lowStockCount > 0 ? "text-red-500" : ""}`}>
           {kpi.lowStockCount > 0 ? `${kpi.lowStockCount} 款` : "正常"}
+        </p>
+        <p className="mt-0.5 text-[10px] leading-tight text-muted-foreground">
+          缺货或低于预警线
         </p>
       </div>
     </div>

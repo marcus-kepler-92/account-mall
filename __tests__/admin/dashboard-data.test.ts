@@ -109,6 +109,29 @@ describe("dashboard-data", () => {
       expect(result).toHaveLength(2)
       expect(result.find((r) => r.productId === "p1")?.isLowStock).toBe(true)
       expect(result.find((r) => r.productId === "p2")?.isLowStock).toBe(false)
+      expect(prismaMock.product.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+        }),
+      )
+    })
+
+    it("includes products with zero unsold cards", async () => {
+      prismaMock.card.groupBy.mockResolvedValueOnce([
+        { productId: "p1", _count: { id: 5 } } as any,
+      ])
+      prismaMock.product.findMany.mockResolvedValueOnce([
+        { id: "p1", name: "Has Stock" } as any,
+        { id: "p2", name: "Empty" } as any,
+      ])
+
+      const result = await getInventoryByProduct()
+
+      expect(result).toHaveLength(2)
+      expect(result.find((r) => r.productId === "p2")).toMatchObject({
+        unsoldCount: 0,
+        isLowStock: true,
+      })
     })
   })
 
