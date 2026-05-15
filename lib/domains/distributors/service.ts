@@ -311,7 +311,7 @@ export async function acceptInvite(token: string, data: AcceptInviteInput & { us
     if (newUserInviterId) {
       await checkAndIssueInvitationMilestoneBonuses(
         tx as Prisma.TransactionClient,
-        newUserInviterId,
+        user.id,
       )
     }
   })

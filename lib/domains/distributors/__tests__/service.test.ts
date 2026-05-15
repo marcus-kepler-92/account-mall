@@ -400,7 +400,7 @@ describe("acceptInvite - invitation milestone check", () => {
     await acceptInvite("tok", { token: "tok", name: "Alice", password: "pass1234" })
 
     expect(checkInvitationMilestoneMock).toHaveBeenCalledTimes(1)
-    expect(checkInvitationMilestoneMock).toHaveBeenCalledWith(prismaMock, "inviter1")
+    expect(checkInvitationMilestoneMock).toHaveBeenCalledWith(prismaMock, "new_user")
   })
 
   it("does NOT call checkAndIssueInvitationMilestoneBonuses when inviter is an ADMIN", async () => {
