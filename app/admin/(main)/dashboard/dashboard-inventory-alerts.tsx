@@ -37,7 +37,7 @@ export function DashboardInventoryAlerts({
   if (data.length === 0) {
     return (
       <p className="py-6 text-center text-sm text-muted-foreground">
-        暂无普通商品，或全部为自动获取类商品（后者不在此展示卡密池库存）
+        暂无上架中的普通商品（自动获取类不在此展示；若仅有下架商品也会显示此项）
       </p>
     )
   }
@@ -50,7 +50,7 @@ export function DashboardInventoryAlerts({
   return (
     <div className="space-y-3">
       <p className="text-xs text-muted-foreground">
-        共 {data.length} 款普通商品（不含自动获取）
+        共 {data.length} 款上架中的普通商品（不含自动获取）
         {outOfStock > 0 ? ` · ${outOfStock} 款缺货` : ""}
         {lowNotZero > 0
           ? ` · ${lowNotZero} 款低库存（可售低于 ${LOW_STOCK_THRESHOLD}）`

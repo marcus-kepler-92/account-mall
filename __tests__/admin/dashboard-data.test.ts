@@ -12,7 +12,9 @@ import {
   getRestockPending,
   getRecentOrders,
   getDashboardData,
+  countInventoryAttentionProducts,
 } from "@/app/admin/(main)/dashboard/dashboard-data"
+import type { InventoryRow } from "@/app/admin/(main)/dashboard/types"
 
 const now = new Date("2024-02-14T12:00:00.000Z")
 
@@ -111,13 +113,16 @@ describe("dashboard-data", () => {
       expect(result.find((r) => r.productId === "p2")?.isLowStock).toBe(false)
       expect(prismaMock.product.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { productType: "NORMAL" },
+          where: { productType: "NORMAL", status: "ACTIVE" },
           orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
         }),
       )
       expect(prismaMock.card.groupBy).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { status: "UNSOLD", product: { productType: "NORMAL" } },
+          where: {
+            status: "UNSOLD",
+            product: { productType: "NORMAL", status: "ACTIVE" },
+          },
         }),
       )
     })
@@ -138,6 +143,17 @@ describe("dashboard-data", () => {
         unsoldCount: 0,
         isLowStock: true,
       })
+    })
+  })
+
+  describe("countInventoryAttentionProducts", () => {
+    it("counts rows where isLowStock is true", () => {
+      const rows: InventoryRow[] = [
+        { productId: "a", productName: "A", unsoldCount: 0, isLowStock: true },
+        { productId: "b", productName: "B", unsoldCount: 5, isLowStock: false },
+        { productId: "c", productName: "C", unsoldCount: 2, isLowStock: true },
+      ]
+      expect(countInventoryAttentionProducts(rows)).toBe(2)
     })
   })
 

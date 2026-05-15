@@ -1,19 +1,31 @@
 import { Suspense } from "react"
 import { config } from "@/lib/config"
 import { PageHeader } from "@/app/admin/components"
-import { getGlobalKPI, getInventoryByProduct, getRestockPending, getRecentOrders } from "./dashboard-data"
+import {
+  getGlobalKPI,
+  getInventoryByProduct,
+  getRestockPending,
+  getRecentOrders,
+  countInventoryAttentionProducts,
+  type GlobalKPI,
+} from "./dashboard-data"
 import { DashboardGlobalKPI } from "./dashboard-global-kpi"
 import { DashboardTabs } from "./dashboard-tabs"
 
 export const dynamic = "force-dynamic"
 
 export default async function AdminDashboardPage() {
-  const [kpi, inventory, restockPending, recentOrders] = await Promise.all([
+  const [metrics, inventory, restockPending, recentOrders] = await Promise.all([
     getGlobalKPI(),
     getInventoryByProduct(),
     getRestockPending(),
     getRecentOrders(),
   ])
+
+  const kpi: GlobalKPI = {
+    ...metrics,
+    lowStockCount: countInventoryAttentionProducts(inventory),
+  }
 
   return (
     <div className="space-y-6">

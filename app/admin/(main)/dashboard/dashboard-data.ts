@@ -11,8 +11,16 @@ import {
 import { getDaysForTrend } from "./dashboard-utils"
 import { ADMIN_DASHBOARD_RECENT_ORDERS_LIMIT, ADMIN_DASHBOARD_TOP_PRODUCTS_LIMIT } from "@/app/admin/constants"
 
-/** Card pool KPIs: manual import only; AUTO_FETCH has no meaningful UNSOLD pool here. */
-const INVENTORY_PRODUCT_WHERE = { productType: "NORMAL" as const }
+/** Dashboard card inventory: manual pool, on-sale catalog only. */
+const INVENTORY_PRODUCT_WHERE = {
+  productType: "NORMAL" as const,
+  status: "ACTIVE" as const,
+}
+
+/** Matches KPI "库存需关注" — same rule as `InventoryRow.isLowStock`. */
+export function countInventoryAttentionProducts(inventory: InventoryRow[]): number {
+  return inventory.filter((r) => r.isLowStock).length
+}
 
 /**
  * Daily aggregated order count, revenue, net income (for trend chart)
@@ -195,13 +203,19 @@ export type GlobalKPI = {
   hasMissingCost: boolean
 }
 
-export async function getGlobalKPI(): Promise<GlobalKPI> {
+export type GlobalKPIMetrics = Omit<GlobalKPI, "lowStockCount">
+
+/**
+ * Today revenue / profit / orders / cost warning. Does not query inventory —
+ * combine with `countInventoryAttentionProducts(await getInventoryByProduct())` for full `GlobalKPI`.
+ */
+export async function getGlobalKPI(): Promise<GlobalKPIMetrics> {
   const now = new Date()
   const todayStart = getHKTDayStart(now)
   const tomorrowStart = new Date(todayStart)
   tomorrowStart.setDate(tomorrowStart.getDate() + 1)
 
-  const [orders, commissions, milestoneBonus, unsoldByProduct, allProducts] = await Promise.all([
+  const [orders, commissions, milestoneBonus] = await Promise.all([
     prisma.order.findMany({
       where: { status: "COMPLETED", paidAt: { gte: todayStart, lt: tomorrowStart } },
       select: { amount: true, quantity: true, costSnapshot: true, costTotalSnapshot: true },
@@ -217,17 +231,7 @@ export async function getGlobalKPI(): Promise<GlobalKPI> {
       where: { createdAt: { gte: todayStart, lt: tomorrowStart } },
       _sum: { amount: true },
     }),
-    prisma.card.groupBy({
-      by: ["productId"],
-      where: { status: "UNSOLD", product: INVENTORY_PRODUCT_WHERE },
-      _count: { id: true },
-    }),
-    prisma.product.findMany({ select: { id: true }, where: INVENTORY_PRODUCT_WHERE }),
   ])
-  const unsoldMap = new Map(unsoldByProduct.map((r) => [r.productId, r._count.id]))
-  const lowStockCount = allProducts.filter(
-    (p) => (unsoldMap.get(p.id) ?? 0) < LOW_STOCK_THRESHOLD,
-  ).length
 
   const todayRevenue = orders.reduce((s, o) => s + Number(o.amount), 0)
   const costResolutions = orders.map((o) => resolveOrderCost(o))
@@ -240,7 +244,6 @@ export async function getGlobalKPI(): Promise<GlobalKPI> {
     todayRevenue,
     todayProfit: todayRevenue - todayCost - todayCommission - todayMilestoneBonus,
     todayOrders: orders.length,
-    lowStockCount,
     hasMissingCost,
   }
 }

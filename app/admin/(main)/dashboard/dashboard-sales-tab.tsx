@@ -160,7 +160,7 @@ export function DashboardSalesTab({
               {lowStockCount > 0 ? `${lowStockCount} 款` : "正常"}
             </p>
             <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
-              仅普通商品：缺货或低于预警线（不含自动获取）
+              与库存表一致：上架中普通商品，可售低于阈值或缺货（不含自动获取）
             </p>
           </CardContent>
         </Card>
