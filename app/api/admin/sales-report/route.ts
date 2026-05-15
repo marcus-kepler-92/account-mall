@@ -29,7 +29,10 @@ export type SalesReportProduct = {
     avgPrice: number
     revenue: number
     commission: number
+    cost: number
     profit: number
+    margin: number
+    hasMissingCost: boolean
 }
 
 export type SalesReportResponse = {
@@ -37,8 +40,10 @@ export type SalesReportResponse = {
         orderCount: number
         totalQuantity: number
         revenue: number
+        cost: number
         milestoneBonus: number
         profit: number
+        hasMissingCost: boolean
     }
     products: SalesReportProduct[]
 }
@@ -75,6 +80,7 @@ export async function GET(request: Request): Promise<NextResponse> {
                 productNameSnapshot: true,
                 quantity: true,
                 amount: true,
+                costSnapshot: true,
                 product: { select: { name: true } },
             },
         }),
@@ -88,7 +94,7 @@ export async function GET(request: Request): Promise<NextResponse> {
 
     if (orders.length === 0) {
         return NextResponse.json<SalesReportResponse>({
-            summary: { orderCount: 0, totalQuantity: 0, revenue: 0, milestoneBonus, profit: 0 },
+            summary: { orderCount: 0, totalQuantity: 0, revenue: 0, cost: 0, milestoneBonus, profit: 0, hasMissingCost: false },
             products: [],
         })
     }
@@ -108,7 +114,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     // Aggregate by product
     const productMap = new Map<
         string,
-        { productName: string; quantity: number; revenue: number; commission: number }
+        { productName: string; quantity: number; revenue: number; commission: number; cost: number; hasMissingCost: boolean }
     >()
 
     for (const order of orders) {
@@ -116,42 +122,61 @@ export async function GET(request: Request): Promise<NextResponse> {
         const name = order.productNameSnapshot ?? order.product.name
         const revenue = Number(order.amount)
         const commission = commissionByOrder.get(order.id) ?? 0
+        const orderCost = order.costSnapshot !== null
+            ? Number(order.costSnapshot) * order.quantity
+            : 0
+        const orderHasMissingCost = order.costSnapshot === null
+
         if (existing) {
             existing.quantity += order.quantity
             existing.revenue += revenue
             existing.commission += commission
+            existing.cost += orderCost
+            if (orderHasMissingCost) existing.hasMissingCost = true
         } else {
             productMap.set(order.productId, {
                 productName: name,
                 quantity: order.quantity,
                 revenue,
                 commission,
+                cost: orderCost,
+                hasMissingCost: orderHasMissingCost,
             })
         }
     }
 
     const products: SalesReportProduct[] = Array.from(productMap.entries())
-        .map(([productId, data]) => ({
-            productId,
-            productName: data.productName,
-            quantity: data.quantity,
-            avgPrice: data.quantity > 0 ? data.revenue / data.quantity : 0,
-            revenue: data.revenue,
-            commission: data.commission,
-            profit: data.revenue - data.commission,
-        }))
+        .map(([productId, data]) => {
+            const profit = data.revenue - data.commission - data.cost
+            return {
+                productId,
+                productName: data.productName,
+                quantity: data.quantity,
+                avgPrice: data.quantity > 0 ? data.revenue / data.quantity : 0,
+                revenue: data.revenue,
+                commission: data.commission,
+                cost: data.cost,
+                profit,
+                margin: data.revenue > 0 ? profit / data.revenue : 0,
+                hasMissingCost: data.hasMissingCost,
+            }
+        })
         .sort((a, b) => b.profit - a.profit)
 
     const totalRevenue = products.reduce((s, p) => s + p.revenue, 0)
     const totalCommission = products.reduce((s, p) => s + p.commission, 0)
+    const totalCost = products.reduce((s, p) => s + p.cost, 0)
+    const hasMissingCost = products.some((p) => p.hasMissingCost)
 
     return NextResponse.json<SalesReportResponse>({
         summary: {
             orderCount: orders.length,
             totalQuantity: products.reduce((s, p) => s + p.quantity, 0),
             revenue: totalRevenue,
+            cost: totalCost,
             milestoneBonus,
-            profit: totalRevenue - totalCommission - milestoneBonus,
+            profit: totalRevenue - totalCommission - totalCost - milestoneBonus,
+            hasMissingCost,
         },
         products,
     })
