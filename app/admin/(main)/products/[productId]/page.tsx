@@ -58,6 +58,7 @@ export default async function AdminEditProductPage({ params }: PageProps) {
                 product={{
                     ...product,
                     price: Number(product.price),
+                    costPerUnit: product.costPerUnit != null ? Number(product.costPerUnit) : null,
                 }}
                 allTags={tags}
                 allCardTemplates={cardTemplates}

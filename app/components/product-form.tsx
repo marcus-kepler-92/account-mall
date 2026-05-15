@@ -30,6 +30,7 @@ type ProductData = {
     summary: string | null
     image: string | null
     price: number
+    costPerUnit?: number | null
     maxQuantity: number
     status: string
     productType?: "NORMAL" | "AUTO_FETCH"
@@ -77,6 +78,7 @@ export function ProductForm({
             summary: product?.summary ?? "",
             image: product?.image ?? "",
             price: product ? String(product.price) : "",
+            costPerUnit: product?.costPerUnit != null ? Number(product.costPerUnit) : null,
             maxQuantity: product ? String(product.maxQuantity) : "10",
             isActive: product ? product.status === "ACTIVE" : true,
             productType: product?.productType ?? "NORMAL",
@@ -132,6 +134,7 @@ export function ProductForm({
             summary: data.summary?.trim() || null,
             image: data.image || null,
             price: data.price === "" ? (isAutoFetch ? 0 : undefined) : parseFloat(data.price),
+            costPerUnit: data.costPerUnit ?? null,
             maxQuantity: isAutoFetch ? 1 : (data.maxQuantity === "" ? 10 : parseInt(data.maxQuantity, 10)),
             status: data.isActive ? "ACTIVE" : "INACTIVE",
             productType: data.productType ?? "NORMAL",

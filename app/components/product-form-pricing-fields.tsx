@@ -93,6 +93,30 @@ export function ProductFormPricingFields({
                                 </FormItem>
                             )}
                         />
+                        <FormField
+                            control={control}
+                            name="costPerUnit"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>采购成本（每张卡密，可选）</FormLabel>
+                                    <FormControl>
+                                        <Input
+                                            type="number"
+                                            min={0}
+                                            step="0.01"
+                                            placeholder="留空表示未设置"
+                                            value={field.value ?? ""}
+                                            onChange={(e) => {
+                                                const v = e.target.value
+                                                field.onChange(v === "" ? null : parseFloat(v))
+                                            }}
+                                        />
+                                    </FormControl>
+                                    <FormDescription>用于利润看板计算，不影响售价和用户展示</FormDescription>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
                         {!isAutoFetch && (
                             <FormField
                                 control={control}

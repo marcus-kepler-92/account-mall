@@ -16,6 +16,7 @@ export const createProductSchema = z.object({
     summary: z.string().max(300, "商品简介最多 300 字").nullable().optional(),
     image: z.string().nullable().optional(),
     price: z.number().min(0, "Price must be non-negative"),
+    costPerUnit: z.number().min(0, "采购成本不能为负").nullable().optional(),
     maxQuantity: z.number().int().min(1, "Must be at least 1").max(1000).optional(),
     status: z.enum(["ACTIVE", "INACTIVE"]).optional(),
     productType: productTypeEnum.optional(),
@@ -62,6 +63,7 @@ export const updateProductSchema = z.object({
     summary: z.string().max(300, "商品简介最多 300 字").nullable().optional(),
     image: z.string().nullable().optional(),
     price: z.number().min(0, "Price must be non-negative").optional(),
+    costPerUnit: z.number().min(0, "采购成本不能为负").nullable().optional(),
     maxQuantity: z.number().int().min(1).max(1000).optional(),
     status: z.enum(["ACTIVE", "INACTIVE"]).optional(),
     productType: productTypeEnum.optional(),
@@ -119,6 +121,7 @@ export const productFormSchema = z
             (v) => v === "" || (!Number.isNaN(parseFloat(v)) && parseFloat(v) >= 0),
             "价格不能为负数"
         ),
+        costPerUnit: z.number().min(0, "采购成本不能为负").nullable().optional(),
         maxQuantity: z.string().refine(
             (v) => v === "" || (!Number.isNaN(parseInt(v, 10)) && parseInt(v, 10) >= 1 && parseInt(v, 10) <= 1000),
             "数量必须在 1-1000 之间"
