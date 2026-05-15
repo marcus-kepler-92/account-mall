@@ -75,6 +75,7 @@ export {
   deleteInvitationMilestone,
   listDistributorMilestoneBonuses,
   checkAndIssueMilestoneBonuses,
+  checkAndIssueInvitationMilestoneBonuses,
 } from "./milestone-service"
 
 export type { CreateMilestoneInput, UpdateMilestoneInput } from "./validators"
