@@ -20,7 +20,7 @@ export async function completePendingOrder(
     where: { orderNo },
     include: {
       product: {
-        select: { name: true, productType: true, validityHours: true },
+        select: { name: true, productType: true, validityHours: true, costPerUnit: true },
       },
       cards: { select: { id: true, status: true } },
     },
@@ -53,6 +53,7 @@ export async function completePendingOrder(
       data: {
         status: "COMPLETED",
         paidAt,
+        costSnapshot: order.product?.costPerUnit ?? null,
         ...(expiresAt && { expiresAt }),
       },
     });
