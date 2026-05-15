@@ -142,7 +142,7 @@ SSR 渲染（`page.tsx` 直接查 Prisma），今日 HKT 范围，不受 Tab 时
 |------|------|
 | 总营收 | `sum(order.amount)` COMPLETED |
 | 采购成本 | `sum(quantity × costSnapshot)`（跳过 null 项），全为 null 时显示「—」，部分 null 加 ⚠ |
-| 佣金支出 | 期间 commission 总额（status ≠ CANCELLED） |
+| 佣金支出 | 期间 commission 总额（status ≠ CANCELLED，含 PENDING/SETTLED/WITHDRAWN）；采用权责发生制——订单完成即确认佣金负债，与实际打款时间无关 |
 | 里程碑奖金 | 期间 `invitationMilestoneBonus.amount` 总额 |
 | 净利润 | 营收 − 成本 − 佣金 − 奖金，有 null costSnapshot → 加 ⚠ |
 | 利润率 % | 净利润 ÷ 营收 |
@@ -349,8 +349,14 @@ if (result._sum.amount >= milestone.thresholdAmount) { /* issue bonus */ }
 ### 已满档分销员在排行榜中的展示
 邀请/销售排行榜中已触发最高档位的分销员，"距下一档"列显示「已满档」badge，进度条填满，不显示差值数字。
 
-### INVITATION 里程碑不回溯历史（有意设计）
-`acceptInvite` 触发点只处理新注册事件，已存在的 inviter+invitees 关系不做 backfill。这是有意为之：上线前存量数据不产生意外奖金支出，业务行为可预期。若日后需要 backfill，作为独立的运维脚本处理，不在本次范围内。
+### INVITATION 里程碑的触发边界（有意设计）
+触发检查在 `acceptInvite` 时执行，检查的是 inviter **当前所有** active invitees 总数（非仅新加入那一个）。
+
+因此实际行为是：
+- 张三有 8 人，门槛 10 人 → 第 9、10 人相继注册时各触发一次检查，第 10 人注册后满足条件，**正常发奖** ✅
+- 张三已有 15 人（均在上线前注册），门槛 10 人 → 若此后**没有新人**在他下面注册，检查永远不被触发，**不会发奖** ❌
+
+真正的限制是：发奖检查必须由"新事件（新人注册）"驱动，不主动扫描存量数据。这是有意为之——防止上线时对历史数据做全量扫描产生意外批量支出。若日后需要对存量做一次性检查，作为独立的运维脚本处理，不在本次范围内。
 
 ---
 
