@@ -9,12 +9,8 @@ import { DashboardTopProductsChart } from "./dashboard-charts"
 import { DashboardInventoryAlerts } from "./dashboard-inventory-alerts"
 import { DashboardRestockPending } from "./dashboard-restock-pending"
 import { ORDER_STATUS_LABEL } from "./types"
-import {
-  todayHKT,
-  offsetDaysHKT,
-  firstDayOfMonthHKT,
-  mondayOfCurrentWeekHKT,
-} from "./dashboard-hkt"
+import { todayHKT } from "./dashboard-hkt"
+import { DashboardDateRangePresets } from "./dashboard-date-range-presets"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -39,13 +35,6 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "
   CLOSED: "destructive",
 }
 
-const PRESETS = [
-  { label: "今日", getRange: () => ({ from: todayHKT(), to: todayHKT() }) },
-  { label: "昨日", getRange: () => ({ from: offsetDaysHKT(-1), to: offsetDaysHKT(-1) }) },
-  { label: "本周", getRange: () => ({ from: mondayOfCurrentWeekHKT(), to: todayHKT() }) },
-  { label: "本月", getRange: () => ({ from: firstDayOfMonthHKT(), to: todayHKT() }) },
-] as const
-
 export function DashboardSalesTab({
   lowStockCount,
   inventory,
@@ -60,7 +49,6 @@ export function DashboardSalesTab({
   const today = todayHKT()
   const [from, setFrom] = useState(today)
   const [to, setTo] = useState(today)
-  const [activePreset, setActivePreset] = useState<string>("今日")
 
   const { data, isLoading } = useQuery<SalesReportResponse>({
     queryKey: ["sales-report", from, to],
@@ -68,13 +56,6 @@ export function DashboardSalesTab({
       fetch(`/api/admin/sales-report?from=${from}&to=${to}`).then((r) => r.json()),
     staleTime: 30_000,
   })
-
-  const handlePreset = (preset: (typeof PRESETS)[number]) => {
-    const range = preset.getRange()
-    setFrom(range.from)
-    setTo(range.to)
-    setActivePreset(preset.label)
-  }
 
   const summary = data?.summary
   const avgPrice =
@@ -101,23 +82,14 @@ export function DashboardSalesTab({
 
   return (
     <div className="space-y-6">
-      {/* Time range presets */}
-      <div className="flex items-center gap-2">
-        <span className="text-sm text-muted-foreground">时间范围：</span>
-        {PRESETS.map((preset) => (
-          <button
-            key={preset.label}
-            onClick={() => handlePreset(preset)}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-              activePreset === preset.label
-                ? "bg-foreground text-background"
-                : "border bg-background text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {preset.label}
-          </button>
-        ))}
-      </div>
+      <DashboardDateRangePresets
+        from={from}
+        to={to}
+        onPresetSelect={(p) => {
+          setFrom(p.from)
+          setTo(p.to)
+        }}
+      />
 
       {/* KPI row */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

@@ -22,3 +22,20 @@ export function mondayOfCurrentWeekHKT(): string {
   const diff = day === 0 ? -6 : 1 - day
   return offsetDaysHKT(diff)
 }
+
+export type DashboardDateRangePreset = {
+  label: string
+  from: string
+  to: string
+}
+
+/** Preset ranges for admin dashboard reports (HKT calendar dates). */
+export function getDashboardDateRangePresets(): DashboardDateRangePreset[] {
+  const today = todayHKT()
+  return [
+    { label: "今日", from: today, to: today },
+    { label: "昨日", from: offsetDaysHKT(-1), to: offsetDaysHKT(-1) },
+    { label: "本周", from: mondayOfCurrentWeekHKT(), to: today },
+    { label: "本月", from: firstDayOfMonthHKT(), to: today },
+  ]
+}

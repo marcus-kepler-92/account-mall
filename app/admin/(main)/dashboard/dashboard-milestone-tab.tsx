@@ -53,22 +53,30 @@ export function DashboardMilestoneTab() {
           ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-lg" />)
           : (
             <>
-              <div className="rounded-lg border bg-card p-3">
-                <p className="text-xs text-muted-foreground">总分销员</p>
-                <p className="mt-1 text-xl font-bold">{g?.totalDistributors ?? 0} 人</p>
-              </div>
-              <div className="rounded-lg border bg-card p-3">
-                <p className="text-xs text-muted-foreground">本月新增</p>
-                <p className="mt-1 text-xl font-bold text-green-600">+{g?.newThisMonth ?? 0}</p>
-              </div>
-              <div className="rounded-lg border bg-card p-3">
-                <p className="text-xs text-muted-foreground">里程碑奖金累计</p>
-                <p className="mt-1 text-xl font-bold text-amber-600">{formatCurrency(g?.totalBonusPaid ?? 0)}</p>
-              </div>
-              <div className="rounded-lg border bg-card p-3">
-                <p className="text-xs text-muted-foreground">已触发次数</p>
-                <p className="mt-1 text-xl font-bold">{g?.totalTriggerCount ?? 0} 次</p>
-              </div>
+              <Card>
+                <CardContent className="pt-4">
+                  <p className="text-xs text-muted-foreground">总分销员</p>
+                  <p className="mt-1 text-xl font-bold">{g?.totalDistributors ?? 0} 人</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-4">
+                  <p className="text-xs text-muted-foreground">本月新增</p>
+                  <p className="mt-1 text-xl font-bold text-green-600">+{g?.newThisMonth ?? 0}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-4">
+                  <p className="text-xs text-muted-foreground">里程碑奖金累计</p>
+                  <p className="mt-1 text-xl font-bold text-amber-600">{formatCurrency(g?.totalBonusPaid ?? 0)}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-4">
+                  <p className="text-xs text-muted-foreground">已触发次数</p>
+                  <p className="mt-1 text-xl font-bold">{g?.totalTriggerCount ?? 0} 次</p>
+                </CardContent>
+              </Card>
             </>
           )}
       </div>

@@ -5,17 +5,13 @@ import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 import { AlertTriangle } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { formatCurrency } from "@/lib/utils"
 import type { SalesReportResponse } from "@/app/api/admin/sales-report/route"
 import type { DistributorReportResponse } from "@/app/api/admin/distributor-report/route"
-import {
-  todayHKT,
-  offsetDaysHKT,
-  firstDayOfMonthHKT,
-  mondayOfCurrentWeekHKT,
-} from "./dashboard-hkt"
+import { todayHKT } from "./dashboard-hkt"
+import { DashboardDateRangePresets } from "./dashboard-date-range-presets"
 
 type WaterfallRow = {
   label: string
@@ -27,14 +23,6 @@ export function DashboardProfitTab() {
   const today = todayHKT()
   const [from, setFrom] = useState(today)
   const [to, setTo] = useState(today)
-
-  const presets = [
-    { label: "今日", from: today, to: today },
-    { label: "昨日", from: offsetDaysHKT(-1), to: offsetDaysHKT(-1) },
-    { label: "本周", from: mondayOfCurrentWeekHKT(), to: today },
-    { label: "本月", from: firstDayOfMonthHKT(), to: today },
-  ]
-  const selectedPreset = presets.find((p) => p.from === from && p.to === to)?.label ?? ""
 
   const { data, isLoading } = useQuery<SalesReportResponse>({
     queryKey: ["sales-report", from, to],
@@ -69,100 +57,109 @@ export function DashboardProfitTab() {
 
   return (
     <div className="space-y-6">
-      {/* Time range selector */}
-      <div className="flex flex-wrap items-center gap-2">
-        {presets.map((preset) => (
-          <Button
-            key={preset.label}
-            variant={selectedPreset === preset.label ? "default" : "outline"}
-            size="sm"
-            className="h-7 text-xs"
-            onClick={() => {
-              setFrom(preset.from)
-              setTo(preset.to)
-            }}
-          >
-            {preset.label}
-          </Button>
-        ))}
-        <input
+      <DashboardDateRangePresets
+        from={from}
+        to={to}
+        onPresetSelect={(p) => {
+          setFrom(p.from)
+          setTo(p.to)
+        }}
+      >
+        <Input
           type="date"
           value={from}
           max={to}
-          className="h-7 rounded-md border px-2 text-xs"
+          className="h-7 w-[9.5rem] px-2 text-xs md:text-xs"
           onChange={(e) => {
             if (e.target.value <= to) setFrom(e.target.value)
           }}
         />
         <span className="text-xs text-muted-foreground">至</span>
-        <input
+        <Input
           type="date"
           value={to}
           min={from}
           max={today}
-          className="h-7 rounded-md border px-2 text-xs"
+          className="h-7 w-[9.5rem] px-2 text-xs md:text-xs"
           onChange={(e) => {
             if (e.target.value >= from) setTo(e.target.value)
           }}
         />
-      </div>
+      </DashboardDateRangePresets>
 
       {/* KPI cards */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {isLoading ? (
           Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-20 rounded-lg" />
+            <Card key={i}>
+              <CardContent className="pt-4">
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="mt-3 h-8 w-28" />
+              </CardContent>
+            </Card>
           ))
         ) : (
           <>
-            <div className="rounded-lg border bg-card p-3">
-              <p className="text-xs text-muted-foreground">总营收</p>
-              <p className="mt-1 text-xl font-bold">{formatCurrency(s?.revenue ?? 0)}</p>
-            </div>
-            <div className="rounded-lg border bg-card p-3">
-              <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                采购成本
-                {hasMissing && (
-                  <span title="部分商品未设成本" className="cursor-help">
-                    ⚠
-                  </span>
-                )}
-              </p>
-              <p className="mt-1 text-xl font-bold text-amber-600">
-                {s?.cost ? formatCurrency(s.cost) : "—"}
-              </p>
-            </div>
-            <div className="rounded-lg border bg-card p-3">
-              <p className="text-xs text-muted-foreground">佣金支出</p>
-              <p className="mt-1 text-xl font-bold text-amber-600">{formatCurrency(commission)}</p>
-            </div>
-            <div className="rounded-lg border bg-card p-3">
-              <p className="text-xs text-muted-foreground">里程碑奖金</p>
-              <p className="mt-1 text-xl font-bold text-amber-600">
-                {formatCurrency(s?.milestoneBonus ?? 0)}
-              </p>
-            </div>
-            <div className="rounded-lg border bg-card p-3">
-              <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                净利润
-                {hasMissing && (
-                  <span title="部分商品未设成本，利润偏高" className="cursor-help">
-                    ⚠
-                  </span>
-                )}
-              </p>
-              <p className="mt-1 text-xl font-bold text-green-600">
-                {formatCurrency(s?.profit ?? 0)}
-              </p>
-            </div>
-            <div className="rounded-lg border bg-card p-3">
-              <p className="text-xs text-muted-foreground">利润率</p>
-              <p className="mt-1 text-xl font-bold text-green-600">
-                {s && s.revenue > 0
-                  ? `${Math.round((s.profit / s.revenue) * 100)}%`
-                  : "—"}
-              </p>
-            </div>
+            <Card>
+              <CardContent className="pt-4">
+                <p className="text-xs text-muted-foreground">总营收</p>
+                <p className="mt-1 text-xl font-bold">{formatCurrency(s?.revenue ?? 0)}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-4">
+                <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                  采购成本
+                  {hasMissing && (
+                    <span title="部分商品未设成本" className="cursor-help">
+                      ⚠
+                    </span>
+                  )}
+                </p>
+                <p className="mt-1 text-xl font-bold text-amber-600">
+                  {s?.cost ? formatCurrency(s.cost) : "—"}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-4">
+                <p className="text-xs text-muted-foreground">佣金支出</p>
+                <p className="mt-1 text-xl font-bold text-amber-600">{formatCurrency(commission)}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-4">
+                <p className="text-xs text-muted-foreground">里程碑奖金</p>
+                <p className="mt-1 text-xl font-bold text-amber-600">
+                  {formatCurrency(s?.milestoneBonus ?? 0)}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-4">
+                <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                  净利润
+                  {hasMissing && (
+                    <span title="部分商品未设成本，利润偏高" className="cursor-help">
+                      ⚠
+                    </span>
+                  )}
+                </p>
+                <p className="mt-1 text-xl font-bold text-green-600">
+                  {formatCurrency(s?.profit ?? 0)}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-4">
+                <p className="text-xs text-muted-foreground">利润率</p>
+                <p className="mt-1 text-xl font-bold text-green-600">
+                  {s && s.revenue > 0
+                    ? `${Math.round((s.profit / s.revenue) * 100)}%`
+                    : "—"}
+                </p>
+              </CardContent>
+            </Card>
           </>
         )}
       </div>
