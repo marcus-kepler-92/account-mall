@@ -26,12 +26,10 @@ function isTabKey(v: string): v is TabKey {
 }
 
 export function DashboardTabs({
-  lowStockCount,
   inventory,
   restockPending,
   recentOrders,
 }: {
-  lowStockCount: number
   inventory: InventoryData
   restockPending: RestockData
   recentOrders: RecentOrdersData
@@ -67,7 +65,6 @@ export function DashboardTabs({
       </TabsList>
       <TabsContent value="sales" className="mt-0 outline-none">
         <DashboardSalesTab
-          lowStockCount={lowStockCount}
           inventory={inventory}
           restockPending={restockPending}
           recentOrders={recentOrders}

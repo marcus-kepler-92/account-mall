@@ -6,13 +6,13 @@ export function DashboardGlobalKPI({ kpi }: { kpi: GlobalKPI }) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       <Card>
-        <CardContent className="pt-4">
+        <CardContent>
           <p className="text-xs text-muted-foreground">今日营收</p>
           <p className="mt-1 text-xl font-bold">{formatCurrency(kpi.todayRevenue)}</p>
         </CardContent>
       </Card>
       <Card>
-        <CardContent className="pt-4">
+        <CardContent>
           <p className="flex items-center gap-1 text-xs text-muted-foreground">
             今日净利润
             {kpi.hasMissingCost && (
@@ -23,15 +23,13 @@ export function DashboardGlobalKPI({ kpi }: { kpi: GlobalKPI }) {
         </CardContent>
       </Card>
       <Card>
-        <CardContent className="pt-4">
+        <CardContent>
           <p className="text-xs text-muted-foreground">今日订单</p>
           <p className="mt-1 text-xl font-bold">{kpi.todayOrders}</p>
         </CardContent>
       </Card>
-      <Card
-        className={kpi.lowStockCount > 0 ? "border-red-200 bg-red-50/50" : ""}
-      >
-        <CardContent className="pt-4">
+      <Card className={kpi.lowStockCount > 0 ? "border-red-200 bg-red-50/50" : ""}>
+        <CardContent>
           <p className="text-xs text-muted-foreground">库存需关注</p>
           <p className={`mt-1 text-xl font-bold ${kpi.lowStockCount > 0 ? "text-red-500" : ""}`}>
             {kpi.lowStockCount > 0 ? `${kpi.lowStockCount} 款` : "正常"}

@@ -3,8 +3,16 @@
 import { useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Check } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import { cn, formatCurrency } from "@/lib/utils"
 import type {
   MilestoneReportResponse,
@@ -54,25 +62,25 @@ export function DashboardMilestoneTab() {
           : (
             <>
               <Card>
-                <CardContent className="pt-4">
+                <CardContent>
                   <p className="text-xs text-muted-foreground">总分销员</p>
                   <p className="mt-1 text-xl font-bold">{g?.totalDistributors ?? 0} 人</p>
                 </CardContent>
               </Card>
               <Card>
-                <CardContent className="pt-4">
+                <CardContent>
                   <p className="text-xs text-muted-foreground">本月新增</p>
                   <p className="mt-1 text-xl font-bold text-green-600">+{g?.newThisMonth ?? 0}</p>
                 </CardContent>
               </Card>
               <Card>
-                <CardContent className="pt-4">
+                <CardContent>
                   <p className="text-xs text-muted-foreground">里程碑奖金累计</p>
                   <p className="mt-1 text-xl font-bold text-amber-600">{formatCurrency(g?.totalBonusPaid ?? 0)}</p>
                 </CardContent>
               </Card>
               <Card>
-                <CardContent className="pt-4">
+                <CardContent>
                   <p className="text-xs text-muted-foreground">已触发次数</p>
                   <p className="mt-1 text-xl font-bold">{g?.totalTriggerCount ?? 0} 次</p>
                 </CardContent>
@@ -83,9 +91,9 @@ export function DashboardMilestoneTab() {
 
       {/* Tier config */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">档位配置</CardTitle>
-          <p className="text-xs text-muted-foreground">N 位下线各自消费满指定金额即触发，每档每人仅发放一次</p>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium">档位配置</CardTitle>
+          <CardDescription>N 位下线各自消费满指定金额即触发，每档每人仅发放一次</CardDescription>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -100,12 +108,12 @@ export function DashboardMilestoneTab() {
 
       {/* Progress matrix */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">分销员里程碑进度</CardTitle>
-          <p className="text-xs text-muted-foreground">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium">分销员里程碑进度</CardTitle>
+          <CardDescription>
             ✓ 已发放奖励 &nbsp;·&nbsp; 数字 = 已达标人数 / 目标人数
             {data?.tiers[0] ? `（达标：各自消费满 ${formatCurrency(data.tiers[0].thresholdAmount)}）` : ""}
-          </p>
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -120,8 +128,8 @@ export function DashboardMilestoneTab() {
 
       {/* New distributors this month */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">本月新增分销员</CardTitle>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium">本月新增分销员</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -130,26 +138,26 @@ export function DashboardMilestoneTab() {
             <p className="py-4 text-center text-sm text-muted-foreground">本月暂无新增</p>
           ) : (
             <div className="overflow-x-auto rounded-md border">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/50 text-xs text-muted-foreground">
-                    <th className="px-3 py-2 text-left">分销员</th>
-                    <th className="px-3 py-2 text-left">来自</th>
-                    <th className="px-3 py-2 text-right">时间</th>
-                  </tr>
-                </thead>
-                <tbody>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>分销员</TableHead>
+                    <TableHead>来自</TableHead>
+                    <TableHead className="text-right">时间</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {data.newDistributors.map((d) => (
-                    <tr key={d.id} className="border-b last:border-0">
-                      <td className="px-3 py-2">
+                    <TableRow key={d.id}>
+                      <TableCell>
                         <button
                           onClick={() => setSelectedId(d.id)}
                           className="hover:underline underline-offset-2 text-left"
                         >
                           {d.name ?? d.email}
                         </button>
-                      </td>
-                      <td className="px-3 py-2 text-xs text-muted-foreground">
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
                         {d.inviterId ? (
                           <button
                             onClick={() => setSelectedId(d.inviterId!)}
@@ -160,8 +168,8 @@ export function DashboardMilestoneTab() {
                         ) : (
                           <span className="italic">直接注册</span>
                         )}
-                      </td>
-                      <td className="px-3 py-2 text-right text-xs text-muted-foreground">
+                      </TableCell>
+                      <TableCell className="text-right text-xs text-muted-foreground">
                         {new Date(d.createdAt).toLocaleString("zh-CN", {
                           timeZone: "Asia/Hong_Kong",
                           month: "numeric",
@@ -169,11 +177,11 @@ export function DashboardMilestoneTab() {
                           hour: "2-digit",
                           minute: "2-digit",
                         })}
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
           )}
         </CardContent>
@@ -193,26 +201,26 @@ export function DashboardMilestoneTab() {
 function TierTable({ tiers }: { tiers: MilestoneTierStat[] }) {
   return (
     <div className="overflow-x-auto rounded-md border">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b bg-muted/50 text-xs text-muted-foreground">
-            <th className="px-3 py-2 text-right">达标人数</th>
-            <th className="px-3 py-2 text-right">每人消费</th>
-            <th className="px-3 py-2 text-right">奖励</th>
-            <th className="px-3 py-2 text-right">已触发</th>
-          </tr>
-        </thead>
-        <tbody>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="text-right">达标人数</TableHead>
+            <TableHead className="text-right">每人消费</TableHead>
+            <TableHead className="text-right">奖励</TableHead>
+            <TableHead className="text-right">已触发</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {tiers.map((t) => (
-            <tr key={t.id} className="border-b last:border-0">
-              <td className="px-3 py-2 text-right font-medium">{t.thresholdCount} 人</td>
-              <td className="px-3 py-2 text-right text-muted-foreground">{formatCurrency(t.thresholdAmount)}</td>
-              <td className="px-3 py-2 text-right font-medium text-green-600">+{formatCurrency(t.bonusAmount)}</td>
-              <td className="px-3 py-2 text-right text-muted-foreground">{t.triggeredCount} 次</td>
-            </tr>
+            <TableRow key={t.id}>
+              <TableCell className="text-right font-medium">{t.thresholdCount} 人</TableCell>
+              <TableCell className="text-right text-muted-foreground">{formatCurrency(t.thresholdAmount)}</TableCell>
+              <TableCell className="text-right font-medium text-green-600">+{formatCurrency(t.bonusAmount)}</TableCell>
+              <TableCell className="text-right text-muted-foreground">{t.triggeredCount} 次</TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   )
 }
@@ -228,36 +236,36 @@ function ProgressMatrix({
 }) {
   return (
     <div className="overflow-x-auto rounded-md border">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b bg-muted/50 text-xs text-muted-foreground">
-            <th className="sticky left-0 z-10 border-r bg-muted/50 px-3 py-2 text-left">分销员</th>
-            <th className="px-3 py-2 text-right">达标</th>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="sticky left-0 z-10 border-r bg-muted/50">分销员</TableHead>
+            <TableHead className="text-right">达标</TableHead>
             {tiers.map((t) => (
-              <th key={t.id} className="whitespace-nowrap px-2 py-2 text-center">
+              <TableHead key={t.id} className="whitespace-nowrap text-center">
                 {t.thresholdCount}人
-              </th>
+              </TableHead>
             ))}
-          </tr>
-        </thead>
-        <tbody>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {leaderboard.map((entry) => (
-            <tr key={entry.inviterId} className="border-b last:border-0">
-              <td className="sticky left-0 z-10 border-r bg-card px-3 py-2 font-medium">
+            <TableRow key={entry.inviterId}>
+              <TableCell className="sticky left-0 z-10 border-r bg-card font-medium">
                 <button
                   onClick={() => onSelectId(entry.inviterId)}
                   className="block max-w-28 truncate text-left hover:underline underline-offset-2 sm:max-w-40"
                 >
                   {entry.name ?? entry.email}
                 </button>
-              </td>
-              <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+              </TableCell>
+              <TableCell className="text-right tabular-nums text-muted-foreground">
                 {entry.qualifiedCount}
-              </td>
+              </TableCell>
               {tiers.map((t) => {
                 const triggered = entry.triggeredMilestoneIds.includes(t.id)
                 return (
-                  <td key={t.id} className="px-2 py-2 text-center">
+                  <TableCell key={t.id} className="text-center">
                     {triggered ? (
                       <Check className="mx-auto size-3.5 text-green-600" />
                     ) : (
@@ -270,13 +278,13 @@ function ProgressMatrix({
                         {entry.qualifiedCount}/{t.thresholdCount}
                       </span>
                     )}
-                  </td>
+                  </TableCell>
                 )
               })}
-            </tr>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   )
 }

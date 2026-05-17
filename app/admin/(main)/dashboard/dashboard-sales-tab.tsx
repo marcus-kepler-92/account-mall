@@ -36,12 +36,10 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "
 }
 
 export function DashboardSalesTab({
-  lowStockCount,
   inventory,
   restockPending,
   recentOrders,
 }: {
-  lowStockCount: number
   inventory: InventoryData
   restockPending: RestockData
   recentOrders: RecentOrdersData
@@ -94,7 +92,17 @@ export function DashboardSalesTab({
       {/* KPI row */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Card>
-          <CardContent className="pt-4">
+          <CardContent>
+            <p className="text-xs text-muted-foreground">总营收</p>
+            {isLoading ? (
+              <Skeleton className="mt-1 h-7 w-20" />
+            ) : (
+              <p className="mt-1 text-xl font-bold">{formatCurrency(summary?.revenue ?? 0)}</p>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent>
             <p className="text-xs text-muted-foreground">订单数</p>
             {isLoading ? (
               <Skeleton className="mt-1 h-7 w-16" />
@@ -104,7 +112,7 @@ export function DashboardSalesTab({
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-4">
+          <CardContent>
             <p className="text-xs text-muted-foreground">卡密销量</p>
             {isLoading ? (
               <Skeleton className="mt-1 h-7 w-16" />
@@ -114,26 +122,13 @@ export function DashboardSalesTab({
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-4">
+          <CardContent>
             <p className="text-xs text-muted-foreground">均单价</p>
             {isLoading ? (
               <Skeleton className="mt-1 h-7 w-20" />
             ) : (
               <p className="mt-1 text-xl font-bold">{formatCurrency(avgPrice)}</p>
             )}
-          </CardContent>
-        </Card>
-        <Card className={lowStockCount > 0 ? "border-red-200 bg-red-50/50" : ""}>
-          <CardContent className="pt-4">
-            <p className="text-xs text-muted-foreground">库存需关注</p>
-            <p
-              className={`mt-1 text-xl font-bold ${lowStockCount > 0 ? "text-red-500" : ""}`}
-            >
-              {lowStockCount > 0 ? `${lowStockCount} 款` : "正常"}
-            </p>
-            <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
-              与库存表一致：上架中普通商品，可售低于阈值或缺货（不含自动获取）
-            </p>
           </CardContent>
         </Card>
       </div>

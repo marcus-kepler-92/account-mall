@@ -36,7 +36,6 @@ export default async function AdminDashboardPage() {
       <DashboardGlobalKPI kpi={kpi} />
       <Suspense>
         <DashboardTabs
-          lowStockCount={kpi.lowStockCount}
           inventory={inventory}
           restockPending={restockPending}
           recentOrders={recentOrders}
