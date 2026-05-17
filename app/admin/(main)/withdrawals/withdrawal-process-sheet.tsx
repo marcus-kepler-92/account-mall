@@ -93,6 +93,7 @@ export function WithdrawalProcessSheet({
         receiptImageUrl,
         level1Settled,
         level2Settled,
+        milestoneBonus,
         paidTotal,
         pendingTotal,
         currentBalance,
@@ -163,6 +164,12 @@ export function WithdrawalProcessSheet({
                                     <span className="text-muted-foreground">二级佣金（已结算）</span>
                                     <span className="tabular-nums">¥{level2Settled.toFixed(2)}</span>
                                 </div>
+                                {milestoneBonus > 0 && (
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">里程碑奖金</span>
+                                        <span className="tabular-nums">¥{milestoneBonus.toFixed(2)}</span>
+                                    </div>
+                                )}
                                 <div className="border-t pt-2 flex justify-between">
                                     <span className="text-muted-foreground">已打款</span>
                                     <span className="tabular-nums">-¥{paidTotal.toFixed(2)}</span>

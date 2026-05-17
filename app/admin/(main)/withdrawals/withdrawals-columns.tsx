@@ -22,6 +22,7 @@ export type WithdrawalRow = {
     createdAt: string
     level1Settled: number
     level2Settled: number
+    milestoneBonus: number
     paidTotal: number
     pendingTotal: number
     currentBalance: number

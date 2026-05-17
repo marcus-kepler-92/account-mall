@@ -26,6 +26,12 @@ export function BalanceCell({ row }: { row: WithdrawalRow }) {
                         <span className="text-muted-foreground">二级佣金（已结算）</span>
                         <span>¥{row.level2Settled.toFixed(2)}</span>
                     </div>
+                    {row.milestoneBonus > 0 && (
+                        <div className="flex justify-between">
+                            <span className="text-muted-foreground">里程碑奖金</span>
+                            <span>¥{row.milestoneBonus.toFixed(2)}</span>
+                        </div>
+                    )}
                     <div className="border-t pt-1 flex justify-between">
                         <span className="text-muted-foreground">已打款</span>
                         <span>-¥{row.paidTotal.toFixed(2)}</span>

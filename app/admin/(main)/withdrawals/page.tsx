@@ -76,7 +76,7 @@ export default async function AdminWithdrawalsPage({ searchParams }: { searchPar
         .findMany({ where: { role: "DISTRIBUTOR" }, select: { id: true } })
         .then((users) => users.map((u) => u.id))
 
-    const [allLevel1, allLevel2, allPaid, allPending] = await Promise.all([
+    const [allLevel1, allLevel2, allPaid, allPending, allBonuses] = await Promise.all([
         prisma.commission.aggregate({
             where: { distributorId: { in: allDistributorIds }, level: 1, status: "SETTLED" },
             _sum: { amount: true },
@@ -93,16 +93,21 @@ export default async function AdminWithdrawalsPage({ searchParams }: { searchPar
             where: { distributorId: { in: allDistributorIds }, status: "PENDING" },
             _sum: { amount: true },
         }),
+        prisma.invitationMilestoneBonus.aggregate({
+            where: { inviterId: { in: allDistributorIds } },
+            _sum: { amount: true },
+        }),
     ])
     const platformTotalWithdrawable =
         Number(allLevel1._sum.amount ?? 0) +
-        Number(allLevel2._sum.amount ?? 0) -
+        Number(allLevel2._sum.amount ?? 0) +
+        Number(allBonuses._sum.amount ?? 0) -
         Number(allPaid._sum.amount ?? 0) -
         Number(allPending._sum.amount ?? 0)
 
     // Per-distributor balance for current page
     const withdrawalDistIds = [...new Set(withdrawals.map((w) => w.distributorId))]
-    const [distL1, distL2, distPaid, distPending] =
+    const [distL1, distL2, distPaid, distPending, distBonuses] =
         withdrawalDistIds.length > 0
             ? await Promise.all([
                   prisma.commission.groupBy({
@@ -125,20 +130,27 @@ export default async function AdminWithdrawalsPage({ searchParams }: { searchPar
                       where: { distributorId: { in: withdrawalDistIds }, status: "PENDING" },
                       _sum: { amount: true },
                   }),
+                  prisma.invitationMilestoneBonus.groupBy({
+                      by: ["inviterId"],
+                      where: { inviterId: { in: withdrawalDistIds } },
+                      _sum: { amount: true },
+                  }),
               ])
-            : [[], [], [], []]
+            : [[], [], [], [], []]
 
     const l1Map = new Map(distL1.map((r) => [r.distributorId, Number(r._sum.amount ?? 0)]))
     const l2Map = new Map(distL2.map((r) => [r.distributorId, Number(r._sum.amount ?? 0)]))
     const paidMap = new Map(distPaid.map((r) => [r.distributorId, Number(r._sum.amount ?? 0)]))
     const pendingMap = new Map(distPending.map((r) => [r.distributorId, Number(r._sum.amount ?? 0)]))
+    const bonusMap = new Map(distBonuses.map((r) => [r.inviterId, Number(r._sum.amount ?? 0)]))
 
     const data: WithdrawalRow[] = withdrawals.map((w) => {
         const l1 = l1Map.get(w.distributorId) ?? 0
         const l2 = l2Map.get(w.distributorId) ?? 0
         const paid = paidMap.get(w.distributorId) ?? 0
         const pending = pendingMap.get(w.distributorId) ?? 0
-        const currentBalance = l1 + l2 - paid - pending
+        const bonus = bonusMap.get(w.distributorId) ?? 0
+        const currentBalance = l1 + l2 + bonus - paid - pending
         const feeAmount = Number(w.feeAmount ?? 0)
         return {
             id: w.id,
@@ -155,6 +167,7 @@ export default async function AdminWithdrawalsPage({ searchParams }: { searchPar
             createdAt: w.createdAt.toISOString(),
             level1Settled: l1,
             level2Settled: l2,
+            milestoneBonus: bonus,
             paidTotal: paid,
             pendingTotal: pending,
             currentBalance,
