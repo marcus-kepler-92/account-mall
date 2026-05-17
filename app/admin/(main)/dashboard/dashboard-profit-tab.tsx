@@ -5,7 +5,6 @@ import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 import { AlertTriangle } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Table,
@@ -68,32 +67,11 @@ export function DashboardProfitTab() {
       <DashboardDateRangePresets
         from={from}
         to={to}
-        onPresetSelect={(p) => {
-          setFrom(p.from)
-          setTo(p.to)
+        onChange={(f, t) => {
+          setFrom(f)
+          setTo(t)
         }}
-      >
-        <Input
-          type="date"
-          value={from}
-          max={to}
-          className="h-7 w-[9.5rem] px-2 text-xs md:text-xs"
-          onChange={(e) => {
-            if (e.target.value <= to) setFrom(e.target.value)
-          }}
-        />
-        <span className="text-xs text-muted-foreground">至</span>
-        <Input
-          type="date"
-          value={to}
-          min={from}
-          max={today}
-          className="h-7 w-[9.5rem] px-2 text-xs md:text-xs"
-          onChange={(e) => {
-            if (e.target.value >= from) setTo(e.target.value)
-          }}
-        />
-      </DashboardDateRangePresets>
+      />
 
       {/* KPI cards */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

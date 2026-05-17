@@ -83,9 +83,9 @@ export function DashboardSalesTab({
       <DashboardDateRangePresets
         from={from}
         to={to}
-        onPresetSelect={(p) => {
-          setFrom(p.from)
-          setTo(p.to)
+        onChange={(f, t) => {
+          setFrom(f)
+          setTo(t)
         }}
       />
 
