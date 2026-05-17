@@ -38,7 +38,7 @@ export async function fetchDistributorContext(distributorId: string): Promise<Di
     weekStart.setDate(weekStart.getDate() - weekStart.getDay())
     weekStart.setHours(0, 0, 0, 0)
 
-    const [user, l1, l2, paid, pending, orderCount, weekSales, teamCount] = await Promise.all([
+    const [user, l1, l2, paid, pending, bonuses, orderCount, weekSales, teamCount] = await Promise.all([
         prisma.user.findUnique({
             where: { id: distributorId },
             select: {
@@ -54,6 +54,7 @@ export async function fetchDistributorContext(distributorId: string): Promise<Di
         prisma.commission.aggregate({ where: { distributorId, level: 2, status: "SETTLED" }, _sum: { amount: true } }),
         prisma.withdrawal.aggregate({ where: { distributorId, status: "PAID" }, _sum: { amount: true } }),
         prisma.withdrawal.aggregate({ where: { distributorId, status: "PENDING" }, _sum: { amount: true } }),
+        prisma.invitationMilestoneBonus.aggregate({ where: { inviterId: distributorId }, _sum: { amount: true } }),
         prisma.order.count({ where: { distributorId } }),
         prisma.order.aggregate({
             where: { distributorId, status: "COMPLETED", paidAt: { gte: weekStart } },
@@ -68,6 +69,7 @@ export async function fetchDistributorContext(distributorId: string): Promise<Di
     const level2 = Number(l2._sum.amount ?? 0)
     const paidAmt = Number(paid._sum.amount ?? 0)
     const pendingAmt = Number(pending._sum.amount ?? 0)
+    const bonusAmt = Number(bonuses._sum.amount ?? 0)
 
     return {
         name: user.name ?? "分销员",
@@ -77,7 +79,7 @@ export async function fetchDistributorContext(distributorId: string): Promise<Di
         discountEnabled: user.discountCodeEnabled,
         discountPercent: user.discountPercent ? Number(user.discountPercent).toFixed(2) : null,
         inviterName: user.inviter?.name ?? null,
-        withdrawableBalance: (level1 + level2 - paidAmt - pendingAmt).toFixed(2),
+        withdrawableBalance: (level1 + level2 + bonusAmt - paidAmt - pendingAmt).toFixed(2),
         orderCount,
         weekSalesAmount: Number(weekSales._sum.amount ?? 0).toFixed(2),
         teamMemberCount: teamCount,

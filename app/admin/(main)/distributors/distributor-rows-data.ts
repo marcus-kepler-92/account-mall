@@ -52,6 +52,7 @@ export async function buildDistributorViewRows(
         inviteeList,
         level1All,
         level2All,
+        milestoneBonuses,
     ] = await Promise.all([
         prisma.invitationMilestone.findMany({ orderBy: { thresholdAmount: "asc" } }),
         prisma.invitationMilestoneBonus.findMany({
@@ -109,6 +110,11 @@ export async function buildDistributorViewRows(
             where: { distributorId: { in: ids }, level: 2, status: "SETTLED" },
             _sum: { amount: true },
         }),
+        prisma.invitationMilestoneBonus.groupBy({
+            by: ["inviterId"],
+            where: { inviterId: { in: ids } },
+            _sum: { amount: true },
+        }),
     ])
 
     const triggeredByDistributor = new Map<string, Set<string>>()
@@ -128,6 +134,7 @@ export async function buildDistributorViewRows(
     const inviteeCountMap = new Map(inviteeCounts.map((u) => [u.inviterId as string, u._count.id]))
     const level1AllMap = new Map(level1All.map((c) => [c.distributorId, Number(c._sum.amount ?? 0)]))
     const level2AllMap = new Map(level2All.map((c) => [c.distributorId, Number(c._sum.amount ?? 0)]))
+    const milestoneBonusMap = new Map(milestoneBonuses.map((b) => [b.inviterId as string, Number(b._sum.amount ?? 0)]))
 
     const inviteeListMap = new Map<string, { id: string; name: string; distributorCode: string | null }[]>()
     for (const u of inviteeList) {
@@ -142,9 +149,10 @@ export async function buildDistributorViewRows(
     return distributors.map((d) => {
         const l1Settled = level1SettledMap.get(d.id) ?? 0
         const l2Settled = level2SettledMap.get(d.id) ?? 0
+        const bonus = milestoneBonusMap.get(d.id) ?? 0
         const paid = paidMap.get(d.id) ?? 0
         const pending = pendingMap.get(d.id) ?? 0
-        const withdrawableBalance = l1Settled + l2Settled - paid - pending
+        const withdrawableBalance = Math.round((l1Settled + l2Settled + bonus - paid - pending) * 100) / 100
 
         const discountPercent =
             d.discountPercent == null

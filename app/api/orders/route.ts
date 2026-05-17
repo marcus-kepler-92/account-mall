@@ -113,14 +113,15 @@ async function createAutoFetchOrder(params: {
     const originalAmount = params.price
     let amount = originalAmount
     if (effectiveDistributorPct != null) {
-        amount = Math.round(amount * (1 - effectiveDistributorPct / 100) * 100) / 100
+        amount = amount * (1 - effectiveDistributorPct / 100)
     }
     if (effectiveExitPct != null) {
-        amount = Math.round(amount * (1 - effectiveExitPct / 100) * 100) / 100
+        amount = amount * (1 - effectiveExitPct / 100)
     }
     if (crossSellDiscountPercent != null) {
-        amount = Math.round(amount * (1 - crossSellDiscountPercent / 100) * 100) / 100
+        amount = amount * (1 - crossSellDiscountPercent / 100)
     }
+    amount = Math.round(amount * 100) / 100
     if (amount < 0.01) amount = 0.01
     const discountPercentApplied = amount < originalAmount
         ? Math.round((1 - amount / originalAmount) * 10000) / 100
@@ -266,7 +267,7 @@ async function createAutoFetchOrder(params: {
         // 获取支付链接
         const paymentUrl = getPaymentUrlForOrder({
             orderNo: paidOrder.orderNo,
-            totalAmount: String(amount),
+            totalAmount: amount.toFixed(2),
             subject: product.name,
             paymentMethod,
             channel,
