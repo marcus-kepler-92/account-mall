@@ -9,6 +9,9 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover"
+import { CopyButtonClient } from "@/app/components/copy-promo-button"
+
+const WECHAT_ID = "void_mall"
 
 const BTN = 48 // button size px
 const DRAG_THRESHOLD = 4 // px moved before treating as drag
@@ -122,6 +125,22 @@ export function CustomerServiceFab() {
                     height={168}
                     className="rounded"
                 />
+                <p className="mt-3 text-center text-[11px] leading-snug text-muted-foreground">
+                    紧急情况可加微信
+                </p>
+                <div className="mt-1 flex items-center justify-between gap-2 rounded border bg-muted/40 px-2 py-1.5">
+                    <span className="truncate text-xs">
+                        <span className="text-muted-foreground">微信：</span>
+                        <span className="font-mono">{WECHAT_ID}</span>
+                    </span>
+                    <CopyButtonClient
+                        text={WECHAT_ID}
+                        size="icon"
+                        variant="ghost"
+                        className="size-6"
+                        successMessage="微信号已复制"
+                    />
+                </div>
             </PopoverContent>
         </Popover>
     )
