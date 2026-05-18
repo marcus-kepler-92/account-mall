@@ -2,6 +2,7 @@ import Image from "next/image";
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { config } from "@/lib/config";
 import { isStorefrontTurnstileEnforced } from "@/lib/turnstile-policy";
@@ -19,7 +20,44 @@ import { buildProductDetailRedirectPath } from "@/lib/product-canonical-url";
 import { MarkdownViewClient } from "@/app/components/markdown-view-client";
 import { RiskWarningDialog } from "./risk-warning-dialog";
 import { verifyCrossSellToken } from "@/lib/cross-sell-token";
-export const dynamic = "force-dynamic";
+
+const PRODUCT_CACHE_TTL_SECONDS = 300;
+const STOCK_CACHE_TTL_SECONDS = 30;
+
+const getCachedProductBySlug = unstable_cache(
+  async (productId: string) =>
+    prisma.product.findUnique({
+      where: { id: productId },
+      include: { tags: { select: { id: true, name: true, slug: true } } },
+    }),
+  ["product-detail"],
+  { revalidate: PRODUCT_CACHE_TTL_SECONDS, tags: ["products"] },
+);
+
+const getCachedProductMetaById = unstable_cache(
+  async (productId: string) =>
+    prisma.product.findUnique({
+      where: { id: productId },
+      select: {
+        name: true,
+        description: true,
+        price: true,
+        status: true,
+        image: true,
+        id: true,
+        slug: true,
+      },
+    }),
+  ["product-meta"],
+  { revalidate: PRODUCT_CACHE_TTL_SECONDS, tags: ["products"] },
+);
+
+const getCachedStockCount = unstable_cache(
+  async (productId: string) =>
+    prisma.card.count({ where: { productId, status: "UNSOLD" } }),
+  ["product-stock"],
+  { revalidate: STOCK_CACHE_TTL_SECONDS, tags: ["cards"] },
+);
 
 type PageProps = {
   params: Promise<{ productIdSlug: string }>;
@@ -44,18 +82,7 @@ export async function generateMetadata({
   const parsed = parseProductIdSlug(productIdSlug);
   if (!parsed) return { title: "商品" };
 
-  const product = await prisma.product.findUnique({
-    where: { id: parsed.productId },
-    select: {
-      name: true,
-      description: true,
-      price: true,
-      status: true,
-      image: true,
-      id: true,
-      slug: true,
-    },
-  });
+  const product = await getCachedProductMetaById(parsed.productId);
   if (!product || product.status !== "ACTIVE") return { title: "商品" };
 
   const desc = product.description
@@ -96,12 +123,7 @@ export default async function ProductDetailPage({
 
   const { productId, slug } = parsed;
 
-  const product = await prisma.product.findUnique({
-    where: { id: productId },
-    include: {
-      tags: { select: { id: true, name: true, slug: true } },
-    },
-  });
+  const product = await getCachedProductBySlug(productId);
 
   if (!product || product.status !== "ACTIVE") {
     notFound();
@@ -130,9 +152,7 @@ export default async function ProductDetailPage({
 
   const productWithImage = product as typeof product & { image: string | null };
 
-  const stockCount = await prisma.card.count({
-    where: { productId: product.id, status: "UNSOLD" },
-  });
+  const stockCount = await getCachedStockCount(product.id);
 
   const isAutoFetch = product.productType === "AUTO_FETCH";
   const isFree = isAutoFetch && Number(product.price) === 0;
@@ -221,9 +241,9 @@ export default async function ProductDetailPage({
   }
   offers.hasMerchantReturnPolicy = merchantReturnPolicy;
 
-  const jsonLd = {
-    "@context": "https://schema.org",
+  const productJsonLd = {
     "@type": "Product",
+    "@id": `${productUrl}#product`,
     name: product.name,
     description: descriptionPlain,
     url: productUrl,
@@ -231,6 +251,34 @@ export default async function ProductDetailPage({
     ...(imageAbsolute && { image: imageAbsolute }),
     brand: { "@type": "Brand", name: config.schemaBrandName },
     offers,
+  };
+
+  const breadcrumbItems: { name: string; item: string }[] = [
+    { name: "首页", item: config.siteUrl },
+  ];
+  if (product.tags.length > 0) {
+    const primaryTag = product.tags[0];
+    breadcrumbItems.push({
+      name: primaryTag.name,
+      item: `${config.siteUrl}/?tag=${encodeURIComponent(primaryTag.slug)}`,
+    });
+  }
+  breadcrumbItems.push({ name: product.name, item: productUrl });
+
+  const breadcrumbJsonLd = {
+    "@type": "BreadcrumbList",
+    "@id": `${productUrl}#breadcrumb`,
+    itemListElement: breadcrumbItems.map((b, idx) => ({
+      "@type": "ListItem",
+      position: idx + 1,
+      name: b.name,
+      item: b.item,
+    })),
+  };
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [productJsonLd, breadcrumbJsonLd],
   };
 
   const jsonLdSafe = JSON.stringify(jsonLd).replace(/</g, "\\u003c");

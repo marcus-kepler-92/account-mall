@@ -20,17 +20,17 @@ const envSchema = z
     nodeEnv: z
       .enum(["development", "production", "test"])
       .default("development"),
-    siteName: z.string().min(1).default("Account Mall"),
+    siteName: z.string().min(1).default("空域账号商城"),
     siteDescription: z
       .string()
       .default(
-        "提供苹果ID购买服务，支持美区/港区/台区/韩区独享及共享空白账号。已购小火箭Shadowrocket账号登录App Store即可直接下载，24小时自动发货，安全稳定，即买即用。",
+        "空域账号商城是专注海外Apple ID购买的电商平台，覆盖美区、港区、日区、台区、韩区等地区的独享与共享苹果ID账号，支持已购小火箭Shadowrocket，下单后24小时自动发货，安全稳定。",
       ),
-    siteTagline: z.string().default("苹果ID购买，小火箭空白号即买即发"),
+    siteTagline: z.string().default("苹果ID商城 · 海外Apple ID一站购买"),
     siteSubtitle: z
       .string()
       .default(
-        "美区/港区/台区/韩区独享及共享空白账号，已购小火箭Shadowrocket，24小时自动发货。",
+        "美区/港区/日区/台区/韩区独享与共享Apple ID，已购小火箭Shadowrocket，24小时自动发货。",
       ),
     siteKeywords: z.string().optional(),
     adminPanelLabel: z.string().default("管理后台"),
@@ -99,8 +99,12 @@ const envSchema = z
     basePromoDiscountPercent: z.coerce.number().min(0).max(50).default(5),
     /** 推荐码/优惠码：前端防抖校验延迟（毫秒），输入停止后多久发起校验 */
     promoValidateDebounceMs: z.coerce.number().int().min(0).default(400),
-    /** Product JSON-LD：品牌名，用于 schema.org Brand */
-    schemaBrandName: z.string().min(1).default("Apple"),
+    /**
+     * Product JSON-LD: schema.org Brand name. Defaults to the site brand ("空域")
+     * rather than "Apple" to reduce trademark/DMCA exposure — declaring "Apple"
+     * as brand on third-party Apple-ID listings invites takedown requests.
+     */
+    schemaBrandName: z.string().min(1).default("空域"),
     /** Product JSON-LD：配送与退货政策适用国家 ISO 代码。面向中国用户填 CN；若主要客户在美国（如海外华人）填 US。与访问者 IP 无关。 */
     schemaShippingCountry: z.string().min(1).default("CN"),
     /** Product JSON-LD：运费金额，0 表示包邮 */

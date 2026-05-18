@@ -11,7 +11,6 @@ import { CustomerServiceFab } from "@/app/components/customer-service-fab";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { config } from "@/lib/config";
 
-import { KEYWORDS_META } from "@/lib/seo-keywords";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -28,7 +27,6 @@ const geistMono = Geist_Mono({
 
 const siteTitle = config.siteName;
 const siteDescription = config.siteDescription;
-const siteKeywords = config.siteKeywords ?? KEYWORDS_META;
 const siteUrl = config.siteUrl;
 
 export const metadata: Metadata = {
@@ -37,10 +35,10 @@ export const metadata: Metadata = {
     template: `%s | ${siteTitle}`,
   },
   description: siteDescription,
-  keywords: siteKeywords
-    ? siteKeywords.split(/[,，]/).map((k) => k.trim()).filter(Boolean)
-    : undefined,
   metadataBase: new URL(siteUrl),
+  alternates: {
+    canonical: siteUrl,
+  },
   openGraph: {
     title: siteTitle,
     description: siteDescription,
@@ -64,13 +62,41 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const webSiteJsonLd = {
+  const organizationId = `${siteUrl}/#organization`
+  const websiteId = `${siteUrl}/#website`
+
+  const jsonLdGraph = {
     "@context": "https://schema.org",
-    "@type": "WebSite",
-    name: siteTitle,
-    url: siteUrl,
-    description: siteDescription,
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": organizationId,
+        name: siteTitle,
+        alternateName: ["空域", "VoidLogins", "苹果ID商城"],
+        url: siteUrl,
+        logo: `${siteUrl}/favicon.ico`,
+      },
+      {
+        "@type": "WebSite",
+        "@id": websiteId,
+        url: siteUrl,
+        name: siteTitle,
+        description: siteDescription,
+        inLanguage: "zh-CN",
+        publisher: { "@id": organizationId },
+        potentialAction: {
+          "@type": "SearchAction",
+          target: {
+            "@type": "EntryPoint",
+            urlTemplate: `${siteUrl}/?tag={search_term_string}`,
+          },
+          "query-input": "required name=search_term_string",
+        },
+      },
+    ],
   }
+
+  const jsonLdSafe = JSON.stringify(jsonLdGraph).replace(/</g, "\\u003c")
 
   return (
     <html lang="zh-CN" suppressHydrationWarning>
@@ -79,7 +105,7 @@ export default function RootLayout({
       >
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(webSiteJsonLd) }}
+          dangerouslySetInnerHTML={{ __html: jsonLdSafe }}
         />
         <ThemeProvider
           attribute="class"

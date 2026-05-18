@@ -20,18 +20,37 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.8,
     }))
 
+    const now = new Date()
     return [
         {
             url: base,
-            lastModified: new Date(),
+            lastModified: now,
             changeFrequency: "daily" as const,
             priority: 1,
         },
         {
             url: `${base}/orders/lookup`,
-            lastModified: new Date(),
+            lastModified: now,
             changeFrequency: "weekly" as const,
             priority: 0.5,
+        },
+        {
+            url: `${base}/privacy`,
+            lastModified: now,
+            changeFrequency: "yearly" as const,
+            priority: 0.3,
+        },
+        {
+            url: `${base}/terms`,
+            lastModified: now,
+            changeFrequency: "yearly" as const,
+            priority: 0.3,
+        },
+        {
+            url: `${base}/refund`,
+            lastModified: now,
+            changeFrequency: "yearly" as const,
+            priority: 0.3,
         },
         ...productUrls,
     ]
