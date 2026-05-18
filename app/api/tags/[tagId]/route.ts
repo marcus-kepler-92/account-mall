@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAdminSession } from "@/lib/auth-guard";
 import { unauthorized, notFound } from "@/lib/api-response";
+import { revalidateTags } from "@/lib/revalidate-storefront";
 
 type RouteContext = {
     params: Promise<{ tagId: string }>;
@@ -32,6 +33,8 @@ export async function DELETE(
     await prisma.tag.delete({
         where: { id: tagId },
     });
+
+    revalidateTags();
 
     return NextResponse.json({ message: "Tag deleted" });
 }

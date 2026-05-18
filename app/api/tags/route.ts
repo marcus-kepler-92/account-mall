@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getAdminSession } from "@/lib/auth-guard";
 import { createTagSchema } from "@/lib/validations/product";
 import { unauthorized, invalidJsonBody, validationError, conflict } from "@/lib/api-response";
+import { revalidateTags } from "@/lib/revalidate-storefront";
 
 /**
  * GET /api/tags
@@ -58,6 +59,8 @@ export async function POST(request: NextRequest) {
     const tag = await prisma.tag.create({
         data: { name, slug },
     });
+
+    revalidateTags();
 
     return NextResponse.json(tag, { status: 201 });
 }

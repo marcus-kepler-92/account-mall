@@ -9,6 +9,7 @@ import {
   CardNotFoundError,
   CardStatusTransitionError,
 } from "@/lib/domains/cards"
+import { revalidateCards } from "@/lib/revalidate-storefront"
 
 type RouteContext = { params: Promise<{ cardId: string }> }
 
@@ -26,6 +27,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
   try {
     const result = await patchCardStatus(cardId, parsed.data)
+    revalidateCards()
     const message = result.status === "DISABLED" ? "Card disabled" : "Card enabled"
     return NextResponse.json({ message, ...result })
   } catch (e) {
@@ -43,6 +45,7 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
 
   try {
     await deleteCard(cardId)
+    revalidateCards()
     return NextResponse.json({ message: "Card deleted" })
   } catch (e) {
     if (e instanceof CardNotFoundError) return notFound("Card not found")

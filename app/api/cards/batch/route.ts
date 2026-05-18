@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getAdminSession, getSuperAdminSession } from "@/lib/auth-guard"
 import { unauthorized, invalidJsonBody, validationError } from "@/lib/api-response"
 import { batchCardActionSchema, batchCardAction } from "@/lib/domains/cards"
+import { revalidateCards } from "@/lib/revalidate-storefront"
 
 export async function POST(request: NextRequest) {
   const session = await getAdminSession()
@@ -21,6 +22,7 @@ export async function POST(request: NextRequest) {
   }
 
   const result = await batchCardAction(parsed.data)
+  revalidateCards()
   return NextResponse.json(result)
 }
 

@@ -8,6 +8,7 @@ import {
     invalidJsonBody,
     validationError,
 } from "@/lib/api-response";
+import { revalidateAnnouncements } from "@/lib/revalidate-storefront";
 
 type RouteContext = {
     params: Promise<{ id: string }>;
@@ -97,6 +98,14 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         data: updateData,
     });
 
+    // Invalidate when status, content, ordering, or audience could affect public list
+    if (
+        existing.status === "PUBLISHED" ||
+        announcement.status === "PUBLISHED"
+    ) {
+        revalidateAnnouncements();
+    }
+
     return NextResponse.json(announcement);
 }
 
@@ -122,6 +131,8 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
     await prisma.announcement.delete({
         where: { id },
     });
+
+    if (existing.status === "PUBLISHED") revalidateAnnouncements();
 
     return NextResponse.json({ message: "Announcement deleted" });
 }

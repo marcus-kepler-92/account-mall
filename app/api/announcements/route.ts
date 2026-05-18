@@ -7,6 +7,7 @@ import {
     invalidJsonBody,
     validationError,
 } from "@/lib/api-response";
+import { revalidateAnnouncements } from "@/lib/revalidate-storefront";
 
 const PUBLIC_LIMIT = 20;
 
@@ -84,6 +85,8 @@ export async function POST(request: NextRequest) {
             publishedAt: isPublished ? new Date() : null,
         },
     });
+
+    if (isPublished) revalidateAnnouncements();
 
     return NextResponse.json(announcement, { status: 201 });
 }

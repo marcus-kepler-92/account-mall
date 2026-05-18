@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getAdminSession } from "@/lib/auth-guard"
 import { unauthorized, notFound, invalidJsonBody, validationError, badRequest } from "@/lib/api-response"
+import { revalidateCards } from "@/lib/revalidate-storefront"
 import { bulkImportCardsSchema, bulkImportCards, getCardsByProduct, AutoFetchProductError } from "@/lib/domains/cards"
 import type { CardStatus } from "@/lib/domains/cards"
 
@@ -47,6 +48,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
   try {
     const result = await bulkImportCards(productId, { ...product, price: Number(product.price) }, parsed.data)
+    revalidateCards()
     return NextResponse.json(result, { status: 201 })
   } catch (e) {
     if (e instanceof AutoFetchProductError) return badRequest("自动获取类型的商品不支持手动导入卡密")

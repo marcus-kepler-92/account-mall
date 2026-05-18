@@ -4,6 +4,7 @@ import { getAdminSession, getSuperAdminSession } from "@/lib/auth-guard";
 import { updateProductSchema } from "@/lib/validations/product";
 import { config } from "@/lib/config";
 import { notFound, unauthorized, invalidJsonBody, validationError, conflict, badRequest } from "@/lib/api-response";
+import { revalidateProducts } from "@/lib/revalidate-storefront";
 
 type RouteContext = {
     params: Promise<{ productId: string }>;
@@ -154,6 +155,8 @@ export async function PUT(
         },
     });
 
+    revalidateProducts();
+
     return NextResponse.json({
         ...product,
         price: Number(product.price),
@@ -210,6 +213,8 @@ export async function DELETE(
             await tx.product.delete({ where: { id: productId } });
         });
 
+        revalidateProducts();
+
         return NextResponse.json({ message: "Product deleted" });
     }
 
@@ -217,6 +222,8 @@ export async function DELETE(
         where: { id: productId },
         data: { status: "INACTIVE" },
     });
+
+    revalidateProducts();
 
     return NextResponse.json({ message: "Product deactivated" });
 }

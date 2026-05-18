@@ -4,6 +4,7 @@ import { getAdminSession, getSuperAdminSession } from "@/lib/auth-guard";
 import { createProductSchema } from "@/lib/validations/product";
 import { config } from "@/lib/config";
 import { unauthorized, invalidJsonBody, validationError, conflict } from "@/lib/api-response";
+import { revalidateProducts } from "@/lib/revalidate-storefront";
 
 /**
  * GET /api/products
@@ -213,6 +214,8 @@ export async function POST(request: NextRequest) {
             },
         },
     });
+
+    revalidateProducts();
 
     return NextResponse.json(
         { ...product, price: Number(product.price) },

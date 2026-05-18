@@ -3,6 +3,7 @@ import { z } from "zod"
 import { prisma } from "@/lib/prisma"
 import { getAdminSession } from "@/lib/auth-guard"
 import { unauthorized, validationError } from "@/lib/api-response"
+import { revalidateProducts } from "@/lib/revalidate-storefront"
 
 const reorderSchema = z.object({
     ids: z.array(z.string()).min(1),
@@ -36,6 +37,8 @@ export async function PATCH(request: NextRequest) {
             })
         )
     )
+
+    revalidateProducts()
 
     return NextResponse.json({ ok: true })
 }

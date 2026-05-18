@@ -56,11 +56,3 @@ export function useSiteName(): string {
 export function useAdminPanelLabel(): string {
     return useContext(SiteConfigContext).adminPanelLabel
 }
-
-export function useSiteTagline(): string {
-    return useContext(SiteConfigContext).siteTagline
-}
-
-export function useSiteSubtitle(): string {
-    return useContext(SiteConfigContext).siteSubtitle
-}

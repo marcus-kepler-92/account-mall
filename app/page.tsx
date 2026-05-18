@@ -29,31 +29,71 @@ export const metadata: Metadata = {
   alternates: { canonical: config.siteUrl },
 }
 
+type CachedAnnouncement = {
+  id: string
+  title: string
+  content: string | null
+  publishedAt: string | null
+}
+
+type CachedTag = {
+  id: string
+  name: string
+  slug: string
+  _count: { products: number }
+}
+
+type CachedProduct = {
+  id: string
+  name: string
+  slug: string
+  description: string | null
+  summary: string | null
+  image: string | null
+  price: number
+  productType: "NORMAL" | "AUTO_FETCH"
+  tags: { id: string; name: string; slug: string }[]
+}
+
 const getCachedAnnouncements = unstable_cache(
-  async () =>
-    prisma.announcement.findMany({
+  async (): Promise<CachedAnnouncement[]> => {
+    const rows = await prisma.announcement.findMany({
       where: { status: "PUBLISHED", audience: { in: ["CUSTOMER", "ALL"] } },
       orderBy: [{ sortOrder: "desc" }, { publishedAt: "desc" }, { createdAt: "desc" }],
       take: ANNOUNCEMENTS_LIMIT,
-    }),
+    })
+    return rows.map((a) => ({
+      id: a.id,
+      title: a.title,
+      content: a.content,
+      publishedAt: a.publishedAt ? a.publishedAt.toISOString() : null,
+    }))
+  },
   ["home-announcements"],
   { revalidate: HOMEPAGE_CACHE_REVALIDATE_SECONDS, tags: ["announcements"] },
 )
 
 const getCachedTags = unstable_cache(
-  async () =>
-    prisma.tag.findMany({
+  async (): Promise<CachedTag[]> => {
+    const rows = await prisma.tag.findMany({
       include: {
         _count: { select: { products: { where: { status: "ACTIVE" } } } },
       },
       orderBy: { name: "asc" },
-    }),
+    })
+    return rows.map((t) => ({
+      id: t.id,
+      name: t.name,
+      slug: t.slug,
+      _count: { products: t._count.products },
+    }))
+  },
   ["home-tags"],
   { revalidate: HOMEPAGE_CACHE_REVALIDATE_SECONDS, tags: ["tags", "products"] },
 )
 
 const getCachedProducts = unstable_cache(
-  async (tagSlugs: string[]) => {
+  async (tagSlugs: string[]): Promise<{ products: CachedProduct[]; total: number }> => {
     const where = {
       status: "ACTIVE" as const,
       ...(tagSlugs.length > 0 && { tags: { some: { slug: { in: tagSlugs } } } }),
@@ -77,20 +117,34 @@ const getCachedProducts = unstable_cache(
       }),
       prisma.product.count({ where }),
     ])
-    return { products, total }
+    const plain: CachedProduct[] = products.map((p) => ({
+      id: p.id,
+      name: p.name,
+      slug: p.slug,
+      description: p.description,
+      summary: p.summary ?? null,
+      image: p.image,
+      price: Number(p.price),
+      productType: (p.productType ?? "NORMAL") as "NORMAL" | "AUTO_FETCH",
+      tags: p.tags,
+    }))
+    return { products: plain, total }
   },
   ["home-products"],
   { revalidate: HOMEPAGE_CACHE_REVALIDATE_SECONDS, tags: ["products"] },
 )
 
 const getCachedStockCounts = unstable_cache(
-  async (productIds: string[]) => {
-    if (productIds.length === 0) return [] as { productId: string; _count: { id: number } }[]
-    return prisma.card.groupBy({
+  async (productIds: string[]): Promise<Record<string, number>> => {
+    if (productIds.length === 0) return {}
+    const rows = await prisma.card.groupBy({
       by: ["productId"],
       where: { status: "UNSOLD", productId: { in: productIds } },
       _count: { id: true },
     })
+    const map: Record<string, number> = {}
+    for (const r of rows) map[r.productId] = r._count.id
+    return map
   },
   ["home-stock-counts"],
   { revalidate: 60, tags: ["cards", "products"] },
@@ -117,17 +171,16 @@ export default async function HomePage({
     const productIds = products.map(p => p.id)
     const stockCounts = await getCachedStockCounts(productIds)
 
-    const stockMap = new Map(stockCounts.map(s => [s.productId, s._count.id]))
     const productsWithStock: ProductCardData[] = products.map(product => ({
         id: product.id,
         name: product.name,
         slug: product.slug,
         description: product.description,
-        summary: product.summary ?? null,
+        summary: product.summary,
         image: product.image,
-        price: Number(product.price),
-        productType: (product.productType ?? "NORMAL") as "NORMAL" | "AUTO_FETCH",
-        stock: product.productType === "AUTO_FETCH" ? 1 : (stockMap.get(product.id) ?? 0),
+        price: product.price,
+        productType: product.productType,
+        stock: product.productType === "AUTO_FETCH" ? 1 : (stockCounts[product.id] ?? 0),
         tags: product.tags,
     }))
 
@@ -141,12 +194,7 @@ export default async function HomePage({
         },
     }
 
-    const frontAnnouncements = announcements.map(a => ({
-        id: a.id,
-        title: a.title,
-        content: a.content,
-        publishedAt: a.publishedAt?.toISOString() ?? null,
-    }))
+    const frontAnnouncements = announcements
 
     return (
         <div className="flex min-h-screen flex-col">
