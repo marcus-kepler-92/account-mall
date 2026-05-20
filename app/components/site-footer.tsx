@@ -1,9 +1,11 @@
 import Link from "next/link"
 import { Zap } from "lucide-react"
 import { config } from "@/lib/config"
+import { getSiteSettings } from "@/lib/site-settings"
 
-export function SiteFooter() {
-    const hasBusinessInfo = config.businessName || config.businessLicenseNo || config.contactEmail
+export async function SiteFooter() {
+    const settings = await getSiteSettings()
+    const hasBusinessInfo = settings.businessName || settings.businessLicenseNo || settings.contactEmail
     return (
         <footer className="border-t">
             <div className="mx-auto max-w-6xl px-4 py-8 space-y-4">
@@ -36,9 +38,9 @@ export function SiteFooter() {
                 </div>
                 {hasBusinessInfo && (
                     <div className="border-t pt-4 flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
-                        {config.businessName && <span>经营者：{config.businessName}</span>}
-                        {config.businessLicenseNo && <span>统一社会信用代码：{config.businessLicenseNo}</span>}
-                        {config.contactEmail && <span>联系邮箱：{config.contactEmail}</span>}
+                        {settings.businessName && <span>经营者：{settings.businessName}</span>}
+                        {settings.businessLicenseNo && <span>统一社会信用代码：{settings.businessLicenseNo}</span>}
+                        {settings.contactEmail && <span>联系邮箱：{settings.contactEmail}</span>}
                     </div>
                 )}
             </div>

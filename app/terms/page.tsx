@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import { SiteHeader } from "@/app/components/site-header"
 import { SiteFooter } from "@/app/components/site-footer"
-import { config } from "@/lib/config"
+import { getSiteSettings } from "@/lib/site-settings"
 
 export const metadata: Metadata = {
     title: "用户服务协议",
@@ -9,10 +9,11 @@ export const metadata: Metadata = {
 }
 
 const EFFECTIVE_DATE = "2026年3月17日"
-const businessName = config.businessName || "本平台"
-const contactEmail = config.contactEmail || null
 
-export default function TermsPage() {
+export default async function TermsPage() {
+    const settings = await getSiteSettings()
+    const businessName = settings.businessName || "本平台"
+    const contactEmail = settings.contactEmail || null
     return (
         <div className="flex min-h-screen flex-col">
             <SiteHeader />

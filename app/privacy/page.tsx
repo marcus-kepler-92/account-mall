@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import { SiteHeader } from "@/app/components/site-header"
 import { SiteFooter } from "@/app/components/site-footer"
-import { config } from "@/lib/config"
+import { getSiteSettings } from "@/lib/site-settings"
 
 export const metadata: Metadata = {
     title: "隐私政策",
@@ -9,9 +9,10 @@ export const metadata: Metadata = {
 }
 
 const EFFECTIVE_DATE = "2026年3月17日"
-const contactEmail = config.contactEmail || null
 
-export default function PrivacyPage() {
+export default async function PrivacyPage() {
+    const settings = await getSiteSettings()
+    const contactEmail = settings.contactEmail || null
     return (
         <div className="flex min-h-screen flex-col">
             <SiteHeader />

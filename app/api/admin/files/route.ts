@@ -3,7 +3,7 @@ import { getAdminSession } from "@/lib/auth-guard"
 import { unauthorized } from "@/lib/api-response"
 import { list, del } from "@vercel/blob"
 
-const PATH_PREFIX_WHITELIST = ["products", "guides", "announcements", "receipts"] as const
+const PATH_PREFIX_WHITELIST = ["products", "guides", "announcements", "receipts", "site-qr"] as const
 type PathPrefix = (typeof PATH_PREFIX_WHITELIST)[number]
 
 function isPathPrefix(raw: string | null): raw is PathPrefix {
