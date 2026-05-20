@@ -31,6 +31,10 @@ const routeLabels: Record<string, string> = {
     campaigns: "群发活动",
     "payment-channels": "收款渠道",
     admins: "管理员管理",
+    agent: "客服 Agent",
+    knowledge: "知识库",
+    leads: "咨询单",
+    conversations: "对话历史",
 }
 
 function isIdSegment(seg: string) {
@@ -102,6 +106,18 @@ function getBreadcrumbItems(pathname: string) {
             } else {
                 label = routeLabels[seg] ?? seg
             }
+        } else if (prev === "knowledge") {
+            if (seg === "new") {
+                label = "新建知识"
+            } else if (isIdSegment(seg)) {
+                label = "编辑知识"
+            } else {
+                label = routeLabels[seg] ?? seg
+            }
+        } else if (prev === "leads" && isIdSegment(seg)) {
+            label = "咨询单详情"
+        } else if (prev === "conversations" && isIdSegment(seg)) {
+            label = "对话详情"
         } else if (seg in routeLabels) {
             label = routeLabels[seg]
         } else {

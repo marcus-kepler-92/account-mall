@@ -22,6 +22,11 @@ import {
     LayoutTemplate,
     Trophy,
     Sparkles,
+    Headset,
+    BookText,
+    UserSearch,
+    MessagesSquare,
+    Settings,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { authClient } from "@/lib/auth-client"
@@ -52,6 +57,7 @@ const allNavItems = [
     { title: "卡密管理", href: "/admin/cards", icon: CreditCard },
     { title: "卡密模版", href: "/admin/card-templates", icon: LayoutTemplate },
     { title: "自动获取验证", href: "/admin/auto-fetch", icon: FlaskConical },
+    { title: "系统设置", href: "/admin/settings/site", icon: Settings },
     { title: "联推折扣", href: "/admin/settings/cross-sell", icon: Sparkles },
     // 数据
     { title: "订单管理", href: "/admin/orders", icon: ShoppingCart },
@@ -72,6 +78,16 @@ const allNavItems = [
 const superAdminOnlyItems = [
     { title: "管理员管理", href: "/admin/admins", icon: ShieldCheck },
 ]
+
+const agentGroup = {
+    label: "客服 Agent",
+    icon: Headset,
+    items: [
+        { title: "知识库", href: "/admin/agent/knowledge", icon: BookText },
+        { title: "咨询单", href: "/admin/agent/leads", icon: UserSearch },
+        { title: "对话历史", href: "/admin/agent/conversations", icon: MessagesSquare },
+    ],
+}
 
 interface AdminSidebarProps {
     allowedMenus: string[] | null
@@ -100,6 +116,10 @@ export function AdminSidebar({ allowedMenus, isSuperAdmin }: AdminSidebarProps) 
         ...allNavItems.filter(item => !allowedMenus || allowedMenus.includes(item.href)),
         ...(isSuperAdmin ? superAdminOnlyItems : []),
     ]
+
+    const agentItems = agentGroup.items.filter(
+        (item) => !allowedMenus || allowedMenus.includes(item.href),
+    )
 
     return (
         <Sidebar collapsible="icon">
@@ -162,6 +182,32 @@ export function AdminSidebar({ allowedMenus, isSuperAdmin }: AdminSidebarProps) 
                         </SidebarMenu>
                     </SidebarGroupContent>
                 </SidebarGroup>
+                {agentItems.length > 0 && (
+                    <SidebarGroup>
+                        <SidebarGroupLabel>
+                            <agentGroup.icon />
+                            <span className="ml-1.5">{agentGroup.label}</span>
+                        </SidebarGroupLabel>
+                        <SidebarGroupContent>
+                            <SidebarMenu>
+                                {agentItems.map((item) => (
+                                    <SidebarMenuItem key={item.href}>
+                                        <SidebarMenuButton
+                                            asChild
+                                            isActive={pathname === item.href || pathname.startsWith(item.href + "/")}
+                                            tooltip={item.title}
+                                        >
+                                            <Link href={item.href}>
+                                                <item.icon className="size-4 shrink-0" />
+                                                <span>{item.title}</span>
+                                            </Link>
+                                        </SidebarMenuButton>
+                                    </SidebarMenuItem>
+                                ))}
+                            </SidebarMenu>
+                        </SidebarGroupContent>
+                    </SidebarGroup>
+                )}
             </SidebarContent>
 
             <SidebarFooter>
