@@ -39,6 +39,7 @@ model User {
   distributorInvitationsSent DistributorInvitation[] @relation("DistributorInvitationInviter")
   inviterMilestoneBonuses InvitationMilestoneBonus[] @relation("InviterMilestoneBonuses")
   announcementReads          AnnouncementRead[]
+  agentKnowledge             AgentKnowledge[]
 
   @@index([inviterId])
 }
@@ -580,6 +581,25 @@ model CrossSellSetting {
   updatedAt       DateTime @updatedAt
 }
 
+// Runtime-editable site-wide settings. Single row pinned by id="singleton".
+// All fields nullable so unset values fall back to env defaults via
+// lib/site-settings.ts (smooth migration: env stays authoritative until the
+// admin explicitly overrides a field in the UI).
+model SiteSetting {
+  id                    String   @id @default("singleton")
+  wechatQrUrl           String?
+  wechatId              String?
+  businessHoursStart    Int?
+  businessHoursEnd      Int?
+  businessHoursTimezone String?
+  businessName          String?
+  businessLicenseNo     String?
+  contactEmail          String?
+  escalateWebhookUrl    String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
 // One-time usage record — enforces a source order can only use the cross-sell discount for a given target product once
 model CrossSellUsage {
   id              String   @id @default(cuid())
@@ -596,3 +616,103 @@ model CrossSellUsage {
   @@index([sourceOrderId])
   @@index([targetProductId])
 }
+
+// ─── Customer Service Agent ──────────────────────────────────────────────────
+
+model AgentSession {
+  id                      String         @id          // 客户端 ULID
+  fingerprintHash         String                      // SHA256(IP + UA).slice(0, 32)
+  startedAt               DateTime       @default(now())
+  endedAt                 DateTime?
+  tokenBudget             Int            @default(2000)
+  tokensUsed              Int            @default(0)
+  escalated               Boolean        @default(false)
+  expiresAt               DateTime
+  messages                AgentMessage[]
+  lead                    AgentLead?
+  @@index([expiresAt])
+}
+
+model AgentMessage {
+  id           String          @id @default(cuid())
+  sessionId    String
+  session      AgentSession    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role         MessageRole
+  parts        Json
+  contentText  String          @db.Text
+  toolName     String?
+  citations    Json?
+  feedback     MessageFeedback?
+  inputTokens  Int             @default(0)
+  outputTokens Int             @default(0)
+  createdAt    DateTime        @default(now())
+  @@index([sessionId, createdAt])
+  @@index([feedback])
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  TOOL
+  SYSTEM
+}
+
+enum MessageFeedback {
+  POSITIVE
+  NEGATIVE
+}
+
+model AgentLead {
+  id                   String       @id @default(cuid())
+  sessionId            String       @unique
+  session              AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  wechatId             String?
+  orderNo              String?
+  reason               String
+  urgency              LeadUrgency  @default(MED)
+  status               LeadStatus   @default(NEW)
+  contactedBy          String?
+  contactedAt          DateTime?
+  notes                String?      @db.Text
+  conversationSnapshot Json
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+  @@index([status, createdAt])
+}
+
+enum LeadStatus {
+  PENDING_CONTACT
+  NEW
+  CONTACTED
+  RESOLVED
+  DROPPED
+}
+
+enum LeadUrgency {
+  LOW
+  MED
+  HIGH
+}
+
+model AgentKnowledge {
+  id          String          @id @default(cuid())
+  title       String
+  content     String          @db.Text
+  tags        String[]
+  status      KnowledgeStatus @default(DRAFT)
+  authorId    String
+  author      User            @relation(fields: [authorId], references: [id])
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  publishedAt DateTime?
+  embedding   Float[]         @default([])
+  @@index([status])
+  @@index([tags], type: Gin)
+}
+
+enum KnowledgeStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
