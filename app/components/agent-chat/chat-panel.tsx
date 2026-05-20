@@ -5,12 +5,14 @@ import { ulid } from "ulid"
 import {
   AssistantRuntimeProvider,
   ThreadPrimitive,
+  useThread,
   type FeedbackAdapter,
 } from "@assistant-ui/react"
 import {
   useChatRuntime,
   AssistantChatTransport,
 } from "@assistant-ui/react-ai-sdk"
+import type { UIMessage } from "ai"
 import { UserBubble, AssistantBubble, ComposerBar } from "./chat-wrappers"
 import { WelcomeChips } from "./welcome-chips"
 import { FallbackQR } from "./fallback-qr"
@@ -20,6 +22,7 @@ import { getOrderHistory } from "@/lib/order-history-storage"
 type FallbackReason = "daily-cap" | "timeout" | "budget"
 
 const SESSION_KEY = "agent_session_id"
+const MESSAGES_KEY_PREFIX = "agent_messages_"
 
 function getOrCreateSessionId(): string {
   if (typeof window === "undefined") return ""
@@ -29,6 +32,47 @@ function getOrCreateSessionId(): string {
     window.localStorage.setItem(SESSION_KEY, id)
   }
   return id
+}
+
+// Read previously-persisted UIMessages for this session out of sessionStorage.
+// Returns `undefined` (not `[]`) when missing so useChatRuntime falls through
+// to its own default — passing `[]` to the AI SDK would mark the thread as
+// "intentionally empty" which is semantically different.
+function readPersistedMessages(sessionId: string): UIMessage[] | undefined {
+  if (typeof window === "undefined" || !sessionId) return undefined
+  try {
+    const raw = window.sessionStorage.getItem(MESSAGES_KEY_PREFIX + sessionId)
+    if (!raw) return undefined
+    const parsed = JSON.parse(raw) as unknown
+    if (!Array.isArray(parsed) || parsed.length === 0) return undefined
+    return parsed as UIMessage[]
+  } catch {
+    return undefined
+  }
+}
+
+// Tiny subcomponent rendered inside <AssistantRuntimeProvider> so it can call
+// useThread() — that hook requires the runtime context to be present.
+// Renders nothing; pure side-effect of persisting thread messages whenever
+// they change, scoped to the current sessionId. sessionStorage (not local)
+// is intentional: scoped to the browser tab, no cross-tab leakage, cleared
+// when the user closes the browser — same lifecycle as a chat "session".
+function PersistMessages({ sessionId }: { sessionId: string }) {
+  const messages = useThread((state) => state.messages)
+  useEffect(() => {
+    if (!sessionId || typeof window === "undefined") return
+    try {
+      window.sessionStorage.setItem(
+        MESSAGES_KEY_PREFIX + sessionId,
+        JSON.stringify(messages),
+      )
+    } catch {
+      // QuotaExceededError on very long conversations — silently drop.
+      // Worst case the user loses persistence; the in-memory runtime
+      // state is unaffected.
+    }
+  }, [sessionId, messages])
+  return null
 }
 
 // Customer-service QR + wechat id resolved at runtime by /api/agent/session/start
@@ -139,9 +183,21 @@ export function ChatPanel() {
     [],
   )
 
+  // Hydrate the thread with any messages persisted to sessionStorage on a
+  // previous render for the same session id. This is how the widget keeps
+  // chat history visible after the user closes & reopens the FAB popup
+  // (Radix unmounts the popover children, so we can't rely on in-memory
+  // runtime state). Memoized on sessionId — runtime is rebuilt only when
+  // the session id changes (which is also when transport rebuilds).
+  const initialMessages = useMemo(
+    () => readPersistedMessages(sessionId),
+    [sessionId],
+  )
+
   const runtime = useChatRuntime({
     transport,
     adapters: { feedback },
+    messages: initialMessages,
     onToolCall: ({ toolCall }) => {
       if (toolCall.toolName === "escalateToHuman") setHandoff(true)
     },
@@ -152,6 +208,7 @@ export function ChatPanel() {
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
+      <PersistMessages sessionId={sessionId} />
       <ThreadPrimitive.Root className="flex h-full flex-col">
         <ThreadPrimitive.Viewport
           autoScroll
