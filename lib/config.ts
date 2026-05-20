@@ -46,7 +46,6 @@ const envSchema = z
     yipayKey: z.string().optional(),
     yipaySubmitUrl: z.string().optional(),
     yipaySiteName: z.string().optional(),
-    cronSecret: z.string().optional(),
     pendingOrderTimeoutMs: z.coerce.number().int().positive().default(1800000),
     orderRateLimitPoints: z.coerce.number().int().positive().default(10),
     orderQueryRateLimitPoints: z.coerce.number().int().positive().default(30),
@@ -159,6 +158,40 @@ const envSchema = z
     businessLicenseNo: z.string().default(""),
     /** 合规页脚：对外联系邮箱，留空则不展示 */
     contactEmail: z.string().default(""),
+    /** 客服工作时间：开始小时（0-23），含边界，默认 9 */
+    businessHoursStart: z.coerce.number().int().min(0).max(23).default(9),
+    /** 客服工作时间：结束小时（0-23），不含边界，默认 22 */
+    businessHoursEnd: z.coerce.number().int().min(0).max(23).default(22),
+    /** 客服工作时间：判定使用的时区，默认 Asia/Shanghai */
+    businessHoursTimezone: z.string().default("Asia/Shanghai"),
+    // 客服 agent
+    agentChatTimeoutMs: z.coerce.number().int().positive().default(15_000),
+    agentSessionTtlDays: z.coerce.number().int().positive().default(90),
+    // 单 session 累计 token (input cache-miss + cache-hit + output 全计入).
+    // 系统 prompt 含 50 个商品 + 全 PUBLISHED 知识库 ≈ 2000 tokens/turn 都
+    // 算入这里. 默认 50000 → 约 15-25 轮自然对话; 用尽走 fallback QR.
+    // 真实美元成本: 极端 50K cache-miss × $0.14/M ≈ $0.007 / session.
+    agentTokenBudget: z.coerce.number().int().positive().default(50_000),
+    dailyInputCap: z.coerce.number().int().positive().default(3_000_000),
+    dailyOutputCap: z.coerce.number().int().positive().default(800_000),
+    // wechatQrUrl / wechatId: env values are env-fallback defaults. Real
+    // production values are managed via /admin/settings/site (SiteSetting
+    // DB row). Empty string means "not configured" — site-settings.ts and
+    // tools handle that gracefully.
+    wechatQrUrl: z.string().url().or(z.literal("")).default(""),
+    wechatId: z.string().default(""),
+    // HIGH urgency 通知 webhook (optional)
+    escalateWebhookUrl: z.string().url().optional(),
+    // Upstash (Marketplace 自动注入, fallback 两种命名)
+    upstashRedisRestUrl: z.string().url().or(z.literal("")).default(""),
+    upstashRedisRestToken: z.string().default(""),
+    // DeepSeek 直连 (OpenAI-compatible, https://api.deepseek.com)
+    // Optional at build time so Next.js can collect page data without the
+    // env var; /api/agent/chat returns 503 at runtime when the key is empty
+    // or looks placeholder. AI customer-service won't work until set.
+    deepseekApiKey: z.string().default(""),
+    // Vercel Cron 鉴权
+    cronSecret: z.string().min(16),
   })
   .transform((data) => {
     const databaseUrl = sanitizeDatabaseUrl(data.databaseUrl.trim());
@@ -304,6 +337,20 @@ function getEnvInput() {
     businessName: e.BUSINESS_NAME,
     businessLicenseNo: e.BUSINESS_LICENSE_NO,
     contactEmail: e.CONTACT_EMAIL,
+    businessHoursStart: e.BUSINESS_HOURS_START,
+    businessHoursEnd: e.BUSINESS_HOURS_END,
+    businessHoursTimezone: e.BUSINESS_HOURS_TIMEZONE,
+    agentChatTimeoutMs: e.AGENT_CHAT_TIMEOUT_MS,
+    agentSessionTtlDays: e.AGENT_SESSION_TTL_DAYS,
+    agentTokenBudget: e.AGENT_TOKEN_BUDGET,
+    dailyInputCap: e.DAILY_INPUT_CAP,
+    dailyOutputCap: e.DAILY_OUTPUT_CAP,
+    wechatQrUrl: e.WECHAT_QR_URL,
+    wechatId: e.WECHAT_ID,
+    escalateWebhookUrl: e.ESCALATE_WEBHOOK_URL,
+    upstashRedisRestUrl: e.UPSTASH_REDIS_REST_URL ?? e.KV_REST_API_URL ?? "",
+    upstashRedisRestToken: e.UPSTASH_REDIS_REST_TOKEN ?? e.KV_REST_API_TOKEN ?? "",
+    deepseekApiKey: e.DEEPSEEK_API_KEY,
   };
 }
 

@@ -30,12 +30,12 @@ function createRequest(authHeader: string | null): NextRequest {
 
 describe("GET /api/cron/close-expired-orders", () => {
   beforeEach(() => {
-    config.cronSecret = undefined
+    ;(config as { cronSecret: string | undefined }).cronSecret = undefined
     closeExpiredOrdersMock.mockReset()
   })
 
   it("returns 503 when CRON_SECRET is not set", async () => {
-    config.cronSecret = undefined
+    ;(config as { cronSecret: string | undefined }).cronSecret = undefined
     const req = createRequest("Bearer any-secret")
     const res = await GET(req)
     const data = await res.json()
