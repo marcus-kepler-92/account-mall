@@ -3,15 +3,21 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { usePathname } from "next/navigation"
 import { Headset } from "lucide-react"
-import Image from "next/image"
 import {
     Popover,
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover"
-import { CopyButtonClient } from "@/app/components/copy-promo-button"
-
-const WECHAT_ID = "void_mall"
+import {
+    Sheet,
+    SheetContent,
+    SheetDescription,
+    SheetHeader,
+    SheetTitle,
+    SheetTrigger,
+} from "@/components/ui/sheet"
+import { useIsMobile } from "@/hooks/use-mobile"
+import { ChatPanel } from "./agent-chat/chat-panel"
 
 const BTN = 48 // button size px
 const DRAG_THRESHOLD = 4 // px moved before treating as drag
@@ -26,6 +32,7 @@ function getInitialPos(): { x: number; y: number } {
 export function CustomerServiceFab() {
     const pathname = usePathname()
     const wechat = true // QR code always shown
+    const isMobile = useIsMobile()
 
     const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
     const [pulsing, setPulsing] = useState(true)
@@ -105,42 +112,50 @@ export function CustomerServiceFab() {
         style: { position: "fixed" as const, left: pos.x, top: pos.y, zIndex: 50 },
     }
 
+    const fabButton = (
+        <button
+            aria-label="联系客服"
+            className={btnClass}
+            {...sharedPointerProps}
+        >
+            <Headset className="size-5" />
+        </button>
+    )
+
+    // 仅渲染一种 trigger; 双渲染会导致 Sheet + Popover 同时监听 open 互相打架.
+    if (isMobile) {
+        return (
+            <Sheet open={open} onOpenChange={setOpen}>
+                <SheetTrigger asChild>{fabButton}</SheetTrigger>
+                <SheetContent
+                    side="bottom"
+                    className="flex h-[100dvh] w-screen max-w-none flex-col gap-0 rounded-none border-0 p-0"
+                >
+                    <SheetHeader className="border-b p-3 text-left">
+                        <SheetTitle className="text-base">AI 客服</SheetTitle>
+                        <SheetDescription className="sr-only">
+                            与 AI 客服对话, 解答商品 / 订单 / 平台规则相关咨询
+                        </SheetDescription>
+                    </SheetHeader>
+                    <div className="min-h-0 flex-1">
+                        <ChatPanel />
+                    </div>
+                </SheetContent>
+            </Sheet>
+        )
+    }
+
     return (
         <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-                <button
-                    aria-label="联系客服"
-                    className={btnClass}
-                    {...sharedPointerProps}
-                >
-                    <Headset className="size-5" />
-                </button>
-            </PopoverTrigger>
-            <PopoverContent side="top" align="end" className="w-48 p-3">
-                <p className="mb-2 text-center text-xs text-muted-foreground">扫码联系客服</p>
-                <Image
-                    src="/contact-qr.png"
-                    alt="客服二维码"
-                    width={168}
-                    height={168}
-                    className="rounded"
-                />
-                <p className="mt-3 text-center text-[11px] leading-snug text-muted-foreground">
-                    紧急情况可加微信
-                </p>
-                <div className="mt-1 flex items-center justify-between gap-2 rounded border bg-muted/40 px-2 py-1.5">
-                    <span className="truncate text-xs">
-                        <span className="text-muted-foreground">微信：</span>
-                        <span className="font-mono">{WECHAT_ID}</span>
-                    </span>
-                    <CopyButtonClient
-                        text={WECHAT_ID}
-                        size="icon"
-                        variant="ghost"
-                        className="size-6"
-                        successMessage="微信号已复制"
-                    />
-                </div>
+            <PopoverTrigger asChild>{fabButton}</PopoverTrigger>
+            <PopoverContent
+                side="top"
+                align="end"
+                sideOffset={8}
+                collisionPadding={8}
+                className="h-[600px] w-[380px] p-0"
+            >
+                <ChatPanel />
             </PopoverContent>
         </Popover>
     )

@@ -9,9 +9,14 @@ import { NetworkStatusBar } from "@/app/components/network-status-bar";
 import { AnalyticsClient } from "@/app/components/analytics-client";
 import { CustomerServiceFab } from "@/app/components/customer-service-fab";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
+import { BotIdClient } from "botid/client";
 import { config } from "@/lib/config";
 
 import "./globals.css";
+// assistant-ui markdown streaming caret (the blinking dot at the end of the
+// last text node while a message is still streaming). Imported globally so
+// the chat bubble's `aui-md` className picks it up.
+import "@assistant-ui/react-markdown/styles/dot.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -103,6 +108,19 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        {/* BotID client script is provisioned by the Vercel platform at
+            /_vercel/botid only on production deployments. Mounting it on
+            previews / local dev triggers 404 noise (BotID infra isn't
+            initialized there). Gate on VERCEL_ENV instead of NODE_ENV —
+            previews have NODE_ENV=production but VERCEL_ENV=preview. */}
+        {process.env.VERCEL_ENV === "production" ? (
+          <BotIdClient
+            protect={[
+              { path: "/api/agent/session/start", method: "POST" },
+              { path: "/api/agent/chat", method: "POST" },
+            ]}
+          />
+        ) : null}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: jsonLdSafe }}
