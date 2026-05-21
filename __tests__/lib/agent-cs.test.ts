@@ -376,6 +376,43 @@ describe("buildCSPrompt — context rendering & red-line completeness", () => {
     expect(prompt).toContain("付款 2026-05-18")
   })
 
+  it("forces multi-order disambiguation instead of defaulting to the first order", () => {
+    // Regression: with multiple userOrders the AI was silently calling
+    // lookup_order on the first one, answering a question that may have
+    // been about a different order — high risk of misleading the user.
+    // Prompt now requires the AI to list the orders and ask which one
+    // when the request is ambiguous.
+    const prompt = buildCSPrompt({
+      ...makeBase(),
+      userOrders: [
+        { orderNo: "OD-A", product: "共享号·美区", status: "COMPLETED", paidAt: "2026-05-18" },
+        { orderNo: "OD-B", product: "独享号·港区", status: "COMPLETED", paidAt: "2026-05-19" },
+      ],
+    })
+    // Disambiguation rule is present and mentions the actual count.
+    expect(prompt).toMatch(/共\s*2\s*个订单/)
+    expect(prompt).toMatch(/必须先列出订单让用户选/)
+    expect(prompt).toMatch(/不能默认拿第一个/)
+    // The "single order = no need to ask" shortcut also documented so the
+    // AI doesn't over-question single-order users.
+    expect(prompt).toMatch(/如果只有 1 个订单.*不必反问/)
+    // Diagnosis answers must call out which order they're for.
+    expect(prompt).toMatch(/先明示"针对订单/)
+  })
+
+  it("omits the multi-order disambiguation note when only one order exists", () => {
+    const prompt = buildCSPrompt({
+      ...makeBase(),
+      userOrders: [
+        { orderNo: "OD-ONLY", product: "共享号", status: "COMPLETED", paidAt: "2026-05-18" },
+      ],
+    })
+    expect(prompt).toMatch(/共\s*1\s*个订单/)
+    // Even with one order the AI should still annotate which order it's
+    // answering about — keeps the habit consistent.
+    expect(prompt).toMatch(/先明示"针对订单/)
+  })
+
   it("omits the user-order section header when no hints are provided", () => {
     const prompt = buildCSPrompt(makeBase())
     // Header is the markdown "## 用户本机最近订单（来自浏览器本地..." line.
