@@ -510,17 +510,29 @@ export function buildCSTools(sessionId: string) {
           .default("customer_support"),
       }),
       execute: async ({ wechatId, orderNo, intent }) => {
+        // Diagnostic log — surfaces what AI actually passed + whether the
+        // safety net activated. Tagged so it's grep-able in dev logs:
+        // `[agent-cs:collect_wechat]`. Doesn't leak sensitive data (no
+        // chat content), just the routing decision.
+        console.log("[agent-cs:collect_wechat] in", {
+          sessionId: sessionId.slice(0, 8),
+          wechatId,
+          orderNo,
+          intent,
+        })
         const settings = await getSiteSettings()
         // Belt-and-suspenders: re-verify orderNo at the DB layer even
         // if AI claims to have called verify_order. A wrong orderNo in
         // the Lead table makes ops chase ghosts.
         let verifiedOrderNo: string | null = null
+        let verifySource: "ai-arg" | "safety-net" | "none" = "none"
         if (orderNo) {
           const ok = await prisma.order.findFirst({
             where: { orderNo },
             select: { orderNo: true },
           })
           verifiedOrderNo = ok?.orderNo ?? null
+          if (verifiedOrderNo) verifySource = "ai-arg"
         }
 
         // Same safety net as escalate_to_human (see comment there) —
@@ -535,8 +547,14 @@ export function buildCSTools(sessionId: string) {
           })
           if (lastLead?.orderNo) {
             verifiedOrderNo = lastLead.orderNo
+            verifySource = "safety-net"
           }
         }
+        console.log("[agent-cs:collect_wechat] verified", {
+          sessionId: sessionId.slice(0, 8),
+          verifiedOrderNo,
+          verifySource,
+        })
 
         // Business inquiries bypass the orderNo requirement — they're not
         // tied to a transaction, ops still needs the wechat handoff to
@@ -586,6 +604,10 @@ export function buildCSTools(sessionId: string) {
               conversationSnapshot: snapshot,
             },
           })
+          console.log("[agent-cs:collect_wechat] out registered=true", {
+            sessionId: sessionId.slice(0, 8),
+            orderNo: verifiedOrderNo,
+          })
           return {
             ok: true,
             registered: true as const,
@@ -602,6 +624,13 @@ export function buildCSTools(sessionId: string) {
         // AI must re-ask. `registered: false` is the explicit signal
         // for the prompt's red line: "registered=false 时绝不能告诉
         // 用户'已登记'，必须说'还没登记，需要订单号'".
+        console.log("[agent-cs:collect_wechat] out registered=false", {
+          sessionId: sessionId.slice(0, 8),
+          rawOrderNoArg: orderNo,
+          reason: orderNo
+            ? "order_not_found_in_db"
+            : "no_order_no_anywhere",
+        })
         return {
           ok: false,
           registered: false as const,
@@ -627,6 +656,13 @@ export function buildCSTools(sessionId: string) {
           .default("customer_support"),
       }),
       execute: async ({ reason, urgency, orderNo, intent }) => {
+        console.log("[agent-cs:escalate] in", {
+          sessionId: sessionId.slice(0, 8),
+          orderNo,
+          intent,
+          urgency,
+          reasonPreview: reason.slice(0, 40),
+        })
         const settings = await getSiteSettings()
         // Snapshot scoped to this consultation (messages since the prior
         // lead, if any). Keeps each lead's transcript independent — ops
@@ -637,12 +673,14 @@ export function buildCSTools(sessionId: string) {
         // Belt-and-suspenders re-verify (also for business_inquiry — if
         // they happen to mention an orderNo we still tag the Lead with it).
         let verifiedOrderNo: string | null = null
+        let verifySource: "ai-arg" | "safety-net" | "none" = "none"
         if (orderNo) {
           const ok = await prisma.order.findFirst({
             where: { orderNo },
             select: { orderNo: true },
           })
           verifiedOrderNo = ok?.orderNo ?? null
+          if (verifiedOrderNo) verifySource = "ai-arg"
         }
 
         // Safety net for the "AI forgets to re-pass orderNo on retry"
@@ -663,8 +701,15 @@ export function buildCSTools(sessionId: string) {
           })
           if (lastLead?.orderNo) {
             verifiedOrderNo = lastLead.orderNo
+            verifySource = "safety-net"
           }
         }
+        console.log("[agent-cs:escalate] verified", {
+          sessionId: sessionId.slice(0, 8),
+          verifiedOrderNo,
+          verifySource,
+          intent,
+        })
 
         const inHours = await isInBusinessHours()
         const pad = (n: number) => String(n).padStart(2, "0")
@@ -707,6 +752,13 @@ export function buildCSTools(sessionId: string) {
           // Don't flip session.escalated — there's no actionable handoff
           // yet. AI must keep iterating until a verified orderNo arrives,
           // or until the conversation reclassifies as business_inquiry.
+          console.log("[agent-cs:escalate] out renderQr=false", {
+            sessionId: sessionId.slice(0, 8),
+            rawOrderNoArg: orderNo,
+            reason: orderNo
+              ? "order_not_found_in_db"
+              : "no_order_no_anywhere",
+          })
           return {
             renderQr: false,
             orderNoVerified: false,
@@ -747,6 +799,10 @@ export function buildCSTools(sessionId: string) {
         const message = inHours
           ? `已为您转接人工客服（订单 ${verifiedOrderNo}），扫码加客服后请发送订单号给我们，我们会查询您的对话和订单情况。`
           : `已为您转接人工客服（订单 ${verifiedOrderNo}），当前 ${pad(settings.businessHoursEnd)}:00–${pad(settings.businessHoursStart)}:00 为客服休息时间。请扫码加客服并发送订单号，我们 ${pad(settings.businessHoursStart)}:00 上线后第一时间处理。`
+        console.log("[agent-cs:escalate] out renderQr=true", {
+          sessionId: sessionId.slice(0, 8),
+          orderNo: verifiedOrderNo,
+        })
         return {
           renderQr: true,
           qrUrl: settings.wechatQrUrl,
