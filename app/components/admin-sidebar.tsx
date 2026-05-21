@@ -47,8 +47,8 @@ import {
 } from "@/components/ui/sidebar"
 import { useSiteName, useAdminPanelLabel } from "@/app/components/site-name-provider"
 import { NotificationBadge } from "@/app/admin/components"
-import { usePendingWithdrawals } from "@/app/admin/hooks/use-pending-withdrawals"
-import { usePendingLeads } from "@/app/admin/hooks/use-pending-leads"
+import { useAdminNotifications } from "@/app/admin/hooks/use-admin-notifications"
+import { sourceFor } from "@/lib/admin-notifications"
 
 const allNavItems = [
     // 总览
@@ -101,8 +101,12 @@ export function AdminSidebar({ allowedMenus, isSuperAdmin }: AdminSidebarProps) 
     useTheme()
     const siteName = useSiteName()
     const adminPanelLabel = useAdminPanelLabel()
-    const { count: pendingWithdrawals } = usePendingWithdrawals()
-    const { count: pendingLeads } = usePendingLeads()
+    const { byKey } = useAdminNotifications()
+
+    const badgeFor = (href: string): number => {
+        const key = sourceFor(href)
+        return key ? (byKey[key]?.count ?? 0) : 0
+    }
 
     const handleSignOut = async () => {
         await authClient.signOut({
@@ -149,7 +153,7 @@ export function AdminSidebar({ allowedMenus, isSuperAdmin }: AdminSidebarProps) 
                     <SidebarGroupContent>
                         <SidebarMenu>
                             {navItems.map((item) => {
-                                const isWithdrawals = item.href === "/admin/withdrawals"
+                                const badgeCount = badgeFor(item.href)
                                 return (
                                     <SidebarMenuItem key={item.title}>
                                         <SidebarMenuButton
@@ -160,19 +164,19 @@ export function AdminSidebar({ allowedMenus, isSuperAdmin }: AdminSidebarProps) 
                                             <Link href={item.href}>
                                                 <span className="relative">
                                                     <item.icon className="size-4 shrink-0" />
-                                                    {isWithdrawals && (
+                                                    {badgeCount > 0 && (
                                                         <NotificationBadge
                                                             variant="dot"
-                                                            count={pendingWithdrawals}
+                                                            count={badgeCount}
                                                             className="hidden group-data-[collapsible=icon]:inline-flex"
                                                         />
                                                     )}
                                                 </span>
                                                 <span>{item.title}</span>
-                                                {isWithdrawals && (
+                                                {badgeCount > 0 && (
                                                     <NotificationBadge
                                                         variant="inline"
-                                                        count={pendingWithdrawals}
+                                                        count={badgeCount}
                                                         className="ml-auto group-data-[collapsible=icon]:hidden"
                                                     />
                                                 )}
@@ -193,7 +197,7 @@ export function AdminSidebar({ allowedMenus, isSuperAdmin }: AdminSidebarProps) 
                         <SidebarGroupContent>
                             <SidebarMenu>
                                 {agentItems.map((item) => {
-                                    const isLeads = item.href === "/admin/agent/leads"
+                                    const badgeCount = badgeFor(item.href)
                                     return (
                                         <SidebarMenuItem key={item.href}>
                                             <SidebarMenuButton
@@ -204,19 +208,19 @@ export function AdminSidebar({ allowedMenus, isSuperAdmin }: AdminSidebarProps) 
                                                 <Link href={item.href}>
                                                     <span className="relative">
                                                         <item.icon className="size-4 shrink-0" />
-                                                        {isLeads && (
+                                                        {badgeCount > 0 && (
                                                             <NotificationBadge
                                                                 variant="dot"
-                                                                count={pendingLeads}
+                                                                count={badgeCount}
                                                                 className="hidden group-data-[collapsible=icon]:inline-flex"
                                                             />
                                                         )}
                                                     </span>
                                                     <span>{item.title}</span>
-                                                    {isLeads && (
+                                                    {badgeCount > 0 && (
                                                         <NotificationBadge
                                                             variant="inline"
-                                                            count={pendingLeads}
+                                                            count={badgeCount}
                                                             className="ml-auto group-data-[collapsible=icon]:hidden"
                                                         />
                                                     )}
