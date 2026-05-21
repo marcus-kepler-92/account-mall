@@ -48,6 +48,7 @@ import {
 import { useSiteName, useAdminPanelLabel } from "@/app/components/site-name-provider"
 import { NotificationBadge } from "@/app/admin/components"
 import { usePendingWithdrawals } from "@/app/admin/hooks/use-pending-withdrawals"
+import { usePendingLeads } from "@/app/admin/hooks/use-pending-leads"
 
 const allNavItems = [
     // 总览
@@ -101,6 +102,7 @@ export function AdminSidebar({ allowedMenus, isSuperAdmin }: AdminSidebarProps) 
     const siteName = useSiteName()
     const adminPanelLabel = useAdminPanelLabel()
     const { count: pendingWithdrawals } = usePendingWithdrawals()
+    const { count: pendingLeads } = usePendingLeads()
 
     const handleSignOut = async () => {
         await authClient.signOut({
@@ -190,20 +192,39 @@ export function AdminSidebar({ allowedMenus, isSuperAdmin }: AdminSidebarProps) 
                         </SidebarGroupLabel>
                         <SidebarGroupContent>
                             <SidebarMenu>
-                                {agentItems.map((item) => (
-                                    <SidebarMenuItem key={item.href}>
-                                        <SidebarMenuButton
-                                            asChild
-                                            isActive={pathname === item.href || pathname.startsWith(item.href + "/")}
-                                            tooltip={item.title}
-                                        >
-                                            <Link href={item.href}>
-                                                <item.icon className="size-4 shrink-0" />
-                                                <span>{item.title}</span>
-                                            </Link>
-                                        </SidebarMenuButton>
-                                    </SidebarMenuItem>
-                                ))}
+                                {agentItems.map((item) => {
+                                    const isLeads = item.href === "/admin/agent/leads"
+                                    return (
+                                        <SidebarMenuItem key={item.href}>
+                                            <SidebarMenuButton
+                                                asChild
+                                                isActive={pathname === item.href || pathname.startsWith(item.href + "/")}
+                                                tooltip={item.title}
+                                            >
+                                                <Link href={item.href}>
+                                                    <span className="relative">
+                                                        <item.icon className="size-4 shrink-0" />
+                                                        {isLeads && (
+                                                            <NotificationBadge
+                                                                variant="dot"
+                                                                count={pendingLeads}
+                                                                className="hidden group-data-[collapsible=icon]:inline-flex"
+                                                            />
+                                                        )}
+                                                    </span>
+                                                    <span>{item.title}</span>
+                                                    {isLeads && (
+                                                        <NotificationBadge
+                                                            variant="inline"
+                                                            count={pendingLeads}
+                                                            className="ml-auto group-data-[collapsible=icon]:hidden"
+                                                        />
+                                                    )}
+                                                </Link>
+                                            </SidebarMenuButton>
+                                        </SidebarMenuItem>
+                                    )
+                                })}
                             </SidebarMenu>
                         </SidebarGroupContent>
                     </SidebarGroup>
