@@ -82,49 +82,36 @@ beforeEach(() => {
     )
 })
 
-describe("session/start — BotID gate honors VERCEL_ENV", () => {
-    it("skips checkBotId on preview (VERCEL_ENV=preview)", async () => {
-        process.env.VERCEL_ENV = "preview"
-        const res = await POST(buildRequest({ sessionId: VALID_SESSION_ID }))
-        expect(res.status).toBe(200)
-        expect(checkBotIdMock).not.toHaveBeenCalled()
+describe("session/start — BotID is fully disabled (custom domain incompatibility)", () => {
+    // Vercel BotID's /_vercel/botid/... script isn't provisioned on
+    // custom domains (only on vercel.app). The client SDK 404s and enters
+    // an infinite retry loop that freezes the tab. Both the client mount
+    // (app/layout.tsx) and the server-side check are off until BotID
+    // supports custom domains. These tests pin "off" so a partial revert
+    // can't reintroduce the 403 / browser-freeze regression.
+
+    it("never invokes checkBotId, regardless of VERCEL_ENV", async () => {
+        for (const env of ["production", "preview", undefined]) {
+            if (env === undefined) delete process.env.VERCEL_ENV
+            else process.env.VERCEL_ENV = env
+            checkBotIdMock.mockClear()
+            const res = await POST(buildRequest({ sessionId: VALID_SESSION_ID }))
+            expect(res.status).toBe(200)
+            expect(checkBotIdMock).not.toHaveBeenCalled()
+        }
     })
 
-    it("skips checkBotId on development (VERCEL_ENV undefined / dev)", async () => {
-        delete process.env.VERCEL_ENV
-        const res = await POST(buildRequest({ sessionId: VALID_SESSION_ID }))
-        expect(res.status).toBe(200)
-        expect(checkBotIdMock).not.toHaveBeenCalled()
-    })
-
-    it("runs checkBotId on production and passes humans through", async () => {
-        process.env.VERCEL_ENV = "production"
-        checkBotIdMock.mockResolvedValueOnce({ isBot: false })
-        const res = await POST(buildRequest({ sessionId: VALID_SESSION_ID }))
-        expect(checkBotIdMock).toHaveBeenCalledTimes(1)
-        expect(res.status).toBe(200)
-    })
-
-    it("runs checkBotId on production and returns 403 for bots", async () => {
-        process.env.VERCEL_ENV = "production"
-        checkBotIdMock.mockResolvedValueOnce({ isBot: true })
-        const res = await POST(buildRequest({ sessionId: VALID_SESSION_ID }))
-        expect(checkBotIdMock).toHaveBeenCalledTimes(1)
-        expect(res.status).toBe(403)
-        const body = await res.json()
-        expect(body.error).toBe("bot-detected")
-        expect(prisma.agentSession.create).not.toHaveBeenCalled()
-    })
-
-    it("forwards BotID's developmentOptions bypass to suppress local misconfig warnings", async () => {
-        process.env.VERCEL_ENV = "production"
-        checkBotIdMock.mockResolvedValueOnce({ isBot: false })
-        await POST(buildRequest({ sessionId: VALID_SESSION_ID }))
-        expect(checkBotIdMock).toHaveBeenCalledWith(
-            expect.objectContaining({
-                developmentOptions: expect.objectContaining({ bypass: "HUMAN" }),
-            }),
+    it("does not import botid/server at all (so a future re-enable is a deliberate change)", () => {
+        // Read the route source and assert no checkBotId import. If somebody
+        // brings BotID back without updating this test, CI will flag.
+        const fs = require("fs") as typeof import("fs")
+        const path = require("path") as typeof import("path")
+        const source = fs.readFileSync(
+            path.join(__dirname, "../../app/api/agent/session/start/route.ts"),
+            "utf8",
         )
+        expect(source).not.toMatch(/from\s+["']botid\/server["']/)
+        expect(source).not.toMatch(/checkBotId\s*\(/)
     })
 })
 

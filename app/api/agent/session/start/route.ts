@@ -1,4 +1,3 @@
-import { checkBotId } from "botid/server"
 import { z } from "zod"
 import { prisma } from "@/lib/prisma"
 import { config } from "@/lib/config"
@@ -9,19 +8,14 @@ export const runtime = "nodejs"
 
 const schema = z.object({ sessionId: z.string().min(20).max(40) })
 
+// BotID is fully disabled — see app/layout.tsx for the rationale (Vercel
+// BotID infrastructure isn't provisioned on custom domains, causing the
+// client SDK to enter an infinite retry loop). Re-enable both the client
+// mount and this server check together once Vercel BotID supports custom
+// domains. Anti-abuse still happens downstream via /api/agent/chat's
+// rate-limiters + token budget + fingerprint tracking.
+
 export async function POST(req: Request) {
-  // BotID is only mounted (client-side) on production deployments — see
-  // app/layout.tsx where <BotIdClient> is gated on VERCEL_ENV === "production".
-  // On preview / local dev the client script doesn't run, so checkBotId()
-  // sees no token and judges the request as bot → 403. Mirror the same gate
-  // here: only enforce BotID on production. NODE_ENV-based bypass alone is
-  // insufficient because preview also has NODE_ENV=production.
-  if (process.env.VERCEL_ENV === "production") {
-    const botCheck = await checkBotId({ developmentOptions: { bypass: "HUMAN" } })
-    if (botCheck.isBot) {
-      return Response.json({ error: "bot-detected" }, { status: 403 })
-    }
-  }
 
   const parsed = schema.safeParse(await req.json())
   if (!parsed.success) {

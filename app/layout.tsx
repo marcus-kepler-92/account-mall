@@ -9,7 +9,6 @@ import { NetworkStatusBar } from "@/app/components/network-status-bar";
 import { AnalyticsClient } from "@/app/components/analytics-client";
 import { CustomerServiceFab } from "@/app/components/customer-service-fab";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
-import { BotIdClient } from "botid/client";
 import { config } from "@/lib/config";
 
 import "./globals.css";
@@ -108,19 +107,13 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {/* BotID client script is provisioned by the Vercel platform at
-            /_vercel/botid only on production deployments. Mounting it on
-            previews / local dev triggers 404 noise (BotID infra isn't
-            initialized there). Gate on VERCEL_ENV instead of NODE_ENV —
-            previews have NODE_ENV=production but VERCEL_ENV=preview. */}
-        {process.env.VERCEL_ENV === "production" ? (
-          <BotIdClient
-            protect={[
-              { path: "/api/agent/session/start", method: "POST" },
-              { path: "/api/agent/chat", method: "POST" },
-            ]}
-          />
-        ) : null}
+        {/* BotID is disabled across the board for now.
+            Even on VERCEL_ENV=production, the /_vercel/botid/... endpoint
+            is only provisioned on Vercel-managed vercel.app domains;
+            on custom domains (voidlogins.com) the script 404s and the
+            BotID client SDK enters an infinite retry loop that locks up
+            the browser tab. Re-enable once Vercel BotID supports custom
+            domains (or after we wire route-level provisioning). */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: jsonLdSafe }}
