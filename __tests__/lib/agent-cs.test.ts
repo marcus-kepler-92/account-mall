@@ -587,6 +587,38 @@ describe("escalateToHuman", () => {
     expect(r.message).toMatch(/订单号|合作/)
   })
 
+  it("reuses last verified orderNo from session history when AI forgets to re-pass it (二次拉起 safety net)", async () => {
+    // Regression: in lead cmpfhuqhe… AI called escalate_to_human a 1st
+    // time with orderNo X (success → Lead created), then the user said
+    // "人工" again, AI re-called escalate_to_human() WITHOUT args.
+    // renderQr came back false and AI hallucinated "系统遇到了问题".
+    //
+    // Server-side fallback: when intent !== business_inquiry and AI
+    // doesn't pass orderNo, pull the most recent Lead for this session
+    // that has a verified orderNo, and reuse it. Prompt still mandates
+    // AI re-pass it explicitly — this is defense in depth.
+    // findFirst is called twice: first by fetchConsultationSnapshot
+    // (looking for a previous lead for scoping), second by the safety
+    // net (looking for any prior lead with a verified orderNo). Mock
+    // both — null then the prior verified orderNo.
+    ;(prisma.agentLead.findFirst as jest.Mock)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ orderNo: "OD-PREV-VERIFIED" })
+    const tools = buildCSTools("s1") as unknown as ToolsRecord
+    const r = (await tools.escalateToHuman.execute(
+      { reason: "用户再次说人工", urgency: "MED" },
+      ctx,
+    )) as { renderQr: boolean; orderNoVerified: boolean }
+    expect(prisma.$transaction).toHaveBeenCalled()
+    expect(r.renderQr).toBe(true)
+    expect(r.orderNoVerified).toBe(true)
+    // Lead created with the reused orderNo
+    const createOp = (prisma.agentLead.create as jest.Mock).mock.calls.find(
+      ([arg]) => arg?.data?.orderNo === "OD-PREV-VERIFIED",
+    )
+    expect(createOp).toBeDefined()
+  })
+
   it("business_inquiry: skips orderNo gate, creates Lead with [合作咨询] tag, renderQr=true", async () => {
     // The only escape from the orderNo discipline. Cooperation /
     // partnership / press / ad inquiries are not order-anchored; ops

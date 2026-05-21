@@ -171,9 +171,17 @@ ${knowledgeText}
 - 用户问知识库未覆盖的细节 → 调 lookup_knowledge
 - 用户主动给微信号 → 调 collect_wechat（参见下方"转人工前置流程"，**先拿订单号再调**）
 - 转人工调 escalate_to_human → **必须严格走下方"转人工前置流程"**，不许直接甩 QR
-- 用户说"看不到二维码 / 二维码呢 / 二维码加载失败" → 查上一次 escalate_to_human 的返回：
-  - 若 \`renderQr: true\` 且 orderNo 已验证 → 再调一次 escalate_to_human（同样的 orderNo + reason），生成新的 toolCallId，前端会重新拉起 QR 卡
+- 用户说"看不到二维码 / 二维码呢 / 二维码加载失败 / 人工"（第二次或之后）→ 查上一次 escalate_to_human 的返回：
+  - 若 \`renderQr: true\` 且 orderNo 已验证 → 再调一次 escalate_to_human（**必须传同样的 orderNo + reason**，不能省略！），生成新的 toolCallId，前端会重新拉起 QR 卡
   - 若 \`renderQr: false\`（之前没拿到 orderNo 或验证失败）→ 如实告诉用户"我还没成功为您转人工，需要订单号"，然后继续走 4 步流程
+- **永远不要说"系统遇到了问题 / 系统出错 / 暂时不可用"**——工具返回的 \`renderQr: false\` / \`registered: false\` 不是系统错误，是预期行为；如实告诉用户原因（缺订单号 / 订单号不对），不要包装成"系统问题"
+
+## orderNo 在对话内的延续性
+
+一旦本对话里通过 lookup_order 或 verify_order 拿到了 **exists: true** 的订单号，**整个咨询窗口内**该 orderNo 都视为"已验证"：
+- 后续任何 escalate_to_human / collect_wechat 调用都必须把这个 orderNo 传进去
+- 不要因为用户后来又说一句"人工"就当成全新的转人工请求，省略 orderNo
+- 例外：用户**明确**说"换个订单 / 那是别人的订单"，才需要重新走 verify_order
 
 ## 转人工前置流程（调 escalate_to_human / collect_wechat 之前必须按顺序穷尽这 4 步）
 
@@ -515,6 +523,21 @@ export function buildCSTools(sessionId: string) {
           verifiedOrderNo = ok?.orderNo ?? null
         }
 
+        // Same safety net as escalate_to_human (see comment there) —
+        // reuse the most recent verified orderNo from this session's
+        // Lead history when AI forgets to re-pass it. Only for the
+        // customer_support path; business inquiries don't need anchor.
+        if (intent !== "business_inquiry" && !verifiedOrderNo) {
+          const lastLead = await prisma.agentLead.findFirst({
+            where: { sessionId, orderNo: { not: null } },
+            orderBy: { createdAt: "desc" },
+            select: { orderNo: true },
+          })
+          if (lastLead?.orderNo) {
+            verifiedOrderNo = lastLead.orderNo
+          }
+        }
+
         // Business inquiries bypass the orderNo requirement — they're not
         // tied to a transaction, ops still needs the wechat handoff to
         // discuss partnership / distribution / press / ads.
@@ -620,6 +643,27 @@ export function buildCSTools(sessionId: string) {
             select: { orderNo: true },
           })
           verifiedOrderNo = ok?.orderNo ?? null
+        }
+
+        // Safety net for the "AI forgets to re-pass orderNo on retry"
+        // failure mode (observed in lead cmpfhuqhe000bnoqnuwx28xk7):
+        // first escalate succeeded with orderNo X; user typed "人工"
+        // again; AI called escalate_to_human() without args; renderQr
+        // came back false; AI panicked and claimed "系统遇到了问题".
+        //
+        // If we're on the customer_support path and no orderNo arrived,
+        // pull the most recent verified orderNo from this session's
+        // own Lead history. Prompt still mandates AI re-pass it
+        // explicitly — this is a defense-in-depth fallback.
+        if (intent !== "business_inquiry" && !verifiedOrderNo) {
+          const lastLead = await prisma.agentLead.findFirst({
+            where: { sessionId, orderNo: { not: null } },
+            orderBy: { createdAt: "desc" },
+            select: { orderNo: true },
+          })
+          if (lastLead?.orderNo) {
+            verifiedOrderNo = lastLead.orderNo
+          }
         }
 
         const inHours = await isInBusinessHours()

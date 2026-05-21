@@ -145,14 +145,10 @@ export function ChatPanel() {
     }
   }, [sessionId])
 
+  // Fallback (budget / daily-cap / timeout) is a terminal state — AI can't
+  // recover, so we replace the chat entirely and let HMR / session reset
+  // be the way back.
   if (fallback) return <FallbackQR reason={fallback} handoff={handoffInfo} />
-  if (handoff)
-    return (
-      <HandoffCard
-        handoff={handoffInfo}
-        onBackToChat={() => setHandoff(false)}
-      />
-    )
 
   // Block mounting the AI SDK runtime until BOTH the session row exists
   // and the history fetch has settled. The runtime captures `messages` as
@@ -167,14 +163,31 @@ export function ChatPanel() {
     )
   }
 
+  // HandoffCard is rendered as an OVERLAY on top of ChatPanelInner —
+  // never replacing it — so the runtime's in-memory message state
+  // survives the user clicking "返回聊天" and coming back. Previous
+  // implementation unmounted ChatPanelInner whenever handoff=true,
+  // throwing away every message exchanged after the initial history
+  // hydration; on dismiss, the chat would only show the stale
+  // initialMessages snapshot.
   return (
-    <ChatPanelInner
-      sessionId={sessionId}
-      orderHints={orderHints}
-      initialMessages={initialMessages}
-      onHandoff={handleHandoff}
-      onFallback={setFallback}
-    />
+    <div className="relative h-full">
+      <ChatPanelInner
+        sessionId={sessionId}
+        orderHints={orderHints}
+        initialMessages={initialMessages}
+        onHandoff={handleHandoff}
+        onFallback={setFallback}
+      />
+      {handoff && (
+        <div className="absolute inset-0 bg-background">
+          <HandoffCard
+            handoff={handoffInfo}
+            onBackToChat={() => setHandoff(false)}
+          />
+        </div>
+      )}
+    </div>
   )
 }
 
