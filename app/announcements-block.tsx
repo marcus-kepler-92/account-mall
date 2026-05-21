@@ -9,11 +9,13 @@ import {
 } from "@/components/ui/collapsible";
 import {
   Dialog,
-  DialogContent,
   DialogDescription,
   DialogHeader,
+  DialogPortal,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Dialog as DialogPrimitive } from "radix-ui";
+import { XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -109,50 +111,77 @@ export function AnnouncementsBlock({ announcements }: AnnouncementsBlockProps) {
 
   return (
     <>
-      <Dialog open={modalOpen} onOpenChange={(open) => { if (!open) setDismissed(true) }}>
-        <DialogContent
-          className="max-w-lg"
-          onInteractOutside={(e) => e.preventDefault()}
-          onEscapeKeyDown={(e) => e.preventDefault()}
-        >
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Megaphone className="size-4 text-primary" aria-hidden />
-              {current.title}
-            </DialogTitle>
-            {current.publishedAt && (
-              <DialogDescription>{formatDate(current.publishedAt)}</DialogDescription>
+      {/*
+        modal={false} + a pointer-events-none custom overlay so the AI
+        customer-service FAB beneath the dim mask stays clickable. The
+        default shadcn DialogContent always pairs with a pointer-events:
+        auto overlay AND Radix sets pointer-events:none on the body when
+        modal=true — together that visibly shows the FAB but blocks
+        every click on it. Compose manually here instead of touching
+        the shared shadcn primitive.
+      */}
+      <Dialog
+        modal={false}
+        open={modalOpen}
+        onOpenChange={(open) => { if (!open) setDismissed(true) }}
+      >
+        <DialogPortal>
+          <div
+            aria-hidden
+            data-state={modalOpen ? "open" : "closed"}
+            className="fixed inset-0 z-50 bg-black/50 pointer-events-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0"
+          />
+          <DialogPrimitive.Content
+            className="fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] sm:max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border bg-background p-6 shadow-lg duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95"
+            onInteractOutside={(e) => e.preventDefault()}
+            onEscapeKeyDown={(e) => e.preventDefault()}
+          >
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Megaphone className="size-4 text-primary" aria-hidden />
+                {current.title}
+              </DialogTitle>
+              {current.publishedAt && (
+                <DialogDescription>{formatDate(current.publishedAt)}</DialogDescription>
+              )}
+            </DialogHeader>
+
+            <ModalContent key={currentIndex} announcement={current} />
+
+            {total > 1 && (
+              <div className="flex items-center justify-between pt-2 border-t">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  disabled={currentIndex === 0}
+                  onClick={() => setCurrentIndex((i) => i - 1)}
+                  aria-label="上一条公告"
+                >
+                  <ChevronLeft className="size-4" />
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  {currentIndex + 1} / {total}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  disabled={currentIndex === total - 1}
+                  onClick={() => setCurrentIndex((i) => i + 1)}
+                  aria-label="下一条公告"
+                >
+                  <ChevronRight className="size-4" />
+                </Button>
+              </div>
             )}
-          </DialogHeader>
 
-          <ModalContent key={currentIndex} announcement={current} />
-
-          {total > 1 && (
-            <div className="flex items-center justify-between pt-2 border-t">
-              <Button
-                variant="ghost"
-                size="icon"
-                disabled={currentIndex === 0}
-                onClick={() => setCurrentIndex((i) => i - 1)}
-                aria-label="上一条公告"
-              >
-                <ChevronLeft className="size-4" />
-              </Button>
-              <span className="text-xs text-muted-foreground">
-                {currentIndex + 1} / {total}
-              </span>
-              <Button
-                variant="ghost"
-                size="icon"
-                disabled={currentIndex === total - 1}
-                onClick={() => setCurrentIndex((i) => i + 1)}
-                aria-label="下一条公告"
-              >
-                <ChevronRight className="size-4" />
-              </Button>
-            </div>
-          )}
-        </DialogContent>
+            <DialogPrimitive.Close
+              className="absolute top-4 right-4 rounded-xs opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+            >
+              <XIcon />
+              <span className="sr-only">关闭</span>
+            </DialogPrimitive.Close>
+          </DialogPrimitive.Content>
+        </DialogPortal>
       </Dialog>
 
       <section
