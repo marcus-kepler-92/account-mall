@@ -1,7 +1,6 @@
 "use client"
 
-import Image from "next/image"
-import { QrCode } from "lucide-react"
+import { QrImage } from "./qr-image"
 
 // daily-cap / timeout 都属于"服务端不可用"语义, 文案统一为中性
 // "暂时不可用", 不暗示具体原因 (避免在配置错误时骗用户说"额度满"). 真实
@@ -17,8 +16,7 @@ type Props = {
   reason: "daily-cap" | "timeout" | "budget"
   // QR URL + wechat id resolved from SiteSetting DB row (with env fallback)
   // via /api/agent/session/start. Empty strings mean the admin hasn't
-  // configured these yet — we degrade to a static QrCode placeholder
-  // rather than 404-ing the next/image.
+  // configured these yet — QrImage degrades to a static placeholder.
   handoff: { qrUrl: string; wechatId: string }
 }
 
@@ -26,21 +24,7 @@ export function FallbackQR({ reason, handoff }: Props) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 p-4">
       <p className="text-center text-sm text-muted-foreground">{COPY[reason]}</p>
-      {handoff.qrUrl ? (
-        <Image
-          src={handoff.qrUrl}
-          alt="客服二维码"
-          width={168}
-          height={168}
-          unoptimized
-          className="h-auto w-[168px] rounded"
-        />
-      ) : (
-        <div className="flex h-[168px] w-[168px] flex-col items-center justify-center gap-1 rounded border bg-muted text-muted-foreground">
-          <QrCode className="size-12" />
-          <span className="text-xs">客服二维码暂未配置</span>
-        </div>
-      )}
+      <QrImage src={handoff.qrUrl} />
       {handoff.wechatId && (
         <p className="text-center text-xs text-muted-foreground">
           微信号：<span className="font-mono">{handoff.wechatId}</span>
