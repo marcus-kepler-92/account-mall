@@ -137,6 +137,56 @@ describe("GET /api/agent/messages — UIMessage shape", () => {
         expect(body.messages[0].parts).toEqual([])
     })
 
+    it("strips non-text parts from ASSISTANT history (tool-call / tool-result don't replay)", async () => {
+        // Regression guard for "useChatRuntime({ messages }) corrupted by
+        // server-side ModelMessage shape". AgentMessage.parts for assistants
+        // is the AI SDK response `content` which includes tool-call /
+        // tool-result parts whose schema does NOT match UIMessage parts on
+        // the client. We rebuild the parts array from `contentText` so the
+        // hydrated thread is always pure text.
+        findMessages.mockResolvedValueOnce([
+            {
+                id: "m-tool",
+                role: "ASSISTANT",
+                // Raw parts as the AI SDK would persist them — must NOT
+                // appear in the response.
+                parts: [
+                    { type: "text", text: "Let me check that order for you." },
+                    {
+                        type: "tool-call",
+                        toolCallId: "call_abc",
+                        toolName: "lookupOrder",
+                        args: { orderNo: "OD123" },
+                    },
+                ],
+                contentText: "Let me check that order for you.",
+            },
+        ])
+        const body = await (await GET(buildRequest(VALID_SESSION_ID))).json()
+        expect(body.messages[0].parts).toEqual([
+            { type: "text", text: "Let me check that order for you." },
+        ])
+        // Defense-in-depth: nothing tool-shaped leaks out
+        const serialized = JSON.stringify(body)
+        expect(serialized).not.toMatch(/tool-call|toolCallId|toolName/i)
+    })
+
+    it("ignores raw parts entirely — contentText is the only source of truth", async () => {
+        // Even when parts is present and contentText is empty, the response
+        // must NOT fall back to parts (that would resurrect the bug).
+        findMessages.mockResolvedValueOnce([
+            {
+                id: "m-raw-only",
+                role: "ASSISTANT",
+                parts: [{ type: "text", text: "this should NOT appear" }],
+                contentText: "",
+            },
+        ])
+        const body = await (await GET(buildRequest(VALID_SESSION_ID))).json()
+        expect(body.messages[0].parts).toEqual([])
+        expect(JSON.stringify(body)).not.toContain("this should NOT appear")
+    })
+
     it("does not leak email / card / token fields", async () => {
         findMessages.mockResolvedValueOnce([
             { id: "m1", role: "USER", parts: [{ type: "text", text: "hi" }], contentText: "hi" },

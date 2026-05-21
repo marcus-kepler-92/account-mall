@@ -84,7 +84,7 @@ const agentGroup = {
     icon: Headset,
     items: [
         { title: "知识库", href: "/admin/agent/knowledge", icon: BookText },
-        { title: "咨询单", href: "/admin/agent/leads", icon: UserSearch },
+        { title: "人工跟进", href: "/admin/agent/leads", icon: UserSearch },
         { title: "对话历史", href: "/admin/agent/conversations", icon: MessagesSquare },
     ],
 }

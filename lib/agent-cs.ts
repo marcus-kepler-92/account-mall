@@ -7,6 +7,39 @@ import { config } from "@/lib/config"
 import { isInBusinessHours } from "@/lib/business-hours"
 import { getSiteSettings } from "@/lib/site-settings"
 
+// Snapshot the messages that belong to the CURRENT consultation — bounded by
+// the most recent prior lead so each lead's transcript matches the customer's
+// mental "this conversation" rather than bleeding in older unrelated chats.
+//
+// One AgentSession can produce many leads (refund today, login issue tomorrow),
+// and a naive `take: 20` from the messages table would mix them, leaving ops
+// guessing which part of the snapshot is "this question".
+async function fetchConsultationSnapshot(sessionId: string) {
+  const previousLead = await prisma.agentLead.findFirst({
+    where: { sessionId },
+    orderBy: { createdAt: "desc" },
+    select: { createdAt: true },
+  })
+  const recent = await prisma.agentMessage.findMany({
+    where: {
+      sessionId,
+      ...(previousLead && { createdAt: { gt: previousLead.createdAt } }),
+    },
+    orderBy: { createdAt: "desc" },
+    // No prior lead → first consultation in this session, cap at 20 like
+    // before. With a prior lead the messages since last lead are bounded
+    // organically; we cap at 50 to keep snapshots manageable for ops UI.
+    take: previousLead ? 50 : 20,
+    select: {
+      role: true,
+      contentText: true,
+      toolName: true,
+      createdAt: true,
+    },
+  })
+  return recent.reverse()
+}
+
 interface KnowledgeItem {
   id: string
   title: string
@@ -68,7 +101,10 @@ export function buildCSPrompt(input: {
             const desc = p.summary ? ` — ${p.summary}` : ""
             const price = Number(p.price)
             const priceText = price === 0 ? "¥0（免费）" : `¥${price.toFixed(2)}`
-            return `- \`${p.id}\` · ${p.name} · ${priceText}${tags}${desc}`
+            // URL is rendered here so the AI never has to compose it
+            // from the id. Prior bug: AI saw `cmoolt5wx0000...` in the
+            // index and pasted it straight into /products/<that> → 404.
+            return `- \`${p.id}\` · ${p.name} · ${priceText} · URL=\`/products/${p.slug}\`${tags}${desc}`
           })
           .join("\n")
 
@@ -105,6 +141,7 @@ ${userOrders
   2. **必须用 Markdown 链接语法 \`[显示文字](/path)\`**，绝不能贴裸路径——纯文本路径在聊天气泡里不可点击，用户无法访问
   - 正确：\`点击进入[免费试用商品](/products/xxx)\` 或 \`[订单查询页](/orders/lookup)\`
   - 错误：\`访问 /products/xxx 提交订单\`、\`👉 入口：/orders/lookup\`
+  3. **商品链接绝不能从 \`id\` 拼接**——索引里每条已经给出 \`URL=/products/<slug>\`，直接复制；id（形如 \`cmXXX...\`）不是 slug，拼出来会 404
 ${userOrdersSection}
 ## 在售商品索引（已加载，按用户描述语义匹配）
 ${productIndexText}
@@ -117,7 +154,7 @@ ${productIndexText}
 
 → AI 应**主动推荐"在售商品索引"中标有"（免费）"的 AUTO_FETCH 商品**：
 1. 从索引段筛选 \`¥0（免费）\` 字样的商品（这些是免费试用商品）
-2. 简短介绍："您可以先免费试用我们的 [商品名]（/products/[slug]），免费领取后即可在订单详情页看到账号密码"
+2. 简短介绍："您可以先免费试用我们的 [商品名]（**复制索引里给出的 URL**），免费领取后即可在订单详情页看到账号密码"
 3. 解释流程："点商品页 → 填邮箱 → 提交 → 直接拿到账号"
 4. 如果索引里没有标"（免费）"的商品 → 引导查看店铺首页，**不要编造免费商品**
 
@@ -129,16 +166,54 @@ ${knowledgeText}
 ## 工具使用规则
 - 用户问商品 → **先从上方"在售商品索引"按语义匹配找到对应 \`id\`**，然后调 lookup_product(productId) 拿实时库存 / URL
 - 用户给订单号或描述自己的订单 → 调 lookup_order；**返回的 canSwitchAccount / switchAccountRemaining / isExpired 是关键字段**，必须基于它判断能否引导用户自助换号
+- **用户给的订单号要传给 escalate_to_human / collect_wechat 之前** → 调 verify_order(orderNo) 验证存在性（比 lookup_order 便宜）；exists=false 时让用户复核重发，绝不传不存在的订单号给转人工工具
 - 用户问平台公告 → 调 get_announcements
 - 用户问知识库未覆盖的细节 → 调 lookup_knowledge
-- 用户主动给微信号 → 调 collect_wechat
+- 用户主动给微信号 → 调 collect_wechat（参见下方"转人工前置流程"，**先拿订单号再调**）
+- 转人工调 escalate_to_human → **必须严格走下方"转人工前置流程"**，不许直接甩 QR
+
+## 转人工前置流程（调 escalate_to_human / collect_wechat 之前必须按顺序穷尽这 4 步）
+
+> 这是硬规则：客服后台靠 orderNo 才能定位到用户的对话。**没问订单号就甩 QR 等于把用户丢进黑洞**——他扫了码，客服那边也对不上是谁。
+
+**第 1 步：本机订单段（最优）**
+- 上方 \`## 用户本机最近订单\` 段如果非空 → 直接挑用户当前问题相关的那条订单号
+- 多个订单 + 用户指代模糊 → 按"多订单消歧规则"先确认是哪一个
+- 拿到 → 直接 \`escalate_to_human({ orderNo, reason })\` 或 \`collect_wechat({ wechatId, orderNo })\`，**不要再多问一遍**
+
+**第 2 步：主动问（本机段为空，或没有匹配项）**
+- 必说话术：「为了客服能在后台找到您的对话记录，麻烦先告诉我**订单号**哈～（订单号一般是您下单后页面顶部那串编号）」
+- 用户回答 → 进 "验证关卡"（见下）
+
+**第 3 步：引导邮箱反查（用户说"忘了 / 找不到 / 不记得"）**
+- 必说话术：「您可以去 [订单查询页](/orders/lookup) 用购买时的邮箱查一下最近的订单，找到后把订单号发给我就好」
+- 不要直接转，等用户回订单号
+
+**验证关卡（拿到任何来自用户的订单号，都必须先调 verify_order）：**
+- 流程：**用户给 → 调 \`verify_order(orderNo)\` → 看 exists**
+  - \`exists: true\` → 再调 \`escalate_to_human({ orderNo, reason })\` 或 \`collect_wechat({ wechatId, orderNo })\`
+  - \`exists: false\` → **不要调 escalate/collect**，回复用户「您给的订单号系统里查不到，麻烦核对下重发，或到 [订单查询页](/orders/lookup) 用邮箱反查」→ 等用户重新提供 → 再走一遍验证
+- 第 1 步从 userOrders 段直接拿的订单号已经服务端验证过，可以**跳过 verify_order**
+
+**第 4 步：兜底无 orderNo QR（最后一招）**
+- 仅以下情形走第 4 步：
+  - 用户**明确说**"没买过 / 不是这里买的 / 邮箱也查不到 / 不想给"
+  - 已经走完第 2/3 步 + 验证关卡，用户拒绝/无法提供有效订单号
+- 调 \`escalate_to_human({ reason })\` 不传 orderNo
+- 必说："没有订单号的话，客服后台没办法定位您这次对话。请扫码后**把问题再发一遍给客服**"
+
+**绝对禁止：**
+- 用户一句"找人工"就跳到第 4 步
+- 第 1 步明明有订单号在 userOrders 段还要再问用户
+- 用户给的订单号没调 verify_order 就直接传给 escalate_to_human / collect_wechat
+- 编造一个看着像的订单号传给工具——必须是真实出现过的（要么来自 userOrders 段，要么用户亲口提供并通过 verify_order）
 
 ## 商品描述权威性
 每个商品有独立的 \`summary\` 字段（来自 lookup_product 返回）。商品使用规则（期限、是否支持改密、是否支持登 iCloud 等）**以 lookup_product 返回的 summary 为最终准则**。知识库是补充共性规则，不要用知识库覆盖商品 summary 的明确说明。
 
 ## 转人工策略（不要被用户当成跳过 AI 的快捷键）
 
-**立刻调 escalate_to_human：**
+**立刻进入转人工流程（仍要走上方"转人工前置流程"4 步拿 orderNo，"立刻"不等于跳过取证）：**
 - 退款 / 投诉 / 改订单 / 改价（AI 无写权限）
 - 独享号被苹果锁定 / 收不到解锁邮件 / 苹果要求密保邮箱验证（按知识库责任归属话术，转后由运营酌情处理）
 - 用户报告**已经点了"更换账号"按钮但提示"无可用账号 / 当前无其他可用账号"** → 转人工（这是后端爬取池子为空，AI 解决不了；这是共享号 2FA 流程里**唯一**需要转人工的情形）
@@ -237,9 +312,8 @@ export function buildCSTools(sessionId: string) {
           summary: product.summary,
           price: Number(product.price).toFixed(2),
           inStock: product.productType === "AUTO_FETCH" || product._count.cards > 0,
-          // Relative path: the chat widget is served on the same origin as
-          // /products, so we don't need to bake in the absolute domain
-          // (which would lock previews to production URLs and vice versa).
+          // Relative path: chat widget is served on the same origin as
+          // /products, so we don't bake in an absolute domain.
           url: `/products/${product.slug}`,
         }
       },
@@ -310,6 +384,37 @@ export function buildCSTools(sessionId: string) {
       },
     }),
 
+    verifyOrder: tool({
+      description:
+        "在把订单号传给 escalate_to_human / collect_wechat 之前**必须**先调一次：用最便宜的查询确认订单号在数据库存在。lookup_order 会返回完整诊断信息（贵），verify_order 只返回是否存在 + 商品名 + 当前状态，专门用来做转人工前的取证。",
+      inputSchema: z.object({ orderNo: z.string().min(6).max(40) }),
+      execute: async ({ orderNo }) => {
+        const order = await prisma.order.findFirst({
+          where: { orderNo },
+          select: {
+            orderNo: true,
+            status: true,
+            productNameSnapshot: true,
+          },
+        })
+        if (!order) {
+          return {
+            exists: false as const,
+            // Tell the AI in plain language so it can relay this to the
+            // user without inventing one. Common cause: typo or pasted
+            // the wrong row from email.
+            hint: "找不到这个订单号。请让用户复核（订单号一般是下单成功页或确认邮件里的那串），或到 /orders/lookup 用邮箱反查后重新提供",
+          }
+        }
+        return {
+          exists: true as const,
+          orderNo: order.orderNo,
+          product: order.productNameSnapshot,
+          status: order.status,
+        }
+      },
+    }),
+
     getAnnouncements: tool({
       description: "查最近 5 条 CUSTOMER/ALL 受众的公告",
       inputSchema: z.object({}),
@@ -360,98 +465,151 @@ export function buildCSTools(sessionId: string) {
     }),
 
     collectWechat: tool({
-      description: "用户主动提供微信号时调用",
+      description:
+        "用户主动提供微信号时调用。若用户已有订单且能提供订单号，请一起传入 orderNo —— 只有带 orderNo 的会进入人工跟进队列，否则只展示二维码。",
       inputSchema: z.object({
         wechatId: z
           .string()
           .regex(/^[a-zA-Z][a-zA-Z0-9_-]{5,19}$/, "微信号格式不符"),
+        orderNo: z.string().min(6).max(40).optional(),
       }),
-      execute: async ({ wechatId }) => {
+      execute: async ({ wechatId, orderNo }) => {
         const settings = await getSiteSettings()
-        await prisma.agentLead.upsert({
-          where: { sessionId },
-          create: {
-            sessionId,
-            wechatId,
-            reason: "用户主动提供",
-            status: "PENDING_CONTACT",
-            conversationSnapshot: {},
-          },
-          update: { wechatId },
-        })
+        // Belt-and-suspenders: re-verify orderNo at the DB layer even
+        // if AI claims to have called verify_order. A wrong orderNo in
+        // the Lead table makes ops chase ghosts; better to drop the
+        // claimed orderNo and tell the AI to ask the user again.
+        let verifiedOrderNo: string | null = null
+        if (orderNo) {
+          const ok = await prisma.order.findFirst({
+            where: { orderNo },
+            select: { orderNo: true },
+          })
+          verifiedOrderNo = ok?.orderNo ?? null
+        }
+        if (verifiedOrderNo) {
+          const snapshot = await fetchConsultationSnapshot(sessionId)
+          await prisma.agentLead.create({
+            data: {
+              sessionId,
+              wechatId,
+              orderNo: verifiedOrderNo,
+              reason: "用户主动提供（含订单号）",
+              status: "PENDING_CONTACT",
+              conversationSnapshot: snapshot,
+            },
+          })
+        }
         return {
           ok: true,
           qrUrl: settings.wechatQrUrl,
           wechatId: settings.wechatId,
-          message:
-            "已记录您的微信号，但客服不会主动加您。请扫码加我们的企微，并把您的订单号发给客服，我们会从后台查询您的对话和订单情况。",
+          // When AI passed an orderNo but it failed verification, tell
+          // it explicitly so it doesn't gaslight the user with "已记录".
+          orderNoVerified: Boolean(verifiedOrderNo),
+          message: verifiedOrderNo
+            ? "已记录您的订单号与微信号。请扫码加我们的企微并发送您的订单号，客服上线后会优先处理。"
+            : orderNo
+              ? "您提供的订单号在系统里找不到，请复核后重发；目前仅展示客服企微二维码，扫码后请把订单号一起发给客服。"
+              : "客服不会主动联系，请扫码加我们的企微并发送您的订单号（必须），客服上线后会查询订单和对话情况。",
         }
       },
     }),
 
     escalateToHuman: tool({
-      description: "需要人工接手时调用，返回企微 QR",
+      description:
+        "需要人工接手时调用，返回企微 QR。若用户已有订单且能提供订单号，请传入 orderNo —— 只有带 orderNo 的转人工会进入跟进队列，否则只展示二维码（用户可主动联系）。",
       inputSchema: z.object({
         reason: z.string().min(2).max(200),
         urgency: z.enum(["LOW", "MED", "HIGH"]).default("MED"),
+        orderNo: z.string().min(6).max(40).optional(),
       }),
-      execute: async ({ reason, urgency }) => {
+      execute: async ({ reason, urgency, orderNo }) => {
         const settings = await getSiteSettings()
-        const recent = await prisma.agentMessage.findMany({
-          where: { sessionId },
-          orderBy: { createdAt: "desc" },
-          take: 20,
-          select: {
-            role: true,
-            contentText: true,
-            toolName: true,
-            createdAt: true,
-          },
-        })
-        const snapshot = recent.reverse()
+        // Snapshot scoped to this consultation (messages since the prior
+        // lead, if any). Keeps each lead's transcript independent — ops
+        // sees only what the customer asked THIS time, not bleed-in from
+        // last week's refund question.
+        const snapshot = await fetchConsultationSnapshot(sessionId)
 
-        await prisma.$transaction([
-          prisma.agentLead.upsert({
-            where: { sessionId },
-            create: {
-              sessionId,
-              reason,
-              urgency,
-              status: "NEW",
-              conversationSnapshot: snapshot,
-            },
-            update: {
-              reason,
-              urgency,
-              status: "NEW",
-              conversationSnapshot: snapshot,
-            },
-          }),
-          prisma.agentSession.update({
+        // Belt-and-suspenders: re-verify orderNo at the DB layer (mirror
+        // of collect_wechat). If AI passed an orderNo the user
+        // hallucinated or mistyped, we drop it rather than persist a
+        // ghost Lead row that ops can never close.
+        let verifiedOrderNo: string | null = null
+        if (orderNo) {
+          const ok = await prisma.order.findFirst({
+            where: { orderNo },
+            select: { orderNo: true },
+          })
+          verifiedOrderNo = ok?.orderNo ?? null
+        }
+
+        if (verifiedOrderNo) {
+          await prisma.$transaction([
+            prisma.agentLead.create({
+              data: {
+                sessionId,
+                reason,
+                urgency,
+                orderNo: verifiedOrderNo,
+                status: "NEW",
+                conversationSnapshot: snapshot,
+              },
+            }),
+            prisma.agentSession.update({
+              where: { id: sessionId },
+              data: { escalated: true },
+            }),
+          ])
+        } else {
+          await prisma.agentSession.update({
             where: { id: sessionId },
             data: { escalated: true },
-          }),
-        ])
+          })
+        }
 
-        if (urgency === "HIGH" && settings.escalateWebhookUrl) {
+        if (verifiedOrderNo && urgency === "HIGH" && settings.escalateWebhookUrl) {
           fetch(settings.escalateWebhookUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              text: `🆘 客服紧急 Lead\n原因: ${reason}\n会话: ${sessionId.slice(0, 8)}\n查看: ${config.siteUrl}/admin/agent/leads`,
+              text: `🆘 紧急人工跟进\n原因: ${reason}\n订单号: ${verifiedOrderNo}\n会话: ${sessionId.slice(0, 8)}\n查看: ${config.siteUrl}/admin/agent/leads`,
             }),
           }).catch(() => {})
         }
 
         const inHours = await isInBusinessHours()
         const pad = (n: number) => String(n).padStart(2, "0")
-        const message = inHours
-          ? "已为您转接人工客服，扫码加客服后请发送您的订单号给我们，我们会查询您的对话和订单情况。"
-          : `已为您转接人工客服，当前 ${pad(settings.businessHoursEnd)}:00–${pad(settings.businessHoursStart)}:00 为客服休息时间。请扫码加客服并发送您的订单号，我们 ${pad(settings.businessHoursStart)}:00 上线后第一时间处理。`
+        // Three distinct UX outcomes based on orderNo verification:
+        //  - verified  → "我已经把订单挂到跟进队列，客服会找过来"
+        //  - claimed but failed verification → AI must back out the
+        //    "已转人工" framing and ask user to re-check
+        //  - no orderNo at all → user opted out; QR only, ops cannot match
+        let message: string
+        if (verifiedOrderNo) {
+          message = inHours
+            ? `已为您转接人工客服（订单 ${verifiedOrderNo}），扫码加客服后请发送订单号给我们，我们会查询您的对话和订单情况。`
+            : `已为您转接人工客服（订单 ${verifiedOrderNo}），当前 ${pad(settings.businessHoursEnd)}:00–${pad(settings.businessHoursStart)}:00 为客服休息时间。请扫码加客服并发送订单号，我们 ${pad(settings.businessHoursStart)}:00 上线后第一时间处理。`
+        } else if (orderNo) {
+          // AI passed an orderNo but DB says no such order. Don't claim
+          // we filed a follow-up; tell the user to recheck.
+          message =
+            "您给的订单号系统里查不到，可能是输错了几位。麻烦核对一下重新发给我，或到订单查询页用邮箱反查后再发。"
+        } else {
+          message = inHours
+            ? "客服后台没有您的订单号，无法定位本次对话。请扫码加客服后**把您的问题再发一遍 + 订单号**，否则客服可能找不到您。"
+            : `客服当前 ${pad(settings.businessHoursEnd)}:00–${pad(settings.businessHoursStart)}:00 休息中。请扫码并把问题 + 订单号一起发给客服，${pad(settings.businessHoursStart)}:00 上线后处理。`
+        }
 
         return {
           qrUrl: settings.wechatQrUrl,
           wechatId: settings.wechatId,
+          orderNoVerified: Boolean(verifiedOrderNo),
+          // When verification failed, tell AI not to render the QR
+          // bubble — it should re-ask instead. The chat panel honors
+          // this hint (see chat-wrappers AssistantBubble).
+          requiresOrderNoFix: Boolean(orderNo) && !verifiedOrderNo,
           message,
         }
       },

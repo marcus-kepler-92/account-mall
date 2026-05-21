@@ -33,7 +33,7 @@ const routeLabels: Record<string, string> = {
     admins: "管理员管理",
     agent: "客服 Agent",
     knowledge: "知识库",
-    leads: "咨询单",
+    leads: "人工跟进",
     conversations: "对话历史",
 }
 
@@ -115,7 +115,7 @@ function getBreadcrumbItems(pathname: string) {
                 label = routeLabels[seg] ?? seg
             }
         } else if (prev === "leads" && isIdSegment(seg)) {
-            label = "咨询单详情"
+            label = "跟进详情"
         } else if (prev === "conversations" && isIdSegment(seg)) {
             label = "对话详情"
         } else if (seg in routeLabels) {

@@ -49,11 +49,17 @@ export default async function AdminAgentConversationDetailPage({
         where: { id: sessionId },
         include: {
             messages: { orderBy: { createdAt: "asc" } },
-            lead: true,
+            // 1:N — show the most recent lead in the side panel and a count
+            // badge. Each escalate_to_human / collect_wechat call now produces
+            // a fresh lead instead of upserting, so a long-running session
+            // can accumulate many distinct consultations.
+            leads: { orderBy: { createdAt: "desc" } },
         },
     })
 
     if (!session) notFound()
+    const latestLead = session.leads[0] ?? null
+    const totalLeads = session.leads.length
 
     const totalInputTokens = session.messages.reduce(
         (sum, m) => sum + m.inputTokens,
@@ -209,56 +215,71 @@ export default async function AdminAgentConversationDetailPage({
                         </CardContent>
                     </Card>
 
-                    {session.lead ? (
+                    {latestLead ? (
                         <Card>
                             <CardHeader>
-                                <CardTitle className="text-base">关联线索</CardTitle>
+                                <CardTitle className="text-base">
+                                    最新线索{totalLeads > 1 && `（共 ${totalLeads} 条）`}
+                                </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-3 text-sm">
                                 <div>
                                     <p className="text-xs text-muted-foreground">状态</p>
                                     <Badge variant="outline">
-                                        {LEAD_STATUS_LABEL[session.lead.status]}
+                                        {LEAD_STATUS_LABEL[latestLead.status]}
                                     </Badge>
                                 </div>
-                                {session.lead.wechatId && (
+                                {latestLead.wechatId && (
                                     <div>
                                         <p className="text-xs text-muted-foreground">
                                             微信号
                                         </p>
                                         <p className="font-mono break-all">
-                                            {session.lead.wechatId}
+                                            {latestLead.wechatId}
                                         </p>
                                     </div>
                                 )}
-                                {session.lead.orderNo && (
+                                {latestLead.orderNo && (
                                     <div>
                                         <p className="text-xs text-muted-foreground">
                                             订单号
                                         </p>
                                         <p className="font-mono break-all">
-                                            {session.lead.orderNo}
+                                            {latestLead.orderNo}
                                         </p>
                                     </div>
                                 )}
                                 <div>
                                     <p className="text-xs text-muted-foreground">原因</p>
                                     <p className="whitespace-pre-wrap">
-                                        {session.lead.reason}
+                                        {latestLead.reason}
                                     </p>
                                 </div>
                                 <Button asChild variant="outline" size="sm">
-                                    <Link href={`/admin/agent/leads/${session.lead.id}`}>
-                                        查看线索详情
+                                    <Link href={`/admin/agent/leads/${latestLead.id}`}>
+                                        查看跟进详情
                                         <ExternalLink className="size-4" />
                                     </Link>
                                 </Button>
+                                {totalLeads > 1 && (
+                                    <p className="text-xs text-muted-foreground">
+                                        该会话还有 {totalLeads - 1} 条历史跟进 ——
+                                        到{" "}
+                                        <Link
+                                            href={`/admin/agent/leads?sessionId=${session.id}`}
+                                            className="underline"
+                                        >
+                                            跟进列表
+                                        </Link>
+                                        {" "}查看全部
+                                    </p>
+                                )}
                             </CardContent>
                         </Card>
                     ) : (
                         <Card>
                             <CardContent className="py-6 text-center text-sm text-muted-foreground">
-                                此会话未生成线索
+                                此会话未生成跟进单（用户未留订单号）
                             </CardContent>
                         </Card>
                     )}

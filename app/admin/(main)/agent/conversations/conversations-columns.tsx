@@ -59,7 +59,7 @@ export const conversationsColumns: ColumnDef<ConvRow>[] = [
     },
     {
         accessorKey: "hasLead",
-        header: "线索",
+        header: "跟进单",
         cell: ({ row }) =>
             row.original.hasLead ? (
                 <span className="text-success text-sm">✓</span>

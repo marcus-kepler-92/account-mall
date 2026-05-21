@@ -23,12 +23,16 @@ type FallbackReason = "daily-cap" | "timeout" | "budget"
 
 const SESSION_KEY = "agent_session_id"
 
+// Tab-scoped: same tab keeps the same session across in-site navigation,
+// closing the tab (or opening a new one) starts a fresh session. This
+// matches "每次重新进入平台 = 一次新会话" — was previously localStorage,
+// which meant one browser kept one session forever.
 function getOrCreateSessionId(): string {
   if (typeof window === "undefined") return ""
-  let id = window.localStorage.getItem(SESSION_KEY)
+  let id = window.sessionStorage.getItem(SESSION_KEY)
   if (!id) {
     id = ulid()
-    window.localStorage.setItem(SESSION_KEY, id)
+    window.sessionStorage.setItem(SESSION_KEY, id)
   }
   return id
 }

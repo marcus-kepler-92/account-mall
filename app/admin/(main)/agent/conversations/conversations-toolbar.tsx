@@ -9,21 +9,27 @@ import { X } from "lucide-react"
 
 interface ConversationsToolbarProps {
     initialQuery: string
+    initialOrderNo: string
     escalatedOnly: boolean
 }
 
 export function ConversationsToolbar({
     initialQuery,
+    initialOrderNo,
     escalatedOnly,
 }: ConversationsToolbarProps) {
     const router = useRouter()
     const searchParams = useSearchParams()
     const [, startTransition] = useTransition()
     const [query, setQuery] = useState(initialQuery)
+    const [orderNo, setOrderNo] = useState(initialOrderNo)
 
     useEffect(() => {
         setQuery(initialQuery)
     }, [initialQuery])
+    useEffect(() => {
+        setOrderNo(initialOrderNo)
+    }, [initialOrderNo])
 
     const update = (next: URLSearchParams) => {
         next.delete("page")
@@ -40,6 +46,14 @@ export function ConversationsToolbar({
         update(next)
     }
 
+    const commitOrderNo = (value: string) => {
+        const next = new URLSearchParams(searchParams.toString())
+        const trimmed = value.trim()
+        if (trimmed) next.set("orderNo", trimmed)
+        else next.delete("orderNo")
+        update(next)
+    }
+
     const toggleEscalated = () => {
         const next = new URLSearchParams(searchParams.toString())
         if (escalatedOnly) next.delete("escalated")
@@ -49,6 +63,7 @@ export function ConversationsToolbar({
 
     const clearAll = () => {
         setQuery("")
+        setOrderNo("")
         startTransition(() => router.push("?"))
     }
 
@@ -67,6 +82,18 @@ export function ConversationsToolbar({
                     if (query !== initialQuery) commitQuery(query)
                 }}
                 className="h-8 w-[200px] lg:w-[300px]"
+            />
+            <Input
+                placeholder="按订单号搜（精确）"
+                value={orderNo}
+                onChange={(e) => setOrderNo(e.target.value)}
+                onKeyDown={(e) => {
+                    if (e.key === "Enter") commitOrderNo(orderNo)
+                }}
+                onBlur={() => {
+                    if (orderNo !== initialOrderNo) commitOrderNo(orderNo)
+                }}
+                className="h-8 w-[200px]"
             />
             <Badge
                 variant={escalatedOnly ? "default" : "outline"}

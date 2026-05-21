@@ -51,18 +51,23 @@ export async function GET(req: Request) {
     })
 
     const messages = rows.map((m) => {
-        // `parts` was persisted as `message.parts as never` (USER) or
-        // `assistant.content as never` (ASSISTANT). Both should already
-        // be UIMessage-part shapes; we defensively coerce to an array
-        // and fall back to a single text part if the shape drifted.
-        let parts: UIMessagePart[]
-        if (Array.isArray(m.parts)) {
-            parts = m.parts as UIMessagePart[]
-        } else if (m.contentText) {
-            parts = [{ type: "text", text: m.contentText }]
-        } else {
-            parts = []
-        }
+        // CRITICAL: only emit text parts.
+        //
+        // USER  `parts` was persisted from a UIMessage and is already
+        //       client-side shape, but assistants store `assistant.content`
+        //       from the AI SDK response which uses server-side ModelMessage
+        //       shape (`tool-call` / `tool-result` parts whose schema does
+        //       NOT match UIMessage parts client-side). Feeding that to
+        //       useChatRuntime({ messages }) corrupts the thread.
+        //
+        // Strategy: strip everything to plain text. We already use
+        // `contentText` (server-extracted text) as the authoritative
+        // human-readable record for admin views. Tool calls deliberately
+        // do NOT replay — sliding-window history is for context only,
+        // not for re-executing the side effects.
+        const text = m.contentText ?? ""
+        const parts: UIMessagePart[] =
+            text.length > 0 ? [{ type: "text", text }] : []
         return {
             id: m.id,
             role: m.role.toLowerCase() as "user" | "assistant",

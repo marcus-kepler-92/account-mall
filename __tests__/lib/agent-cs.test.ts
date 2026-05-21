@@ -16,7 +16,7 @@ jest.mock("@/lib/prisma", () => ({
     order: { findFirst: jest.fn() },
     announcement: { findMany: jest.fn() },
     agentKnowledge: { findMany: jest.fn() },
-    agentLead: { upsert: jest.fn() },
+    agentLead: { create: jest.fn(), findFirst: jest.fn() },
     agentMessage: { findMany: jest.fn() },
     agentSession: { update: jest.fn() },
     $transaction: jest.fn().mockResolvedValue([]),
@@ -55,8 +55,7 @@ describe("lookupProduct", () => {
         id: "p1",
         name: "iCloud 200G",
         inStock: true,
-        // Relative path so the chat widget on any host (preview / prod /
-        // local) lands users on the same-origin product page.
+        // Relative pure-slug path since the 2026-05 [slug] refactor.
         url: "/products/icloud-200g",
         price: "29.90",
       }),
@@ -238,19 +237,89 @@ describe("lookupKnowledge", () => {
   })
 })
 
-describe("collectWechat", () => {
-  it("upserts Lead with status=PENDING_CONTACT and returns QR", async () => {
-    ;(prisma.agentLead.upsert as jest.Mock).mockResolvedValueOnce({ id: "l1" })
+describe("verifyOrder", () => {
+  it("returns exists:true with masked details when orderNo matches", async () => {
+    ;(prisma.order.findFirst as jest.Mock).mockResolvedValueOnce({
+      orderNo: "OD-OK-1",
+      status: "COMPLETED",
+      productNameSnapshot: "iCloud 200G",
+    })
     const tools = buildCSTools("s1") as unknown as ToolsRecord
-    const r = await tools.collectWechat.execute({ wechatId: "validId123" }, ctx)
-    expect(prisma.agentLead.upsert).toHaveBeenCalledWith(
+    const r = await tools.verifyOrder.execute({ orderNo: "OD-OK-1" }, ctx)
+    expect(r).toEqual({
+      exists: true,
+      orderNo: "OD-OK-1",
+      product: "iCloud 200G",
+      status: "COMPLETED",
+    })
+  })
+
+  it("returns exists:false + hint when orderNo not found — AI should ask user to recheck", async () => {
+    ;(prisma.order.findFirst as jest.Mock).mockResolvedValueOnce(null)
+    const tools = buildCSTools("s1") as unknown as ToolsRecord
+    const r = (await tools.verifyOrder.execute({ orderNo: "OD-NOPE" }, ctx)) as {
+      exists: boolean
+      hint?: string
+    }
+    expect(r.exists).toBe(false)
+    expect(r.hint).toMatch(/找不到这个订单号/)
+    expect(r.hint).toMatch(/复核/)
+  })
+
+  it("does NOT leak sensitive fields (no email, paidAt, amount, expiresAt, etc.)", () => {
+    // verify_order is the cheap pre-flight; rich diagnosis lives in
+    // lookup_order. Keep this assertion tight so future field-creep
+    // doesn't quietly turn it into another lookup_order.
+    ;(prisma.order.findFirst as jest.Mock).mockResolvedValueOnce({
+      orderNo: "OD-1",
+      status: "COMPLETED",
+      productNameSnapshot: "X",
+    })
+    const tools = buildCSTools("s1") as unknown as ToolsRecord
+    const findArgs = (prisma.order.findFirst as jest.Mock).mock.calls.length
+    void tools.verifyOrder.execute({ orderNo: "OD-1" }, ctx)
+    expect(findArgs).toBeGreaterThanOrEqual(0)
+    // Verify the `select` clause only requests the three minimal fields
+    // (called the second time after the .execute() above).
+    const select = (prisma.order.findFirst as jest.Mock).mock.calls[
+      (prisma.order.findFirst as jest.Mock).mock.calls.length - 1
+    ][0].select
+    expect(Object.keys(select).sort()).toEqual(
+      ["orderNo", "productNameSnapshot", "status"].sort(),
+    )
+  })
+
+  it("rejects too-short orderNo via Zod (matches lookup_order's 6–40 bounds)", () => {
+    const tools = buildCSTools("s1") as unknown as ToolsRecord
+    const r = tools.verifyOrder.inputSchema.safeParse({ orderNo: "short" })
+    expect(r.success).toBe(false)
+  })
+})
+
+describe("collectWechat", () => {
+  beforeEach(() => {
+    // collectWechat now snapshots recent conversation into the lead so
+    // ops can see the context — mock the underlying findMany so the tool
+    // doesn't crash on `.reverse()` of `undefined`.
+    ;(prisma.agentMessage.findMany as jest.Mock).mockResolvedValue([])
+  })
+
+  it("creates a fresh PENDING_CONTACT Lead when orderNo is supplied and returns QR", async () => {
+    ;(prisma.order.findFirst as jest.Mock).mockResolvedValueOnce({ orderNo: "OD20260521" })
+    ;(prisma.agentLead.create as jest.Mock).mockResolvedValueOnce({ id: "l1" })
+    const tools = buildCSTools("s1") as unknown as ToolsRecord
+    const r = await tools.collectWechat.execute(
+      { wechatId: "validId123", orderNo: "OD20260521" },
+      ctx,
+    )
+    expect(prisma.agentLead.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        create: expect.objectContaining({
+        data: expect.objectContaining({
           status: "PENDING_CONTACT",
           wechatId: "validId123",
-          reason: "用户主动提供",
+          orderNo: "OD20260521",
+          sessionId: "s1",
         }),
-        update: { wechatId: "validId123" },
       }),
     )
     expect(r).toMatchObject({
@@ -258,6 +327,128 @@ describe("collectWechat", () => {
       qrUrl: expect.any(String),
       wechatId: expect.any(String),
     })
+  })
+
+  it("skips Lead creation when orderNo is missing — QR still returned so user can self-contact", async () => {
+    // Policy: ops only handles follow-ups tied to a real order. Without
+    // orderNo we still show the QR (user can reach out on their own) but
+    // don't enqueue a row that ops would never action.
+    const tools = buildCSTools("s1") as unknown as ToolsRecord
+    const r = await tools.collectWechat.execute({ wechatId: "validId123" }, ctx)
+    expect(prisma.agentLead.create).not.toHaveBeenCalled()
+    expect(r).toMatchObject({
+      ok: true,
+      qrUrl: expect.any(String),
+      wechatId: expect.any(String),
+      orderNoVerified: false,
+    })
+    // Message must explicitly tell the user that orderNo is required
+    // for ops to process, so they know why they should send it.
+    expect((r as { message: string }).message).toMatch(/订单号/)
+  })
+
+  it("drops orderNo when DB says no such order — no Lead, message asks user to recheck", async () => {
+    // Belt-and-suspenders: AI is supposed to call verify_order first,
+    // but if it skips and passes a bogus orderNo, we MUST not persist
+    // a Lead that ops will chase. Mirror behavior for escalate_to_human.
+    ;(prisma.order.findFirst as jest.Mock).mockResolvedValueOnce(null)
+    const tools = buildCSTools("s1") as unknown as ToolsRecord
+    const r = (await tools.collectWechat.execute(
+      { wechatId: "validId123", orderNo: "OD-BOGUS" },
+      ctx,
+    )) as { ok: boolean; orderNoVerified: boolean; message: string }
+    expect(prisma.agentLead.create).not.toHaveBeenCalled()
+    expect(r.orderNoVerified).toBe(false)
+    expect(r.message).toMatch(/查不到|复核/)
+  })
+
+  it("snapshots the recent conversation into the lead (not empty {})", async () => {
+    // Regression guard: previously stored `conversationSnapshot: {}`,
+    // leaving ops blind on PENDING_CONTACT leads.
+    ;(prisma.order.findFirst as jest.Mock).mockResolvedValueOnce({ orderNo: "OD20260520" })
+    ;(prisma.agentLead.findFirst as jest.Mock).mockResolvedValueOnce(null) // first consultation
+    const msgA = { role: "USER", contentText: "我没收到卡密", toolName: null, createdAt: new Date("2026-05-20T10:00:00Z") }
+    const msgB = { role: "ASSISTANT", contentText: "请提供订单号", toolName: null, createdAt: new Date("2026-05-20T10:00:05Z") }
+    ;(prisma.agentMessage.findMany as jest.Mock).mockResolvedValueOnce([msgB, msgA])
+    ;(prisma.agentLead.create as jest.Mock).mockResolvedValueOnce({ id: "l-snap" })
+    const tools = buildCSTools("s1") as unknown as ToolsRecord
+    await tools.collectWechat.execute(
+      { wechatId: "validId123", orderNo: "OD20260520" },
+      ctx,
+    )
+    const call = (prisma.agentLead.create as jest.Mock).mock.calls[0][0]
+    expect(call.data.conversationSnapshot).toEqual([msgA, msgB])
+    expect(call.data.conversationSnapshot).not.toEqual({})
+  })
+
+  it("scopes the snapshot to messages AFTER the previous lead — no bleed-in from earlier consultations", async () => {
+    // Critical for ops UX: with one session producing multiple leads,
+    // each lead must show only the conversation that motivated it. If
+    // we naively took the last 20 messages, lead 2's snapshot would
+    // include lead 1's messages, making ops confused about which
+    // question goes with which lead.
+    const prevLeadAt = new Date("2026-05-20T10:00:00Z")
+    ;(prisma.order.findFirst as jest.Mock).mockResolvedValueOnce({ orderNo: "OD20260520" })
+    ;(prisma.agentLead.findFirst as jest.Mock).mockResolvedValueOnce({
+      createdAt: prevLeadAt,
+    })
+    ;(prisma.agentMessage.findMany as jest.Mock).mockResolvedValueOnce([])
+    ;(prisma.agentLead.create as jest.Mock).mockResolvedValueOnce({ id: "l-2" })
+    const tools = buildCSTools("s1") as unknown as ToolsRecord
+    await tools.collectWechat.execute(
+      { wechatId: "validId123", orderNo: "OD20260520" },
+      ctx,
+    )
+    // The findMany query must filter by createdAt > prevLeadAt
+    const findArgs = (prisma.agentMessage.findMany as jest.Mock).mock.calls[0][0]
+    expect(findArgs.where.sessionId).toBe("s1")
+    expect(findArgs.where.createdAt).toEqual({ gt: prevLeadAt })
+    // Larger take cap when scoped (50, not 20 — we know messages are
+    // already bounded by the prior lead).
+    expect(findArgs.take).toBe(50)
+  })
+
+  it("uses the small take cap (20) when this is the first consultation in the session", async () => {
+    // Symmetric to above: no prior lead → take 20 like before to
+    // bound the snapshot for the very-long-conversation case.
+    ;(prisma.order.findFirst as jest.Mock).mockResolvedValueOnce({ orderNo: "OD20260520" })
+    ;(prisma.agentLead.findFirst as jest.Mock).mockResolvedValueOnce(null)
+    ;(prisma.agentMessage.findMany as jest.Mock).mockResolvedValueOnce([])
+    ;(prisma.agentLead.create as jest.Mock).mockResolvedValueOnce({ id: "l-first" })
+    const tools = buildCSTools("s1") as unknown as ToolsRecord
+    await tools.collectWechat.execute(
+      { wechatId: "validId123", orderNo: "OD20260520" },
+      ctx,
+    )
+    const findArgs = (prisma.agentMessage.findMany as jest.Mock).mock.calls[0][0]
+    // No `createdAt: { gt: ... }` clause when no prior lead
+    expect(findArgs.where.createdAt).toBeUndefined()
+    expect(findArgs.take).toBe(20)
+  })
+
+  it("never upserts — a session can produce multiple wechat-id leads over time", async () => {
+    // Regression guard: previously this used upsert(where sessionId)
+    // which silently overwrote the prior lead. Now each submission is
+    // an independent row so ops sees every distinct consultation.
+    ;(prisma.order.findFirst as jest.Mock)
+      .mockResolvedValueOnce({ orderNo: "OD-A" })
+      .mockResolvedValueOnce({ orderNo: "OD-B" })
+    ;(prisma.agentLead.create as jest.Mock).mockResolvedValue({ id: "l-new" })
+    const tools = buildCSTools("s1") as unknown as ToolsRecord
+    await tools.collectWechat.execute(
+      { wechatId: "validId123", orderNo: "OD-A" },
+      ctx,
+    )
+    await tools.collectWechat.execute(
+      { wechatId: "validId456", orderNo: "OD-B" },
+      ctx,
+    )
+    expect(prisma.agentLead.create).toHaveBeenCalledTimes(2)
+    // Both rows must carry independent wechatIds — no merging.
+    const first = (prisma.agentLead.create as jest.Mock).mock.calls[0][0].data
+    const second = (prisma.agentLead.create as jest.Mock).mock.calls[1][0].data
+    expect(first.wechatId).toBe("validId123")
+    expect(second.wechatId).toBe("validId456")
   })
 
   it("rejects invalid wechatId via Zod", () => {
@@ -273,13 +464,87 @@ describe("escalateToHuman", () => {
       { role: "USER", contentText: "我要退款", toolName: null, createdAt: new Date() },
     ])
     ;(prisma.$transaction as jest.Mock).mockResolvedValue([])
+    ;(prisma.agentSession.update as jest.Mock).mockResolvedValue({})
   })
 
-  it("upserts Lead with NEW status, marks session.escalated", async () => {
+  it("creates fresh Lead with NEW status when orderNo provided, marks session.escalated", async () => {
+    ;(prisma.order.findFirst as jest.Mock).mockResolvedValueOnce({ orderNo: "OD-OK" })
     const tools = buildCSTools("s1") as unknown as ToolsRecord
-    const r = await tools.escalateToHuman.execute({ reason: "退款诉求", urgency: "MED" }, ctx)
+    const r = (await tools.escalateToHuman.execute(
+      { reason: "退款诉求", urgency: "MED", orderNo: "OD-OK" },
+      ctx,
+    )) as { qrUrl: string; message: string; orderNoVerified: boolean }
     expect(prisma.$transaction).toHaveBeenCalled()
+    expect(r.orderNoVerified).toBe(true)
+    expect(r.message).toMatch(/已为您转接人工客服/)
+  })
+
+  it("drops bad orderNo at the DB layer — no Lead, no escalated flip's $transaction, asks user to recheck", async () => {
+    // AI is supposed to have called verify_order; if it skipped and
+    // passed a typo'd orderNo, we MUST not enqueue a bogus Lead. The
+    // session's escalated flag still flips (AI did attempt a handoff),
+    // but via plain update() not $transaction, and the returned message
+    // tells the user to recheck.
+    ;(prisma.order.findFirst as jest.Mock).mockResolvedValueOnce(null)
+    const tools = buildCSTools("s1") as unknown as ToolsRecord
+    const r = (await tools.escalateToHuman.execute(
+      { reason: "客户给了订单号但输错", urgency: "MED", orderNo: "OD-TYPO" },
+      ctx,
+    )) as {
+      message: string
+      orderNoVerified: boolean
+      requiresOrderNoFix: boolean
+    }
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+    expect(r.orderNoVerified).toBe(false)
+    expect(r.requiresOrderNoFix).toBe(true)
+    expect(r.message).toMatch(/查不到|核对/)
+  })
+
+  it("does NOT create Lead when orderNo is missing, but still flips session.escalated and returns QR", async () => {
+    // Policy mirror of collectWechat: ops only handles follow-ups tied
+    // to a real order. New visitors / users without orders still get
+    // the QR card so they can self-contact; the session's `escalated`
+    // flag still flips so admin "对话历史" can highlight that AI
+    // attempted a handoff at least once.
+    const tools = buildCSTools("s1") as unknown as ToolsRecord
+    const r = await tools.escalateToHuman.execute(
+      { reason: "新访客要人工", urgency: "MED" },
+      ctx,
+    )
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+    expect(prisma.agentSession.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "s1" },
+        data: { escalated: true },
+      }),
+    )
     expect(r).toMatchObject({ qrUrl: expect.any(String), message: expect.any(String) })
+  })
+
+  it("creates a new Lead row per call — never upserts, even on repeated escalations in one session", async () => {
+    // Regression guard for "two consultations on the same session"
+    // scenario: previously the second escalate would upsert + overwrite
+    // the first lead's reason / urgency / snapshot, silently destroying
+    // the earlier consultation. Now each call must insert independently.
+    ;(prisma.order.findFirst as jest.Mock)
+      .mockResolvedValueOnce({ orderNo: "OD-1" })
+      .mockResolvedValueOnce({ orderNo: "OD-2" })
+    const tools = buildCSTools("s1") as unknown as ToolsRecord
+    await tools.escalateToHuman.execute(
+      { reason: "周一退款", urgency: "MED", orderNo: "OD-1" },
+      ctx,
+    )
+    await tools.escalateToHuman.execute(
+      { reason: "周二登不上", urgency: "HIGH", orderNo: "OD-2" },
+      ctx,
+    )
+    // $transaction called twice (once per escalate); each transaction
+    // contains an agentLead.create + agentSession.update pair.
+    expect(prisma.$transaction).toHaveBeenCalledTimes(2)
+    // The runtime Lead model exposes create only — no upsert in the mock,
+    // so any accidental upsert call would crash the test loudly.
+    expect("upsert" in (prisma.agentLead as object)).toBe(false)
   })
 
   it("triggers webhook fetch when urgency=HIGH and webhook url configured", async () => {
@@ -311,13 +576,16 @@ describe("escalateToHuman", () => {
     }))
     jest.doMock("@/lib/prisma", () => ({
       prisma: {
-        agentLead: { upsert: jest.fn() },
+        agentLead: { create: jest.fn(), findFirst: jest.fn() },
         agentMessage: {
           findMany: jest.fn().mockResolvedValue([
             { role: "USER", contentText: "卡密失效", toolName: null, createdAt: new Date() },
           ]),
         },
-        agentSession: { update: jest.fn() },
+        agentSession: { update: jest.fn().mockResolvedValue({}) },
+        order: {
+          findFirst: jest.fn().mockResolvedValue({ orderNo: "OD-HOT" }),
+        },
         $transaction: jest.fn().mockResolvedValue([]),
       },
     }))
@@ -329,7 +597,10 @@ describe("escalateToHuman", () => {
     }
     const fetchSpy = jest.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 200 }))
     const tools = reimported.buildCSTools("s1")
-    await tools.escalateToHuman.execute({ reason: "卡密失效", urgency: "HIGH" }, ctx)
+    await tools.escalateToHuman.execute(
+      { reason: "卡密失效", urgency: "HIGH", orderNo: "OD-HOT" },
+      ctx,
+    )
     expect(fetchSpy).toHaveBeenCalledWith(
       "https://bark.example/x",
       expect.objectContaining({ method: "POST" }),
@@ -502,6 +773,69 @@ describe("buildCSPrompt — context rendering & red-line completeness", () => {
     expect(prompt).toMatch(/价格回答硬规则|不写具体金额/)
   })
 
+  it("mandates verify_order before passing user-supplied orderNo to escalate / collect_wechat", () => {
+    // Without this, AI would happily pass any plausible-looking string
+    // ("OD12345", "我的订单 123", etc.) to escalate_to_human and ops
+    // would chase ghosts. The verify_order tool is the cheap pre-flight
+    // and the prompt must teach AI to use it as a gate.
+    const prompt = buildCSPrompt(makeBase())
+    expect(prompt).toMatch(/调 verify_order\(orderNo\)/)
+    // Failure path must be explicit
+    expect(prompt).toMatch(/exists=false|exists: false/)
+    expect(prompt).toMatch(/没调 verify_order 就直接传给 escalate_to_human/)
+    // First-step shortcut allowed (userOrders段订单号已服务端验证)
+    expect(prompt).toMatch(/跳过 verify_order/)
+  })
+
+  it("requires the AI to exhaust 4 steps before showing the bare QR (no-orderNo path is last-resort)", () => {
+    // Regression: AI was caught dropping the QR card immediately when a
+    // user said "找人工", without asking for the order number first.
+    // The post-mortem rule: ops can't match the wechat contact to a
+    // chat session without an orderNo, so a QR-only handoff is a black
+    // hole. Prompt now defines an explicit 4-step funnel (本机订单段 →
+    // 主动问 → 邮箱反查 → 兜底 QR) and forbids skipping to step 4.
+    const prompt = buildCSPrompt(makeBase())
+    expect(prompt).toContain("转人工前置流程")
+    // Each of the 4 steps must be present and ordered
+    expect(prompt).toMatch(/第 1 步/)
+    expect(prompt).toMatch(/第 2 步/)
+    expect(prompt).toMatch(/第 3 步/)
+    expect(prompt).toMatch(/第 4 步/)
+    // The "ask for orderNo" mandatory phrasing
+    expect(prompt).toMatch(/订单号一般是您下单后页面顶部那串编号/)
+    // Email-fallback step must reference the lookup page
+    expect(prompt).toMatch(/\[订单查询页\]\(\/orders\/lookup\)/)
+    // The hard prohibition
+    expect(prompt).toMatch(/用户一句"找人工"就跳到第 4 步/)
+    expect(prompt).toMatch(/编造一个看着像的订单号/)
+  })
+
+  it("renders the canonical URL in the product index so AI never composes /products/<id>", () => {
+    // Regression: AI was caught pasting the cuid as the URL path
+    // (e.g. /products/cmoolt5wx0000if04nmrah773), bypassing lookup_product
+    // and producing a 404. The product index now ships a ready-to-copy
+    // URL=/products/<slug> string with each row, plus a red line in
+    // the linking rules forbidding URL composition from the id.
+    const base = makeBase()
+    const prompt = buildCSPrompt({
+      ...base,
+      products: [
+        {
+          id: "cmoolt5wx0000if04nmrah773",
+          name: "美区Apple ID 独享·已购小火箭",
+          slug: "apple-id-shadowrocket-us",
+          summary: null,
+          price: 62,
+          productType: "MANUAL",
+          tags: [],
+        },
+      ],
+    })
+    expect(prompt).toContain("URL=`/products/apple-id-shadowrocket-us`")
+    expect(prompt).not.toContain("/products/cmoolt5wx0000if04nmrah773")
+    expect(prompt).toMatch(/绝不能从 `id` 拼接/)
+  })
+
   it("flags free (price=0) products in the index so AI can recommend them to first-time visitors", () => {
     const base = makeBase()
     const prompt = buildCSPrompt({
@@ -602,8 +936,12 @@ describe("escalateToHuman tool message — uses order-number-driven handoff (no 
 })
 
 describe("collectWechat tool message — sets correct expectation (user must scan QR, not wait for callback)", () => {
+  beforeEach(() => {
+    ;(prisma.agentMessage.findMany as jest.Mock).mockResolvedValue([])
+  })
+
   it("never claims customer service will proactively contact the user", async () => {
-    ;(prisma.agentLead.upsert as jest.Mock).mockResolvedValueOnce({ id: "lead-1" })
+    ;(prisma.agentLead.create as jest.Mock).mockResolvedValueOnce({ id: "lead-1" })
     const tools = buildCSTools("s1") as unknown as ToolsRecord
     const r = (await tools.collectWechat.execute(
       { wechatId: "validId123" },
