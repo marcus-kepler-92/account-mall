@@ -231,16 +231,15 @@ function ChatPanelInner({
     adapters: { feedback },
   })
 
-  // Trigger the handoff card only when escalate_to_human actually settled
-  // with a usable QR — not on every tool call. Previously a bogus orderNo
-  // would still flip the chat to the QR card, swallowing the AI's
-  // "请复核订单号" reply. The server distinguishes the cases via
-  // `requiresOrderNoFix`: true means "AI must re-ask, no QR yet"; false
-  // (or missing) is the verified / opted-out path that warrants the card.
+  // Trigger the handoff card only when escalate_to_human's result says
+  // `renderQr: true`. Three cases the server distinguishes:
+  //   - customer_support + verified orderNo → renderQr: true
+  //   - business_inquiry → renderQr: true (合作咨询绕过订单号)
+  //   - customer_support + no/bogus orderNo → renderQr: false; AI re-asks
   //
   // firedFor lives in a ref so the effect can safely re-bind without
-  // resetting the dedupe guard (would otherwise re-trigger the handoff
-  // card if anything in the runtime ref re-renders this inner component).
+  // resetting the dedupe guard (would otherwise re-trigger the card
+  // if anything else in this inner component re-renders).
   const firedForRef = useRef<string | null>(null)
   useEffect(() => {
     const check = () => {
@@ -255,8 +254,8 @@ function ChatPanelInner({
           // don't re-fire on subsequent unrelated updates.
           if (part.result === undefined || part.isError) return
           if (firedForRef.current === part.toolCallId) return
-          const result = part.result as { requiresOrderNoFix?: boolean }
-          if (result?.requiresOrderNoFix === true) return
+          const result = part.result as { renderQr?: boolean }
+          if (result?.renderQr !== true) return
           firedForRef.current = part.toolCallId
           onHandoff()
           return

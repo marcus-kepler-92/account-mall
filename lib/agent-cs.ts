@@ -195,18 +195,37 @@ ${knowledgeText}
   - \`exists: false\` → **不要调 escalate/collect**，回复用户「您给的订单号系统里查不到，麻烦核对下重发，或到 [订单查询页](/orders/lookup) 用邮箱反查」→ 等用户重新提供 → 再走一遍验证
 - 第 1 步从 userOrders 段直接拿的订单号已经服务端验证过，可以**跳过 verify_order**
 
-**第 4 步：兜底无 orderNo QR（最后一招）**
-- 仅以下情形走第 4 步：
-  - 用户**明确说**"没买过 / 不是这里买的 / 邮箱也查不到 / 不想给"
-  - 已经走完第 2/3 步 + 验证关卡，用户拒绝/无法提供有效订单号
-- 调 \`escalate_to_human({ reason })\` 不传 orderNo
-- 必说："没有订单号的话，客服后台没办法定位您这次对话。请扫码后**把问题再发一遍给客服**"
+**没有"第 4 步兜底 QR"——customer support 必须验证过 orderNo 才能渲染 QR：**
+- 用户说"没买过 / 邮箱也查不到 / 不想给" → **继续**：
+  - 第 1 步：再次确认 userOrders 段是否真的为空，或里面是否有未排除的订单
+  - 第 2/3 步：如果还是没有，明确问"您是售后咨询还是想咨询合作？"
+    - 售后 → 继续要订单号（耐心问，直到拿到并验证通过）
+    - 合作 → 走下方"合作咨询例外"
+- **服务端会硬拦**：customer_support intent 且无验证过 orderNo 时，工具返回 \`renderQr: false\`，QR 不会渲染。你需要根据返回的 message 继续追问
+
+## 合作咨询例外（唯一绕过 orderNo 工作流的场景）
+
+**触发关键词**：合作 / 代理 / 批发 / 分销 / 渠道 / 商务 / 对接 / 联系老板 / 媒体 / 采访 / 广告 / 投放
+
+**判断方式**：
+- 用户明显不是来咨询订单的（没买东西 + 上述关键词），且能简述合作方向
+- 或者用户主动说"我不是顾客，我是想找你们谈合作"
+
+**处理**：
+- 不要再问订单号
+- 直接 \`escalate_to_human({ intent: "business_inquiry", reason: "合作方向简述" })\` 或 \`collect_wechat({ wechatId, intent: "business_inquiry" })\`
+- 这个分支会渲染 QR，让运营接手
+
+**判断不清晰的情况**：
+- 一句话同时混了订单问题和合作 → 拆开：先处理订单（走 customer_support 流程），合作单独发一遍 escalate_to_human(intent=business_inquiry)
+- 关键词都没出现，只说"找人工"：默认 customer_support，继续要订单号
 
 **绝对禁止：**
-- 用户一句"找人工"就跳到第 4 步
+- 用户一句"找人工"就以为是合作而设 intent=business_inquiry
 - 第 1 步明明有订单号在 userOrders 段还要再问用户
 - 用户给的订单号没调 verify_order 就直接传给 escalate_to_human / collect_wechat
 - 编造一个看着像的订单号传给工具——必须是真实出现过的（要么来自 userOrders 段，要么用户亲口提供并通过 verify_order）
+- customer_support 路径没验证 orderNo 就指望"工具会渲染 QR"——它不会，你必须继续问
 
 ## 商品描述权威性
 每个商品有独立的 \`summary\` 字段（来自 lookup_product 返回）。商品使用规则（期限、是否支持改密、是否支持登 iCloud 等）**以 lookup_product 返回的 summary 为最终准则**。知识库是补充共性规则，不要用知识库覆盖商品 summary 的明确说明。
@@ -466,19 +485,21 @@ export function buildCSTools(sessionId: string) {
 
     collectWechat: tool({
       description:
-        "用户主动提供微信号时调用。若用户已有订单且能提供订单号，请一起传入 orderNo —— 只有带 orderNo 的会进入人工跟进队列，否则只展示二维码。",
+        "用户主动提供微信号时调用。intent='customer_support'（默认）：必须带验证过的 orderNo，否则不入队、不渲染 QR。intent='business_inquiry'：合作/代理/批发/分销/媒体/广告等场景，不需要 orderNo，直接入队、渲染 QR。",
       inputSchema: z.object({
         wechatId: z
           .string()
           .regex(/^[a-zA-Z][a-zA-Z0-9_-]{5,19}$/, "微信号格式不符"),
         orderNo: z.string().min(6).max(40).optional(),
+        intent: z
+          .enum(["customer_support", "business_inquiry"])
+          .default("customer_support"),
       }),
-      execute: async ({ wechatId, orderNo }) => {
+      execute: async ({ wechatId, orderNo, intent }) => {
         const settings = await getSiteSettings()
         // Belt-and-suspenders: re-verify orderNo at the DB layer even
         // if AI claims to have called verify_order. A wrong orderNo in
-        // the Lead table makes ops chase ghosts; better to drop the
-        // claimed orderNo and tell the AI to ask the user again.
+        // the Lead table makes ops chase ghosts.
         let verifiedOrderNo: string | null = null
         if (orderNo) {
           const ok = await prisma.order.findFirst({
@@ -487,6 +508,36 @@ export function buildCSTools(sessionId: string) {
           })
           verifiedOrderNo = ok?.orderNo ?? null
         }
+
+        // Business inquiries bypass the orderNo requirement — they're not
+        // tied to a transaction, ops still needs the wechat handoff to
+        // discuss partnership / distribution / press / ads.
+        if (intent === "business_inquiry") {
+          const snapshot = await fetchConsultationSnapshot(sessionId)
+          await prisma.agentLead.create({
+            data: {
+              sessionId,
+              wechatId,
+              orderNo: verifiedOrderNo,
+              reason: "[合作咨询] 用户主动提供微信",
+              status: "PENDING_CONTACT",
+              conversationSnapshot: snapshot,
+            },
+          })
+          return {
+            ok: true,
+            renderQr: true,
+            qrUrl: settings.wechatQrUrl,
+            wechatId: settings.wechatId,
+            orderNoVerified: Boolean(verifiedOrderNo),
+            message:
+              "已记录您的微信，运营会主动联系您讨论合作。也可以直接扫码加我们的企微。",
+          }
+        }
+
+        // customer_support path: orderNo is mandatory for the Lead, and
+        // QR only renders after verification passes. AI must keep asking
+        // until a verified orderNo arrives.
         if (verifiedOrderNo) {
           const snapshot = await fetchConsultationSnapshot(sessionId)
           await prisma.agentLead.create({
@@ -499,32 +550,42 @@ export function buildCSTools(sessionId: string) {
               conversationSnapshot: snapshot,
             },
           })
+          return {
+            ok: true,
+            renderQr: true,
+            qrUrl: settings.wechatQrUrl,
+            wechatId: settings.wechatId,
+            orderNoVerified: true,
+            message:
+              "已记录您的订单号与微信号。请扫码加我们的企微并发送您的订单号，客服上线后会优先处理。",
+          }
         }
+
+        // No verified orderNo — do NOT render QR; AI must re-ask.
         return {
-          ok: true,
-          qrUrl: settings.wechatQrUrl,
-          wechatId: settings.wechatId,
-          // When AI passed an orderNo but it failed verification, tell
-          // it explicitly so it doesn't gaslight the user with "已记录".
-          orderNoVerified: Boolean(verifiedOrderNo),
-          message: verifiedOrderNo
-            ? "已记录您的订单号与微信号。请扫码加我们的企微并发送您的订单号，客服上线后会优先处理。"
-            : orderNo
-              ? "您提供的订单号在系统里找不到，请复核后重发；目前仅展示客服企微二维码，扫码后请把订单号一起发给客服。"
-              : "客服不会主动联系，请扫码加我们的企微并发送您的订单号（必须），客服上线后会查询订单和对话情况。",
+          ok: false,
+          renderQr: false,
+          orderNoVerified: false,
+          requiresOrderNoFix: Boolean(orderNo),
+          message: orderNo
+            ? "您提供的订单号在系统里找不到，请复核后重发；订单号正确后我才能帮您加客服微信。"
+            : "客服不会主动联系，请先告诉我您的订单号（订单成功页或确认邮件里都能找到），核对通过后再加客服微信。",
         }
       },
     }),
 
     escalateToHuman: tool({
       description:
-        "需要人工接手时调用，返回企微 QR。若用户已有订单且能提供订单号，请传入 orderNo —— 只有带 orderNo 的转人工会进入跟进队列，否则只展示二维码（用户可主动联系）。",
+        "转人工。intent='customer_support'（默认）：必须带验证过的 orderNo，否则不入队、不渲染 QR、AI 继续问。intent='business_inquiry'：合作/代理/批发/分销/媒体/广告/商务洽谈等，不要 orderNo，直接入队、渲染 QR。",
       inputSchema: z.object({
         reason: z.string().min(2).max(200),
         urgency: z.enum(["LOW", "MED", "HIGH"]).default("MED"),
         orderNo: z.string().min(6).max(40).optional(),
+        intent: z
+          .enum(["customer_support", "business_inquiry"])
+          .default("customer_support"),
       }),
-      execute: async ({ reason, urgency, orderNo }) => {
+      execute: async ({ reason, urgency, orderNo, intent }) => {
         const settings = await getSiteSettings()
         // Snapshot scoped to this consultation (messages since the prior
         // lead, if any). Keeps each lead's transcript independent — ops
@@ -532,10 +593,8 @@ export function buildCSTools(sessionId: string) {
         // last week's refund question.
         const snapshot = await fetchConsultationSnapshot(sessionId)
 
-        // Belt-and-suspenders: re-verify orderNo at the DB layer (mirror
-        // of collect_wechat). If AI passed an orderNo the user
-        // hallucinated or mistyped, we drop it rather than persist a
-        // ghost Lead row that ops can never close.
+        // Belt-and-suspenders re-verify (also for business_inquiry — if
+        // they happen to mention an orderNo we still tag the Lead with it).
         let verifiedOrderNo: string | null = null
         if (orderNo) {
           const ok = await prisma.order.findFirst({
@@ -545,12 +604,18 @@ export function buildCSTools(sessionId: string) {
           verifiedOrderNo = ok?.orderNo ?? null
         }
 
-        if (verifiedOrderNo) {
+        const inHours = await isInBusinessHours()
+        const pad = (n: number) => String(n).padStart(2, "0")
+
+        // Business inquiry path: no orderNo gate. Always create Lead,
+        // tag the reason so ops can split partnership leads from
+        // customer-support ones. Render QR unconditionally.
+        if (intent === "business_inquiry") {
           await prisma.$transaction([
             prisma.agentLead.create({
               data: {
                 sessionId,
-                reason,
+                reason: `[合作咨询] ${reason}`,
                 urgency,
                 orderNo: verifiedOrderNo,
                 status: "NEW",
@@ -562,14 +627,52 @@ export function buildCSTools(sessionId: string) {
               data: { escalated: true },
             }),
           ])
-        } else {
-          await prisma.agentSession.update({
-            where: { id: sessionId },
-            data: { escalated: true },
-          })
+          const message = inHours
+            ? "已为您转接合作运营，请扫码加企微，说明合作方向（代理/批发/广告/...），我们尽快回复。"
+            : `已为您转接合作运营，当前 ${pad(settings.businessHoursEnd)}:00–${pad(settings.businessHoursStart)}:00 休息中。请扫码并简要说明合作方向，${pad(settings.businessHoursStart)}:00 上线后处理。`
+          return {
+            renderQr: true,
+            qrUrl: settings.wechatQrUrl,
+            wechatId: settings.wechatId,
+            intent: "business_inquiry" as const,
+            orderNoVerified: Boolean(verifiedOrderNo),
+            message,
+          }
         }
 
-        if (verifiedOrderNo && urgency === "HIGH" && settings.escalateWebhookUrl) {
+        // customer_support path: QR gated on verified orderNo.
+        if (!verifiedOrderNo) {
+          // Don't flip session.escalated — there's no actionable handoff
+          // yet. AI must keep iterating until a verified orderNo arrives,
+          // or until the conversation reclassifies as business_inquiry.
+          return {
+            renderQr: false,
+            orderNoVerified: false,
+            requiresOrderNoFix: Boolean(orderNo),
+            message: orderNo
+              ? "您给的订单号系统里查不到，可能是输错了几位。麻烦核对一下重新发给我，或到 [订单查询页](/orders/lookup) 用邮箱反查后再发。"
+              : "为了客服后台能定位您的对话，请先告诉我订单号（订单成功页或确认邮件里都有）。如果您是想咨询合作而不是售后，请明确告诉我。",
+          }
+        }
+
+        await prisma.$transaction([
+          prisma.agentLead.create({
+            data: {
+              sessionId,
+              reason,
+              urgency,
+              orderNo: verifiedOrderNo,
+              status: "NEW",
+              conversationSnapshot: snapshot,
+            },
+          }),
+          prisma.agentSession.update({
+            where: { id: sessionId },
+            data: { escalated: true },
+          }),
+        ])
+
+        if (urgency === "HIGH" && settings.escalateWebhookUrl) {
           fetch(settings.escalateWebhookUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -579,37 +682,15 @@ export function buildCSTools(sessionId: string) {
           }).catch(() => {})
         }
 
-        const inHours = await isInBusinessHours()
-        const pad = (n: number) => String(n).padStart(2, "0")
-        // Three distinct UX outcomes based on orderNo verification:
-        //  - verified  → "我已经把订单挂到跟进队列，客服会找过来"
-        //  - claimed but failed verification → AI must back out the
-        //    "已转人工" framing and ask user to re-check
-        //  - no orderNo at all → user opted out; QR only, ops cannot match
-        let message: string
-        if (verifiedOrderNo) {
-          message = inHours
-            ? `已为您转接人工客服（订单 ${verifiedOrderNo}），扫码加客服后请发送订单号给我们，我们会查询您的对话和订单情况。`
-            : `已为您转接人工客服（订单 ${verifiedOrderNo}），当前 ${pad(settings.businessHoursEnd)}:00–${pad(settings.businessHoursStart)}:00 为客服休息时间。请扫码加客服并发送订单号，我们 ${pad(settings.businessHoursStart)}:00 上线后第一时间处理。`
-        } else if (orderNo) {
-          // AI passed an orderNo but DB says no such order. Don't claim
-          // we filed a follow-up; tell the user to recheck.
-          message =
-            "您给的订单号系统里查不到，可能是输错了几位。麻烦核对一下重新发给我，或到订单查询页用邮箱反查后再发。"
-        } else {
-          message = inHours
-            ? "客服后台没有您的订单号，无法定位本次对话。请扫码加客服后**把您的问题再发一遍 + 订单号**，否则客服可能找不到您。"
-            : `客服当前 ${pad(settings.businessHoursEnd)}:00–${pad(settings.businessHoursStart)}:00 休息中。请扫码并把问题 + 订单号一起发给客服，${pad(settings.businessHoursStart)}:00 上线后处理。`
-        }
-
+        const message = inHours
+          ? `已为您转接人工客服（订单 ${verifiedOrderNo}），扫码加客服后请发送订单号给我们，我们会查询您的对话和订单情况。`
+          : `已为您转接人工客服（订单 ${verifiedOrderNo}），当前 ${pad(settings.businessHoursEnd)}:00–${pad(settings.businessHoursStart)}:00 为客服休息时间。请扫码加客服并发送订单号，我们 ${pad(settings.businessHoursStart)}:00 上线后第一时间处理。`
         return {
+          renderQr: true,
           qrUrl: settings.wechatQrUrl,
           wechatId: settings.wechatId,
-          orderNoVerified: Boolean(verifiedOrderNo),
-          // When verification failed, tell AI not to render the QR
-          // bubble — it should re-ask instead. The chat panel honors
-          // this hint (see chat-wrappers AssistantBubble).
-          requiresOrderNoFix: Boolean(orderNo) && !verifiedOrderNo,
+          intent: "customer_support" as const,
+          orderNoVerified: true,
           message,
         }
       },

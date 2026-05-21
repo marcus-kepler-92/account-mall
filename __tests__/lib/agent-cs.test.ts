@@ -304,7 +304,7 @@ describe("collectWechat", () => {
     ;(prisma.agentMessage.findMany as jest.Mock).mockResolvedValue([])
   })
 
-  it("creates a fresh PENDING_CONTACT Lead when orderNo is supplied and returns QR", async () => {
+  it("customer_support + verified orderNo: creates Lead, renders QR", async () => {
     ;(prisma.order.findFirst as jest.Mock).mockResolvedValueOnce({ orderNo: "OD20260521" })
     ;(prisma.agentLead.create as jest.Mock).mockResolvedValueOnce({ id: "l1" })
     const tools = buildCSTools("s1") as unknown as ToolsRecord
@@ -324,42 +324,75 @@ describe("collectWechat", () => {
     )
     expect(r).toMatchObject({
       ok: true,
+      renderQr: true,
       qrUrl: expect.any(String),
       wechatId: expect.any(String),
+      orderNoVerified: true,
     })
   })
 
-  it("skips Lead creation when orderNo is missing — QR still returned so user can self-contact", async () => {
-    // Policy: ops only handles follow-ups tied to a real order. Without
-    // orderNo we still show the QR (user can reach out on their own) but
-    // don't enqueue a row that ops would never action.
+  it("customer_support + missing orderNo: no Lead, NO QR — AI must keep asking", async () => {
+    // Policy update (2026-05): customer-support handoffs are gated on a
+    // verified orderNo. Showing the QR without one was sending users
+    // into a black hole where ops couldn't match them to a session.
     const tools = buildCSTools("s1") as unknown as ToolsRecord
-    const r = await tools.collectWechat.execute({ wechatId: "validId123" }, ctx)
+    const r = (await tools.collectWechat.execute(
+      { wechatId: "validId123" },
+      ctx,
+    )) as {
+      ok: boolean
+      renderQr: boolean
+      orderNoVerified: boolean
+      message: string
+    }
     expect(prisma.agentLead.create).not.toHaveBeenCalled()
-    expect(r).toMatchObject({
-      ok: true,
-      qrUrl: expect.any(String),
-      wechatId: expect.any(String),
-      orderNoVerified: false,
-    })
-    // Message must explicitly tell the user that orderNo is required
-    // for ops to process, so they know why they should send it.
-    expect((r as { message: string }).message).toMatch(/订单号/)
+    expect(r.ok).toBe(false)
+    expect(r.renderQr).toBe(false)
+    expect(r.orderNoVerified).toBe(false)
+    // Message must explicitly ask for the orderNo so AI's bubble follows up
+    expect(r.message).toMatch(/订单号/)
   })
 
-  it("drops orderNo when DB says no such order — no Lead, message asks user to recheck", async () => {
-    // Belt-and-suspenders: AI is supposed to call verify_order first,
-    // but if it skips and passes a bogus orderNo, we MUST not persist
-    // a Lead that ops will chase. Mirror behavior for escalate_to_human.
+  it("customer_support + bogus orderNo: no Lead, NO QR, message asks user to recheck", async () => {
     ;(prisma.order.findFirst as jest.Mock).mockResolvedValueOnce(null)
     const tools = buildCSTools("s1") as unknown as ToolsRecord
     const r = (await tools.collectWechat.execute(
       { wechatId: "validId123", orderNo: "OD-BOGUS" },
       ctx,
-    )) as { ok: boolean; orderNoVerified: boolean; message: string }
+    )) as {
+      ok: boolean
+      renderQr: boolean
+      orderNoVerified: boolean
+      requiresOrderNoFix: boolean
+      message: string
+    }
     expect(prisma.agentLead.create).not.toHaveBeenCalled()
+    expect(r.renderQr).toBe(false)
     expect(r.orderNoVerified).toBe(false)
+    expect(r.requiresOrderNoFix).toBe(true)
     expect(r.message).toMatch(/查不到|复核/)
+  })
+
+  it("business_inquiry bypasses orderNo: creates Lead with [合作咨询] tag, renders QR", async () => {
+    // 合作 / 代理 / 批发 / 媒体 etc. don't have an order to anchor to —
+    // ops still wants the wechat handoff to discuss partnership. Lead
+    // reason is prefixed so admin can distinguish from customer support.
+    ;(prisma.agentLead.create as jest.Mock).mockResolvedValueOnce({ id: "l-biz" })
+    const tools = buildCSTools("s1") as unknown as ToolsRecord
+    const r = (await tools.collectWechat.execute(
+      { wechatId: "validId123", intent: "business_inquiry" },
+      ctx,
+    )) as { ok: boolean; renderQr: boolean; qrUrl: string }
+    expect(prisma.agentLead.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          reason: expect.stringMatching(/^\[合作咨询\]/),
+          wechatId: "validId123",
+        }),
+      }),
+    )
+    expect(r.ok).toBe(true)
+    expect(r.renderQr).toBe(true)
   })
 
   it("snapshots the recent conversation into the lead (not empty {})", async () => {
@@ -467,24 +500,28 @@ describe("escalateToHuman", () => {
     ;(prisma.agentSession.update as jest.Mock).mockResolvedValue({})
   })
 
-  it("creates fresh Lead with NEW status when orderNo provided, marks session.escalated", async () => {
+  it("customer_support + verified orderNo: Lead created, renderQr=true, session.escalated flipped", async () => {
     ;(prisma.order.findFirst as jest.Mock).mockResolvedValueOnce({ orderNo: "OD-OK" })
     const tools = buildCSTools("s1") as unknown as ToolsRecord
     const r = (await tools.escalateToHuman.execute(
       { reason: "退款诉求", urgency: "MED", orderNo: "OD-OK" },
       ctx,
-    )) as { qrUrl: string; message: string; orderNoVerified: boolean }
+    )) as {
+      qrUrl: string
+      message: string
+      orderNoVerified: boolean
+      renderQr: boolean
+    }
     expect(prisma.$transaction).toHaveBeenCalled()
+    expect(r.renderQr).toBe(true)
     expect(r.orderNoVerified).toBe(true)
     expect(r.message).toMatch(/已为您转接人工客服/)
   })
 
-  it("drops bad orderNo at the DB layer — no Lead, no escalated flip's $transaction, asks user to recheck", async () => {
-    // AI is supposed to have called verify_order; if it skipped and
-    // passed a typo'd orderNo, we MUST not enqueue a bogus Lead. The
-    // session's escalated flag still flips (AI did attempt a handoff),
-    // but via plain update() not $transaction, and the returned message
-    // tells the user to recheck.
+  it("customer_support + bogus orderNo: no Lead, NO renderQr, session.escalated NOT flipped (no actionable handoff yet)", async () => {
+    // Policy update: an unverified orderNo doesn't even flip the escalated
+    // flag, because nothing actionable happened — AI must keep asking
+    // until orderNo is verified.
     ;(prisma.order.findFirst as jest.Mock).mockResolvedValueOnce(null)
     const tools = buildCSTools("s1") as unknown as ToolsRecord
     const r = (await tools.escalateToHuman.execute(
@@ -492,34 +529,58 @@ describe("escalateToHuman", () => {
       ctx,
     )) as {
       message: string
+      renderQr: boolean
       orderNoVerified: boolean
       requiresOrderNoFix: boolean
     }
     expect(prisma.$transaction).not.toHaveBeenCalled()
+    expect(prisma.agentSession.update).not.toHaveBeenCalled()
+    expect(r.renderQr).toBe(false)
     expect(r.orderNoVerified).toBe(false)
     expect(r.requiresOrderNoFix).toBe(true)
-    expect(r.message).toMatch(/查不到|核对/)
+    expect(r.message).toMatch(/查不到|复核/)
   })
 
-  it("does NOT create Lead when orderNo is missing, but still flips session.escalated and returns QR", async () => {
-    // Policy mirror of collectWechat: ops only handles follow-ups tied
-    // to a real order. New visitors / users without orders still get
-    // the QR card so they can self-contact; the session's `escalated`
-    // flag still flips so admin "对话历史" can highlight that AI
-    // attempted a handoff at least once.
+  it("customer_support + missing orderNo: no Lead, no QR — AI must keep iterating", async () => {
+    // Replaces the old "bare QR fallback" path. Customer-support
+    // handoffs without a verified orderNo create a black hole for ops
+    // (can't match wechat contact back to chat), so we refuse to render
+    // QR until AI gets a verified orderNo. Lead and escalated stay off.
     const tools = buildCSTools("s1") as unknown as ToolsRecord
-    const r = await tools.escalateToHuman.execute(
+    const r = (await tools.escalateToHuman.execute(
       { reason: "新访客要人工", urgency: "MED" },
       ctx,
-    )
+    )) as { renderQr: boolean; message: string }
     expect(prisma.$transaction).not.toHaveBeenCalled()
-    expect(prisma.agentSession.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: "s1" },
-        data: { escalated: true },
-      }),
+    expect(prisma.agentSession.update).not.toHaveBeenCalled()
+    expect(r.renderQr).toBe(false)
+    // Message should prompt for orderNo OR for clarification of intent
+    expect(r.message).toMatch(/订单号|合作/)
+  })
+
+  it("business_inquiry: skips orderNo gate, creates Lead with [合作咨询] tag, renderQr=true", async () => {
+    // The only escape from the orderNo discipline. Cooperation /
+    // partnership / press / ad inquiries are not order-anchored; ops
+    // still wants the wechat handoff. Lead reason prefixed so the
+    // admin queue can split partnership leads from customer-support.
+    const tools = buildCSTools("s1") as unknown as ToolsRecord
+    const r = (await tools.escalateToHuman.execute(
+      {
+        reason: "想做美区分销代理",
+        urgency: "MED",
+        intent: "business_inquiry",
+      },
+      ctx,
+    )) as { renderQr: boolean; intent: string; qrUrl: string }
+    expect(prisma.$transaction).toHaveBeenCalled()
+    expect(r.renderQr).toBe(true)
+    expect(r.intent).toBe("business_inquiry")
+    // agentLead.create is invoked (synchronously, since it's mocked) to
+    // build the array passed to $transaction — its args are recorded.
+    const createCall = (prisma.agentLead.create as jest.Mock).mock.calls.find(
+      ([arg]) => arg?.data?.reason?.startsWith("[合作咨询]"),
     )
-    expect(r).toMatchObject({ qrUrl: expect.any(String), message: expect.any(String) })
+    expect(createCall).toBeDefined()
   })
 
   it("creates a new Lead row per call — never upserts, even on repeated escalations in one session", async () => {
@@ -796,17 +857,22 @@ describe("buildCSPrompt — context rendering & red-line completeness", () => {
     // 主动问 → 邮箱反查 → 兜底 QR) and forbids skipping to step 4.
     const prompt = buildCSPrompt(makeBase())
     expect(prompt).toContain("转人工前置流程")
-    // Each of the 4 steps must be present and ordered
+    // Steps 1–3 still mandatory; step 4 (bare QR fallback) was killed
+    // — customer support handoffs ALWAYS need a verified orderNo now.
     expect(prompt).toMatch(/第 1 步/)
     expect(prompt).toMatch(/第 2 步/)
     expect(prompt).toMatch(/第 3 步/)
-    expect(prompt).toMatch(/第 4 步/)
+    expect(prompt).toContain('没有"第 4 步兜底 QR"')
     // The "ask for orderNo" mandatory phrasing
     expect(prompt).toMatch(/订单号一般是您下单后页面顶部那串编号/)
     // Email-fallback step must reference the lookup page
     expect(prompt).toMatch(/\[订单查询页\]\(\/orders\/lookup\)/)
-    // The hard prohibition
-    expect(prompt).toMatch(/用户一句"找人工"就跳到第 4 步/)
+    // 合作 escape hatch must be present + ringfenced
+    expect(prompt).toContain("合作咨询例外")
+    expect(prompt).toMatch(/intent: "business_inquiry"/)
+    expect(prompt).toMatch(/代理|批发|分销/)
+    // The hard prohibitions
+    expect(prompt).toMatch(/用户一句"找人工"就以为是合作/)
     expect(prompt).toMatch(/编造一个看着像的订单号/)
   })
 
