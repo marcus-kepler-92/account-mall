@@ -439,6 +439,19 @@ describe("buildCSPrompt — context rendering & red-line completeness", () => {
     expect(prompt).toMatch(/\/orders\/lookup/)
   })
 
+  it("requires markdown link syntax — bare paths are not clickable in the chat bubble", () => {
+    // Regression: AI was caught replying with raw paths like
+    //   "👉 入口：/products/cmm7kttbu..."
+    // which render as plain text in the markdown bubble — users have no
+    // way to click. The prompt now mandates `[label](/path)` and shows
+    // both a positive and a negative example so the model learns the
+    // distinction.
+    const prompt = buildCSPrompt(makeBase())
+    expect(prompt).toMatch(/Markdown 链接语法/)
+    expect(prompt).toMatch(/\[.+?\]\(\/.+?\)/) // contains an example like [文字](/path)
+    expect(prompt).toMatch(/不能贴裸路径|不可点击/)
+  })
+
   it("forbids fabricated prices and markdown comparison tables", () => {
     // Regression: AI was caught rendering a markdown table comparing
     // shared / dedicated accounts with made-up prices ("¥0~2.99", "¥42起")
