@@ -3,10 +3,9 @@
 import {
   MessagePrimitive,
   ComposerPrimitive,
-  ActionBarPrimitive,
   ThreadPrimitive,
 } from "@assistant-ui/react"
-import { Send, Square, Copy, ThumbsUp, ThumbsDown, Loader2 } from "lucide-react"
+import { Send, Square, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { MarkdownText } from "./markdown-text"
 
@@ -53,23 +52,10 @@ export function AssistantBubble() {
           />
         </div>
       </div>
-      {/* Mobile lacks hover; default to visible at <md and hover-reveal at ≥md. */}
-      <ActionBarPrimitive.Root
-        hideWhenRunning
-        autohide="not-last"
-        autohideFloat="single-branch"
-        className="flex gap-1 pl-2 opacity-100 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 data-[floating]:opacity-100"
-      >
-        <ActionBarPrimitive.Copy className="rounded p-2 text-muted-foreground hover:bg-muted hover:text-foreground md:p-1">
-          <Copy className="size-4 md:size-3.5" />
-        </ActionBarPrimitive.Copy>
-        <ActionBarPrimitive.FeedbackPositive className="rounded p-2 text-muted-foreground hover:bg-muted hover:text-foreground data-[active]:text-primary md:p-1">
-          <ThumbsUp className="size-4 md:size-3.5" />
-        </ActionBarPrimitive.FeedbackPositive>
-        <ActionBarPrimitive.FeedbackNegative className="rounded p-2 text-muted-foreground hover:bg-muted hover:text-foreground data-[active]:text-destructive md:p-1">
-          <ThumbsDown className="size-4 md:size-3.5" />
-        </ActionBarPrimitive.FeedbackNegative>
-      </ActionBarPrimitive.Root>
+      {/* ActionBar (copy / thumbs up / thumbs down) intentionally removed —
+          customer-facing chat doesn't need these affordances, and the
+          /api/agent/message-feedback hook stays wired in chat-panel.tsx
+          for if we want to bring them back later. */}
     </MessagePrimitive.Root>
   )
 }
