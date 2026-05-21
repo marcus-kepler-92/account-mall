@@ -102,7 +102,13 @@ export async function applyAntiAbuse(
       response: Response.json({ error: "session-expired" }, { status: 410 }),
     }
   }
-  if (session.tokensUsed >= session.tokenBudget) {
+  // In local dev (`npm run dev`) skip the per-session token budget cap so
+  // iterating on the chat doesn't hit 423 after a few back-and-forths.
+  // NODE_ENV === "development" is narrow: jest test runs set NODE_ENV=test
+  // (still goes through this branch, keeping the regression test intact),
+  // and production / Vercel preview set NODE_ENV=production (enforced).
+  const isLocalDev = process.env.NODE_ENV === "development"
+  if (!isLocalDev && session.tokensUsed >= session.tokenBudget) {
     return { ok: false, response: fallback("budget") }
   }
 

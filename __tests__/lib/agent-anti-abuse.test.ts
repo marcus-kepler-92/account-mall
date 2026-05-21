@@ -171,6 +171,25 @@ describe("applyAntiAbuse", () => {
     if (!result.ok) expect(result.response.status).toBe(423)
   })
 
+  it("bypasses the per-session budget cap when NODE_ENV=development (local dev only)", async () => {
+    const original = process.env.NODE_ENV
+    // @ts-expect-error — readonly in @types/node but jest lets us mutate
+    process.env.NODE_ENV = "development"
+    try {
+      ;(mockPrisma.agentSession.findUnique as jest.Mock).mockResolvedValueOnce({
+        ...validSession,
+        tokensUsed: 2000,
+        tokenBudget: 2000,
+      })
+      const result = await applyAntiAbuse(makeReq("{}"), "s1", [userMsg("hi")])
+      // Budget would normally trip 423 here; dev bypass lets it through.
+      expect(result.ok).toBe(true)
+    } finally {
+      // @ts-expect-error — restore
+      process.env.NODE_ENV = original
+    }
+  })
+
   it("returns 429 when any limiter fails", async () => {
     ;(mockLimiters!.chatIp.limit as jest.Mock).mockResolvedValueOnce({ success: false })
     const result = await applyAntiAbuse(makeReq("{}"), "s1", [userMsg("hi")])
