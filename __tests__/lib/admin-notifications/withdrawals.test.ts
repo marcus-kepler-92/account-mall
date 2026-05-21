@@ -16,9 +16,9 @@ describe("withdrawalsSource", () => {
   it("counts PENDING withdrawals and returns up to 3 latest items with distributor names", async () => {
     count.mockResolvedValue(7)
     findMany.mockResolvedValue([
-      { id: "w1", amount: { toString: () => "200" }, createdAt: new Date("2026-05-21T10:00:00Z"), distributor: { name: "张三" } },
-      { id: "w2", amount: { toString: () => "80" }, createdAt: new Date("2026-05-21T09:00:00Z"), distributor: { name: "李四" } },
-      { id: "w3", amount: { toString: () => "150" }, createdAt: new Date("2026-05-21T08:00:00Z"), distributor: { name: null, email: "wang@example.com" } },
+      { id: "w1", amount: 200, createdAt: new Date("2026-05-21T10:00:00Z"), distributor: { name: "张三" } },
+      { id: "w2", amount: 80, createdAt: new Date("2026-05-21T09:00:00Z"), distributor: { name: "李四" } },
+      { id: "w3", amount: 150, createdAt: new Date("2026-05-21T08:00:00Z"), distributor: { name: null, email: "wang@example.com" } },
     ])
 
     const result = await withdrawalsSource.fetch(prisma)
