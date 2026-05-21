@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ulid } from "ulid"
 import {
   AssistantRuntimeProvider,
@@ -56,6 +56,10 @@ export function ChatPanel() {
   const [handoff, setHandoff] = useState(false)
   const [handoffInfo, setHandoffInfo] = useState<HandoffInfo>({ qrUrl: "", wechatId: "" })
   const [fallback, setFallback] = useState<FallbackReason | null>(null)
+  // Stable identity so the inner runtime-watcher effect doesn't tear down
+  // on every parent render (would otherwise reset its "already fired"
+  // guard and double-trigger the handoff card).
+  const handleHandoff = useCallback(() => setHandoff(true), [])
 
   useEffect(() => {
     setSessionId(getOrCreateSessionId())
@@ -162,7 +166,7 @@ export function ChatPanel() {
       sessionId={sessionId}
       orderHints={orderHints}
       initialMessages={initialMessages}
-      onHandoff={() => setHandoff(true)}
+      onHandoff={handleHandoff}
       onFallback={setFallback}
     />
   )
@@ -225,10 +229,43 @@ function ChatPanelInner({
     transport,
     messages: initialMessages.length > 0 ? initialMessages : undefined,
     adapters: { feedback },
-    onToolCall: ({ toolCall }) => {
-      if (toolCall.toolName === "escalateToHuman") onHandoff()
-    },
   })
+
+  // Trigger the handoff card only when escalate_to_human actually settled
+  // with a usable QR — not on every tool call. Previously a bogus orderNo
+  // would still flip the chat to the QR card, swallowing the AI's
+  // "请复核订单号" reply. The server distinguishes the cases via
+  // `requiresOrderNoFix`: true means "AI must re-ask, no QR yet"; false
+  // (or missing) is the verified / opted-out path that warrants the card.
+  //
+  // firedFor lives in a ref so the effect can safely re-bind without
+  // resetting the dedupe guard (would otherwise re-trigger the handoff
+  // card if anything in the runtime ref re-renders this inner component).
+  const firedForRef = useRef<string | null>(null)
+  useEffect(() => {
+    const check = () => {
+      const messages = runtime.thread.getState().messages
+      for (let i = messages.length - 1; i >= 0; i--) {
+        const m = messages[i]
+        if (m.role !== "assistant") continue
+        for (const part of m.content) {
+          if (part.type !== "tool-call") continue
+          if (part.toolName !== "escalateToHuman") continue
+          // Skip until the result lands; once we've fired for this call,
+          // don't re-fire on subsequent unrelated updates.
+          if (part.result === undefined || part.isError) return
+          if (firedForRef.current === part.toolCallId) return
+          const result = part.result as { requiresOrderNoFix?: boolean }
+          if (result?.requiresOrderNoFix === true) return
+          firedForRef.current = part.toolCallId
+          onHandoff()
+          return
+        }
+      }
+    }
+    check()
+    return runtime.thread.subscribe(check)
+  }, [runtime, onHandoff])
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
