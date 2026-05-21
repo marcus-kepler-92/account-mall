@@ -36,10 +36,11 @@ describe("AdminProductsPage — sales query", () => {
         prismaMock.product.findMany.mockResolvedValue([baseProduct] as any)
         prismaMock.card.groupBy.mockResolvedValue([])
         prismaMock.order.groupBy.mockResolvedValue([])
+        prismaMock.restockSubscription.groupBy.mockResolvedValue([])
     })
 
     it("queries completed orders with quantity sum", async () => {
-        await AdminProductsPage()
+        await AdminProductsPage({ searchParams: Promise.resolve({}) })
 
         expect(prismaMock.order.groupBy).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -55,7 +56,7 @@ describe("AdminProductsPage — sales query", () => {
             { productId: "p1", _sum: { quantity: 7 } },
         ] as any)
 
-        const jsx = await AdminProductsPage()
+        const jsx = await AdminProductsPage({ searchParams: Promise.resolve({}) })
         // Extract data prop from ProductsTableWrapper element
         const wrapper = (jsx as any).props.children.find(
             (c: any) => c?.type?.name === "ProductsTableWrapper" || c?.props?.data,
@@ -67,9 +68,23 @@ describe("AdminProductsPage — sales query", () => {
     it("defaults sales to 0 when product has no completed orders", async () => {
         prismaMock.order.groupBy.mockResolvedValue([])
 
-        const jsx = await AdminProductsPage()
+        const jsx = await AdminProductsPage({ searchParams: Promise.resolve({}) })
         const wrapper = (jsx as any).props.children.find((c: any) => c?.props?.data)
         const data = wrapper?.props?.data
         expect(data?.[0]?.sales).toBe(0)
+    })
+
+    it("passes defaultFilters { hasAlert: true } when notice=inventory", async () => {
+        const jsx = await AdminProductsPage({
+            searchParams: Promise.resolve({ notice: "inventory" }),
+        })
+        const wrapper = (jsx as any).props.children.find((c: any) => c?.props?.data)
+        expect(wrapper?.props?.defaultFilters).toEqual({ hasAlert: true })
+    })
+
+    it("does not pass defaultFilters when notice query is absent", async () => {
+        const jsx = await AdminProductsPage({ searchParams: Promise.resolve({}) })
+        const wrapper = (jsx as any).props.children.find((c: any) => c?.props?.data)
+        expect(wrapper?.props?.defaultFilters).toBeUndefined()
     })
 })
