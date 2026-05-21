@@ -57,27 +57,17 @@ describe("ChatPanel transport contract", () => {
         expect(SOURCE).toMatch(/setSessionReady\(true\)/)
     })
 
-    it("hydrates chat history from sessionStorage on remount and persists on change", () => {
-        // Regression: Radix Popover / Sheet unmount their children on close,
-        // so opening + closing + reopening the FAB used to wipe the chat
-        // thread. We now persist UIMessages keyed by sessionId in
-        // sessionStorage and rehydrate via useChatRuntime({ messages }).
+    it("documents that chat-history persistence is intentionally NOT yet wired", () => {
+        // We attempted a sessionStorage hydration of useChatRuntime({ messages })
+        // but assistant-ui's useThread state.messages is a different shape
+        // from the AI SDK UIMessage[] that useChatRuntime expects, so the
+        // round-trip broke the chat thread entirely. Reverted; a fix needs
+        // a converter (or to subscribe to the underlying AI SDK chat).
         //
-        // sessionStorage is the right scope here:
-        //   - persists across mount/unmount within the same tab (the actual bug)
-        //   - cleared on tab close (no stale leakage to next visitor)
-        //   - never shared across tabs (each tab has its own thread)
-
-        // Hydration on mount
-        expect(SOURCE).toMatch(/readPersistedMessages\(sessionId\)/)
-        expect(SOURCE).toMatch(/messages:\s*initialMessages/)
-
-        // Persistence on change — PersistMessages subscribes to thread state
-        expect(SOURCE).toMatch(/function PersistMessages/)
-        expect(SOURCE).toMatch(/useThread\(\(state\)\s*=>\s*state\.messages\)/)
-        expect(SOURCE).toMatch(/sessionStorage\.setItem\(\s*MESSAGES_KEY_PREFIX/)
-
-        // Storage key is scoped by sessionId so different sessions don't collide
-        expect(SOURCE).toMatch(/MESSAGES_KEY_PREFIX\s*\+\s*sessionId/)
+        // This test pins the revert so a stale refactor doesn't bring the
+        // broken code back without first solving the shape-mismatch.
+        expect(SOURCE).not.toMatch(/messages:\s*initialMessages/)
+        expect(SOURCE).not.toMatch(/function PersistMessages/)
+        expect(SOURCE).toMatch(/TODO[\s\S]{0,80}persistence/i)
     })
 })
