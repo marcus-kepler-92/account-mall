@@ -82,7 +82,15 @@ const statusOptions = [
     { label: "下架", value: "INACTIVE" },
 ]
 
-export function ProductsDataTable({ data, isSuperAdmin = false }: { data: ProductRow[]; isSuperAdmin?: boolean }) {
+export function ProductsDataTable({
+    data,
+    isSuperAdmin = false,
+    defaultFilters,
+}: {
+    data: ProductRow[]
+    isSuperAdmin?: boolean
+    defaultFilters?: { hasAlert?: boolean }
+}) {
     const router = useRouter()
     const [dragRows, setDragRows] = useState<ProductRow[] | null>(null)
     const rows = dragRows ?? data
@@ -92,8 +100,15 @@ export function ProductsDataTable({ data, isSuperAdmin = false }: { data: Produc
         setDragRows(null)
     }, [data])
     const [sorting, setSorting] = useState<SortingState>([])
-    const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
-    const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
+    const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>(() => {
+        if (!defaultFilters) return []
+        const filters: ColumnFiltersState = []
+        if (defaultFilters.hasAlert !== undefined) {
+            filters.push({ id: "hasAlert", value: defaultFilters.hasAlert })
+        }
+        return filters
+    })
+    const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({ hasAlert: false })
 
     const columns = useMemo(() => createProductsColumns(isSuperAdmin), [isSuperAdmin])
 

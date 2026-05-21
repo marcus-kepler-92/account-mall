@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { prisma } from "@/lib/prisma"
 import { getAdminPermissions } from "@/lib/admin-permissions"
+import { resolveInventorySubtype } from "@/lib/inventory"
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
 import { ProductsTableWrapper } from "./products-table-wrapper"
@@ -9,11 +10,16 @@ import { PageHeader } from "@/app/admin/components"
 
 export const dynamic = "force-dynamic"
 
-export default async function AdminProductsPage() {
+export default async function AdminProductsPage({
+    searchParams,
+}: {
+    searchParams: Promise<{ notice?: string }>
+}) {
+    const params = await searchParams
     const perms = await getAdminPermissions()
     const isSuperAdmin = perms?.isSuperAdmin ?? false
 
-    const [products, stockCounts, salesCounts] = await Promise.all([
+    const [products, stockCounts, salesCounts, subCounts] = await Promise.all([
         prisma.product.findMany({
             include: {
                 tags: { select: { id: true, name: true, slug: true } },
@@ -30,22 +36,38 @@ export default async function AdminProductsPage() {
             where: { status: "COMPLETED" },
             _sum: { quantity: true },
         }),
+        prisma.restockSubscription.groupBy({
+            by: ["productId"],
+            where: { status: "PENDING" },
+            _count: { id: true },
+        }),
     ])
 
     const stockMap = new Map(stockCounts.map((s) => [s.productId, s._count.id]))
     const salesMap = new Map(salesCounts.map((s) => [s.productId, s._sum.quantity ?? 0]))
+    const subMap = new Map(subCounts.map((s) => [s.productId, s._count.id]))
 
-    const data: ProductRow[] = products.map((p) => ({
-        id: p.id,
-        name: p.name,
-        slug: p.slug,
-        status: p.status,
-        productType: p.productType,
-        price: Number(p.price),
-        tags: p.tags,
-        stock: stockMap.get(p.id) ?? 0,
-        sales: salesMap.get(p.id) ?? 0,
-    }))
+    const data: ProductRow[] = products.map((p) => {
+        const stock = stockMap.get(p.id) ?? 0
+        const subscriberCount = subMap.get(p.id) ?? 0
+        const isNormalActive = p.productType === "NORMAL" && p.status === "ACTIVE"
+        const hasAlert = isNormalActive && resolveInventorySubtype(stock, subscriberCount) !== null
+        return {
+            id: p.id,
+            name: p.name,
+            slug: p.slug,
+            status: p.status,
+            productType: p.productType,
+            price: Number(p.price),
+            tags: p.tags,
+            stock,
+            sales: salesMap.get(p.id) ?? 0,
+            subscriberCount,
+            hasAlert,
+        }
+    })
+
+    const defaultFilters = params.notice === "inventory" ? { hasAlert: true } : undefined
 
     return (
         <div className="space-y-6">
@@ -59,7 +81,7 @@ export default async function AdminProductsPage() {
                     </Button>
                 )}
             </PageHeader>
-            <ProductsTableWrapper data={data} isSuperAdmin={isSuperAdmin} />
+            <ProductsTableWrapper data={data} isSuperAdmin={isSuperAdmin} defaultFilters={defaultFilters} />
         </div>
     )
 }

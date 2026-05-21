@@ -18,6 +18,8 @@ export type ProductRow = {
     tags: { id: string; name: string; slug: string }[]
     stock: number
     sales: number
+    subscriberCount: number
+    hasAlert: boolean
 }
 
 const statusMap: Record<ProductRow["status"], { label: string; variant: "default" | "secondary" }> = {
@@ -108,6 +110,19 @@ return [
                 />
             </div>
         ),
+    },
+    {
+        accessorKey: "hasAlert",
+        header: () => null,
+        cell: () => null,
+        enableHiding: true,
+        enableColumnFilter: true,
+        enableSorting: false,
+        size: 0,
+        filterFn: (row, _id, value) => {
+            if (value === undefined) return true
+            return row.original.hasAlert === Boolean(value)
+        },
     },
 ]
 }
