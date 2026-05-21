@@ -57,17 +57,25 @@ describe("ChatPanel transport contract", () => {
         expect(SOURCE).toMatch(/setSessionReady\(true\)/)
     })
 
-    it("documents that chat-history persistence is intentionally NOT yet wired", () => {
-        // We attempted a sessionStorage hydration of useChatRuntime({ messages })
-        // but assistant-ui's useThread state.messages is a different shape
-        // from the AI SDK UIMessage[] that useChatRuntime expects, so the
-        // round-trip broke the chat thread entirely. Reverted; a fix needs
-        // a converter (or to subscribe to the underlying AI SDK chat).
+    it("rehydrates chat history from the server before mounting the runtime", () => {
+        // Chat history persists in the AgentMessage DB table; the widget
+        // fetches it on mount and feeds it into useChatRuntime({ messages })
+        // as initial state. The earlier sessionStorage attempt failed
+        // because useThread state.messages (ThreadMessage[]) doesn't match
+        // useChatRuntime's expected UIMessage[]. The server already stores
+        // UIMessage-shaped parts, so the round-trip works.
         //
-        // This test pins the revert so a stale refactor doesn't bring the
-        // broken code back without first solving the shape-mismatch.
-        expect(SOURCE).not.toMatch(/messages:\s*initialMessages/)
-        expect(SOURCE).not.toMatch(/function PersistMessages/)
-        expect(SOURCE).toMatch(/TODO[\s\S]{0,80}persistence/i)
+        // Critical: runtime mount is BLOCKED until the fetch resolves —
+        // useChatRuntime captures `messages` as initial state on first
+        // render, so a late update would silently no-op.
+        expect(SOURCE).toMatch(/\/api\/agent\/messages\?sessionId=/)
+        expect(SOURCE).toMatch(/setInitialMessages\(/)
+        expect(SOURCE).toMatch(/setHistoryReady\(true\)/)
+        // Gate: don't mount the inner Provider until both session + history
+        // are ready. Without this, the user can race a chip click and lose
+        // their history.
+        expect(SOURCE).toMatch(/!sessionReady\s*\|\|\s*!historyReady/)
+        // useChatRuntime must receive the fetched messages, not undefined.
+        expect(SOURCE).toMatch(/messages:\s*initialMessages\.length\s*>\s*0\s*\?\s*initialMessages/)
     })
 })

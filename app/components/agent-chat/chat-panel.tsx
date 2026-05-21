@@ -11,6 +11,8 @@ import {
   useChatRuntime,
   AssistantChatTransport,
 } from "@assistant-ui/react-ai-sdk"
+import type { UIMessage } from "ai"
+import { Loader2 } from "lucide-react"
 import { UserBubble, AssistantBubble, ComposerBar } from "./chat-wrappers"
 import { WelcomeChips } from "./welcome-chips"
 import { FallbackQR } from "./fallback-qr"
@@ -31,14 +33,6 @@ function getOrCreateSessionId(): string {
   return id
 }
 
-// TODO: chat-history persistence across FAB open/close was attempted via
-// sessionStorage + useChatRuntime({ messages }) hydration, but the
-// useThread() state.messages format (assistant-ui's ThreadMessage[])
-// doesn't match what useChatRuntime expects for initial messages
-// (AI SDK's UIMessage[]). The mismatch broke chat for everyone. Reverted
-// for now — the proper fix needs a converter between the two shapes (or
-// to subscribe to the AI SDK chat directly rather than useThread).
-
 // Customer-service QR + wechat id resolved at runtime by /api/agent/session/start
 // (server reads SiteSetting DB row with env fallback). Used by FallbackQR and
 // HandoffCard so admin-configured QR / wechat id flow through without
@@ -52,6 +46,8 @@ export function ChatPanel() {
   // Initialize lazily on the client so SSR returns the same empty marker.
   const [sessionId, setSessionId] = useState<string>("")
   const [sessionReady, setSessionReady] = useState(false)
+  const [historyReady, setHistoryReady] = useState(false)
+  const [initialMessages, setInitialMessages] = useState<UIMessage[]>([])
   const [orderHints, setOrderHints] = useState<string[]>([])
   const [handoff, setHandoff] = useState(false)
   const [handoffInfo, setHandoffInfo] = useState<HandoffInfo>({ qrUrl: "", wechatId: "" })
@@ -107,29 +103,103 @@ export function ChatPanel() {
     }
   }, [sessionId])
 
-  // Custom fetch intercepts HTTP fallback codes (423 budget, 503 daily-cap, 504 timeout)
-  // before the AI SDK tries to stream the response.
-  //
-  // The transport is created as soon as we have a sessionId, even before
-  // /session/start has settled. Returning `undefined` is unsafe: useChatRuntime
-  // would fall back to the AI SDK default API path (`/api/chat`), causing the
-  // first request to 404 if the user clicks a chip during the brief
-  // provisioning window. Session-readiness is enforced via the UI instead
-  // (WelcomeChips and ComposerBar disable themselves until sessionReady).
-  const transport = useMemo(() => {
-    if (!sessionId) return undefined
-    return new AssistantChatTransport({
-      api: "/api/agent/chat",
-      body: { sessionId, orderHints },
-      fetch: async (input, init) => {
-        const res = await fetch(input as RequestInfo, init)
-        if (res.status === 423) setFallback("budget")
-        else if (res.status === 503) setFallback("daily-cap")
-        else if (res.status === 504) setFallback("timeout")
-        return res
-      },
-    })
-  }, [sessionId, orderHints])
+  // Fetch persisted chat history (AgentMessage rows) for this session and
+  // hydrate the runtime via useChatRuntime({ messages }). This is how the
+  // widget remembers the conversation after the user closes & reopens the
+  // FAB popup — Radix unmounts the popover children so in-memory runtime
+  // state is gone, but the server-side AgentMessage table is the source
+  // of truth. We block runtime creation on history readiness so the AI
+  // SDK only builds its internal state once with the correct messages.
+  useEffect(() => {
+    if (!sessionId) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/agent/messages?sessionId=${encodeURIComponent(sessionId)}`,
+        )
+        if (res.ok) {
+          const data = (await res.json().catch(() => null)) as
+            | { messages?: UIMessage[] }
+            | null
+          if (!cancelled && Array.isArray(data?.messages)) {
+            setInitialMessages(data.messages)
+          }
+        }
+      } catch {
+        // Empty history on error — widget still works, user just starts fresh.
+      } finally {
+        if (!cancelled) setHistoryReady(true)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [sessionId])
+
+  if (fallback) return <FallbackQR reason={fallback} handoff={handoffInfo} />
+  if (handoff) return <HandoffCard handoff={handoffInfo} />
+
+  // Block mounting the AI SDK runtime until BOTH the session row exists
+  // and the history fetch has settled. The runtime captures `messages` as
+  // initial state once on first render — flipping `messages` after the
+  // fact would have no effect (which is what burned us on the earlier
+  // attempt). The loading flash is ~300ms on warm cache.
+  if (!sessionId || !sessionReady || !historyReady) {
+    return (
+      <div className="flex h-full items-center justify-center text-muted-foreground">
+        <Loader2 className="size-5 animate-spin" />
+      </div>
+    )
+  }
+
+  return (
+    <ChatPanelInner
+      sessionId={sessionId}
+      orderHints={orderHints}
+      initialMessages={initialMessages}
+      onHandoff={() => setHandoff(true)}
+      onFallback={setFallback}
+    />
+  )
+}
+
+// Inner component — mounted only after sessionReady + historyReady so the
+// runtime's `messages` initial state is correct on first render. Lifted out
+// so the runtime hook isn't created until we have everything we need; any
+// hook-level early return in the parent would have violated the rules of
+// hooks (useChatRuntime / useMemo orderings would shift).
+type InnerProps = {
+  sessionId: string
+  orderHints: string[]
+  initialMessages: UIMessage[]
+  onHandoff: () => void
+  onFallback: (reason: FallbackReason) => void
+}
+function ChatPanelInner({
+  sessionId,
+  orderHints,
+  initialMessages,
+  onHandoff,
+  onFallback,
+}: InnerProps) {
+  // Custom fetch intercepts HTTP fallback codes (423 budget, 503 daily-cap,
+  // 504 timeout) before the AI SDK tries to stream the response.
+  const transport = useMemo(
+    () =>
+      new AssistantChatTransport({
+        api: "/api/agent/chat",
+        body: { sessionId, orderHints },
+        fetch: async (input, init) => {
+          const res = await fetch(input as RequestInfo, init)
+          if (res.status === 423) onFallback("budget")
+          else if (res.status === 503) onFallback("daily-cap")
+          else if (res.status === 504) onFallback("timeout")
+          return res
+        },
+      }),
+    [sessionId, orderHints, onFallback],
+  )
 
   const feedback: FeedbackAdapter = useMemo(
     () => ({
@@ -149,14 +219,12 @@ export function ChatPanel() {
 
   const runtime = useChatRuntime({
     transport,
+    messages: initialMessages.length > 0 ? initialMessages : undefined,
     adapters: { feedback },
     onToolCall: ({ toolCall }) => {
-      if (toolCall.toolName === "escalateToHuman") setHandoff(true)
+      if (toolCall.toolName === "escalateToHuman") onHandoff()
     },
   })
-
-  if (fallback) return <FallbackQR reason={fallback} handoff={handoffInfo} />
-  if (handoff) return <HandoffCard handoff={handoffInfo} />
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
