@@ -66,3 +66,6 @@ registerSource(withdrawalsSource)
 
 import { agentLeadsSource } from "./sources/agent-leads"
 registerSource(agentLeadsSource)
+
+import { inventoryAlertsSource } from "./sources/inventory-alerts"
+registerSource(inventoryAlertsSource)
