@@ -63,3 +63,6 @@ export function sourceFor(menuHref: string): SourceKey | undefined {
 
 import { withdrawalsSource } from "./sources/withdrawals"
 registerSource(withdrawalsSource)
+
+import { agentLeadsSource } from "./sources/agent-leads"
+registerSource(agentLeadsSource)
