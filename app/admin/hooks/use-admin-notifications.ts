@@ -8,7 +8,11 @@ type Response = { sources: SourceResult[] }
 export function useAdminNotifications() {
   const { data, isLoading } = useQuery<Response>({
     queryKey: ["admin", "notifications"],
-    queryFn: () => fetch("/api/admin/notifications").then((r) => r.json()),
+    queryFn: async () => {
+      const r = await fetch("/api/admin/notifications")
+      if (!r.ok) throw new Error(`notifications fetch failed: ${r.status}`)
+      return r.json()
+    },
     staleTime: 30_000,
     refetchOnWindowFocus: true,
     refetchOnMount: "always",

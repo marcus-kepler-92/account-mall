@@ -16,7 +16,11 @@ export const agentLeadsSource: NotificationSource<"agentLeads"> = {
       prisma.agentLead.count({ where }),
       prisma.agentLead.findMany({
         where,
-        take: 9,
+        // Overfetch then sort by urgency in JS. Prisma's enum lexical sort
+        // would put MED/LOW before HIGH, so we sort here. 30 is a buffer
+        // for the case where HIGH urgency leads are scattered among recent
+        // activity — if lead volume exceeds this, switch to raw SQL CASE.
+        take: 30,
         orderBy: { createdAt: "desc" },
         select: { id: true, wechatId: true, status: true, urgency: true, createdAt: true },
       }),
