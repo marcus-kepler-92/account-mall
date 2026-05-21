@@ -167,13 +167,32 @@ const envSchema = z
     // 客服 agent
     agentChatTimeoutMs: z.coerce.number().int().positive().default(15_000),
     agentSessionTtlDays: z.coerce.number().int().positive().default(90),
-    // 单 session 累计 token (input cache-miss + cache-hit + output 全计入).
-    // 系统 prompt 含 50 个商品 + 全 PUBLISHED 知识库 ≈ 2000 tokens/turn 都
-    // 算入这里. 默认 50000 → 约 15-25 轮自然对话; 用尽走 fallback QR.
-    // 真实美元成本: 极端 50K cache-miss × $0.14/M ≈ $0.007 / session.
-    agentTokenBudget: z.coerce.number().int().positive().default(50_000),
-    dailyInputCap: z.coerce.number().int().positive().default(3_000_000),
-    dailyOutputCap: z.coerce.number().int().positive().default(800_000),
+    // 单 session 累计 token (input + output 全部计入 budget, 不抵 cache 折扣
+    // —— 这是 anti-abuse 设计, 防攻击者用 cache 反复刷).
+    //
+    // 容量由 ¥0.35 / session 硬成本上限反推 (DeepSeek v4-flash 官方价:
+    // ¥1/M input cache-miss, ¥0.02/M input cache-hit, ¥2/M output):
+    //   客服场景实际 input:output ≈ 22:1 (每轮 input ~11K, output ~300)
+    //   最坏全 cache-miss 时 per-token 平均成本 ≈ ¥1.04/M
+    //   ¥0.35 / ¥1.04 × 1e6 = ~335K tokens → 取 330K
+    //
+    // 实际由于 DeepSeek prefix cache 几乎一定命中 system prompt (5K), 典型
+    // 命中率 70%+ → 同样 330K budget 真实成本通常 < ¥0.13 / session.
+    //
+    // 容量推算 (配合 /api/agent/chat 的 sliding window 截 30 条):
+    //   330K → ~30 轮自然对话 (硬成本上限场景)
+    //   常见场景 (cache 高命中) → 可撑更多轮但仍受 token 上限保护.
+    agentTokenBudget: z.coerce.number().int().positive().default(330_000),
+    // 日级 cap 故意远大于 session budget — 两者角色不同:
+    //   - agentTokenBudget: 日常用户 UX 上限 (普通用户长聊会触达)
+    //   - dailyInputCap/dailyOutputCap: catastrophic ceiling, 被爬虫
+    //     / 脚本批量创建 session 时的硬刹车; 不应该在正常运营中触达
+    // 真实成本上限 (¥1/M cache-miss + ¥2/M output):
+    //   极端 100M input + 25M output 全 cache-miss = ¥150 / 天
+    //   典型 (90% cache-hit input): ~¥60 / 天
+    //   正常运营预期 < ¥10 / 天, 触达 cap 意味着正在被攻击.
+    dailyInputCap: z.coerce.number().int().positive().default(100_000_000),
+    dailyOutputCap: z.coerce.number().int().positive().default(25_000_000),
     // wechatQrUrl / wechatId: env values are env-fallback defaults. Real
     // production values are managed via /admin/settings/site (SiteSetting
     // DB row). Empty string means "not configured" — site-settings.ts and
