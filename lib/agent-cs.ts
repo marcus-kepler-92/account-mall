@@ -769,22 +769,52 @@ export function buildCSTools(sessionId: string) {
           }
         }
 
-        await prisma.$transaction([
-          prisma.agentLead.create({
-            data: {
-              sessionId,
-              reason,
-              urgency,
-              orderNo: verifiedOrderNo,
-              status: "NEW",
-              conversationSnapshot: snapshot,
-            },
-          }),
-          prisma.agentSession.update({
-            where: { id: sessionId },
-            data: { escalated: true },
-          }),
-        ])
+        // Log snapshot shape so we can confirm conversationSnapshot is
+        // a valid JSON array (not undefined / wrong type causing Prisma
+        // to throw, which would explain why we never saw `out renderQr=true`
+        // in dev logs).
+        console.log("[agent-cs:escalate] before-transaction", {
+          sessionId: sessionId.slice(0, 8),
+          snapshotIsArray: Array.isArray(snapshot),
+          snapshotLength: Array.isArray(snapshot) ? snapshot.length : "n/a",
+          orderNo: verifiedOrderNo,
+        })
+        try {
+          await prisma.$transaction([
+            prisma.agentLead.create({
+              data: {
+                sessionId,
+                reason,
+                urgency,
+                orderNo: verifiedOrderNo,
+                status: "NEW",
+                conversationSnapshot: snapshot,
+              },
+            }),
+            prisma.agentSession.update({
+              where: { id: sessionId },
+              data: { escalated: true },
+            }),
+          ])
+        } catch (err) {
+          console.error("[agent-cs:escalate] transaction failed", {
+            sessionId: sessionId.slice(0, 8),
+            orderNo: verifiedOrderNo,
+            error: err instanceof Error ? err.message : String(err),
+            code:
+              err && typeof err === "object" && "code" in err
+                ? (err as { code: string }).code
+                : undefined,
+          })
+          // Re-throw so AI SDK surfaces the tool error; the LLM will
+          // see it and (per prompt) say "我还没成功为您转人工..." not
+          // hallucinate "系统遇到了问题".
+          throw err
+        }
+        console.log("[agent-cs:escalate] transaction-ok", {
+          sessionId: sessionId.slice(0, 8),
+          orderNo: verifiedOrderNo,
+        })
 
         if (urgency === "HIGH" && settings.escalateWebhookUrl) {
           fetch(settings.escalateWebhookUrl, {
