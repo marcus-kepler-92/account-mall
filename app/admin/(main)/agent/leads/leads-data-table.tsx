@@ -50,14 +50,14 @@ export function LeadsDataTable({ data, total }: LeadsDataTableProps) {
     return (
         <Card>
             <CardHeader className="pb-4">
-                <CardTitle className="text-base">线索列表</CardTitle>
+                <CardTitle className="text-base">跟进列表</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 pt-0">
                 <Separator />
                 <DataTable
                     table={table}
                     columns={columns}
-                    emptyMessage="暂无线索"
+                    emptyMessage="暂无跟进单"
                     onRowClick={(row) => router.push(`/admin/agent/leads/${row.id}`)}
                 />
                 <DataTablePagination table={table} total={total} />

@@ -629,7 +629,11 @@ model AgentSession {
   escalated               Boolean        @default(false)
   expiresAt               DateTime
   messages                AgentMessage[]
-  lead                    AgentLead?
+  // One session can produce multiple leads over its 90-day lifetime
+  // (each escalate_to_human creates a fresh row so operations can
+  // track each distinct consultation separately, instead of upsert
+  // wiping the previous one).
+  leads                   AgentLead[]
   @@index([expiresAt])
 }
 
@@ -664,7 +668,11 @@ enum MessageFeedback {
 
 model AgentLead {
   id                   String       @id @default(cuid())
-  sessionId            String       @unique
+  /// One AgentSession can produce multiple leads. Each escalate_to_human
+  /// (or collect_wechat → PENDING_CONTACT) creates a fresh row so each
+  /// consultation is tracked independently. The conversationSnapshot
+  /// freezes the messages at trigger time for ops to scope back to.
+  sessionId            String
   session              AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   wechatId             String?
   orderNo              String?
@@ -678,6 +686,7 @@ model AgentLead {
   createdAt            DateTime     @default(now())
   updatedAt            DateTime     @updatedAt
   @@index([status, createdAt])
+  @@index([sessionId, createdAt])
 }
 
 enum LeadStatus {

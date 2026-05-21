@@ -100,7 +100,7 @@ export default async function AdminAgentLeadDetailPage({ params }: PageProps) {
                     </Link>
                 </Button>
                 <div className="flex-1 min-w-0">
-                    <h2 className="text-2xl font-bold tracking-tight">线索详情</h2>
+                    <h2 className="text-2xl font-bold tracking-tight">跟进详情</h2>
                     <p className="text-muted-foreground text-sm mt-0.5 font-mono">
                         {lead.id}
                     </p>

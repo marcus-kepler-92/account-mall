@@ -15,6 +15,9 @@ export type LeadRow = {
     urgency: "LOW" | "MED" | "HIGH"
     status: "PENDING_CONTACT" | "NEW" | "CONTACTED" | "RESOLVED" | "DROPPED"
     createdAt: string
+    // Total lead count for this session (across all statuses) — drives the
+    // "回头客 N 次" badge so ops can spot repeat consultations.
+    sessionLeadCount: number
 }
 
 const statusMap: Record<
@@ -100,14 +103,32 @@ export const leadsColumns: ColumnDef<LeadRow>[] = [
     {
         id: "linkSession",
         header: "会话",
-        cell: ({ row }) => (
-            <Link
-                href={`/admin/agent/conversations/${row.original.sessionId}`}
-                className="text-xs text-muted-foreground hover:underline font-mono"
-                onClick={(e) => e.stopPropagation()}
-            >
-                {row.original.sessionId.slice(0, 8)}
-            </Link>
-        ),
+        cell: ({ row }) => {
+            const { sessionId, sessionLeadCount } = row.original
+            return (
+                <div className="flex items-center gap-1.5">
+                    <Link
+                        href={`/admin/agent/conversations/${sessionId}`}
+                        className="text-xs text-muted-foreground hover:underline font-mono"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {sessionId.slice(0, 8)}
+                    </Link>
+                    {sessionLeadCount > 1 && (
+                        // Same user came back N times — clicking jumps to
+                        // the leads list filtered to this session so ops
+                        // can see the prior consultations side-by-side.
+                        <Link
+                            href={`/admin/agent/leads?sessionId=${sessionId}`}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <Badge variant="secondary" className="text-[10px] cursor-pointer">
+                                回头客 {sessionLeadCount} 次
+                            </Badge>
+                        </Link>
+                    )}
+                </div>
+            )
+        },
     },
 ]
