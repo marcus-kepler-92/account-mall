@@ -90,8 +90,23 @@ export async function POST(req: Request) {
   // 5. Track lookupKnowledge citations for AgentMessage.citations
   const citations: string[] = []
 
+  // Sliding-window context: cap the chat history sent to the LLM at the
+  // most recent MAX_LLM_HISTORY messages. This keeps per-turn token cost
+  // bounded as a session grows — without it, turn N's input is
+  // `system + all prior turns`, which scales O(N²) cumulatively and
+  // exhausts the per-session budget after ~40 real exchanges.
+  //
+  // The UI thread keeps the full transcript (assistant-ui state +
+  // /api/agent/messages on rehydrate); we just don't replay everything
+  // to the model. The model treating older context as "forgotten" is
+  // intentional — fits a customer-service flow where each issue is
+  // usually scoped to the recent few turns.
+  const MAX_LLM_HISTORY = 30
+  const trimmedMessages =
+    messages.length > MAX_LLM_HISTORY ? messages.slice(-MAX_LLM_HISTORY) : messages
+
   // AI SDK v6: convertToModelMessages returns Promise<ModelMessage[]>
-  const modelMessages = await convertToModelMessages(messages)
+  const modelMessages = await convertToModelMessages(trimmedMessages)
 
   // 6. Stream
   const result = streamText({
