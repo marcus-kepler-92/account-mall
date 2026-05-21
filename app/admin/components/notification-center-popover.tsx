@@ -1,0 +1,141 @@
+"use client"
+
+import Link from "next/link"
+import type { ReactNode } from "react"
+import { Bell } from "lucide-react"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { Button } from "@/components/ui/button"
+import { Separator } from "@/components/ui/separator"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { NotificationBadge } from "./notification-badge"
+import { useAdminNotifications } from "@/app/admin/hooks/use-admin-notifications"
+import { SOURCES, type SourceResult } from "@/lib/admin-notifications"
+import { formatCurrency } from "@/lib/utils"
+
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime()
+  const min = Math.floor(diff / 60_000)
+  if (min < 1) return "刚刚"
+  if (min < 60) return `${min} 分钟前`
+  const hr = Math.floor(min / 60)
+  if (hr < 24) return `${hr} 小时前`
+  const day = Math.floor(hr / 24)
+  return `${day} 天前`
+}
+
+function renderItems(source: SourceResult): ReactNode {
+  switch (source.key) {
+    case "withdrawals":
+      return source.items.map((it) => (
+        <div key={it.id} className="flex items-center justify-between gap-2 py-1 text-sm">
+          <span className="truncate">{it.distributorName} · {formatCurrency(it.amount)}</span>
+          <span className="text-muted-foreground tabular-nums shrink-0">{timeAgo(it.createdAt)}</span>
+        </div>
+      ))
+    case "agentLeads":
+      return source.items.map((it) => (
+        <div key={it.id} className="flex items-center justify-between gap-2 py-1 text-sm">
+          <span className="truncate">
+            {it.displayName} · {it.status}
+            {it.urgency === "HIGH" ? " · 紧急" : ""}
+          </span>
+          <span className="text-muted-foreground tabular-nums shrink-0">{timeAgo(it.createdAt)}</span>
+        </div>
+      ))
+    case "inventoryAlerts":
+      return source.items.map((it) => {
+        const label =
+          it.subtype === "RESTOCK_WAITING"
+            ? `缺货 · ${it.subscriberCount} 人等待`
+            : it.subtype === "OUT_OF_STOCK"
+              ? "缺货"
+              : `低库存（剩 ${it.unsoldCount}）`
+        return (
+          <div key={it.productId} className="py-1 text-sm">
+            <span className="truncate">{it.productName} · {label}</span>
+          </div>
+        )
+      })
+  }
+}
+
+export function NotificationCenterPopover() {
+  const { byKey, totalCount } = useAdminNotifications()
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="relative min-w-9 touch-manipulation"
+          aria-label={totalCount > 0 ? `${totalCount} 项待办` : "通知中心"}
+        >
+          <Bell className="size-4" />
+          <NotificationBadge variant="dot" count={totalCount} />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-[380px] p-0">
+        <div className="px-4 py-3 border-b">
+          <div className="font-medium">通知中心</div>
+          <div className="text-xs text-muted-foreground mt-0.5">
+            {totalCount > 0 ? `你有 ${totalCount} 项待办` : "暂无待办"}
+          </div>
+        </div>
+        <ScrollArea className="max-h-[calc(100vh-12rem)]">
+          {totalCount === 0 ? (
+            <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+              ✨ 暂无待办
+            </div>
+          ) : (
+            SOURCES.map((src, idx) => {
+              const data = byKey[src.key]
+              if (!data || data.count === 0) return null
+              const Icon = src.icon
+              const breakdownLine =
+                data.key === "inventoryAlerts" ? (
+                  <div className="text-xs text-muted-foreground mb-2">
+                    {[
+                      data.breakdown.outOfStock > 0 ? `${data.breakdown.outOfStock} 款缺货` : null,
+                      data.breakdown.lowStock > 0 ? `${data.breakdown.lowStock} 款低库存` : null,
+                      data.breakdown.restockWaiting > 0
+                        ? `${data.breakdown.restockWaiting} 款等到货提醒`
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </div>
+                ) : null
+              return (
+                <div key={src.key}>
+                  {idx > 0 ? <Separator /> : null}
+                  <div className="px-4 py-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2 text-sm font-medium">
+                        <Icon className="size-4" />
+                        {src.label}
+                      </div>
+                      <NotificationBadge variant="inline" count={data.count} />
+                    </div>
+                    {breakdownLine}
+                    <div className="space-y-0.5">{renderItems(data)}</div>
+                    <Link
+                      href={src.viewAllHref}
+                      className="mt-2 inline-block text-xs text-primary hover:underline"
+                    >
+                      查看全部 →
+                    </Link>
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </ScrollArea>
+      </PopoverContent>
+    </Popover>
+  )
+}
