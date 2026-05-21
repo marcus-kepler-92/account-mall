@@ -146,7 +146,13 @@ export function ChatPanel() {
   }, [sessionId])
 
   if (fallback) return <FallbackQR reason={fallback} handoff={handoffInfo} />
-  if (handoff) return <HandoffCard handoff={handoffInfo} />
+  if (handoff)
+    return (
+      <HandoffCard
+        handoff={handoffInfo}
+        onBackToChat={() => setHandoff(false)}
+      />
+    )
 
   // Block mounting the AI SDK runtime until BOTH the session row exists
   // and the history fetch has settled. The runtime captures `messages` as
@@ -237,26 +243,48 @@ function ChatPanelInner({
   //   - business_inquiry → renderQr: true (合作咨询绕过订单号)
   //   - customer_support + no/bogus orderNo → renderQr: false; AI re-asks
   //
-  // firedFor lives in a ref so the effect can safely re-bind without
-  // resetting the dedupe guard (would otherwise re-trigger the card
-  // if anything else in this inner component re-renders).
-  const firedForRef = useRef<string | null>(null)
+  // Seeding behavior: on first run we mark every escalate_to_human
+  // already present in the hydrated history as "fired". Without this,
+  // a reopened chat (sessionStorage preserves the sessionId; history is
+  // re-fetched on mount) would auto-replay the QR card every time the
+  // user comes back, preventing them from continuing the conversation
+  // even after they dismissed the QR. With seeding, only NEW tool
+  // calls made post-mount trigger the card.
+  const firedForRef = useRef<Set<string>>(new Set())
+  const seededRef = useRef(false)
   useEffect(() => {
     const check = () => {
       const messages = runtime.thread.getState().messages
+
+      if (!seededRef.current) {
+        seededRef.current = true
+        for (const m of messages) {
+          if (m.role !== "assistant") continue
+          for (const part of m.content) {
+            if (
+              part.type === "tool-call" &&
+              part.toolName === "escalateToHuman"
+            ) {
+              firedForRef.current.add(part.toolCallId)
+            }
+          }
+        }
+        return
+      }
+
       for (let i = messages.length - 1; i >= 0; i--) {
         const m = messages[i]
         if (m.role !== "assistant") continue
         for (const part of m.content) {
           if (part.type !== "tool-call") continue
           if (part.toolName !== "escalateToHuman") continue
-          // Skip until the result lands; once we've fired for this call,
-          // don't re-fire on subsequent unrelated updates.
+          // Skip until the result lands; dedupe by toolCallId so the
+          // same call doesn't fire twice on subsequent thread updates.
           if (part.result === undefined || part.isError) return
-          if (firedForRef.current === part.toolCallId) return
+          if (firedForRef.current.has(part.toolCallId)) return
           const result = part.result as { renderQr?: boolean }
           if (result?.renderQr !== true) return
-          firedForRef.current = part.toolCallId
+          firedForRef.current.add(part.toolCallId)
           onHandoff()
           return
         }

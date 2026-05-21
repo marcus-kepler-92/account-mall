@@ -382,7 +382,7 @@ describe("collectWechat", () => {
     const r = (await tools.collectWechat.execute(
       { wechatId: "validId123", intent: "business_inquiry" },
       ctx,
-    )) as { ok: boolean; renderQr: boolean; qrUrl: string }
+    )) as { ok: boolean; registered: boolean; renderQr: boolean; qrUrl: string }
     expect(prisma.agentLead.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -392,7 +392,36 @@ describe("collectWechat", () => {
       }),
     )
     expect(r.ok).toBe(true)
+    expect(r.registered).toBe(true)
     expect(r.renderQr).toBe(true)
+  })
+
+  it("returns registered: false + 还没登记 wording when no orderNo — pins the signal AI must respect", async () => {
+    // Regression: AI was caught telling users "已登记" even though
+    // collect_wechat had refused to create a Lead (because no orderNo
+    // was provided). The explicit `registered` boolean + a message
+    // that literally starts with "我还没登记" make the truth
+    // un-spinnable by the model.
+    const tools = buildCSTools("s1") as unknown as ToolsRecord
+    const r = (await tools.collectWechat.execute(
+      { wechatId: "validId123" },
+      ctx,
+    )) as { registered: boolean; message: string }
+    expect(prisma.agentLead.create).not.toHaveBeenCalled()
+    expect(r.registered).toBe(false)
+    expect(r.message).toMatch(/还没登记|未登记/)
+  })
+
+  it("returns registered: false when orderNo provided but DB says no such order", async () => {
+    ;(prisma.order.findFirst as jest.Mock).mockResolvedValueOnce(null)
+    const tools = buildCSTools("s1") as unknown as ToolsRecord
+    const r = (await tools.collectWechat.execute(
+      { wechatId: "validId123", orderNo: "OD-BOGUS" },
+      ctx,
+    )) as { registered: boolean; message: string }
+    expect(prisma.agentLead.create).not.toHaveBeenCalled()
+    expect(r.registered).toBe(false)
+    expect(r.message).toMatch(/还没登记|未登记/)
   })
 
   it("snapshots the recent conversation into the lead (not empty {})", async () => {
@@ -832,6 +861,36 @@ describe("buildCSPrompt — context rendering & red-line completeness", () => {
     expect(prompt).toMatch(/必须先调 lookup_product/)
     expect(prompt).toMatch(/禁止用 Markdown 表格/)
     expect(prompt).toMatch(/价格回答硬规则|不写具体金额/)
+  })
+
+  it("forbids AI from claiming '已登记' / '已转人工' when tool returned registered: false / renderQr: false", () => {
+    // Regression: AI was caught telling users 'I've registered your
+    // wechat' even though the tool refused to persist anything because
+    // there was no orderNo. The two boolean signals (registered for
+    // collect_wechat, renderQr for escalate_to_human) make the actual
+    // tool outcome explicit; the red line stops the model from
+    // overriding them with a polite-sounding fib.
+    const prompt = buildCSPrompt(makeBase())
+    expect(prompt).toMatch(/registered: false.*绝不能告诉用户/)
+    expect(prompt).toMatch(/renderQr: false.*绝不能告诉用户/)
+    // Companion red line: AI was also caught telling users
+    // "订单查询页 / 订单详情页 也有客服联系方式" — this is false; the
+    // only CS contact path is the chat widget itself.
+    expect(prompt).toMatch(/不要编造其他页面有客服联系方式/)
+  })
+
+  it("teaches AI how to handle '我看不到二维码' by re-calling escalate or explaining why it didn't render", () => {
+    // Without this rule the AI would either hallucinate (claim QR was
+    // already sent) or pivot to suggesting non-existent CS pages
+    // — both observed in prod. Real options:
+    //   renderQr=true previously → re-call escalate_to_human → new
+    //     toolCallId → client re-fires onHandoff and the QR card pops
+    //     back up
+    //   renderQr=false previously → tell user the truth, keep asking
+    //     for the orderNo
+    const prompt = buildCSPrompt(makeBase())
+    expect(prompt).toMatch(/看不到二维码/)
+    expect(prompt).toMatch(/再调一次 escalate_to_human/)
   })
 
   it("mandates verify_order before passing user-supplied orderNo to escalate / collect_wechat", () => {

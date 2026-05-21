@@ -16,12 +16,6 @@ type PageProps = {
     params: Promise<{ id: string }>
 }
 
-type SnapshotMessage = {
-    role: string
-    contentText: string
-    createdAt?: string
-}
-
 const STATUS_LABEL: Record<string, string> = {
     PENDING_CONTACT: "待补充",
     NEW: "待跟进",
@@ -41,30 +35,6 @@ const ROLE_LABEL: Record<string, string> = {
     ASSISTANT: "Agent",
     TOOL: "工具",
     SYSTEM: "系统",
-}
-
-function parseSnapshot(raw: unknown): SnapshotMessage[] {
-    if (!Array.isArray(raw)) return []
-    return raw.flatMap((item): SnapshotMessage[] => {
-        if (!item || typeof item !== "object") return []
-        const o = item as Record<string, unknown>
-        const role = typeof o.role === "string" ? o.role : ""
-        const contentText =
-            typeof o.contentText === "string"
-                ? o.contentText
-                : typeof o.content === "string"
-                  ? o.content
-                  : ""
-        if (!role && !contentText) return []
-        return [
-            {
-                role,
-                contentText,
-                createdAt:
-                    typeof o.createdAt === "string" ? o.createdAt : undefined,
-            },
-        ]
-    })
 }
 
 export default async function AdminAgentLeadDetailPage({ params }: PageProps) {
@@ -87,8 +57,50 @@ export default async function AdminAgentLeadDetailPage({ params }: PageProps) {
 
     if (!lead) notFound()
 
-    const snapshot = parseSnapshot(lead.conversationSnapshot)
+    // Show LIVE messages scoped to this lead's consultation window, not
+    // the frozen conversationSnapshot. The snapshot column only captures
+    // up to the moment escalate / collect_wechat fired; after that the
+    // user often keeps chatting (chat history persists across refresh
+    // via sessionStorage), and ops needs to see those follow-up
+    // messages to decide if the lead is still relevant.
+    //
+    // Window = (previousLead.createdAt OR session.startedAt) → nextLead.createdAt
+    // OR present. Each lead's view scopes to its own consultation.
     const sessionId = lead.session.id
+    const [previousLead, nextLead] = await Promise.all([
+        prisma.agentLead.findFirst({
+            where: { sessionId, createdAt: { lt: lead.createdAt } },
+            orderBy: { createdAt: "desc" },
+            select: { createdAt: true },
+        }),
+        prisma.agentLead.findFirst({
+            where: { sessionId, createdAt: { gt: lead.createdAt } },
+            orderBy: { createdAt: "asc" },
+            select: { createdAt: true },
+        }),
+    ])
+
+    // Window lower bound: the previous lead's createdAt, or the session
+    // start if this is the first lead. `gt` (not `gte`) skips the
+    // boundary message that triggered the previous escalation.
+    const lowerBound = previousLead?.createdAt ?? lead.session.startedAt
+    const messages = await prisma.agentMessage.findMany({
+        where: {
+            sessionId,
+            createdAt: nextLead
+                ? { gt: lowerBound, lte: nextLead.createdAt }
+                : { gt: lowerBound },
+        },
+        orderBy: { createdAt: "asc" },
+        take: 200,
+        select: {
+            id: true,
+            role: true,
+            contentText: true,
+            toolName: true,
+            createdAt: true,
+        },
+    })
 
     return (
         <div className="space-y-6">
@@ -101,40 +113,57 @@ export default async function AdminAgentLeadDetailPage({ params }: PageProps) {
                 </Button>
                 <div className="flex-1 min-w-0">
                     <h2 className="text-2xl font-bold tracking-tight">跟进详情</h2>
-                    <p className="text-muted-foreground text-sm mt-0.5 font-mono">
+                    <p className="text-muted-foreground text-sm mt-0.5 font-mono break-all">
                         {lead.id}
                     </p>
                 </div>
-                <Badge variant="outline">{STATUS_LABEL[lead.status]}</Badge>
+                <Badge variant="outline" className="shrink-0">{STATUS_LABEL[lead.status]}</Badge>
             </div>
 
-            <div className="grid gap-6 md:grid-cols-[1fr_320px]">
-                {/* Left: conversation snapshot */}
-                <div className="space-y-4">
-                    <Card>
+            {/* min-w-0 on the grid container so children can shrink below
+                their intrinsic content width — without it, a long markdown
+                block or unbroken URL inside the snapshot pushes the grid
+                wider than the viewport. */}
+            <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_320px] min-w-0">
+                {/* Left: live conversation window for this lead */}
+                <div className="space-y-4 min-w-0">
+                    <Card className="min-w-0">
                         <CardHeader>
-                            <CardTitle className="text-base">对话快照</CardTitle>
+                            <CardTitle className="text-base">
+                                对话内容
+                                <span className="ml-2 text-xs font-normal text-muted-foreground">
+                                    （本次咨询窗口，含跟进单建后用户继续说的话）
+                                </span>
+                            </CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-4">
-                            {snapshot.length === 0 ? (
+                        <CardContent className="space-y-4 min-w-0">
+                            {messages.length === 0 ? (
                                 <p className="text-sm text-muted-foreground">
-                                    暂无对话内容
+                                    本次咨询窗口暂无消息
                                 </p>
                             ) : (
-                                snapshot.map((msg, i) => (
-                                    <div key={i} className="space-y-1">
-                                        <div className="flex items-center gap-2 text-xs">
+                                messages.map((msg) => (
+                                    <div key={msg.id} className="space-y-1 min-w-0">
+                                        <div className="flex items-center gap-2 text-xs flex-wrap">
                                             <Badge variant="outline">
                                                 {ROLE_LABEL[msg.role] ?? msg.role}
                                             </Badge>
-                                            {msg.createdAt && (
-                                                <span className="text-muted-foreground">
-                                                    {formatDateTime(msg.createdAt)}
-                                                </span>
+                                            {msg.toolName && (
+                                                <Badge variant="secondary" className="font-mono text-[10px]">
+                                                    {msg.toolName}
+                                                </Badge>
+                                            )}
+                                            <span className="text-muted-foreground">
+                                                {formatDateTime(msg.createdAt)}
+                                            </span>
+                                            {msg.createdAt > lead.createdAt && (
+                                                <Badge variant="outline" className="text-[10px]">
+                                                    跟进单后
+                                                </Badge>
                                             )}
                                         </div>
-                                        <div className="pl-3 border-l-2 border-muted">
-                                            <MarkdownView content={msg.contentText} />
+                                        <div className="pl-3 border-l-2 border-muted min-w-0 overflow-x-auto">
+                                            <MarkdownView content={msg.contentText ?? ""} />
                                         </div>
                                     </div>
                                 ))
@@ -154,7 +183,7 @@ export default async function AdminAgentLeadDetailPage({ params }: PageProps) {
                 </div>
 
                 {/* Right: metadata + status form */}
-                <div className="space-y-4">
+                <div className="space-y-4 min-w-0">
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-base">基本信息</CardTitle>
@@ -174,7 +203,7 @@ export default async function AdminAgentLeadDetailPage({ params }: PageProps) {
                             </div>
                             <div>
                                 <p className="text-xs text-muted-foreground">原因</p>
-                                <p className="whitespace-pre-wrap">{lead.reason}</p>
+                                <p className="whitespace-pre-wrap break-words">{lead.reason}</p>
                             </div>
                             <div>
                                 <p className="text-xs text-muted-foreground">紧急度</p>
@@ -198,7 +227,7 @@ export default async function AdminAgentLeadDetailPage({ params }: PageProps) {
                                     <p className="text-xs text-muted-foreground">
                                         联系人
                                     </p>
-                                    <p className="font-mono text-xs">
+                                    <p className="font-mono text-xs break-all">
                                         {lead.contactedBy}
                                     </p>
                                 </div>

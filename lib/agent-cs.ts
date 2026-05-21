@@ -171,6 +171,9 @@ ${knowledgeText}
 - 用户问知识库未覆盖的细节 → 调 lookup_knowledge
 - 用户主动给微信号 → 调 collect_wechat（参见下方"转人工前置流程"，**先拿订单号再调**）
 - 转人工调 escalate_to_human → **必须严格走下方"转人工前置流程"**，不许直接甩 QR
+- 用户说"看不到二维码 / 二维码呢 / 二维码加载失败" → 查上一次 escalate_to_human 的返回：
+  - 若 \`renderQr: true\` 且 orderNo 已验证 → 再调一次 escalate_to_human（同样的 orderNo + reason），生成新的 toolCallId，前端会重新拉起 QR 卡
+  - 若 \`renderQr: false\`（之前没拿到 orderNo 或验证失败）→ 如实告诉用户"我还没成功为您转人工，需要订单号"，然后继续走 4 步流程
 
 ## 转人工前置流程（调 escalate_to_human / collect_wechat 之前必须按顺序穷尽这 4 步）
 
@@ -226,6 +229,9 @@ ${knowledgeText}
 - 用户给的订单号没调 verify_order 就直接传给 escalate_to_human / collect_wechat
 - 编造一个看着像的订单号传给工具——必须是真实出现过的（要么来自 userOrders 段，要么用户亲口提供并通过 verify_order）
 - customer_support 路径没验证 orderNo 就指望"工具会渲染 QR"——它不会，你必须继续问
+- **当 \`collect_wechat\` 返回 \`registered: false\` 时绝不能告诉用户"已登记 / 已记录"——必须如实说"还没登记，需要订单号"**；只有 \`registered: true\` 才能宣称"已登记"
+- **当 \`escalate_to_human\` 返回 \`renderQr: false\` 时绝不能告诉用户"已转接 / 二维码已发"——必须如实说"还没转接，需要订单号"**；只有 \`renderQr: true\` 才能宣称"已转接"
+- 不要编造其他页面有客服联系方式——本平台只有 AI 客服窗口（这个对话）一个入口，订单查询页 / 订单详情页 / 商品详情页都没有静态客服二维码
 
 ## 商品描述权威性
 每个商品有独立的 \`summary\` 字段（来自 lookup_product 返回）。商品使用规则（期限、是否支持改密、是否支持登 iCloud 等）**以 lookup_product 返回的 summary 为最终准则**。知识库是补充共性规则，不要用知识库覆盖商品 summary 的明确说明。
@@ -526,6 +532,13 @@ export function buildCSTools(sessionId: string) {
           })
           return {
             ok: true,
+            // `registered` is the explicit signal AI should key on for
+            // "did the wechat actually get recorded?" — previously AI
+            // would claim "已登记" even when ok:false because it
+            // mis-read the tool result. With a dedicated boolean field,
+            // the prompt can name it directly: "只有 registered=true 才
+            //能告诉用户已登记".
+            registered: true as const,
             renderQr: true,
             qrUrl: settings.wechatQrUrl,
             wechatId: settings.wechatId,
@@ -552,6 +565,7 @@ export function buildCSTools(sessionId: string) {
           })
           return {
             ok: true,
+            registered: true as const,
             renderQr: true,
             qrUrl: settings.wechatQrUrl,
             wechatId: settings.wechatId,
@@ -561,15 +575,19 @@ export function buildCSTools(sessionId: string) {
           }
         }
 
-        // No verified orderNo — do NOT render QR; AI must re-ask.
+        // No verified orderNo — do NOT render QR, do NOT create Lead;
+        // AI must re-ask. `registered: false` is the explicit signal
+        // for the prompt's red line: "registered=false 时绝不能告诉
+        // 用户'已登记'，必须说'还没登记，需要订单号'".
         return {
           ok: false,
+          registered: false as const,
           renderQr: false,
           orderNoVerified: false,
           requiresOrderNoFix: Boolean(orderNo),
           message: orderNo
-            ? "您提供的订单号在系统里找不到，请复核后重发；订单号正确后我才能帮您加客服微信。"
-            : "客服不会主动联系，请先告诉我您的订单号（订单成功页或确认邮件里都能找到），核对通过后再加客服微信。",
+            ? "我还没登记您的微信号——您提供的订单号在系统里找不到，请复核后重发；订单号正确后我才能登记。"
+            : "我还没登记您的微信号——客服后台需要订单号才能定位您的对话。请先告诉我订单号（订单成功页或确认邮件里都有），核对通过后我才能帮您登记。",
         }
       },
     }),
