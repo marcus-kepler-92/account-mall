@@ -45,14 +45,12 @@ export function ProductCard({ product, gradientIndex = 0, className, code, disco
     const isFree = isAutoFetch && product.price === 0
     const isSoldOut = !isAutoFetch && product.stock === 0
     const isLowStock = !isAutoFetch && !isSoldOut && product.stock > 0 && product.stock <= configClient.lowStockThreshold
-    const productSlug = `${product.id}-${product.slug}`
-
     const buildDetailHref = () => {
         const params = new URLSearchParams()
         if (isSoldOut) params.set("restock", "1")
         if (code) params.set("code", code)
         const query = params.toString()
-        return `/products/${productSlug}${query ? `?${query}` : ""}`
+        return `/products/${product.slug}${query ? `?${query}` : ""}`
     }
     const detailHref = href ?? buildDetailHref()
     const hasDiscount = typeof discountPercent === "number" && discountPercent > 0 && discountPercent <= 99 && product.price > 0

@@ -85,7 +85,7 @@ export function ProductRowActions({
     }
 
     const copyLink = async () => {
-        const url = `${window.location.origin}/products/${productId}-${slug}`
+        const url = `${window.location.origin}/products/${slug}`
         await navigator.clipboard.writeText(url)
         toast.success("链接已复制")
     }
@@ -171,7 +171,7 @@ export function ProductRowActions({
                         </DropdownMenuItem>
                     )}
                     <DropdownMenuItem asChild>
-                        <a href={`/products/${productId}-${slug}`} target="_blank" rel="noopener noreferrer">
+                        <a href={`/products/${slug}`} target="_blank" rel="noopener noreferrer">
                             <ExternalLink className="size-4" />
                             预览
                         </a>

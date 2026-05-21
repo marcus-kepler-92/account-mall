@@ -3,7 +3,7 @@ import { revalidateTag } from "next/cache"
 /**
  * Cache tag invalidation helpers for the storefront's `unstable_cache` entries.
  *
- * Storefront tag map (see app/page.tsx, app/products/[productIdSlug]/page.tsx):
+ * Storefront tag map (see app/page.tsx, app/products/[slug]/page.tsx):
  * - "products"      — product list + product detail + stock counts
  * - "tags"          — catalog tag filter list
  * - "announcements" — homepage announcements

@@ -163,11 +163,11 @@ export default async function OrderSuccessPage({
             );
             if (!csToken) return null;
             const params = new URLSearchParams({ email: order.email, csToken });
-            href = `/products/${product.id}-${product.slug}?${params}`;
+            href = `/products/${product.slug}?${params}`;
           } else {
             // No discount — plain link with email prefill only
             const params = new URLSearchParams({ email: order.email });
-            href = `/products/${product.id}-${product.slug}?${params}`;
+            href = `/products/${product.slug}?${params}`;
           }
           return {
             product,

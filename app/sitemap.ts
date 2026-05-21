@@ -10,11 +10,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
     const products = await prisma.product.findMany({
         where: { status: "ACTIVE" },
-        select: { id: true, slug: true, updatedAt: true },
+        select: { slug: true, updatedAt: true },
     })
 
     const productUrls: MetadataRoute.Sitemap = products.map((p) => ({
-        url: `${base}/products/${p.id}-${p.slug}`,
+        url: `${base}/products/${p.slug}`,
         lastModified: p.updatedAt,
         changeFrequency: "weekly" as const,
         priority: 0.8,

@@ -74,7 +74,7 @@ export async function createTestProduct(opts: {
         })
     }
 
-    return { id: product.id, slug: product.slug, path: `/products/${product.id}-${product.slug}` }
+    return { id: product.id, slug: product.slug, path: `/products/${product.slug}` }
 }
 
 /**

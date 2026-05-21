@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { unstable_cache } from "next/cache";
@@ -16,7 +16,6 @@ import { SoldOutOverlay } from "@/app/components/sold-out-overlay";
 import { RestockReminderForm } from "./restock-reminder-form";
 import { ProductBottomBar } from "../../components/product-bottom-bar";
 import { descriptionToPlainText } from "@/lib/description";
-import { buildProductDetailRedirectPath } from "@/lib/product-canonical-url";
 import { MarkdownViewClient } from "@/app/components/markdown-view-client";
 import { RiskWarningDialog } from "./risk-warning-dialog";
 import { verifyCrossSellToken } from "@/lib/cross-sell-token";
@@ -25,19 +24,19 @@ const PRODUCT_CACHE_TTL_SECONDS = 300;
 const STOCK_CACHE_TTL_SECONDS = 30;
 
 const getCachedProductBySlug = unstable_cache(
-  async (productId: string) =>
+  async (slug: string) =>
     prisma.product.findUnique({
-      where: { id: productId },
+      where: { slug },
       include: { tags: { select: { id: true, name: true, slug: true } } },
     }),
-  ["product-detail"],
+  ["product-detail-by-slug"],
   { revalidate: PRODUCT_CACHE_TTL_SECONDS, tags: ["products"] },
 );
 
-const getCachedProductMetaById = unstable_cache(
-  async (productId: string) =>
+const getCachedProductMetaBySlug = unstable_cache(
+  async (slug: string) =>
     prisma.product.findUnique({
-      where: { id: productId },
+      where: { slug },
       select: {
         name: true,
         description: true,
@@ -48,7 +47,7 @@ const getCachedProductMetaById = unstable_cache(
         slug: true,
       },
     }),
-  ["product-meta"],
+  ["product-meta-by-slug"],
   { revalidate: PRODUCT_CACHE_TTL_SECONDS, tags: ["products"] },
 );
 
@@ -60,35 +59,21 @@ const getCachedStockCount = unstable_cache(
 );
 
 type PageProps = {
-  params: Promise<{ productIdSlug: string }>;
+  params: Promise<{ slug: string }>;
   searchParams: Promise<{ promoCode?: string; email?: string; csToken?: string }>;
 };
-
-function parseProductIdSlug(
-  segment: string,
-): { productId: string; slug: string } | null {
-  const idx = segment.indexOf("-");
-  if (idx <= 0 || idx === segment.length - 1) return null;
-  return {
-    productId: segment.slice(0, idx),
-    slug: segment.slice(idx + 1),
-  };
-}
 
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
-  const { productIdSlug } = await params;
-  const parsed = parseProductIdSlug(productIdSlug);
-  if (!parsed) return { title: "商品" };
-
-  const product = await getCachedProductMetaById(parsed.productId);
+  const { slug } = await params;
+  const product = await getCachedProductMetaBySlug(slug);
   if (!product || product.status !== "ACTIVE") return { title: "商品" };
 
   const desc = product.description
     ? descriptionToPlainText(product.description, 160)
     : `${product.name} - ¥${Number(product.price).toFixed(2)}`;
-  const productUrl = `${config.siteUrl}/products/${product.id}-${product.slug}`;
+  const productUrl = `${config.siteUrl}/products/${product.slug}`;
   const ogImages = product.image ? [{ url: product.image }] : undefined;
   return {
     title: product.name,
@@ -115,28 +100,13 @@ export default async function ProductDetailPage({
   params,
   searchParams,
 }: PageProps) {
-  const { productIdSlug } = await params;
+  const { slug } = await params;
   const resolvedParams = await searchParams;
 
-  const parsed = parseProductIdSlug(productIdSlug);
-  if (!parsed) notFound();
-
-  const { productId, slug } = parsed;
-
-  const product = await getCachedProductBySlug(productId);
+  const product = await getCachedProductBySlug(slug);
 
   if (!product || product.status !== "ACTIVE") {
     notFound();
-  }
-
-  // Redirect to canonical URL if slug mismatch; preserve promoCode + cross-sell params
-  if (product.slug !== slug) {
-    const base = buildProductDetailRedirectPath(product.id, product.slug, resolvedParams.promoCode)
-    const extra: Record<string, string> = {}
-    if (resolvedParams.email) extra.email = resolvedParams.email
-    if (resolvedParams.csToken) extra.csToken = resolvedParams.csToken
-    const extraStr = new URLSearchParams(extra).toString()
-    redirect(extraStr ? `${base}${base.includes("?") ? "&" : "?"}${extraStr}` : base)
   }
 
   const prefilledEmail = resolvedParams.email?.trim() || null
@@ -144,7 +114,7 @@ export default async function ProductDetailPage({
   let crossSellDiscountPercent: number | null = null
   if (resolvedParams.csToken) {
     const csVerify = verifyCrossSellToken(resolvedParams.csToken)
-    if (csVerify.valid && csVerify.payload?.targetProductId === productId) {
+    if (csVerify.valid && csVerify.payload?.targetProductId === product.id) {
       crossSellToken = resolvedParams.csToken
       crossSellDiscountPercent = csVerify.payload.discountPercent
     }
@@ -169,7 +139,7 @@ export default async function ProductDetailPage({
     Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY) &&
     isStorefrontTurnstileEnforced();
 
-  const productUrl = `${config.siteUrl}/products/${product.id}-${product.slug}`;
+  const productUrl = `${config.siteUrl}/products/${product.slug}`;
   const descriptionPlain = product.description
     ? descriptionToPlainText(product.description, 160)
     : `${product.name} - ¥${priceNumber.toFixed(2)}`;
