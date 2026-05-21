@@ -17,6 +17,7 @@ import {
 import { formatCurrency } from "@/lib/utils"
 import type { SalesReportResponse } from "@/app/api/admin/sales-report/route"
 import type { DistributorReportResponse } from "@/app/api/admin/distributor-report/route"
+import { useAdminNotifications } from "@/app/admin/hooks/use-admin-notifications"
 import { todayHKT } from "./dashboard-hkt"
 import { DashboardDateRangePresets } from "./dashboard-date-range-presets"
 
@@ -288,23 +289,16 @@ export function DashboardProfitTab() {
 }
 
 function PendingWithdrawalsBanner() {
-  const { data } = useQuery<{ pending: number } | null>({
-    queryKey: ["pending-withdrawals-count"],
-    queryFn: async () => {
-      const res = await fetch("/api/admin/withdrawals/count")
-      if (!res.ok) return null
-      return res.json() as Promise<{ pending: number }>
-    },
-    staleTime: 30_000,
-  })
+  const { byKey } = useAdminNotifications()
+  const pending = byKey.withdrawals?.count ?? 0
 
-  if (!data || data.pending === 0) return null
+  if (pending === 0) return null
 
   return (
     <div className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
       <span className="flex items-center gap-2">
         <AlertTriangle className="size-4" />
-        待处理提现 <strong>{data.pending} 笔</strong>，请及时审核
+        待处理提现 <strong>{pending} 笔</strong>，请及时审核
       </span>
       <Link href="/admin/withdrawals" className="underline hover:no-underline">
         去处理
