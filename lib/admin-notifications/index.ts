@@ -37,13 +37,15 @@ export type SourceResult =
       items: InventoryAlertItem[]
     }
 
-export type NotificationSource = {
-  key: SourceKey
+type ResultByKey<K extends SourceKey> = Omit<Extract<SourceResult, { key: K }>, "key">
+
+export type NotificationSource<K extends SourceKey = SourceKey> = {
+  key: K
   label: string
   icon: LucideIcon
   menuHref: string
   viewAllHref: string
-  fetch(prisma: PrismaClient): Promise<Omit<SourceResult, "key">>
+  fetch(prisma: PrismaClient): Promise<ResultByKey<K>>
 }
 
 // Populated by subsequent tasks.
@@ -58,3 +60,6 @@ export function registerSource(source: NotificationSource): void {
 export function sourceFor(menuHref: string): SourceKey | undefined {
   return HREF_TO_KEY.get(menuHref)
 }
+
+import { withdrawalsSource } from "./sources/withdrawals"
+registerSource(withdrawalsSource)
