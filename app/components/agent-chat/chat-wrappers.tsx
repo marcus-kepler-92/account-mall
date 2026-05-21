@@ -62,9 +62,14 @@ export function AssistantBubble() {
 
 // Composer bar: textarea + escalate + send/cancel.
 // Send/Cancel are toggled via ComposerPrimitive.If running.
+//
+// `pb-[max(...)]` keeps the bar clear of the iPhone home indicator
+// when no keyboard is open. The Sheet wrapper handles keyboard inset
+// separately via useKeyboardInset (see customer-service-fab.tsx) so
+// we don't double-pad while typing.
 export function ComposerBar() {
   return (
-    <ComposerPrimitive.Root className="flex items-end gap-2 border-t bg-background p-2">
+    <ComposerPrimitive.Root className="flex items-end gap-2 border-t bg-background p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
       {/* text-base on mobile avoids iOS auto-zoom (<16px triggers it); md: drops back to 14px for desktop density */}
       <ComposerPrimitive.Input
         autoFocus
