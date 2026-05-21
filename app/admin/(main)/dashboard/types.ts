@@ -9,7 +9,7 @@ export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
 export const DASHBOARD_TREND_DAYS = [7, 30] as const
 export type DashboardTrendDays = (typeof DASHBOARD_TREND_DAYS)[number]
 
-export const LOW_STOCK_THRESHOLD = 3
+export { LOW_STOCK_THRESHOLD } from "@/lib/inventory"
 
 export type DashboardTrendPoint = {
   date: string
