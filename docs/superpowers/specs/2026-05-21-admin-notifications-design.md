@@ -27,6 +27,23 @@
 - SSE / WebSocket 实时推送（继续用 30s 轮询 + 窗口聚焦重取）
 - 系统告警 / auto-fetch 失败 / PENDING_CONTACT lead（YAGNI，未来按需加 source）
 
+## 前置改动（先做，独立可合）
+
+**统一 `LOW_STOCK_THRESHOLD` 口径**
+
+当前三处来源：
+- `app/admin/(main)/dashboard/types.ts:12` 路由内常量 `= 3`
+- `lib/config-client.ts` `configClient.lowStockThreshold` 默认 `5`（受 `NEXT_PUBLIC_LOW_STOCK_THRESHOLD` 控制，前端商品卡用）
+- `app/products/[slug]/page.tsx:130` 直读 `process.env.NEXT_PUBLIC_LOW_STOCK_THRESHOLD`，fallback `5`
+
+本次方案：
+1. 新建 `lib/inventory.ts`，导出 `export const LOW_STOCK_THRESHOLD = 3`（admin 后端口径）
+2. `app/admin/(main)/dashboard/types.ts` 改为 `re-export from "@/lib/inventory"`，保持现有 import 路径不破
+3. `lib/admin-notifications/sources/inventory-alerts.ts` 从 `@/lib/inventory` 取阈值
+4. `configClient.lowStockThreshold` 不动（前端商品卡语义独立，可由站长通过 env 调）
+
+这一步建议**独立 commit**，与本次 spec 主体改动解耦，避免混入审查。
+
 ## 架构总览
 
 ```
@@ -135,39 +152,54 @@ type SourceResult =
 
 ### inventoryAlerts
 
-最复杂，需要合并三类信号。实现策略（一次查询拿全数据，JS 内合并）：
+最复杂，需要合并三类信号。**实现策略：3 个 query 并行执行，JS 内合并去重**。
 
-1. `card.groupBy({ by: productId, where: { status: UNSOLD }, _count: id })` → 各商品可售卡密数
-2. `product.findMany({ where: { status: ACTIVE }, select: { id, name } })` → 活跃商品（阈值用全局常量 `LOW_STOCK_THRESHOLD`，与 dashboard 共用）
-3. `restockSubscription.groupBy({ by: productId, where: { status: PENDING }, _count: id })` → 各商品待通知人数
-
-JS 合并：
+关键过滤口径（沿用 dashboard 已有约束）：
 
 ```ts
-for product in activeProducts:
-  unsold = unsoldMap[product.id] ?? 0
-  subscribers = subscriberMap[product.id] ?? 0
-  isOutOfStock = unsold === 0
-  isLowStock = unsold > 0 && unsold < LOW_STOCK_THRESHOLD
-  hasRestockWaiting = subscribers > 0 && unsold === 0
-
-  if isOutOfStock || isLowStock || hasRestockWaiting:
-    add to alerts
+const INVENTORY_PRODUCT_WHERE = {
+  productType: "NORMAL" as const,   // AUTO_FETCH 不依赖卡密池，排除
+  status: "ACTIVE" as const,
+}
 ```
 
-**count**：alerts 长度（去重）
+1. `card.groupBy({ by: productId, where: { status: UNSOLD, product: INVENTORY_PRODUCT_WHERE }, _count: id })`
+2. `product.findMany({ where: INVENTORY_PRODUCT_WHERE, select: { id, name } })`
+3. `restockSubscription.groupBy({ by: productId, where: { status: PENDING, product: INVENTORY_PRODUCT_WHERE }, _count: id })`
 
-**breakdown**（注意：按状态计，可重叠；total != sum）：
+阈值取自 `import { LOW_STOCK_THRESHOLD } from "@/lib/inventory"`。
 
-- `outOfStock`：unsold = 0 的商品数
+**subtype 单值优先级（互斥）**：`RESTOCK_WAITING > OUT_OF_STOCK > LOW_STOCK`
+
+```ts
+function resolveSubtype(unsold: number, subscribers: number): Subtype | null {
+  if (unsold === 0 && subscribers > 0) return "RESTOCK_WAITING"
+  if (unsold === 0) return "OUT_OF_STOCK"
+  if (unsold < LOW_STOCK_THRESHOLD) return "LOW_STOCK"
+  return null
+}
+
+for (const product of activeProducts) {
+  const unsold = unsoldMap.get(product.id) ?? 0
+  const subscribers = subscriberMap.get(product.id) ?? 0
+  const subtype = resolveSubtype(unsold, subscribers)
+  if (subtype) alerts.push({ productId: product.id, productName: product.name, unsoldCount: unsold, subscriberCount: subscribers, subtype })
+}
+```
+
+**count**：`alerts.length`（每商品最多一条，自然去重）
+
+**breakdown**（显式注明：按"状态"计数，与 subtype 互斥分类无关，total 通常 != sum）：
+
+- `outOfStock`：unsold = 0 的商品数（含 RESTOCK_WAITING）
 - `lowStock`：0 < unsold < threshold 的商品数
-- `restockWaiting`：unsold = 0 且 subscribers > 0 的商品数
+- `restockWaiting`：unsold = 0 且 subscribers > 0 的商品数（OUT_OF_STOCK 的子集）
 
-**items 排序**（决定 Popover 里前 3 个看到什么）：
+**items 排序**（决定 Popover 前 3 条显示哪些）：
 
-1. `OUT_OF_STOCK && subscriberCount > 0`（缺货且有人等，最紧急）
-2. `OUT_OF_STOCK`（缺货）
-3. `LOW_STOCK`（低库存）
+1. `subtype = RESTOCK_WAITING`（缺货且有人等）
+2. `subtype = OUT_OF_STOCK`（缺货）
+3. `subtype = LOW_STOCK`（低库存）
 
 排序键内再按 `subscriberCount DESC, unsoldCount ASC`。
 
@@ -248,7 +280,7 @@ export function useAdminNotifications() {
 - 空态：`totalCount === 0` 时显示「✨ 暂无待办」
 - 非空态：按 SOURCES 注册顺序渲染 section，跳过 `count === 0`
 - 每 section 结构：
-  - Header: `<Icon /> {label} <NotificationBadge inline count={count} />`
+  - Header: `<Icon /> {label} <NotificationBadge variant="inline" count={count} />`
   - `inventoryAlerts` 额外一行 breakdown 文案：`2 款缺货 · 1 款低库存 · 3 款等到货提醒`
   - Items：单行 truncate，按 source 类型 switch 渲染（switch 内是强类型）
   - `查看全部 → {viewAllHref}` 链接
@@ -260,18 +292,42 @@ export function useAdminNotifications() {
 
 ### AdminSidebar（修改）
 
-- 删除 `usePendingWithdrawals` / `usePendingLeads` 引用
-- 改用 `useAdminNotifications()`
+- 删除 `usePendingWithdrawals` / `usePendingLeads` 引用，改用 `useAdminNotifications()`
 - 新增对 `/admin/products` 菜单的 badge 渲染（消费 `byKey.inventoryAlerts.count`）
-- 折叠 / 展开两种形态保留现有逻辑（`dot` vs `inline`）
+- 不要在 sidebar 内为第 3 个 menu 加第 3 个硬编码 `isProducts` 分支。**抽出辅助组件** `<SidebarItemBadge count={count} />`，在 menu loop 里按 `byKey[sourceFor(item.href)]?.count` 调用一次，统一处理 `dot`（折叠）/ `inline`（展开）两形态
+- `sourceFor(href)` 是 `lib/admin-notifications/index.ts` 导出的简单 mapping：`href → SourceKey | undefined`
+
+**Sidebar badge 计数语义**：与 `byKey[source].count` 完全一致。inventoryAlerts 的 sidebar 数字会包含所有 LOW_STOCK，可能感觉偏大；如未来运营反馈"想看到只有紧急的"，可在 `lib/admin-notifications/index.ts` 增加 `urgentCount` 字段供 sidebar 单独消费 —— 本次不做。
 
 ### Products 页面（修改）
 
-- `app/admin/(main)/products/page.tsx` 接收 `searchParams: Promise<{ notice?: string }>`
-- `notice === "inventory"` 时把默认筛选条件传给 `ProductsTableWrapper`
-- `ProductsTableWrapper` 接受 `defaultFilters` prop，初始化 TanStack Table state 时应用
-- 筛选条件：`stock = 0`（缺货）OR `stock < LOW_STOCK_THRESHOLD`（低库存）OR 有 pending restock subscription
-  - 简化方案：新增一列虚拟字段 `hasAlert: boolean`（page.tsx 计算并传给 row），筛选用此字段
+接入 `?notice=inventory` 跳转后默认筛选库存预警商品。涉及 4 处改动：
+
+1. **`app/admin/(main)/products/page.tsx`**
+   - 接收 `searchParams: Promise<{ notice?: string }>`
+   - 新增一次 `restockSubscription.groupBy({ by: productId, where: { status: PENDING }, _count: id })`
+   - 把 `subscriberCount` 与 `hasAlert: boolean` 计算后塞进 `ProductRow`
+   - 把 `notice === "inventory"` 转成 `defaultFilters: { hasAlert: true }` 传给 wrapper
+
+2. **`app/admin/(main)/products/products-columns.tsx`**
+   - `ProductRow` 类型加 `subscriberCount: number` 与 `hasAlert: boolean`
+   - 新增一个隐藏 column（`enableHiding: true, enableColumnFilter: true`，column header 不可见或不渲染），仅用于 TanStack column filter；`accessorKey: "hasAlert"`
+   - 现有 `stock` 列保持不变
+
+3. **`app/admin/(main)/products/products-table-wrapper.tsx`**
+   - 加 `defaultFilters?: Record<string, unknown>` prop
+   - 初始化 `columnFilters` state 时合并默认值（`useState(() => defaultFilters ? toColumnFilters(defaultFilters) : [])`）
+
+4. **`app/admin/(main)/products/products-data-table.tsx`**（如有此文件，否则跳过）
+   - 确保 `getFilteredRowModel()` 已启用
+
+**`hasAlert` 计算逻辑** 与 `inventoryAlerts.fetch` 内 `resolveSubtype` 一致，避免列表页与 Popover 不同步：
+
+```ts
+const hasAlert = resolveSubtype(stock, subscriberCount) !== null
+```
+
+可考虑把 `resolveSubtype` 也导出在 `lib/inventory.ts` 让两处共用。
 
 ## 权限联动
 
@@ -291,6 +347,13 @@ export function useAdminNotifications() {
 - `app/admin/hooks/use-pending-leads.ts`
 - `app/api/admin/withdrawals/count/route.ts`
 - `app/api/admin/agent/leads/count/route.ts`
+
+**删除前必做**：grep 整个仓库（含 `e2e/`、`__tests__/`、`scripts/`）确认无残留调用。重点搜：
+
+```bash
+grep -rn "withdrawals/count\|agent/leads/count\|usePendingWithdrawals\|usePendingLeads" \
+  app/ lib/ e2e/ __tests__/ scripts/
+```
 
 ## 测试策略
 
@@ -329,11 +392,25 @@ export function useAdminNotifications() {
 - 回退策略：单一 PR，回滚即恢复
 - 不影响线上数据，无需数据迁移脚本
 
+## 错误回退
+
+每个 `source.fetch` 在 handler 内独立 `try/catch`，失败时该 source 直接**从响应中省略**（不返回 error 变体，保持 SourceResult union 紧凑）。前端 `byKey[key]` 拿到 `undefined` → sidebar badge 自然隐藏 / Popover section 不渲染。
+
+handler 内打印 `console.error(\`[admin-notifications] source ${key} failed\`, err)` 便于排查。不向用户暴露错误。
+
+## 子管理员场景说明
+
+默认 `allowedMenus` 配置（见 `lib/admin-role-config.ts`）下，常见子管理员（如 SYSTEM_OPS）可能不含 `/admin/withdrawals` 与 `/admin/agent/leads`，则其 Bell Popover 只会显示 `inventoryAlerts` 一项。这是**预期行为**：不是 bug，是权限收敛的自然结果。
+
+如果运营反馈"Bell 经常空"，再加 source 或调整 allowedMenus。
+
 ## 风险与缓解
 
 | 风险 | 概率 | 缓解 |
 |---|---|---|
-| 聚合 API 单点失败导致所有 badge 消失 | 低 | source 内部 try/catch，单 source 失败不影响其他 |
-| inventoryAlerts SQL 在商品多时慢 | 中 | 复用 `Card.status` 现有索引；商品数 < 1k 量级，groupBy 在毫秒级 |
+| 聚合 API 单点失败导致所有 badge 消失 | 低 | source 内部 try/catch，单 source 失败不影响其他（见上节） |
+| inventoryAlerts SQL 在商品多时慢 | 低 | 复用 `Card.status` 与 `RestockSubscription @@index([productId, status])`；商品数 < 1k 量级，groupBy 在毫秒级 |
 | 子管理员能从 Popover 看到无权限页面的 badge | 已规避 | menuHref 与 allowedMenus 严格对齐 + 后端过滤 |
+| LOW_STOCK 三处口径仍不一致 | 已规避 | 「前置改动」一节先迁移 dashboard 到 `lib/inventory.ts` |
+| AUTO_FETCH 商品被误判为缺货塞进 Popover | 已规避 | `INVENTORY_PRODUCT_WHERE.productType = NORMAL` 全程过滤 |
 | Popover 在 mobile 屏窄被裁切 | 低 | 设宽度 max-w 与响应式适配 |
