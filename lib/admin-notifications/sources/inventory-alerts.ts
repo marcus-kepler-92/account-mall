@@ -1,10 +1,6 @@
 import { Package } from "lucide-react"
 import type { NotificationSource, InventoryAlertItem } from "@/lib/admin-notifications"
-import {
-  LOW_STOCK_THRESHOLD,
-  resolveInventorySubtype,
-  type InventorySubtype,
-} from "@/lib/inventory"
+import { resolveInventorySubtype, type InventorySubtype } from "@/lib/inventory"
 
 const INVENTORY_PRODUCT_WHERE = {
   productType: "NORMAL" as const,
@@ -85,5 +81,3 @@ export const inventoryAlertsSource: NotificationSource<"inventoryAlerts"> = {
     }
   },
 }
-
-export { LOW_STOCK_THRESHOLD }
