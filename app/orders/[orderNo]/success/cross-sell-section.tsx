@@ -178,7 +178,10 @@ export function CrossSellSection({
               style={pulseStyle}
             >
               <Clock className="size-3 opacity-70" />
-              {countdownStr}
+              {/* Countdown reads sessionStorage on the client, which can hold a deadline from
+                  an earlier visit. The SSR value naturally differs — suppress the warning so
+                  React quietly accepts the client value on hydration. */}
+              <span suppressHydrationWarning>{countdownStr}</span>
             </span>
           )}
         </div>
