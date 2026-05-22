@@ -28,10 +28,20 @@ export function DashboardGlobalKPI({ kpi }: { kpi: GlobalKPI }) {
           <p className="mt-1 text-xl font-bold">{kpi.todayOrders}</p>
         </CardContent>
       </Card>
-      <Card className={kpi.lowStockCount > 0 ? "border-red-200 bg-red-50/50" : ""}>
+      <Card
+        className={
+          kpi.lowStockCount > 0
+            ? "border-red-200 bg-red-50/50 dark:border-red-900/60 dark:bg-red-950/30"
+            : ""
+        }
+      >
         <CardContent>
           <p className="text-xs text-muted-foreground">库存需关注</p>
-          <p className={`mt-1 text-xl font-bold ${kpi.lowStockCount > 0 ? "text-red-500" : ""}`}>
+          <p
+            className={`mt-1 text-xl font-bold ${
+              kpi.lowStockCount > 0 ? "text-red-600 dark:text-red-400" : ""
+            }`}
+          >
             {kpi.lowStockCount > 0 ? `${kpi.lowStockCount} 款` : "正常"}
           </p>
           <p className="mt-0.5 text-[10px] leading-tight text-muted-foreground">
