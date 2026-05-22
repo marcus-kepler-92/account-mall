@@ -36,6 +36,15 @@ export type SalesReportProduct = {
     hasMissingCost: boolean
 }
 
+export type SalesReportSeriesPoint = {
+    date: string // YYYY-MM-DD (HKT calendar date)
+    revenue: number
+    cost: number
+    profit: number
+    quantity: number
+    orderCount: number
+}
+
 export type SalesReportResponse = {
     summary: {
         orderCount: number
@@ -47,6 +56,34 @@ export type SalesReportResponse = {
         hasMissingCost: boolean
     }
     products: SalesReportProduct[]
+    series: SalesReportSeriesPoint[]
+}
+
+const hktDateFormat = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: HKT,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+})
+
+function hktDateKey(d: Date): string {
+    return hktDateFormat.format(d)
+}
+
+function enumerateDays(from: string, to: string): string[] {
+    const result: string[] = []
+    const [fy, fm, fd] = from.split("-").map(Number)
+    const [ty, tm, td] = to.split("-").map(Number)
+    const current = new Date(Date.UTC(fy, fm - 1, fd))
+    const end = new Date(Date.UTC(ty, tm - 1, td))
+    while (current <= end) {
+        const y = current.getUTCFullYear()
+        const m = String(current.getUTCMonth() + 1).padStart(2, "0")
+        const d = String(current.getUTCDate()).padStart(2, "0")
+        result.push(`${y}-${m}-${d}`)
+        current.setUTCDate(current.getUTCDate() + 1)
+    }
+    return result
 }
 
 export async function GET(request: Request): Promise<NextResponse> {
@@ -72,7 +109,7 @@ export async function GET(request: Request): Promise<NextResponse> {
 
     const { startUTC, endUTC } = parseHKTRange(fy, fm, fd, ty, tm, td)
 
-    const [orders, milestoneBonusRow] = await Promise.all([
+    const [orders, milestoneBonusRows] = await Promise.all([
         prisma.order.findMany({
             where: { status: "COMPLETED", paidAt: { gte: startUTC, lt: endUTC } },
             select: {
@@ -83,21 +120,40 @@ export async function GET(request: Request): Promise<NextResponse> {
                 amount: true,
                 costSnapshot: true,
                 costTotalSnapshot: true,
+                paidAt: true,
                 product: { select: { name: true } },
             },
         }),
-        prisma.invitationMilestoneBonus.aggregate({
+        prisma.invitationMilestoneBonus.findMany({
             where: { createdAt: { gte: startUTC, lt: endUTC } },
-            _sum: { amount: true },
+            select: { amount: true, createdAt: true },
         }),
     ])
 
-    const milestoneBonus = Number(milestoneBonusRow._sum.amount ?? 0)
+    const milestoneBonus = milestoneBonusRows.reduce(
+        (s, r) => s + Number(r.amount),
+        0,
+    )
+    const dayList = enumerateDays(from, to)
 
     if (orders.length === 0) {
+        const emptySeries: SalesReportSeriesPoint[] = dayList.map((date) => {
+            const dayBonus = milestoneBonusRows
+                .filter((r) => hktDateKey(r.createdAt) === date)
+                .reduce((s, r) => s + Number(r.amount), 0)
+            return {
+                date,
+                revenue: 0,
+                cost: 0,
+                profit: -dayBonus,
+                quantity: 0,
+                orderCount: 0,
+            }
+        })
         return NextResponse.json<SalesReportResponse>({
-            summary: { orderCount: 0, totalQuantity: 0, revenue: 0, cost: 0, milestoneBonus, profit: 0, hasMissingCost: false },
+            summary: { orderCount: 0, totalQuantity: 0, revenue: 0, cost: 0, milestoneBonus, profit: -milestoneBonus, hasMissingCost: false },
             products: [],
+            series: emptySeries,
         })
     }
 
@@ -118,6 +174,25 @@ export async function GET(request: Request): Promise<NextResponse> {
         string,
         { productName: string; quantity: number; revenue: number; commission: number; cost: number; hasMissingCost: boolean }
     >()
+
+    // Aggregate by HKT day for time series
+    type DayBucket = {
+        revenue: number
+        cost: number
+        commission: number
+        milestoneBonus: number
+        quantity: number
+        orderCount: number
+    }
+    const dayMap = new Map<string, DayBucket>()
+    const ensureDay = (key: string): DayBucket => {
+        let b = dayMap.get(key)
+        if (!b) {
+            b = { revenue: 0, cost: 0, commission: 0, milestoneBonus: 0, quantity: 0, orderCount: 0 }
+            dayMap.set(key, b)
+        }
+        return b
+    }
 
     for (const order of orders) {
         const existing = productMap.get(order.productId)
@@ -143,6 +218,20 @@ export async function GET(request: Request): Promise<NextResponse> {
                 hasMissingCost: orderHasMissingCost,
             })
         }
+
+        if (order.paidAt) {
+            const day = ensureDay(hktDateKey(order.paidAt))
+            day.revenue += revenue
+            day.commission += commission
+            day.cost += orderCost
+            day.quantity += order.quantity
+            day.orderCount += 1
+        }
+    }
+
+    for (const bonus of milestoneBonusRows) {
+        const day = ensureDay(hktDateKey(bonus.createdAt))
+        day.milestoneBonus += Number(bonus.amount)
     }
 
     const products: SalesReportProduct[] = Array.from(productMap.entries())
@@ -168,6 +257,21 @@ export async function GET(request: Request): Promise<NextResponse> {
     const totalCost = products.reduce((s, p) => s + p.cost, 0)
     const hasMissingCost = products.some((p) => p.hasMissingCost)
 
+    const series: SalesReportSeriesPoint[] = dayList.map((date) => {
+        const b = dayMap.get(date)
+        if (!b) {
+            return { date, revenue: 0, cost: 0, profit: 0, quantity: 0, orderCount: 0 }
+        }
+        return {
+            date,
+            revenue: b.revenue,
+            cost: b.cost,
+            profit: b.revenue - b.cost - b.commission - b.milestoneBonus,
+            quantity: b.quantity,
+            orderCount: b.orderCount,
+        }
+    })
+
     return NextResponse.json<SalesReportResponse>({
         summary: {
             orderCount: orders.length,
@@ -179,5 +283,6 @@ export async function GET(request: Request): Promise<NextResponse> {
             hasMissingCost,
         },
         products,
+        series,
     })
 }

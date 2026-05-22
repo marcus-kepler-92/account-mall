@@ -20,6 +20,7 @@ import type { DistributorReportResponse } from "@/app/api/admin/distributor-repo
 import { useAdminNotifications } from "@/app/admin/hooks/use-admin-notifications"
 import { todayHKT } from "./dashboard-hkt"
 import { DashboardDateRangePresets } from "./dashboard-date-range-presets"
+import { DashboardProfitTrendChart } from "./dashboard-charts"
 
 type WaterfallRow = {
   label: string
@@ -48,6 +49,7 @@ export function DashboardProfitTab() {
 
   const s = data?.summary
   const products = data?.products ?? []
+  const series = data?.series ?? []
   const leaderboard = distData?.leaderboard ?? []
   const hasMissing = s?.hasMissingCost
 
@@ -150,6 +152,22 @@ export function DashboardProfitTab() {
           </>
         )}
       </div>
+
+      {/* Profit trend */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium">
+            趋势（营收 / 成本 / 利润）
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <Skeleton className="h-[280px] w-full" />
+          ) : (
+            <DashboardProfitTrendChart data={series} />
+          )}
+        </CardContent>
+      </Card>
 
       {/* Profit waterfall */}
       {s && (
