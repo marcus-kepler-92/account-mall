@@ -50,7 +50,8 @@ export const inventoryAlertsSource: NotificationSource<"inventoryAlerts"> = {
       if (!subtype) continue
 
       items.push({
-        productId: p.id,
+        id: p.id,
+        fingerprint: subtype,
         productName: p.name,
         unsoldCount: unsold,
         subscriberCount: subscribers,
@@ -77,7 +78,7 @@ export const inventoryAlertsSource: NotificationSource<"inventoryAlerts"> = {
     return {
       count: items.length,
       breakdown,
-      items: items.slice(0, 3),
+      items: items.slice(0, 50),
     }
   },
 }

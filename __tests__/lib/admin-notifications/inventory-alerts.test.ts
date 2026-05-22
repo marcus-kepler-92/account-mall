@@ -58,8 +58,9 @@ describe("inventoryAlertsSource", () => {
     const result = await inventoryAlertsSource.fetch(prisma)
 
     expect(result.count).toBe(3)
-    const byId = Object.fromEntries(result.items.map((i) => [i.productId, i]))
+    const byId = Object.fromEntries(result.items.map((i) => [i.id, i]))
     expect(byId.p1.subtype).toBe("RESTOCK_WAITING")
+    expect(byId.p1.fingerprint).toBe("RESTOCK_WAITING")
     expect(byId.p2.subtype).toBe("OUT_OF_STOCK")
     expect(byId.p3.subtype).toBe("LOW_STOCK")
     expect(byId.p4).toBeUndefined()
@@ -95,7 +96,8 @@ describe("inventoryAlertsSource", () => {
     })
 
     const result = await inventoryAlertsSource.fetch(prisma)
-    expect(result.items.map((i) => i.productId)).toEqual(["wait", "out2", "out1"])
+    // Source returns up to 50; the route slices to 3 for the popover. We assert the head order here.
+    expect(result.items.slice(0, 3).map((i) => i.id)).toEqual(["wait", "out2", "out1"])
   })
 
   it("returns zero state with empty items + zero breakdown", async () => {

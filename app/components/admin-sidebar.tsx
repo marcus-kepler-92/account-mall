@@ -46,8 +46,9 @@ import {
     SidebarRail,
 } from "@/components/ui/sidebar"
 import { useSiteName, useAdminPanelLabel } from "@/app/components/site-name-provider"
-import { NotificationBadge } from "@/app/admin/components"
+import { DraggableSourceBadge } from "@/app/admin/components"
 import { useAdminNotifications } from "@/app/admin/hooks/use-admin-notifications"
+import type { DismissItem } from "@/app/admin/hooks/use-admin-notifications"
 import { sourceFor } from "@/lib/admin-notifications"
 
 const allNavItems = [
@@ -103,9 +104,13 @@ export function AdminSidebar({ allowedMenus, isSuperAdmin }: AdminSidebarProps) 
     const adminPanelLabel = useAdminPanelLabel()
     const { byKey } = useAdminNotifications()
 
-    const badgeFor = (href: string): number => {
-        const key = sourceFor(href)
-        return key ? (byKey[key]?.count ?? 0) : 0
+    const badgeFor = (href: string): { count: number; items: DismissItem[] } | null => {
+        const sourceKey = sourceFor(href)
+        if (!sourceKey) return null
+        const src = byKey[sourceKey]
+        if (!src) return null
+        const items: DismissItem[] = src.items.map((it) => ({ sourceKey, itemId: it.id, fingerprint: it.fingerprint }))
+        return { count: src.count, items }
     }
 
     const handleSignOut = async () => {
@@ -153,35 +158,35 @@ export function AdminSidebar({ allowedMenus, isSuperAdmin }: AdminSidebarProps) 
                     <SidebarGroupContent>
                         <SidebarMenu>
                             {navItems.map((item) => {
-                                const badgeCount = badgeFor(item.href)
+                                const badge = badgeFor(item.href)
                                 return (
-                                    <SidebarMenuItem key={item.title}>
+                                    <SidebarMenuItem key={item.title} className="relative">
                                         <SidebarMenuButton
                                             asChild
                                             isActive={pathname === item.href || pathname.startsWith(item.href + "/")}
                                             tooltip={item.title}
                                         >
-                                            <Link href={item.href}>
-                                                <span className="relative">
-                                                    <item.icon className="size-4 shrink-0" />
-                                                    {badgeCount > 0 && (
-                                                        <NotificationBadge
-                                                            variant="dot"
-                                                            count={badgeCount}
-                                                            className="hidden group-data-[collapsible=icon]:inline-flex"
-                                                        />
-                                                    )}
-                                                </span>
+                                            <Link href={item.href} draggable={false}>
+                                                <item.icon className="size-4 shrink-0" />
                                                 <span>{item.title}</span>
-                                                {badgeCount > 0 && (
-                                                    <NotificationBadge
-                                                        variant="inline"
-                                                        count={badgeCount}
-                                                        className="ml-auto group-data-[collapsible=icon]:hidden"
-                                                    />
-                                                )}
                                             </Link>
                                         </SidebarMenuButton>
+                                        {badge && badge.count > 0 && (
+                                            <DraggableSourceBadge
+                                                variant="inline"
+                                                count={badge.count}
+                                                items={badge.items}
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 z-10 group-data-[collapsible=icon]:hidden"
+                                            />
+                                        )}
+                                        {badge && badge.count > 0 && (
+                                            <DraggableSourceBadge
+                                                variant="dot"
+                                                count={badge.count}
+                                                items={badge.items}
+                                                className="hidden group-data-[collapsible=icon]:inline-flex absolute top-1 right-1 z-10"
+                                            />
+                                        )}
                                     </SidebarMenuItem>
                                 )
                             })}
@@ -197,35 +202,35 @@ export function AdminSidebar({ allowedMenus, isSuperAdmin }: AdminSidebarProps) 
                         <SidebarGroupContent>
                             <SidebarMenu>
                                 {agentItems.map((item) => {
-                                    const badgeCount = badgeFor(item.href)
+                                    const badge = badgeFor(item.href)
                                     return (
-                                        <SidebarMenuItem key={item.href}>
+                                        <SidebarMenuItem key={item.href} className="relative">
                                             <SidebarMenuButton
                                                 asChild
                                                 isActive={pathname === item.href || pathname.startsWith(item.href + "/")}
                                                 tooltip={item.title}
                                             >
-                                                <Link href={item.href}>
-                                                    <span className="relative">
-                                                        <item.icon className="size-4 shrink-0" />
-                                                        {badgeCount > 0 && (
-                                                            <NotificationBadge
-                                                                variant="dot"
-                                                                count={badgeCount}
-                                                                className="hidden group-data-[collapsible=icon]:inline-flex"
-                                                            />
-                                                        )}
-                                                    </span>
+                                                <Link href={item.href} draggable={false}>
+                                                    <item.icon className="size-4 shrink-0" />
                                                     <span>{item.title}</span>
-                                                    {badgeCount > 0 && (
-                                                        <NotificationBadge
-                                                            variant="inline"
-                                                            count={badgeCount}
-                                                            className="ml-auto group-data-[collapsible=icon]:hidden"
-                                                        />
-                                                    )}
                                                 </Link>
                                             </SidebarMenuButton>
+                                            {badge && badge.count > 0 && (
+                                                <DraggableSourceBadge
+                                                    variant="inline"
+                                                    count={badge.count}
+                                                    items={badge.items}
+                                                    className="absolute right-2 top-1/2 -translate-y-1/2 z-10 group-data-[collapsible=icon]:hidden"
+                                                />
+                                            )}
+                                            {badge && badge.count > 0 && (
+                                                <DraggableSourceBadge
+                                                    variant="dot"
+                                                    count={badge.count}
+                                                    items={badge.items}
+                                                    className="hidden group-data-[collapsible=icon]:inline-flex absolute top-1 right-1 z-10"
+                                                />
+                                            )}
                                         </SidebarMenuItem>
                                     )
                                 })}

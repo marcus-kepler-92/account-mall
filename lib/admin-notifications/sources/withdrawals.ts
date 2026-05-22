@@ -13,7 +13,7 @@ export const withdrawalsSource: NotificationSource<"withdrawals"> = {
       prisma.withdrawal.count({ where }),
       prisma.withdrawal.findMany({
         where,
-        take: 3,
+        take: 50,
         orderBy: { createdAt: "desc" },
         select: {
           id: true,
@@ -28,6 +28,7 @@ export const withdrawalsSource: NotificationSource<"withdrawals"> = {
       count,
       items: rows.map((row) => ({
         id: row.id,
+        fingerprint: "v1",
         distributorName: row.distributor.name || row.distributor.email || "未知",
         amount: Number(row.amount),
         createdAt: row.createdAt.toISOString(),

@@ -2,10 +2,12 @@ import type { PrismaClient } from "@prisma/client"
 import type { LucideIcon } from "lucide-react"
 import type { InventorySubtype } from "@/lib/inventory"
 
-export type SourceKey = "withdrawals" | "agentLeads" | "inventoryAlerts"
+export const SOURCE_KEYS = ["withdrawals", "agentLeads", "inventoryAlerts"] as const
+export type SourceKey = (typeof SOURCE_KEYS)[number]
 
 export type WithdrawalItem = {
   id: string
+  fingerprint: string
   distributorName: string
   amount: number
   createdAt: string
@@ -13,6 +15,7 @@ export type WithdrawalItem = {
 
 export type AgentLeadItem = {
   id: string
+  fingerprint: string
   displayName: string
   status: "NEW" | "CONTACTED"
   urgency: "LOW" | "MED" | "HIGH"
@@ -20,7 +23,8 @@ export type AgentLeadItem = {
 }
 
 export type InventoryAlertItem = {
-  productId: string
+  id: string
+  fingerprint: string
   productName: string
   unsoldCount: number
   subscriberCount: number

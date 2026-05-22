@@ -13,7 +13,7 @@ beforeEach(() => {
 })
 
 describe("withdrawalsSource", () => {
-  it("counts PENDING withdrawals and returns up to 3 latest items with distributor names", async () => {
+  it("counts PENDING withdrawals and returns up to 50 latest items with distributor names + fingerprint", async () => {
     count.mockResolvedValue(7)
     findMany.mockResolvedValue([
       { id: "w1", amount: 200, createdAt: new Date("2026-05-21T10:00:00Z"), distributor: { name: "张三" } },
@@ -27,7 +27,7 @@ describe("withdrawalsSource", () => {
     expect(findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { status: "PENDING" },
-        take: 3,
+        take: 50,
         orderBy: { createdAt: "desc" },
       }),
     )
@@ -35,6 +35,7 @@ describe("withdrawalsSource", () => {
     expect(result.items).toHaveLength(3)
     expect(result.items[0]).toEqual({
       id: "w1",
+      fingerprint: "v1",
       distributorName: "张三",
       amount: 200,
       createdAt: "2026-05-21T10:00:00.000Z",

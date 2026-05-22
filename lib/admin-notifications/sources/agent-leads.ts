@@ -17,10 +17,11 @@ export const agentLeadsSource: NotificationSource<"agentLeads"> = {
       prisma.agentLead.findMany({
         where,
         // Overfetch then sort by urgency in JS. Prisma's enum lexical sort
-        // would put MED/LOW before HIGH, so we sort here. 30 is a buffer
-        // for the case where HIGH urgency leads are scattered among recent
-        // activity — if lead volume exceeds this, switch to raw SQL CASE.
-        take: 30,
+        // would put MED/LOW before HIGH, so we sort here. 50 is a buffer
+        // for HIGH-urgency leads scattered in recent activity plus headroom
+        // for dismissal filtering — if lead volume exceeds this, switch to
+        // raw SQL CASE.
+        take: 50,
         orderBy: { createdAt: "desc" },
         select: { id: true, wechatId: true, status: true, urgency: true, createdAt: true },
       }),
@@ -29,6 +30,7 @@ export const agentLeadsSource: NotificationSource<"agentLeads"> = {
     const items: AgentLeadItem[] = rows
       .map((r) => ({
         id: r.id,
+        fingerprint: `${r.status}:${r.urgency}`,
         displayName: r.wechatId ?? "匿名",
         status: r.status as "NEW" | "CONTACTED",
         urgency: r.urgency as "LOW" | "MED" | "HIGH",
@@ -39,7 +41,7 @@ export const agentLeadsSource: NotificationSource<"agentLeads"> = {
         if (byUrgency !== 0) return byUrgency
         return b.createdAt.localeCompare(a.createdAt)
       })
-      .slice(0, 3)
+      .slice(0, 50)
 
     return { count, items }
   },

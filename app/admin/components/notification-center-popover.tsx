@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import type { ReactNode } from "react"
-import { Bell } from "lucide-react"
+import { Bell, GripVertical } from "lucide-react"
 import {
   Popover,
   PopoverContent,
@@ -10,10 +10,13 @@ import {
 } from "@/components/ui/popover"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { NotificationBadge } from "./notification-badge"
-import { useAdminNotifications } from "@/app/admin/hooks/use-admin-notifications"
-import { SOURCES, type SourceResult } from "@/lib/admin-notifications"
+import { SwipeToDismiss } from "./swipe-to-dismiss"
+import {
+  useAdminNotifications,
+  useDismissAdminNotifications,
+} from "@/app/admin/hooks/use-admin-notifications"
+import { SOURCES, type SourceKey, type SourceResult } from "@/lib/admin-notifications"
 import { formatCurrency } from "@/lib/utils"
 
 function timeAgo(iso: string): string {
@@ -27,27 +30,70 @@ function timeAgo(iso: string): string {
   return `${day} 天前`
 }
 
-function renderItems(source: SourceResult): ReactNode {
+type DismissFn = (args: { sourceKey: SourceKey; itemId: string; fingerprint: string }) => void
+
+function Row({
+  sourceKey,
+  itemId,
+  fingerprint,
+  onDismiss,
+  children,
+}: {
+  sourceKey: SourceKey
+  itemId: string
+  fingerprint: string
+  onDismiss: DismissFn
+  children: ReactNode
+}) {
+  return (
+    <SwipeToDismiss onDismiss={() => onDismiss({ sourceKey, itemId, fingerprint })}>
+      <div className="flex items-center gap-2 py-1.5 text-sm">
+        <div className="min-w-0 flex-1">{children}</div>
+        <GripVertical className="size-3.5 shrink-0 text-muted-foreground/50" aria-hidden />
+      </div>
+    </SwipeToDismiss>
+  )
+}
+
+const POPOVER_ITEM_LIMIT = 3
+
+function renderItems(source: SourceResult, onDismiss: DismissFn): ReactNode {
   switch (source.key) {
     case "withdrawals":
-      return source.items.map((it) => (
-        <div key={it.id} className="flex items-center justify-between gap-2 py-1 text-sm">
-          <span className="truncate">{it.distributorName} · {formatCurrency(it.amount)}</span>
-          <span className="text-muted-foreground tabular-nums shrink-0">{timeAgo(it.createdAt)}</span>
-        </div>
+      return source.items.slice(0, POPOVER_ITEM_LIMIT).map((it) => (
+        <Row
+          key={it.id}
+          sourceKey={source.key}
+          itemId={it.id}
+          fingerprint={it.fingerprint}
+          onDismiss={onDismiss}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <span className="truncate">{it.distributorName} · {formatCurrency(it.amount)}</span>
+            <span className="text-muted-foreground tabular-nums shrink-0">{timeAgo(it.createdAt)}</span>
+          </div>
+        </Row>
       ))
     case "agentLeads":
-      return source.items.map((it) => (
-        <div key={it.id} className="flex items-center justify-between gap-2 py-1 text-sm">
-          <span className="truncate">
-            {it.displayName} · {it.status}
-            {it.urgency === "HIGH" ? " · 紧急" : ""}
-          </span>
-          <span className="text-muted-foreground tabular-nums shrink-0">{timeAgo(it.createdAt)}</span>
-        </div>
+      return source.items.slice(0, POPOVER_ITEM_LIMIT).map((it) => (
+        <Row
+          key={it.id}
+          sourceKey={source.key}
+          itemId={it.id}
+          fingerprint={it.fingerprint}
+          onDismiss={onDismiss}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <span className="truncate">
+              {it.displayName} · {it.status}
+              {it.urgency === "HIGH" ? " · 紧急" : ""}
+            </span>
+            <span className="text-muted-foreground tabular-nums shrink-0">{timeAgo(it.createdAt)}</span>
+          </div>
+        </Row>
       ))
     case "inventoryAlerts":
-      return source.items.map((it) => {
+      return source.items.slice(0, POPOVER_ITEM_LIMIT).map((it) => {
         const label =
           it.subtype === "RESTOCK_WAITING"
             ? `缺货 · ${it.subscriberCount} 人等待`
@@ -55,9 +101,15 @@ function renderItems(source: SourceResult): ReactNode {
               ? "缺货"
               : `低库存（剩 ${it.unsoldCount}）`
         return (
-          <div key={it.productId} className="py-1 text-sm">
+          <Row
+            key={it.id}
+            sourceKey={source.key}
+            itemId={it.id}
+            fingerprint={it.fingerprint}
+            onDismiss={onDismiss}
+          >
             <span className="truncate">{it.productName} · {label}</span>
-          </div>
+          </Row>
         )
       })
   }
@@ -65,6 +117,8 @@ function renderItems(source: SourceResult): ReactNode {
 
 export function NotificationCenterPopover() {
   const { byKey, totalCount } = useAdminNotifications()
+  const dismiss = useDismissAdminNotifications()
+  const onDismiss: DismissFn = (args) => dismiss.mutate([args])
 
   return (
     <Popover>
@@ -80,15 +134,24 @@ export function NotificationCenterPopover() {
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-[380px] p-0">
-        <div className="px-4 py-3 border-b">
-          <div className="font-medium">通知中心</div>
-          <div className="text-xs text-muted-foreground mt-0.5">
-            {totalCount > 0 ? `你有 ${totalCount} 项待办` : "暂无待办"}
+        <div className="border-b px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="font-medium">通知中心</div>
+            {totalCount > 0 && (
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {totalCount} 项待办
+              </span>
+            )}
           </div>
+          {totalCount > 0 && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              左右滑动单条标记已读；拖走侧边栏菜单上的红点可整组标记
+            </p>
+          )}
         </div>
-        <ScrollArea className="max-h-[calc(100vh-12rem)]">
+        <div className="max-h-[calc(100vh-12rem)] overflow-y-auto">
           {totalCount === 0 ? (
-            <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+            <div className="px-4 py-10 text-center text-sm text-muted-foreground">
               ✨ 暂无待办
             </div>
           ) : (
@@ -119,10 +182,9 @@ export function NotificationCenterPopover() {
                         <Icon className="size-4" />
                         {src.label}
                       </div>
-                      <NotificationBadge variant="inline" count={data.count} />
                     </div>
                     {breakdownLine}
-                    <div className="space-y-0.5">{renderItems(data)}</div>
+                    <div className="space-y-0.5">{renderItems(data, onDismiss)}</div>
                     <Link
                       href={src.viewAllHref}
                       className="mt-2 inline-block text-xs text-primary hover:underline"
@@ -134,7 +196,7 @@ export function NotificationCenterPopover() {
               )
             })
           )}
-        </ScrollArea>
+        </div>
       </PopoverContent>
     </Popover>
   )

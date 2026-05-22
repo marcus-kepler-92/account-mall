@@ -1,3 +1,7 @@
+import { prismaMock } from "@/__mocks__/prisma"
+
+jest.mock("@/lib/prisma", () => ({ prisma: prismaMock }))
+
 import { GET } from "@/app/api/admin/notifications/route"
 
 jest.mock("@/lib/auth-guard", () => ({
@@ -45,6 +49,8 @@ beforeEach(() => {
     getAdminSession.mockReset()
     getAdminPermissions.mockReset()
     Object.values(spies).forEach((s) => s.mockClear())
+    // Default: no dismissals so existing tests don't need to opt in.
+    prismaMock.adminNotificationDismissal.findMany.mockResolvedValue([])
 })
 
 describe("GET /api/admin/notifications", () => {
@@ -88,5 +94,60 @@ describe("GET /api/admin/notifications", () => {
             "agentLeads",
             "inventoryAlerts",
         ])
+    })
+
+    it("filters out items whose dismissal fingerprint still matches", async () => {
+        getAdminSession.mockResolvedValue({ user: { id: "admin_1" } })
+        getAdminPermissions.mockResolvedValue({ allowedMenus: null })
+        spies.fetchWith.mockResolvedValueOnce({
+            count: 2,
+            items: [
+                { id: "w1", fingerprint: "v1", distributorName: "A", amount: 100, createdAt: "" },
+                { id: "w2", fingerprint: "v1", distributorName: "B", amount: 200, createdAt: "" },
+            ],
+        })
+        prismaMock.adminNotificationDismissal.findMany.mockResolvedValue([
+            { sourceKey: "withdrawals", itemId: "w1", fingerprint: "v1" } as any,
+        ])
+        const res = await GET()
+        const body = await res.json()
+        const w = body.sources.find((s: { key: string }) => s.key === "withdrawals")
+        expect(w.count).toBe(1)
+        expect(w.items).toHaveLength(1)
+        expect(w.items[0].id).toBe("w2")
+    })
+
+    it("re-surfaces items whose fingerprint has changed since dismissal", async () => {
+        getAdminSession.mockResolvedValue({ user: { id: "admin_1" } })
+        getAdminPermissions.mockResolvedValue({ allowedMenus: null })
+        spies.fetchAgent.mockResolvedValueOnce({
+            count: 1,
+            items: [
+                { id: "lead1", fingerprint: "NEW:HIGH", displayName: "x", status: "NEW", urgency: "HIGH", createdAt: "" },
+            ],
+        })
+        prismaMock.adminNotificationDismissal.findMany.mockResolvedValue([
+            // dismissed when urgency was MED — now it's HIGH, should re-surface
+            { sourceKey: "agentLeads", itemId: "lead1", fingerprint: "NEW:MED" } as any,
+        ])
+        const res = await GET()
+        const body = await res.json()
+        const a = body.sources.find((s: { key: string }) => s.key === "agentLeads")
+        expect(a.count).toBe(1)
+        expect(a.items[0].id).toBe("lead1")
+    })
+
+    it("scopes dismissal query by adminId and enabled sourceKeys", async () => {
+        getAdminSession.mockResolvedValue({ user: { id: "admin_42" } })
+        getAdminPermissions.mockResolvedValue({ allowedMenus: ["/admin/products"] })
+        await GET()
+        expect(prismaMock.adminNotificationDismissal.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    adminId: "admin_42",
+                    sourceKey: { in: ["inventoryAlerts"] },
+                }),
+            }),
+        )
     })
 })

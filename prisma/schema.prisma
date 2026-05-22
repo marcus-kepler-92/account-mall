@@ -40,8 +40,22 @@ model User {
   inviterMilestoneBonuses InvitationMilestoneBonus[] @relation("InviterMilestoneBonuses")
   announcementReads          AnnouncementRead[]
   agentKnowledge             AgentKnowledge[]
+  notificationDismissals     AdminNotificationDismissal[]
 
   @@index([inviterId])
+}
+
+model AdminNotificationDismissal {
+  id          String   @id @default(cuid())
+  adminId     String
+  sourceKey   String   @db.VarChar(32)
+  itemId      String   @db.VarChar(64)
+  fingerprint String   @db.VarChar(128)
+  dismissedAt DateTime @default(now())
+
+  admin User @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@unique([adminId, sourceKey, itemId])
 }
 
 model Session {
