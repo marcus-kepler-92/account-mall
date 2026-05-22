@@ -105,33 +105,34 @@ export function DashboardProfitCompositionBar({
                 })}
             </div>
 
-            {/* Legend / breakdown */}
-            <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
-                {segments.map((seg) => {
-                    const pct = (seg.value / sum) * 100
-                    const isProfit = seg.key === "profit"
-                    return (
-                        <button
-                            key={seg.key}
-                            type="button"
-                            onMouseEnter={() => setHovered(seg.key)}
-                            onMouseLeave={() => setHovered(null)}
-                            className={cn(
-                                "flex flex-col items-start gap-0.5 rounded-md border bg-card p-2 text-left transition-colors",
-                                hovered === seg.key && "border-foreground/30",
-                            )}
-                        >
-                            <span className="flex items-center gap-1.5 text-muted-foreground">
-                                <span className={cn("size-2 rounded-sm", seg.color)} />
-                                {seg.label}
-                            </span>
-                            <span className={cn("font-semibold tabular-nums", isProfit && "text-emerald-600 dark:text-emerald-500")}>
-                                {formatCurrency(seg.value)}
-                            </span>
-                            <span className="text-muted-foreground tabular-nums">{pct.toFixed(1)}%</span>
-                        </button>
-                    )
-                })}
+            {/* Breakdown — deduction segments only; profit is already the headline above. */}
+            <div className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
+                {segments
+                    .filter((seg) => seg.key !== "profit")
+                    .map((seg) => {
+                        const pct = (seg.value / sum) * 100
+                        return (
+                            <button
+                                key={seg.key}
+                                type="button"
+                                onMouseEnter={() => setHovered(seg.key)}
+                                onMouseLeave={() => setHovered(null)}
+                                className={cn(
+                                    "flex flex-col items-start gap-0.5 rounded-md border bg-card p-2 text-left transition-colors",
+                                    hovered === seg.key && "border-foreground/30",
+                                )}
+                            >
+                                <span className="flex items-center gap-1.5 text-muted-foreground">
+                                    <span className={cn("size-2 rounded-sm", seg.color)} />
+                                    {seg.label}
+                                </span>
+                                <span className="font-semibold tabular-nums">
+                                    {formatCurrency(seg.value)}
+                                </span>
+                                <span className="text-muted-foreground tabular-nums">{pct.toFixed(1)}%</span>
+                            </button>
+                        )
+                    })}
             </div>
         </div>
     )
