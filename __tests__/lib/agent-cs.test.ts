@@ -191,8 +191,10 @@ describe("lookupOrder", () => {
     const tools = buildCSTools("s1") as unknown as ToolsRecord
     const r = (await tools.lookupOrder.execute({ orderNo: "OD-SAFE" }, ctx)) as Record<string, unknown>
     // Relative path — no scheme, no host. Locks both "no tokenized URL"
-    // and "no domain hard-coding" into one assertion.
-    expect(r.lookupUrl).toBe("/orders/lookup")
+    // and "no domain hard-coding" into one assertion. Lookup URL now
+    // carries mode + orderNo so users land in the right tab with the
+    // order number prefilled (the lookup password still gates access).
+    expect(r.lookupUrl).toBe("/orders/lookup?mode=orderNo&orderNo=OD-SAFE")
     expect(JSON.stringify(r)).not.toMatch(/token|success\?|access[_-]?token|https?:\/\//i)
   })
 })

@@ -67,6 +67,7 @@ interface OrderLookupFormProps {
     lookupMode: LookupMode
     formRef: React.MutableRefObject<UseFormReturn<OrderLookupFormValues> | null>
     initialOrderNo: string | null
+    initialEmail: string | null
     loading: boolean
     showPassword: boolean
     setShowPassword: React.Dispatch<React.SetStateAction<boolean>>
@@ -77,7 +78,7 @@ interface OrderLookupFormProps {
 }
 
 function OrderLookupForm({
-    lookupMode, formRef, initialOrderNo, loading,
+    lookupMode, formRef, initialOrderNo, initialEmail, loading,
     showPassword, setShowPassword,
     setResult, setOrderList, setLoading, setSheetOpen,
 }: OrderLookupFormProps) {
@@ -96,11 +97,18 @@ function OrderLookupForm({
     }, [form, formRef])
 
     useEffect(() => {
-        if (initialOrderNo) {
-            form.setValue("orderNo", initialOrderNo)
+        // Hydrate both fields so the "other" mode also keeps the URL preset
+        // when the user manually switches tabs (form remounts via key, so
+        // each mount needs to re-apply both values from props).
+        if (initialOrderNo) form.setValue("orderNo", initialOrderNo)
+        if (initialEmail) form.setValue("email", initialEmail)
+        const currentModeFilled =
+            (lookupMode === "orderNo" && initialOrderNo) ||
+            (lookupMode === "email" && initialEmail)
+        if (currentModeFilled) {
             setTimeout(() => passwordInputRef.current?.focus(), 100)
         }
-    }, [initialOrderNo, form])
+    }, [initialOrderNo, initialEmail, lookupMode, form])
 
     const onSubmit = async (data: OrderLookupFormValues) => {
         const isOrderMode = lookupMode === "orderNo"
@@ -234,10 +242,23 @@ function OrderLookupPageContent() {
     const getPassword = useCallback(() => formRef.current?.getValues("password") ?? "", [])
 
     useEffect(() => {
+        // URL is the single source of truth for initial query state.
+        // Inference order (first match wins):
+        //   1. explicit `mode`
+        //   2. legacy `type=email` (kept for existing links)
+        //   3. `email` present + no `orderNo` → email mode
+        //   4. `orderNo` present → orderNo mode
+        //   5. default → orderNo
+        const modeParam = searchParams.get("mode")
         const typeParam = searchParams.get("type")
         const orderNoParam = searchParams.get("orderNo")
-        setLookupMode(typeParam === "email" ? "email" : "orderNo")
-        if (orderNoParam) setLookupMode("orderNo")
+        const emailParam = searchParams.get("email")
+        let inferred: LookupMode = "orderNo"
+        if (modeParam === "email" || modeParam === "orderNo") inferred = modeParam
+        else if (typeParam === "email") inferred = "email"
+        else if (emailParam && !orderNoParam) inferred = "email"
+        else if (orderNoParam) inferred = "orderNo"
+        setLookupMode(inferred)
     }, [searchParams])
 
     const switchMode = useCallback((mode: LookupMode) => {
@@ -314,6 +335,7 @@ function OrderLookupPageContent() {
                                 lookupMode={lookupMode}
                                 formRef={formRef}
                                 initialOrderNo={searchParams.get("orderNo")}
+                                initialEmail={searchParams.get("email")}
                                 loading={loading}
                                 showPassword={showPassword}
                                 setShowPassword={setShowPassword}

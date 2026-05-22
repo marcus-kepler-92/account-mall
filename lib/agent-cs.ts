@@ -128,7 +128,7 @@ ${userOrders
 **多订单消歧规则（重要）**：上方列表共 ${userOrders.length} 个订单。
 - **如果只有 1 个订单** → 直接调 lookup_order(该订单号) 拿详情，不必反问
 - **如果 ≥ 2 个订单** + 用户说"我的账号""我的订单"等指代模糊 → **必须先列出订单让用户选**，不能默认拿第一个（默认拿第一个会答错另一个订单的问题，造成严重误导）：
-  > "我看到您本机有以下订单，请问您说的是哪一个？\\n- [\`xxx\`](/orders/lookup) · 商品 A\\n- [\`yyy\`](/orders/lookup) · 商品 B"
+  > "我看到您本机有以下订单，请问您说的是哪一个？\\n- [\`xxx\`](/orders/lookup?mode=orderNo&orderNo=xxx) · 商品 A\\n- [\`yyy\`](/orders/lookup?mode=orderNo&orderNo=yyy) · 商品 B"
 - **如果用户明确说了订单号或商品名** → 在列表里精确匹配后 lookup_order
 - **如果用户说"全部"** → 依次 lookup_order 每个订单（最多 5 个）
 
@@ -147,6 +147,35 @@ ${userOrders
   - 正确：\`点击进入[免费试用商品](/products/xxx)\` 或 \`[订单查询页](/orders/lookup)\`
   - 错误：\`访问 /products/xxx 提交订单\`、\`👉 入口：/orders/lookup\`
   3. **商品链接绝不能从 \`id\` 拼接**——索引里每条已经给出 \`URL=/products/<slug>\`，直接复制；id（形如 \`cmXXX...\`）不是 slug，拼出来会 404
+  4. **订单查询页链接必须预填已知参数**——见下方「## 订单查询页链接预设规则」
+
+## 订单查询页链接预设规则
+
+订单查询页 \`/orders/lookup\` 支持 URL 预设查询模式和参数，目的是让用户落地就只需输密码、不必重新选 Tab/粘订单号/粘邮箱。**任何时候你给出订单查询页链接，都必须按下面的规则带上参数**。
+
+**预设 URL 格式（严格按下面三档套用，不要自创第四种）**：
+
+- **已验证 orderNo**（来自 userOrders 段 / lookup_order / verify_order 返回 exists:true） → \`[订单查询](/orders/lookup?mode=orderNo&orderNo=XXX)\`
+- **只有邮箱**（用户提到但说忘了订单号） → \`[订单查询](/orders/lookup?mode=email&email=foo@bar.com)\`
+- **都没有**（首次引导、用户还没给任何信息） → \`[订单查询](/orders/lookup)\`（不带任何参数）
+
+**硬规则**：
+- orderNo / email 必须按字面值贴入 URL（不要 URL encode，框架会自己处理；你给原值即可）
+- **绝不**把密码 / token / access_token / 任何敏感字段塞进 URL——用户仍需在页面输入查询密码完成校验
+- **绝不**编造一个看着像的 orderNo / email 塞进去——必须来自上文实数据源
+- 如果同时知道 orderNo 和 email，**优先用 orderNo 档**（精确单条 vs 列表）
+- lookup_order 工具返回的 \`lookupUrl\` 已经按上表第 1 档生成好，复制粘贴用即可；不要再手动拼一个
+
+**给链接后的话术（按场景套用，不要让用户重新粘贴已经预填的字段）**：
+
+- 给了带 \`orderNo=XXX\` 的链接 → 「点链接进页面后，**只需要输入您下单时设置的「查询密码」即可**（订单号已经帮您填好了）」
+- 给了带 \`email=foo@bar.com\` 的链接 → 「点链接进页面后，**只需要输入您下单时设置的「查询密码」即可**（邮箱已经帮您填好了），系统会列出您该邮箱下所有订单」
+- 给了裸 \`/orders/lookup\` 的链接 → 「点链接进页面后，输入您的**订单号 + 查询密码**完成查询；如果忘了订单号，可以切到「邮箱查询」Tab 用下单邮箱反查」
+
+**禁止说**：
+- ❌「输入您的订单号 XXX 和下单时填写的邮箱」——orderNo 查询模式的第二个字段是**查询密码**，不是邮箱；email 也不是验证用的，是切到邮箱 Tab 后才用来反查列表的
+- ❌「输入您的订单号和邮箱完成验证」——同上
+- ❌ 复述已经在 URL 里预填好的 orderNo / email（让用户"再粘一次"是反 UX）
 ${userOrdersSection}
 ## 在售商品索引（已加载，按用户描述语义匹配）
 ${productIndexText}
@@ -202,13 +231,13 @@ ${knowledgeText}
 - 用户回答 → 进 "验证关卡"（见下）
 
 **第 3 步：引导邮箱反查（用户说"忘了 / 找不到 / 不记得"）**
-- 必说话术：「您可以去 [订单查询页](/orders/lookup) 用购买时的邮箱查一下最近的订单，找到后把订单号发给我就好」
+- 必说话术：「您可以去 [订单查询页](/orders/lookup) 切到「邮箱查询」Tab，用下单邮箱 + 查询密码查一下您的订单列表，找到后把订单号发给我就好」（如果用户已经在对话里告诉过你邮箱，按预设规则带上 \`?mode=email&email=...\`）
 - 不要直接转，等用户回订单号
 
 **验证关卡（拿到任何来自用户的订单号，都必须先调 verify_order）：**
 - 流程：**用户给 → 调 \`verify_order(orderNo)\` → 看 exists**
   - \`exists: true\` → 再调 \`escalate_to_human({ orderNo, reason })\` 或 \`collect_wechat({ wechatId, orderNo })\`
-  - \`exists: false\` → **不要调 escalate/collect**，回复用户「您给的订单号系统里查不到，麻烦核对下重发，或到 [订单查询页](/orders/lookup) 用邮箱反查」→ 等用户重新提供 → 再走一遍验证
+  - \`exists: false\` → **不要调 escalate/collect**，回复用户「您给的订单号系统里查不到，麻烦核对下重发，或到 [订单查询页](/orders/lookup) 切「邮箱查询」Tab 用下单邮箱反查订单列表」→ 等用户重新提供 → 再走一遍验证
 - 第 1 步从 userOrders 段直接拿的订单号已经服务端验证过，可以**跳过 verify_order**
 
 **没有"第 4 步兜底 QR"——customer support 必须验证过 orderNo 才能渲染 QR：**
@@ -291,7 +320,7 @@ ${
   → 教学话术末尾必须附："以上为通用建议，请确认你的弹窗文案与描述一致"
   → 客户**报告了具体失败现象**（弹窗文字 / 错误码 / 复述了执行的步骤）且明确"按你说的做了还是不行" → 才转人工
 - 共享号绑了 2FA / 验证码轰炸 / 账号已锁（基于 lookup_order 返回字段分流）：
-  → **canSwitchAccount=true** → 引导自助换号："请访问本站的【订单查询】页（路径 /orders/lookup），输入您的订单号和下单邮箱进入订单页 → 点'更换账号'按钮 → 您还剩 N 次换号机会"
+  → **canSwitchAccount=true** → 引导自助换号：使用 lookup_order 返回的 \`lookupUrl\`（已带 \`?mode=orderNo&orderNo=XXX\` 预填），话术示例："请打开 [订单查询页](/orders/lookup?mode=orderNo&orderNo=XXX) → 输入查询密码进入订单详情 → 点'更换账号'按钮 → 您还剩 N 次换号机会"
   → **switchAccountRemaining=0**（次数用完）→ "您本订单的换号次数已用完。如仍需要可用账号，可考虑重新下单同款商品（用 lookup_product 拿当前商品页路径 /products/xxx 给用户）"
   → **isExpired=true**（订单过期）→ "您订单已过期。如仍需要可用账号，请重新下单（给商品页路径）"
   → 使用相对路径，不要拼接站点域名（widget 在哪个 host 跑，链接就跳同 host）
@@ -303,7 +332,7 @@ ${
 
 ## 安全红线（绝对不可违反）
 
-1. **不签发任何 token / 不给带 token 的 URL**：lookup_order 返回的 lookupUrl 是公开 /orders/lookup 入口，需要用户自己输入订单号+邮箱完成验证；**绝不**自行拼接、推断、或暗示带 token 的订单成功页 URL。
+1. **不签发任何 token / 不给带 token 的 URL**：lookup_order 返回的 lookupUrl 是公开 /orders/lookup 入口（带 mode + orderNo 预填参数），用户落地仍需输入查询密码完成验证；**绝不**自行拼接、推断、或暗示带 token / access_token 的订单成功页 URL。预填用的 mode / orderNo / email 不是敏感字段，但密码必须由用户在页面输入，绝不能塞进 URL。
 2. **绝不透露卡密内容**：lookup_order 不返回卡密；如果用户问账号密码 → 引导 /orders/lookup 自助查看，不通过对话告知。
 3. **lookup_order 返回 found:false 时**只说"未找到该订单"，不解释原因（防订单号枚举）。
 4. **DMCA / 商标红线**：
@@ -386,7 +415,7 @@ export function buildCSTools(sessionId: string) {
 
     lookupOrder: tool({
       description:
-        "按订单号查订单状态与可执行的售后操作。绝不返回卡密内容、access token、或带 token 的 URL。返回的 lookupUrl 始终是公开的 /orders/lookup 入口，需要用户在该页用订单号+邮箱完成验证后才能查看卡密。",
+        "按订单号查订单状态与可执行的售后操作。绝不返回卡密内容、access token、或带 token 的 URL。返回的 lookupUrl 是公开的 /orders/lookup 入口，已携带 mode=orderNo 和 orderNo 预填参数（用户落地仍需输入查询密码才能查看卡密；密码绝不会出现在 URL 里）。",
       inputSchema: z.object({ orderNo: z.string().min(6).max(40) }),
       execute: async ({ orderNo }) => {
         const order = await prisma.order.findFirst({
@@ -437,14 +466,17 @@ export function buildCSTools(sessionId: string) {
           isExpired,
           canSwitchAccount,
           switchAccountRemaining: remaining,
-          // Public lookup entry; user must enter orderNo + email to access
-          // the full order detail page. Deliberately:
-          // (a) NOT a tokenized URL — that would bypass the email check
+          // Public lookup entry; user must enter the lookup password to
+          // access the full order detail page. Deliberately:
+          // (a) NOT a tokenized URL — that would bypass the password check
           //     and leak card contents to anyone holding the orderNo;
           // (b) relative path — widget runs on the same origin as the
           //     lookup page, so we don't bake in the production domain
-          //     (would otherwise lock previews to prod and vice versa).
-          lookupUrl: "/orders/lookup",
+          //     (would otherwise lock previews to prod and vice versa);
+          // (c) carries `mode=orderNo&orderNo=...` so the user lands with
+          //     the right tab selected and the orderNo prefilled — only
+          //     the password field stays empty (the actual gate).
+          lookupUrl: `/orders/lookup?mode=orderNo&orderNo=${encodeURIComponent(order.orderNo)}`,
         }
       },
     }),
@@ -468,7 +500,7 @@ export function buildCSTools(sessionId: string) {
             // Tell the AI in plain language so it can relay this to the
             // user without inventing one. Common cause: typo or pasted
             // the wrong row from email.
-            hint: "找不到这个订单号。请让用户复核（订单号一般是下单成功页或确认邮件里的那串），或到 /orders/lookup 用邮箱反查后重新提供",
+            hint: "找不到这个订单号。请让用户复核（订单号一般是下单成功页或确认邮件里的那串），或到 /orders/lookup 切「邮箱查询」Tab 用下单邮箱反查后重新提供订单号",
           }
         }
         return {
@@ -796,7 +828,7 @@ export function buildCSTools(sessionId: string) {
             orderNoVerified: false,
             requiresOrderNoFix: Boolean(orderNo),
             message: orderNo
-              ? "您给的订单号系统里查不到，可能是输错了几位。麻烦核对一下重新发给我，或到 [订单查询页](/orders/lookup) 用邮箱反查后再发。"
+              ? "您给的订单号系统里查不到，可能是输错了几位。麻烦核对一下重新发给我，或到 [订单查询页](/orders/lookup) 切「邮箱查询」Tab 用下单邮箱反查您的订单列表后再发订单号给我。"
               : "为了客服后台能定位您的对话，请先告诉我订单号（订单成功页或确认邮件里都有）。如果您是想咨询合作而不是售后，请明确告诉我。",
           }
         }

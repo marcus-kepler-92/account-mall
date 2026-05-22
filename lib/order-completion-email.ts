@@ -29,7 +29,7 @@ export async function sendOrderCompletionEmail(orderId: string): Promise<void> {
         return;
     }
 
-    const lookupUrl = `${config.siteUrl}/orders/lookup?type=orderNo&orderNo=${encodeURIComponent(order.orderNo)}`;
+    const lookupUrl = `${config.siteUrl}/orders/lookup?mode=orderNo&orderNo=${encodeURIComponent(order.orderNo)}`;
 
     const html = await render(
         React.createElement(OrderCompletion, {
