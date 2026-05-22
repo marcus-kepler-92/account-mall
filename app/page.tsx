@@ -13,6 +13,7 @@ import {
   DEFAULT_SEO_SUBTITLE,
 } from "@/lib/seo-keywords"
 import type { ProductCardData } from "@/app/components/product-card"
+import { resolveCrossSellDiscountsForProducts } from "@/lib/cross-sell"
 
 const PAGE_SIZE = 18
 const ANNOUNCEMENTS_LIMIT = 20
@@ -157,6 +158,7 @@ export default async function HomePage({
 }) {
     const params = await searchParams
     const tagParam = params.tag ?? ""
+    const csParam = params.cs ?? null
     const tagSlugs = tagParam
         ? tagParam.split(",").map(s => s.trim()).filter(Boolean).sort()
         : []
@@ -169,20 +171,30 @@ export default async function HomePage({
     const { products, total } = productsResult
 
     const productIds = products.map(p => p.id)
-    const stockCounts = await getCachedStockCounts(productIds)
+    const [stockCounts, csDiscountMap] = await Promise.all([
+        getCachedStockCounts(productIds),
+        // Resolve per-product cross-sell discount for the user's current cs
+        // session. Empty map for anonymous browsing / expired tokens —
+        // products simply render at original price.
+        resolveCrossSellDiscountsForProducts(csParam, productIds),
+    ])
 
-    const productsWithStock: ProductCardData[] = products.map(product => ({
-        id: product.id,
-        name: product.name,
-        slug: product.slug,
-        description: product.description,
-        summary: product.summary,
-        image: product.image,
-        price: product.price,
-        productType: product.productType,
-        stock: product.productType === "AUTO_FETCH" ? 1 : (stockCounts[product.id] ?? 0),
-        tags: product.tags,
-    }))
+    const productsWithStock: ProductCardData[] = products.map(product => {
+        const discountPercent = csDiscountMap.get(product.id)
+        return {
+            id: product.id,
+            name: product.name,
+            slug: product.slug,
+            description: product.description,
+            summary: product.summary,
+            image: product.image,
+            price: product.price,
+            productType: product.productType,
+            stock: product.productType === "AUTO_FETCH" ? 1 : (stockCounts[product.id] ?? 0),
+            tags: product.tags,
+            ...(discountPercent != null && { discountPercent }),
+        }
+    })
 
     const initialData = {
         tags,
@@ -198,7 +210,7 @@ export default async function HomePage({
 
     return (
         <div className="flex min-h-screen flex-col">
-            <SiteHeader />
+            <SiteHeader cs={csParam} />
 
             <main className="flex-1">
                 <div className="mx-auto max-w-6xl px-4 py-5 sm:py-8 xl:max-w-7xl 2xl:max-w-[90rem]">

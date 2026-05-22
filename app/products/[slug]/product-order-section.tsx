@@ -18,7 +18,7 @@ type ProductOrderSectionProps = {
     couponEnabled?: boolean
     requireTurnstile: boolean
     prefilledEmail?: string
-    crossSellToken?: string | null
+    cs?: string | null
     crossSellDiscountPercent?: number | null
 }
 
@@ -38,7 +38,7 @@ export function ProductOrderSection({
     couponEnabled = false,
     requireTurnstile,
     prefilledEmail,
-    crossSellToken = null,
+    cs = null,
     crossSellDiscountPercent = null,
 }: ProductOrderSectionProps) {
     const [exitDiscountToken, setExitDiscountToken] = useState<string | null>(null)
@@ -82,10 +82,10 @@ export function ProductOrderSection({
                 exitDiscountToken={exitDiscountToken}
                 exitDiscountPercent={exitDiscountPercent}
                 onExitDiscountConsumed={handleConsumed}
-                crossSellToken={crossSellToken}
+                cs={cs}
                 crossSellDiscountPercent={crossSellDiscountPercent}
             />
-            {price > 0 && !crossSellToken && (
+            {price > 0 && !cs && (
                 <ExitIntentDialog
                     productId={productId}
                     productName={productName}

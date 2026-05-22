@@ -1092,6 +1092,80 @@ describe("escalateToHuman tool message — uses order-number-driven handoff (no 
   })
 })
 
+describe("buildCSPrompt — 支付成功礼 SOP for price discrepancy", () => {
+  const makeBase = () => ({
+    knowledge: [],
+    products: [
+      {
+        id: "p1",
+        name: "美区 Apple ID",
+        slug: "apple-id-us",
+        summary: null,
+        price: 62,
+        productType: "NORMAL",
+        tags: [],
+      },
+    ],
+    siteName: "空域账号商城",
+    businessHoursText: "09:00 – 22:00",
+  })
+
+  it("includes 支付成功礼 SOP when cross-sell is enabled", () => {
+    const prompt = buildCSPrompt({
+      ...makeBase(),
+      crossSell: { enabled: true, discountPercent: 10, ttlMinutes: 30 },
+    })
+    expect(prompt).toContain("支付成功礼")
+    // Mentions the live discount and TTL so the AI cites accurate figures
+    expect(prompt).toContain("30 分钟")
+    expect(prompt).toMatch(/9\s*折|10%/)
+  })
+
+  it("forbids the AI from re-calling lookup_product when a user-mentioned price isn't in the index", () => {
+    // Regression target: AI saw "55 元" not in index and burned 2 lookup_product
+    // calls trying to find a phantom product, then told the user "we don't sell at ¥55".
+    const prompt = buildCSPrompt({
+      ...makeBase(),
+      crossSell: { enabled: true, discountPercent: 10, ttlMinutes: 30 },
+    })
+    expect(prompt).toMatch(/不要再调 lookup_product/)
+  })
+
+  it("forbids the AI from leaking technical terms to the user", () => {
+    const prompt = buildCSPrompt({
+      ...makeBase(),
+      crossSell: { enabled: true, discountPercent: 10, ttlMinutes: 30 },
+    })
+    // The SOP body should explicitly tell the AI not to say these to users
+    expect(prompt).toMatch(/token|URL|签名|cross-sell/)
+    expect(prompt).toMatch(/禁止/)
+  })
+
+  it("forbids the AI from promising to reactivate / reissue the discount", () => {
+    const prompt = buildCSPrompt({
+      ...makeBase(),
+      crossSell: { enabled: true, discountPercent: 10, ttlMinutes: 30 },
+    })
+    expect(prompt).toMatch(/不要承诺|不画饼|不|没办法补/)
+  })
+
+  it("falls back to a quiet 'feature off' note when cross-sell is disabled or 0%", () => {
+    const prompt = buildCSPrompt({
+      ...makeBase(),
+      crossSell: { enabled: false, discountPercent: 10, ttlMinutes: 30 },
+    })
+    expect(prompt).toMatch(/未启用|功能.*0|折扣.*0/)
+  })
+
+  it("renders the SOP section header so the AI sees it as a top-level rule", () => {
+    const prompt = buildCSPrompt({
+      ...makeBase(),
+      crossSell: { enabled: true, discountPercent: 10, ttlMinutes: 30 },
+    })
+    expect(prompt).toMatch(/##\s*支付成功礼/)
+  })
+})
+
 describe("collectWechat tool message — sets correct expectation (user must scan QR, not wait for callback)", () => {
   beforeEach(() => {
     ;(prisma.agentMessage.findMany as jest.Mock).mockResolvedValue([])

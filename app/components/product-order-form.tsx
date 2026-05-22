@@ -84,7 +84,7 @@ type ProductOrderFormProps = {
     exitDiscountToken?: string | null
     exitDiscountPercent?: number | null
     onExitDiscountConsumed?: () => void
-    crossSellToken?: string | null
+    cs?: string | null
     crossSellDiscountPercent?: number | null
 }
 
@@ -102,7 +102,7 @@ export function ProductOrderForm({
     exitDiscountToken = null,
     exitDiscountPercent = null,
     onExitDiscountConsumed,
-    crossSellToken = null,
+    cs = null,
     crossSellDiscountPercent = null,
 }: ProductOrderFormProps) {
     const [showOrderPassword, setShowOrderPassword] = useState(false)
@@ -174,7 +174,7 @@ export function ProductOrderForm({
             : null
 
     const activeCrossSellDiscount =
-        crossSellToken && crossSellDiscountPercent != null
+        cs && crossSellDiscountPercent != null
             ? crossSellDiscountPercent
             : null
 
@@ -222,8 +222,8 @@ export function ProductOrderForm({
                 fingerprintHash: data.fingerprintHash,
                 ...(turnstileToken && { turnstileToken }),
             }
-            if (activeCrossSellDiscount != null && crossSellToken) {
-                payload.crossSellToken = crossSellToken
+            if (activeCrossSellDiscount != null && cs) {
+                payload.cs = cs
             } else if (codeTrimmed && isValidDiscountCodeFormat(codeTrimmed)) {
                 payload.promoCode = codeTrimmed
             } else if (exitDiscountToken && activeExitDiscount != null) {

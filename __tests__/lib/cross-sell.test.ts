@@ -13,7 +13,19 @@ import { prismaMock } from "../../__mocks__/prisma"
 import {
     getCrossSellSetting,
     getCrossSellRecommendations,
+    getEligibleTargetIds,
+    resolveCrossSellDiscount,
+    resolveCrossSellDiscountsForProducts,
+    getCsExpiryMs,
 } from "@/lib/cross-sell"
+import { generateCsToken } from "@/lib/cross-sell-token"
+
+jest.mock("@/lib/config", () => ({
+    config: {
+        crossSellTokenSecret: "test-cross-sell-secret-16chars!!",
+        betterAuthSecret: "fallback-secret-16chars!!",
+    },
+}))
 
 // Helper: build a product-like object for mocking
 function makeProduct(overrides: Record<string, unknown> = {}) {
@@ -178,5 +190,319 @@ describe("getCrossSellRecommendations", () => {
         )
         const results = await getCrossSellRecommendations(sourceProductId, 3)
         expect(results).toEqual([])
+    })
+})
+
+describe("getEligibleTargetIds (projection of getCrossSellRecommendations)", () => {
+    const sourceProductId = "source-prod"
+
+    beforeEach(() => {
+        prismaMock.productCrossSell.findMany.mockResolvedValue([])
+        prismaMock.product.findUnique.mockResolvedValue(
+            makeProduct({
+                id: sourceProductId,
+                tags: [{ id: "tag-1", name: "Gaming", slug: "gaming" }],
+            }) as any,
+        )
+        prismaMock.product.findMany.mockResolvedValue([])
+        prismaMock.card.count.mockResolvedValue(5)
+    })
+
+    it("returns IDs of admin-bound targets", async () => {
+        prismaMock.productCrossSell.findMany.mockResolvedValue([
+            {
+                id: "cs-1",
+                sourceProductId,
+                targetProductId: "prod-a",
+                sortOrder: 0,
+                createdAt: new Date(),
+                target: makeProduct({ id: "prod-a" }),
+            },
+            {
+                id: "cs-2",
+                sourceProductId,
+                targetProductId: "prod-b",
+                sortOrder: 1,
+                createdAt: new Date(),
+                target: makeProduct({ id: "prod-b" }),
+            },
+        ] as any)
+
+        const ids = await getEligibleTargetIds(sourceProductId, 3)
+        expect(ids.has("prod-a")).toBe(true)
+        expect(ids.has("prod-b")).toBe(true)
+    })
+
+    it("includes tag-matched fallback when admin bindings under limit", async () => {
+        prismaMock.productCrossSell.findMany.mockResolvedValue([
+            {
+                id: "cs-1",
+                sourceProductId,
+                targetProductId: "prod-a",
+                sortOrder: 0,
+                createdAt: new Date(),
+                target: makeProduct({ id: "prod-a" }),
+            },
+        ] as any)
+        prismaMock.product.findMany.mockResolvedValue([
+            makeProduct({ id: "prod-tag-1" }),
+            makeProduct({ id: "prod-tag-2" }),
+        ] as any)
+
+        const ids = await getEligibleTargetIds(sourceProductId, 3)
+        expect(ids.has("prod-a")).toBe(true)
+        expect(ids.has("prod-tag-1")).toBe(true)
+        expect(ids.has("prod-tag-2")).toBe(true)
+    })
+
+    it("excludes out-of-stock targets (matches recommendation behavior)", async () => {
+        // Regression: previously getEligibleTargetIds skipped stock filtering,
+        // so it could return IDs that getCrossSellRecommendations had already
+        // filtered out — causing 推荐区 ↔ resolver drift. Now they share the
+        // candidate pool and both honor stock.
+        prismaMock.product.findMany.mockResolvedValue([
+            makeProduct({ id: "prod-in-stock" }),
+            makeProduct({ id: "prod-no-stock" }),
+        ] as any)
+        prismaMock.card.count.mockImplementation((async ({ where }: any) => {
+            if (where.productId === "prod-in-stock") return 5
+            return 0
+        }) as any)
+
+        const ids = await getEligibleTargetIds(sourceProductId, 3)
+        expect(ids.has("prod-in-stock")).toBe(true)
+        expect(ids.has("prod-no-stock")).toBe(false)
+    })
+
+    it("never includes the source product itself", async () => {
+        prismaMock.productCrossSell.findMany.mockResolvedValue([
+            {
+                id: "cs-1",
+                sourceProductId,
+                targetProductId: sourceProductId,
+                sortOrder: 0,
+                createdAt: new Date(),
+                target: makeProduct({ id: sourceProductId }),
+            },
+        ] as any)
+        const ids = await getEligibleTargetIds(sourceProductId, 3)
+        expect(ids.has(sourceProductId)).toBe(false)
+    })
+})
+
+describe("resolveCrossSellDiscount (single-source per token)", () => {
+    const sourceOrderId = "src-order-1"
+    const sourceProductId = "src-prod"
+    const targetProductId = "tgt-prod"
+    const now = new Date()
+
+    beforeEach(() => {
+        prismaMock.crossSellSetting.findUnique.mockResolvedValue({
+            id: "singleton",
+            enabled: true,
+            discountPercent: new Prisma.Decimal("10"),
+            ttlMinutes: 30,
+            createdAt: now,
+            updatedAt: now,
+        } as any)
+        prismaMock.order.findUnique.mockResolvedValue({
+            id: sourceOrderId,
+            status: "COMPLETED",
+            productId: sourceProductId,
+            paidAt: now,
+        } as any)
+        prismaMock.productCrossSell.findMany.mockResolvedValue([
+            {
+                id: "cs-binding",
+                sourceProductId,
+                targetProductId,
+                sortOrder: 0,
+                createdAt: now,
+                target: makeProduct({ id: targetProductId }),
+            },
+        ] as any)
+        prismaMock.product.findUnique.mockResolvedValue(
+            makeProduct({ id: sourceProductId, tags: [] }) as any,
+        )
+        prismaMock.product.findMany.mockResolvedValue([])
+        prismaMock.card.count.mockResolvedValue(5)
+        prismaMock.crossSellUsage.findUnique.mockResolvedValue(null)
+    })
+
+    it("returns null for missing token", async () => {
+        expect(await resolveCrossSellDiscount(null, targetProductId)).toBeNull()
+        expect(await resolveCrossSellDiscount(undefined, targetProductId)).toBeNull()
+        expect(await resolveCrossSellDiscount("", targetProductId)).toBeNull()
+    })
+
+    it("returns null for invalid token", async () => {
+        expect(
+            await resolveCrossSellDiscount("garbage.token.value", targetProductId),
+        ).toBeNull()
+    })
+
+    it("returns discountPercent for valid token + eligible target + unconsumed", async () => {
+        const token = generateCsToken(sourceOrderId, 60_000)!
+        const result = await resolveCrossSellDiscount(token, targetProductId)
+        expect(result).toBe(10)
+    })
+
+    it("returns null when source order not COMPLETED", async () => {
+        prismaMock.order.findUnique.mockResolvedValue({
+            id: sourceOrderId,
+            status: "PENDING",
+            productId: sourceProductId,
+            paidAt: now,
+        } as any)
+        const token = generateCsToken(sourceOrderId, 60_000)!
+        expect(await resolveCrossSellDiscount(token, targetProductId)).toBeNull()
+    })
+
+    it("returns null when cross-sell globally disabled", async () => {
+        prismaMock.crossSellSetting.findUnique.mockResolvedValue({
+            id: "singleton",
+            enabled: false,
+            discountPercent: new Prisma.Decimal("10"),
+            ttlMinutes: 30,
+            createdAt: now,
+            updatedAt: now,
+        } as any)
+        const token = generateCsToken(sourceOrderId, 60_000)!
+        expect(await resolveCrossSellDiscount(token, targetProductId)).toBeNull()
+    })
+
+    it("returns null when product not in the source's eligible target set", async () => {
+        const token = generateCsToken(sourceOrderId, 60_000)!
+        expect(
+            await resolveCrossSellDiscount(token, "unrelated-product-id"),
+        ).toBeNull()
+    })
+
+    it("returns null when CrossSellUsage already consumed (this source × target)", async () => {
+        prismaMock.crossSellUsage.findUnique.mockResolvedValue({
+            id: "usage-1",
+        } as any)
+        const token = generateCsToken(sourceOrderId, 60_000)!
+        expect(await resolveCrossSellDiscount(token, targetProductId)).toBeNull()
+    })
+
+    it("returns null when paidAt + TTL has elapsed (data-layer TTL guard)", async () => {
+        const longAgo = new Date(Date.now() - 60 * 60_000)
+        prismaMock.order.findUnique.mockResolvedValue({
+            id: sourceOrderId,
+            status: "COMPLETED",
+            productId: sourceProductId,
+            paidAt: longAgo,
+        } as any)
+        // Token still valid (long ttlMs), but paidAt+TTL is past
+        const token = generateCsToken(sourceOrderId, 60 * 60_000)!
+        expect(await resolveCrossSellDiscount(token, targetProductId)).toBeNull()
+    })
+})
+
+describe("resolveCrossSellDiscountsForProducts (single-source per token)", () => {
+    const sourceOrderId = "src-order-1"
+    const sourceProductId = "src-prod"
+    const now = new Date()
+
+    beforeEach(() => {
+        prismaMock.crossSellSetting.findUnique.mockResolvedValue({
+            id: "singleton",
+            enabled: true,
+            discountPercent: new Prisma.Decimal("10"),
+            ttlMinutes: 30,
+            createdAt: now,
+            updatedAt: now,
+        } as any)
+        prismaMock.order.findUnique.mockResolvedValue({
+            id: sourceOrderId,
+            status: "COMPLETED",
+            productId: sourceProductId,
+            paidAt: now,
+        } as any)
+        prismaMock.productCrossSell.findMany.mockResolvedValue([
+            {
+                id: "cs-pa",
+                sourceProductId,
+                targetProductId: "p-a",
+                sortOrder: 0,
+                createdAt: now,
+                target: makeProduct({ id: "p-a" }),
+            },
+            {
+                id: "cs-pb",
+                sourceProductId,
+                targetProductId: "p-b",
+                sortOrder: 1,
+                createdAt: now,
+                target: makeProduct({ id: "p-b" }),
+            },
+        ] as any)
+        prismaMock.product.findUnique.mockResolvedValue(
+            makeProduct({ id: sourceProductId, tags: [] }) as any,
+        )
+        prismaMock.product.findMany.mockResolvedValue([])
+        prismaMock.card.count.mockResolvedValue(5)
+        prismaMock.crossSellUsage.findMany.mockResolvedValue([])
+    })
+
+    it("returns empty map for missing token", async () => {
+        const m = await resolveCrossSellDiscountsForProducts(null, ["p-a"])
+        expect(m.size).toBe(0)
+    })
+
+    it("returns empty map for empty productIds", async () => {
+        const token = generateCsToken(sourceOrderId, 60_000)!
+        const m = await resolveCrossSellDiscountsForProducts(token, [])
+        expect(m.size).toBe(0)
+    })
+
+    it("marks eligible products with discountPercent, skips others", async () => {
+        const token = generateCsToken(sourceOrderId, 60_000)!
+        const m = await resolveCrossSellDiscountsForProducts(token, [
+            "p-a",
+            "p-b",
+            "p-unrelated",
+        ])
+        expect(m.get("p-a")).toBe(10)
+        expect(m.get("p-b")).toBe(10)
+        expect(m.has("p-unrelated")).toBe(false)
+    })
+
+    it("skips products already consumed by the token's source", async () => {
+        prismaMock.crossSellUsage.findMany.mockResolvedValue([
+            { targetProductId: "p-a" },
+        ] as any)
+        const token = generateCsToken(sourceOrderId, 60_000)!
+        const m = await resolveCrossSellDiscountsForProducts(token, ["p-a", "p-b"])
+        expect(m.has("p-a")).toBe(false)
+        expect(m.get("p-b")).toBe(10)
+    })
+
+    it("queries CrossSellUsage scoped to the token's source", async () => {
+        const findManySpy = prismaMock.crossSellUsage.findMany as jest.Mock
+        findManySpy.mockResolvedValue([])
+        const token = generateCsToken(sourceOrderId, 60_000)!
+        await resolveCrossSellDiscountsForProducts(token, ["p-a"])
+
+        const callArgs = findManySpy.mock.calls[0][0]
+        // Scalar, not `{ in: [...] }` — single-source semantics.
+        expect(callArgs.where.sourceOrderId).toBe(sourceOrderId)
+    })
+})
+
+describe("getCsExpiryMs", () => {
+    it("returns paidAt + ttlMinutes when paidAt present", () => {
+        const paidAt = new Date("2026-01-01T00:00:00Z")
+        const result = getCsExpiryMs(paidAt, 30)
+        expect(result).toBe(paidAt.getTime() + 30 * 60_000)
+    })
+
+    it("falls back to now + ttlMinutes when paidAt null", () => {
+        const before = Date.now()
+        const result = getCsExpiryMs(null, 5)
+        const after = Date.now()
+        expect(result).toBeGreaterThanOrEqual(before + 5 * 60_000)
+        expect(result).toBeLessThanOrEqual(after + 5 * 60_000)
     })
 })

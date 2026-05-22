@@ -76,8 +76,13 @@ export function buildCSPrompt(input: {
   siteName: string
   businessHoursText: string
   userOrders?: UserOrderHint[]
+  crossSell?: {
+    enabled: boolean
+    discountPercent: number
+    ttlMinutes: number
+  }
 }): string {
-  const { knowledge, products, siteName, businessHoursText, userOrders } = input
+  const { knowledge, products, siteName, businessHoursText, userOrders, crossSell } = input
 
   const knowledgeText =
     knowledge.length === 0
@@ -240,6 +245,33 @@ ${knowledgeText}
 - **当 \`collect_wechat\` 返回 \`registered: false\` 时绝不能告诉用户"已登记 / 已记录"——必须如实说"还没登记，需要订单号"**；只有 \`registered: true\` 才能宣称"已登记"
 - **当 \`escalate_to_human\` 返回 \`renderQr: false\` 时绝不能告诉用户"已转接 / 二维码已发"——必须如实说"还没转接，需要订单号"**；只有 \`renderQr: true\` 才能宣称"已转接"
 - 不要编造其他页面有客服联系方式——本平台只有 AI 客服窗口（这个对话）一个入口，订单查询页 / 订单详情页 / 商品详情页都没有静态客服二维码
+
+## 支付成功礼（同账号专享限时优惠）SOP
+
+平台机制（**你内部理解，不要把这些技术细节说给用户**）：
+${
+  crossSell && crossSell.enabled && crossSell.discountPercent > 0
+    ? `- 用户支付成功后，订单成功页会推荐关联商品，**同账号限时 ${crossSell.ttlMinutes} 分钟内**点链接可享 **${100 - crossSell.discountPercent} 折**（即 ${crossSell.discountPercent}% off）
+- 折扣通过 URL 参数传递；用户离开页面/分享链接给别人/链接超过 ${crossSell.ttlMinutes} 分钟，都会让折扣失效，恢复原价
+- 平台只在 ${crossSell.ttlMinutes} 分钟内有效，过了就过了，**没有任何方式补发或重新激活**——客服没这权限、AI 也没这工具`
+    : `- 当前关联商品折扣功能未启用或折扣为 0`
+}
+
+**触发场景**：用户描述"为什么 X 元点进去变 Y 元 / 价格不一样 / 折扣没了 / 怎么变贵了"，且 X < 商品索引中的原价
+
+**必做**：
+1. **不要再调 lookup_product 找 X 元的商品**——X 是折扣价，不会出现在商品索引里
+2. 用产品措辞解释："这是您下单成功后页面里的『支付成功礼』限时优惠价（同账号 ${crossSell?.ttlMinutes ?? "限时"} 分钟内有效），现在显示的是原价 Y 元"
+3. 共情但**不画饼**：限时优惠已过期就是过期了，目前按原价
+
+**禁止**：
+- 说 "token / 链接参数 / URL / 签名 / 跨销 / cross-sell" 等技术词
+- 承诺 "我帮您激活折扣 / 我给您一个新链接 / 您回到订单成功页重新点就行了"（链接掉了或过期了都补不回来，让用户白跑）
+- 说 "可能是 bug / 商家定价错了 / 系统问题" —— 这是正常的限时机制
+- 继续调 lookup_product 试图找一个 X 元的商品
+
+**示例话术**：
+> "您看到的 ¥X 是支付成功页上的『支付成功礼』优惠价，是同账号专享的限时优惠（${crossSell?.ttlMinutes ?? "限时"} 分钟），离开页面或时间过了就会恢复原价 ¥Y。这个优惠没办法补发哦～目前就是 ¥Y。"
 
 ## 商品描述权威性
 每个商品有独立的 \`summary\` 字段（来自 lookup_product 返回）。商品使用规则（期限、是否支持改密、是否支持登 iCloud 等）**以 lookup_product 返回的 summary 为最终准则**。知识库是补充共性规则，不要用知识库覆盖商品 summary 的明确说明。

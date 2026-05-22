@@ -22,6 +22,11 @@ export type ProductCardData = {
     stock: number
     productType?: "NORMAL" | "AUTO_FETCH"
     tags: { id: string; name: string; slug: string }[]
+    // Set by /api/products when ?cs=<token> is present and this product is an
+    // eligible cross-sell target of the source order's product. Absent for
+    // anonymous browsing or expired sessions. Grid-level renderers should
+    // forward this to <ProductCard discountPercent={...}>.
+    discountPercent?: number
 }
 
 type ProductCardProps = {
@@ -29,6 +34,7 @@ type ProductCardProps = {
     gradientIndex?: number
     className?: string
     code?: string
+    cs?: string
     discountPercent?: number
     href?: string
     horizontal?: boolean
@@ -37,7 +43,7 @@ type ProductCardProps = {
 /**
  * Product card with equal height in grid, cover maintains aspect ratio (1:1).
  */
-export function ProductCard({ product, gradientIndex = 0, className, code, discountPercent, href, horizontal }: ProductCardProps) {
+export function ProductCard({ product, gradientIndex = 0, className, code, cs, discountPercent, href, horizontal }: ProductCardProps) {
     const descriptionFallback = descriptionToPlainText(product.description, 80)
     const briefRaw = product.summary?.trim() || descriptionFallback
     const brief = briefRaw.slice(0, 80)
@@ -49,6 +55,7 @@ export function ProductCard({ product, gradientIndex = 0, className, code, disco
         const params = new URLSearchParams()
         if (isSoldOut) params.set("restock", "1")
         if (code) params.set("code", code)
+        if (cs) params.set("cs", cs)
         const query = params.toString()
         return `/products/${product.slug}${query ? `?${query}` : ""}`
     }
@@ -176,9 +183,9 @@ export function ProductCard({ product, gradientIndex = 0, className, code, disco
                             ) : (
                                 <>
                                     {!isSoldOut && hasDiscount ? (
-                                        <span className="flex items-baseline gap-0.5">
-                                            <span className="line-through text-muted-foreground text-xs mr-1">¥{product.price.toFixed(2)}</span>
-                                            <span className="font-bold text-destructive">¥{(product.price * (1 - discountPercent! / 100)).toFixed(2)}</span>
+                                        <span className="flex flex-col leading-tight">
+                                            <span className="line-through text-muted-foreground text-[11px]">¥{product.price.toFixed(2)}</span>
+                                            <span className="font-bold text-destructive text-base tabular-nums sm:text-lg">¥{(product.price * (1 - discountPercent! / 100)).toFixed(2)}</span>
                                         </span>
                                     ) : (
                                         <span

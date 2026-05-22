@@ -23,6 +23,7 @@ import {
 } from "@/lib/agent-persistence"
 import { config } from "@/lib/config"
 import { getSiteSettings } from "@/lib/site-settings"
+import { getCrossSellSetting } from "@/lib/cross-sell"
 
 export const runtime = "nodejs"
 
@@ -76,12 +77,15 @@ export async function POST(req: Request) {
   await persistUserMessage(sessionId, messages.at(-1)!)
 
   // 4. Pull knowledge + ACTIVE product index + user's verified recent orders +
-  //    runtime site settings (for business-hours line in the system prompt)
-  const [knowledge, products, userOrders, settings] = await Promise.all([
+  //    runtime site settings (for business-hours line in the system prompt) +
+  //    cross-sell setting (so the agent can explain the "支付成功礼" mechanic
+  //    in the customer's terms when they ask about price discrepancies)
+  const [knowledge, products, userOrders, settings, crossSell] = await Promise.all([
     fetchPublishedKnowledge(),
     fetchActiveProducts(),
     fetchUserOrdersByHints(orderHints),
     getSiteSettings(),
+    getCrossSellSetting(),
   ])
 
   const pad = (n: number) => String(n).padStart(2, "0")
@@ -117,6 +121,7 @@ export async function POST(req: Request) {
       siteName: config.siteName,
       businessHoursText,
       userOrders,
+      crossSell,
     }),
     messages: modelMessages,
     tools: buildCSTools(sessionId),

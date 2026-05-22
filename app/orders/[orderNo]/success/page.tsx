@@ -20,13 +20,17 @@ import { OrderAutoFetchSection } from "@/app/components/order-detail/auto-fetch-
 import {
   getCrossSellSetting,
   getCrossSellRecommendations,
+  getCsExpiryMs,
+  getCsRemainingMs,
+  resolveCrossSellDiscountsForProducts,
+  signCsTokenForOrder,
 } from "@/lib/cross-sell";
-import { generateCrossSellToken } from "@/lib/cross-sell-token";
+import { appendCsParam } from "@/lib/cs-params";
 import { CrossSellSection } from "./cross-sell-section";
 
 type PageProps = {
   params: Promise<{ orderNo: string }>;
-  searchParams: Promise<{ token?: string }>;
+  searchParams: Promise<{ token?: string; cs?: string }>;
 };
 
 export const dynamic = "force-dynamic";
@@ -36,12 +40,12 @@ export default async function OrderSuccessPage({
   searchParams,
 }: PageProps) {
   const { orderNo } = await params;
-  const { token } = await searchParams;
+  const { token, cs: incomingCs } = await searchParams;
 
   if (!token || !verifyOrderSuccessToken(orderNo, token)) {
     return (
       <div className="flex min-h-screen flex-col">
-        <SiteHeader />
+        <SiteHeader cs={incomingCs} />
         <main className="flex-1 px-4 py-12">
           <div className="mx-auto max-w-md">
             <Card>
@@ -96,7 +100,7 @@ export default async function OrderSuccessPage({
   if (order.status !== "COMPLETED") {
     return (
       <div className="flex min-h-screen flex-col">
-        <SiteHeader />
+        <SiteHeader cs={incomingCs} />
         <main className="flex-1 px-4 py-12">
           <div className="mx-auto max-w-md">
             <Card>
@@ -138,41 +142,55 @@ export default async function OrderSuccessPage({
     remainingSwitches > 0 &&
     notExpired;
 
-  // Cross-sell section data
+  // Cross-sell section data — single cs token bound to this order, applied to
+  // every recommendation link and consumed across the storefront for the TTL
+  // window starting from paidAt. TTL is anchored to paidAt (not "now") so the
+  // session doesn't reset when the user refreshes this page.
   const crossSellSetting = await getCrossSellSetting();
   const crossSellRecommendations = crossSellSetting.enabled
     ? await getCrossSellRecommendations(order.productId)
     : [];
 
   const ttlMs = crossSellSetting.ttlMinutes * 60_000;
+  const csExpiresAt = getCsExpiryMs(order.paidAt, crossSellSetting.ttlMinutes);
+  const csInitialRemainingMs = getCsRemainingMs(csExpiresAt);
 
-  const hasDiscount = crossSellSetting.discountPercent > 0;
+  // Sign a fresh cs token anchored to paidAt + TTL. Returns null past the
+  // window so the recommendation links degrade to plain (no-discount) URLs.
+  const csToken = crossSellSetting.enabled
+    ? signCsTokenForOrder(order.id, order.paidAt, crossSellSetting.ttlMinutes)
+    : null;
 
+  // Per-item discount via the same resolver the product detail page uses.
+  // Without this, the recommendation card would advertise a discounted price
+  // (just by multiplying setting.discountPercent) while the detail page —
+  // which honors CrossSellUsage / eligibility / TTL — would show the original.
+  // The visual lie ("¥37.80 here, ¥42 there") is exactly the bug we're fixing.
+  const recDiscountMap = csToken
+    ? await resolveCrossSellDiscountsForProducts(
+        csToken,
+        crossSellRecommendations.map((p) => p.id),
+      )
+    : new Map<string, number>();
+
+  // Filter out recommendations where the resolver says no discount applies —
+  // already consumed via CrossSellUsage, ineligible after the session sweep,
+  // or out of TTL. Showing such items at original price next to discounted
+  // ones in the same "支付成功礼" block creates a visual lie ("title says 9折
+  // but this row isn't?") and lures users into clicks that land on full price.
+  // If everything is filtered out, the whole section won't render anyway
+  // (caller checks crossSellItems.length > 0).
   const crossSellItems = crossSellSetting.enabled
     ? crossSellRecommendations
         .map((product) => {
-          let href: string;
-          if (hasDiscount) {
-            const csToken = generateCrossSellToken(
-              {
-                sourceOrderId: order.id,
-                targetProductId: product.id,
-                discountPercent: crossSellSetting.discountPercent,
-              },
-              ttlMs,
-            );
-            if (!csToken) return null;
-            const params = new URLSearchParams({ email: order.email, csToken });
-            href = `/products/${product.slug}?${params}`;
-          } else {
-            // No discount — plain link with email prefill only
-            const params = new URLSearchParams({ email: order.email });
-            href = `/products/${product.slug}?${params}`;
-          }
+          const itemDiscount = recDiscountMap.get(product.id) ?? 0;
+          if (itemDiscount <= 0) return null;
+          const baseParams = new URLSearchParams({ email: order.email });
+          const baseHref = `/products/${product.slug}?${baseParams}`;
           return {
             product,
-            href,
-            discountPercent: crossSellSetting.discountPercent,
+            href: appendCsParam(baseHref, csToken),
+            discountPercent: itemDiscount,
           };
         })
         .filter((x): x is NonNullable<typeof x> => x !== null)
@@ -188,7 +206,7 @@ export default async function OrderSuccessPage({
         amount={Number(order.amount)}
         isFree={Number(order.amount) === 0}
       />
-      <SiteHeader />
+      <SiteHeader cs={csToken ?? incomingCs} />
       <main className="flex-1 py-8">
         <div className="mx-auto max-w-2xl space-y-4 px-4 pb-8">
           <div className="text-center">
@@ -241,7 +259,8 @@ export default async function OrderSuccessPage({
               recommendations={crossSellItems}
               discountPercent={crossSellSetting.discountPercent}
               ttlMs={ttlMs}
-              orderId={order.id}
+              expiresAt={csExpiresAt}
+              initialRemainingMs={csInitialRemainingMs}
             />
           )}
         </div>

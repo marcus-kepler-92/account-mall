@@ -50,6 +50,7 @@ export function ProductCatalog({ initialData }: { initialData?: InitialData }) {
     const searchParams = useSearchParams()
     const tagParam = searchParams.get("tag") ?? ""
     const codeParam = searchParams.get("code") ?? ""
+    const csParam = searchParams.get("cs") ?? ""
     const selectedTagSlugs = parseTagFromUrl(searchParams.get("tag"))
 
     const [searchInput, setSearchInput] = useState("")
@@ -70,6 +71,7 @@ export function ProductCatalog({ initialData }: { initialData?: InitialData }) {
     if (search.trim()) productsParams.set("q", search.trim())
     if (tagParam) productsParams.set("tag", tagParam)
     if (codeParam) productsParams.set("code", codeParam)
+    if (csParam) productsParams.set("cs", csParam)
     if (sort !== "default") productsParams.set("sort", sort)
     productsParams.set("page", String(currentPage))
     productsParams.set("pageSize", String(PAGE_SIZE))
@@ -81,7 +83,7 @@ export function ProductCatalog({ initialData }: { initialData?: InitialData }) {
         error: queryError,
         refetch: refetchProducts,
     } = useQuery<{ data: ProductCardData[]; meta: { totalPages: number } }>({
-        queryKey: ["products", search, tagParam, codeParam, sort, currentPage],
+        queryKey: ["products", search, tagParam, codeParam, csParam, sort, currentPage],
         queryFn: () => fetchJson(`/api/products?${productsParams}`),
         initialData: initialData?.products,
         staleTime: 60 * 1000,
@@ -255,6 +257,7 @@ export function ProductCatalog({ initialData }: { initialData?: InitialData }) {
                     currentPage={currentPage}
                     totalPages={totalPages}
                     codeParam={codeParam}
+                    csParam={csParam}
                     onPageChange={setCurrentPage}
                     onRetry={refetchProducts}
                 />

@@ -15,7 +15,8 @@ import { config } from "@/lib/config"
 import { verifyTurnstileToken } from "@/lib/turnstile"
 import { isStorefrontTurnstileEnforced } from "@/lib/turnstile-policy"
 import { verifyExitDiscountToken, type ExitDiscountPayload } from "@/lib/exit-discount"
-import { verifyCrossSellToken } from "@/lib/cross-sell-token"
+import { verifyCsToken } from "@/lib/cross-sell-token"
+import { resolveCrossSellDiscount } from "@/lib/cross-sell"
 import { scrapeMultipleUrls } from "@/lib/scrape-shared-accounts"
 import { sharedAccountToCardPayload, toCardContentJson, MANUAL_BLACKLIST_REASON } from "@/lib/auto-fetch-card"
 import { createOrderSuccessToken } from "@/lib/order-success-token"
@@ -447,7 +448,7 @@ export async function POST(request: NextRequest) {
         return validationError(parsed.error.flatten())
     }
 
-    const { productId, email, orderPassword, quantity, paymentMethod, turnstileToken, promoCode: bodyPromoCode, exitDiscountToken, crossSellToken, fingerprintHash: rawFingerprintHash } = parsed.data
+    const { productId, email, orderPassword, quantity, paymentMethod, turnstileToken, promoCode: bodyPromoCode, exitDiscountToken, cs, fingerprintHash: rawFingerprintHash } = parsed.data
     const fingerprintHash = rawFingerprintHash?.trim() || null
 
     // 优惠码：用户主动填写，用于归因 + 折扣；受 couponEnabled 限制
@@ -593,35 +594,35 @@ export async function POST(request: NextRequest) {
         }
     }
 
-    // Cross-sell discount: verify HMAC token and one-time usage constraint
+    // Cross-sell discount: token now carries only sourceOrderId; eligibility and
+    // discount percent are resolved via resolveCrossSellDiscount (HMAC + source
+    // order COMPLETED + setting enabled + TTL from paidAt + eligible target +
+    // CrossSellUsage unique). On top of that, the buyer email must match the
+    // source order's email — defense against shared tokens (URL token leak
+    // shouldn't let a stranger claim a discount on someone else's order).
     let crossSellDiscountPercent: number | null = null
     let crossSellPayload: { sourceOrderId: string; targetProductId: string; discountPercent: number } | null = null
-    if (crossSellToken) {
-        const csVerify = verifyCrossSellToken(crossSellToken)
+    if (cs) {
+        const csVerify = verifyCsToken(cs)
         if (csVerify.valid && csVerify.payload) {
-            const p = csVerify.payload
-            if (p.targetProductId === productId) {
-                // Source order must be COMPLETED and belong to the same buyer email
-                const sourceOrder = await prisma.order.findUnique({
-                    where: { id: p.sourceOrderId },
-                    select: { status: true, email: true },
-                })
-                if (
-                    sourceOrder?.status === "COMPLETED" &&
-                    sourceOrder.email === email.trim().toLowerCase()
-                ) {
-                    // One-time: check CrossSellUsage not already consumed
-                    const usageExists = await prisma.crossSellUsage.findUnique({
-                        where: { sourceOrderId_targetProductId: { sourceOrderId: p.sourceOrderId, targetProductId: p.targetProductId } },
-                    })
-                    if (!usageExists) {
-                        crossSellDiscountPercent = p.discountPercent
-                        crossSellPayload = { sourceOrderId: p.sourceOrderId, targetProductId: p.targetProductId, discountPercent: p.discountPercent }
+            const sourceOrderId = csVerify.payload.sourceOrderId
+            const sourceOrder = await prisma.order.findUnique({
+                where: { id: sourceOrderId },
+                select: { email: true },
+            })
+            if (sourceOrder?.email === email.trim().toLowerCase()) {
+                const discountPercent = await resolveCrossSellDiscount(cs, productId)
+                if (discountPercent != null) {
+                    crossSellDiscountPercent = discountPercent
+                    crossSellPayload = {
+                        sourceOrderId,
+                        targetProductId: productId,
+                        discountPercent,
                     }
                 }
             }
         }
-        // If token is invalid/expired/used: silently skip discount, proceed at full price
+        // Invalid / expired / used / wrong email: silently skip discount, proceed at full price
     }
 
     // ─── AUTO_FETCH：实时爬取，随机取一个账号，单次领取 ─────────────────────────

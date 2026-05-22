@@ -11,6 +11,7 @@ type Props = {
     currentPage: number
     totalPages: number
     codeParam: string
+    csParam: string
     onPageChange: (page: number) => void
     onRetry: () => void
 }
@@ -22,6 +23,7 @@ export function ProductCatalogGrid({
     currentPage,
     totalPages,
     codeParam,
+    csParam,
     onPageChange,
     onRetry,
 }: Props) {
@@ -71,6 +73,8 @@ export function ProductCatalogGrid({
                         product={product}
                         gradientIndex={idx}
                         code={codeParam || undefined}
+                        cs={csParam || undefined}
+                        discountPercent={product.discountPercent}
                     />
                 ))}
             </div>

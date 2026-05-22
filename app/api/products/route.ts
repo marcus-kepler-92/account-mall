@@ -5,6 +5,7 @@ import { createProductSchema } from "@/lib/validations/product";
 import { config } from "@/lib/config";
 import { unauthorized, invalidJsonBody, validationError, conflict } from "@/lib/api-response";
 import { revalidateProducts } from "@/lib/revalidate-storefront";
+import { resolveCrossSellDiscountsForProducts } from "@/lib/cross-sell";
 
 /**
  * GET /api/products
@@ -106,17 +107,28 @@ export async function GET(request: NextRequest) {
 
     const stockMap = new Map(stockCounts.map((s) => [s.productId, s._count.id]));
 
+    // Cross-sell session: when the storefront passes ?cs=<token>, mark each
+    // eligible product with its applicable discountPercent so cards render
+    // the discounted price. Admin requests skip this — admin views show raw
+    // catalog data, not customer-personalized pricing.
+    const csToken = isAdmin ? null : searchParams.get("cs");
+    const discountMap = csToken
+        ? await resolveCrossSellDiscountsForProducts(csToken, productIds)
+        : new Map<string, number>();
+
     const productsWithStock = products.map((product) => {
         const { sourceUrl, costPerUnit, ...productRest } = product as typeof product & {
             costPerUnit?: unknown
         };
         const isAutoFetch = product.productType === "AUTO_FETCH";
+        const discountPercent = discountMap.get(product.id) ?? null;
         return {
             ...productRest,
             price: Number(product.price),
             productType: product.productType ?? "NORMAL",
             // AUTO_FETCH 在列表里按「有货」展示，不依赖库存数
             stock: isAutoFetch ? 1 : (stockMap.get(product.id) ?? 0),
+            ...(discountPercent != null && { discountPercent }),
             ...(isAdmin && {
                 sourceUrl: sourceUrl ?? null,
                 costPerUnit: costPerUnit == null ? null : Number(costPerUnit),

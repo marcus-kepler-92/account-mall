@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Clock, Package, Sparkles } from "lucide-react";
@@ -12,34 +12,40 @@ import type { ProductCardData } from "@/app/components/product-card";
 type CrossSellRecommendation = {
   product: ProductCardData;
   href: string;
+  // Per-item, resolver-honest discount. 0 means "no discount applies right
+  // now" (e.g. already consumed via CrossSellUsage, ineligible after sweep,
+  // or out of TTL window). Kept per-item rather than as a section-wide prop
+  // so the recommendation never advertises a price the detail page won't honor.
   discountPercent: number;
 };
 
 type CrossSellSectionProps = {
   recommendations: CrossSellRecommendation[];
+  // Header-level rate used only for the "支付成功礼 · 同账号专享 N 折" badge.
+  // Individual rows use their own `discountPercent` for actual price rendering.
   discountPercent: number;
   ttlMs: number;
-  orderId: string;
+  // Absolute expiry (ms epoch), anchored to order.paidAt + TTL. Stable across
+  // refreshes — server emits the same value so countdown doesn't reset.
+  expiresAt: number;
+  // Server-computed remaining ms at SSR time. Seeds the countdown so the
+  // first client render hydrates with identical DOM (no progress-bar flicker).
+  // useEffect re-syncs to client-side Date.now() on mount and ticks per second.
+  initialRemainingMs: number;
 };
 
-// lastTickTime is only updated when the interval fires, never inside getSnapshot,
-// so the snapshot is stable between ticks and doesn't cause infinite re-renders.
-let lastTickTime = Date.now();
-
-function subscribe(callback: () => void) {
-  const id = setInterval(() => {
-    lastTickTime = Date.now();
-    callback();
-  }, 1000);
-  return () => clearInterval(id);
-}
-
-function useCountdownMs(expiresAt: number): number {
-  return useSyncExternalStore(
-    subscribe,
-    () => Math.max(0, expiresAt - lastTickTime),
-    () => Math.max(0, expiresAt - lastTickTime),
-  );
+// Per-instance countdown driven by useState/useEffect. Initial state matches
+// the server-computed value so SSR and first client render produce identical
+// DOM — Date.now() lives only inside useEffect, never in the render path.
+function useCountdownMs(expiresAt: number, initialRemainingMs: number): number {
+  const [remainingMs, setRemainingMs] = useState(initialRemainingMs);
+  useEffect(() => {
+    const tick = () => setRemainingMs(Math.max(0, expiresAt - Date.now()));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [expiresAt]);
+  return remainingMs;
 }
 
 const AVATAR_COLORS = [
@@ -62,31 +68,11 @@ export function CrossSellSection({
   recommendations,
   discountPercent,
   ttlMs,
-  orderId,
+  expiresAt,
+  initialRemainingMs,
 }: CrossSellSectionProps) {
   const hasDiscount = discountPercent > 0;
-  const [expiresAt] = useState(() => {
-    // sessionStorage is not available during SSR; client remounts read the persisted value
-    if (typeof window === "undefined") return Date.now() + ttlMs;
-    const key = `cs-exp-${orderId}`;
-    const stored = sessionStorage.getItem(key);
-    if (stored) {
-      const t = Number(stored);
-      if (t > Date.now()) return t;
-    }
-    const t = Date.now() + ttlMs;
-    sessionStorage.setItem(key, String(t));
-    return t;
-  });
-
-  // After SSR hydration the initializer didn't run on the client, so persist here
-  useEffect(() => {
-    const key = `cs-exp-${orderId}`;
-    if (!sessionStorage.getItem(key)) {
-      sessionStorage.setItem(key, String(expiresAt));
-    }
-  }, [orderId, expiresAt]);
-  const remainingMs = useCountdownMs(expiresAt);
+  const remainingMs = useCountdownMs(expiresAt, initialRemainingMs);
   const isExpired = hasDiscount && remainingMs <= 0;
   const isUrgent = hasDiscount && remainingMs <= 3 * 60_000 && !isExpired; // < 3 min
   const isCritical = hasDiscount && remainingMs <= 60_000 && !isExpired; // < 1 min
@@ -207,9 +193,10 @@ export function CrossSellSection({
       {/* Product rows */}
       <div className="divide-y divide-border">
         {recommendations.map((rec, i) => {
-          const { product, href, discountPercent: pct } = rec;
-          const hasItemDiscount = !isExpired && pct > 0 && product.price > 0;
-          const discountedPrice = product.price * (1 - pct / 100);
+          const { product, href, discountPercent: itemPct } = rec;
+          const hasItemDiscount =
+            !isExpired && itemPct > 0 && product.price > 0;
+          const discountedPrice = product.price * (1 - itemPct / 100);
           const avatarColor = AVATAR_COLORS[i % AVATAR_COLORS.length];
 
           return (

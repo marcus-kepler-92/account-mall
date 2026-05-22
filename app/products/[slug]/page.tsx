@@ -18,7 +18,7 @@ import { ProductBottomBar } from "../../components/product-bottom-bar";
 import { descriptionToPlainText } from "@/lib/description";
 import { MarkdownViewClient } from "@/app/components/markdown-view-client";
 import { RiskWarningDialog } from "./risk-warning-dialog";
-import { verifyCrossSellToken } from "@/lib/cross-sell-token";
+import { resolveCrossSellDiscount } from "@/lib/cross-sell";
 
 const PRODUCT_CACHE_TTL_SECONDS = 300;
 const STOCK_CACHE_TTL_SECONDS = 30;
@@ -60,7 +60,7 @@ const getCachedStockCount = unstable_cache(
 
 type PageProps = {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ promoCode?: string; email?: string; csToken?: string }>;
+  searchParams: Promise<{ promoCode?: string; email?: string; cs?: string }>;
 };
 
 export async function generateMetadata({
@@ -110,15 +110,14 @@ export default async function ProductDetailPage({
   }
 
   const prefilledEmail = resolvedParams.email?.trim() || null
-  let crossSellToken: string | null = null
-  let crossSellDiscountPercent: number | null = null
-  if (resolvedParams.csToken) {
-    const csVerify = verifyCrossSellToken(resolvedParams.csToken)
-    if (csVerify.valid && csVerify.payload?.targetProductId === product.id) {
-      crossSellToken = resolvedParams.csToken
-      crossSellDiscountPercent = csVerify.payload.discountPercent
-    }
-  }
+  // Resolve cross-sell discount via the single source-of-truth function.
+  // Returns null on missing/invalid/expired/used/ineligible — we then render
+  // original price. Token itself is forwarded to the order form so the
+  // backend re-verifies before applying the discount.
+  const csToken: string | null = resolvedParams.cs ?? null
+  const crossSellDiscountPercent = csToken
+    ? await resolveCrossSellDiscount(csToken, product.id)
+    : null
 
   const productWithImage = product as typeof product & { image: string | null };
 
@@ -259,7 +258,7 @@ export default async function ProductDetailPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: jsonLdSafe }}
       />
-      <SiteHeader />
+      <SiteHeader cs={csToken} />
 
       <main className="flex-1 mx-auto w-full max-w-6xl px-4 pb-[calc(7rem+env(safe-area-inset-bottom,0px))] pt-4 2xl:max-w-7xl lg:pb-10 lg:pt-8">
         <div
@@ -300,6 +299,7 @@ export default async function ProductDetailPage({
               isFree={isFree}
               isAutoFetch={isAutoFetch}
               isLowStock={isLowStock}
+              discountPercent={crossSellDiscountPercent}
             />
 
             <ProductMetaNoticeSection />
@@ -327,7 +327,7 @@ export default async function ProductDetailPage({
                 couponEnabled={product.couponEnabled}
                 requireTurnstile={requireTurnstile}
                 prefilledEmail={prefilledEmail ?? undefined}
-                crossSellToken={crossSellToken}
+                cs={crossSellDiscountPercent != null ? csToken : null}
                 crossSellDiscountPercent={crossSellDiscountPercent}
               />
             </section>
@@ -397,6 +397,11 @@ type ProductInfoSectionProps = {
   isFree?: boolean;
   isAutoFetch?: boolean;
   isLowStock?: boolean;
+  // Cross-sell discount applied to this product for the current cs session.
+  // When set, the price block renders strike-through original + red discounted
+  // — keeps the displayed price consistent with what the order form will
+  // actually charge.
+  discountPercent?: number | null;
 };
 
 function ProductInfoSection({
@@ -408,7 +413,16 @@ function ProductInfoSection({
   isFree,
   isAutoFetch,
   isLowStock,
+  discountPercent,
 }: ProductInfoSectionProps) {
+  const hasDiscount =
+    !isSoldOut &&
+    !isFree &&
+    typeof discountPercent === "number" &&
+    discountPercent > 0 &&
+    discountPercent < 100 &&
+    price > 0;
+  const discountedPrice = hasDiscount ? price * (1 - discountPercent! / 100) : price;
   return (
     <section
       aria-labelledby="product-info-heading"
@@ -444,14 +458,25 @@ function ProductInfoSection({
               </>
             ) : (
               <>
-                <span
-                  className={cn(
-                    "text-2xl font-bold tabular-nums lg:text-3xl",
-                    isSoldOut && "text-muted-foreground line-through",
-                  )}
-                >
-                  ¥{price.toFixed(2)}
-                </span>
+                {hasDiscount ? (
+                  <span className="flex items-baseline gap-2">
+                    <span className="text-sm font-medium text-muted-foreground line-through tabular-nums">
+                      ¥{price.toFixed(2)}
+                    </span>
+                    <span className="text-2xl font-bold tabular-nums text-destructive lg:text-3xl">
+                      ¥{discountedPrice.toFixed(2)}
+                    </span>
+                  </span>
+                ) : (
+                  <span
+                    className={cn(
+                      "text-2xl font-bold tabular-nums lg:text-3xl",
+                      isSoldOut && "text-muted-foreground line-through",
+                    )}
+                  >
+                    ¥{price.toFixed(2)}
+                  </span>
+                )}
                 {isAutoFetch ? (
                   <Badge variant="secondary" className="text-xs font-normal">
                     有货
