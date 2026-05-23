@@ -25,6 +25,25 @@ export const siteSettingPatchSchema = z.object({
     businessLicenseNo: z.preprocess(emptyToNull, z.string().max(64).nullable()).optional(),
     contactEmail: z.preprocess(emptyToNull, z.string().email("邮箱格式无效").nullable()).optional(),
     escalateWebhookUrl: z.preprocess(emptyToNull, httpUrl("Webhook URL 格式无效（需 http/https）").nullable()).optional(),
+    wecomWebhookUrl: z.preprocess(emptyToNull, httpUrl("企微 webhook URL 格式无效").nullable()).optional(),
+    dunCooldownMinutes: z.preprocess(
+        (v) => (v === "" || v === null ? null : v),
+        z.coerce.number().int().min(0).max(1440).nullable(),
+    ).optional(),
+    dunMinAgeMinutes: z.preprocess(
+        (v) => (v === "" || v === null ? null : v),
+        z.coerce.number().int().min(0).max(60).nullable(),
+    ).optional(),
+    businessHoursWeekdays: z.preprocess(
+        emptyToNull,
+        z.string().nullable().refine((v) => {
+            if (v === null) return true
+            try {
+                const arr = JSON.parse(v)
+                return Array.isArray(arr) && arr.every((n) => Number.isInteger(n) && n >= 0 && n <= 6)
+            } catch { return false }
+        }, "工作日字段必须是 0-6 整数 JSON 数组"),
+    ).optional(),
 })
 .refine(
     (data) => {

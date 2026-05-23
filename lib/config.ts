@@ -201,6 +201,14 @@ const envSchema = z
     wechatId: z.string().default(""),
     // HIGH urgency 通知 webhook (optional)
     escalateWebhookUrl: z.string().url().optional(),
+    // 企微机器人 webhook (MANUAL 发货流程通知, optional)
+    wecomWebhookUrl: z.string().url().optional(),
+    // 买家催发货按钮冷却时间（分钟），默认 30
+    dunCooldownMinutes: z.coerce.number().int().min(0).default(30),
+    // 买家催发货按钮最早可点击时间（订单创建后 X 分钟），默认 5
+    dunMinAgeMinutes: z.coerce.number().int().min(0).default(5),
+    // 客服工作日（0=周日 … 6=周六），JSON 数组字符串；未配置时使用 [0..6]
+    businessHoursWeekdays: z.string().optional(),
     // Upstash (Marketplace 自动注入, fallback 两种命名)
     upstashRedisRestUrl: z.string().url().or(z.literal("")).default(""),
     upstashRedisRestToken: z.string().default(""),
@@ -367,6 +375,10 @@ function getEnvInput() {
     wechatQrUrl: e.WECHAT_QR_URL,
     wechatId: e.WECHAT_ID,
     escalateWebhookUrl: e.ESCALATE_WEBHOOK_URL,
+    wecomWebhookUrl: e.WECOM_WEBHOOK_URL,
+    dunCooldownMinutes: e.DUN_COOLDOWN_MINUTES,
+    dunMinAgeMinutes: e.DUN_MIN_AGE_MINUTES,
+    businessHoursWeekdays: e.BUSINESS_HOURS_WEEKDAYS,
     upstashRedisRestUrl: e.UPSTASH_REDIS_REST_URL ?? e.KV_REST_API_URL ?? "",
     upstashRedisRestToken: e.UPSTASH_REDIS_REST_TOKEN ?? e.KV_REST_API_TOKEN ?? "",
     deepseekApiKey: e.DEEPSEEK_API_KEY,

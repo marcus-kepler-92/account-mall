@@ -21,6 +21,10 @@ jest.mock("@/lib/config", () => ({
         businessLicenseNo: "env-license-123",
         contactEmail: "env@example.com",
         escalateWebhookUrl: undefined,
+        wecomWebhookUrl: undefined,
+        dunCooldownMinutes: 30,
+        dunMinAgeMinutes: 5,
+        businessHoursWeekdays: undefined,
     },
 }))
 
@@ -47,6 +51,10 @@ describe("getSiteSettings — env fallback", () => {
             businessLicenseNo: "env-license-123",
             contactEmail: "env@example.com",
             escalateWebhookUrl: undefined,
+            wecomWebhookUrl: undefined,
+            dunCooldownMinutes: 30,
+            dunMinAgeMinutes: 5,
+            businessHoursWeekdays: [0, 1, 2, 3, 4, 5, 6],
         })
         expect(findUnique).toHaveBeenCalledWith({ where: { id: "singleton" } })
     })
@@ -63,6 +71,10 @@ describe("getSiteSettings — env fallback", () => {
             businessLicenseNo: "db-license",
             contactEmail: "db@example.com",
             escalateWebhookUrl: "https://hooks.example/notify",
+            wecomWebhookUrl: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=abc",
+            dunCooldownMinutes: 15,
+            dunMinAgeMinutes: 10,
+            businessHoursWeekdays: "[1,2,3,4,5]",
         })
         const s = await getSiteSettings()
         expect(s.wechatQrUrl).toBe("https://blob.example/site-qr/abc.png")
@@ -74,6 +86,10 @@ describe("getSiteSettings — env fallback", () => {
         expect(s.businessLicenseNo).toBe("db-license")
         expect(s.contactEmail).toBe("db@example.com")
         expect(s.escalateWebhookUrl).toBe("https://hooks.example/notify")
+        expect(s.wecomWebhookUrl).toBe("https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=abc")
+        expect(s.dunCooldownMinutes).toBe(15)
+        expect(s.dunMinAgeMinutes).toBe(10)
+        expect(s.businessHoursWeekdays).toEqual([1, 2, 3, 4, 5])
     })
 
     it("falls back per-field when DB row has nulls", async () => {
@@ -88,6 +104,10 @@ describe("getSiteSettings — env fallback", () => {
             businessLicenseNo: null,
             contactEmail: "db@example.com",
             escalateWebhookUrl: null,
+            wecomWebhookUrl: null,
+            dunCooldownMinutes: null,
+            dunMinAgeMinutes: null,
+            businessHoursWeekdays: null,
         })
         const s = await getSiteSettings()
         // DB-set fields keep DB value
@@ -101,6 +121,10 @@ describe("getSiteSettings — env fallback", () => {
         expect(s.businessName).toBe("env-shop")
         expect(s.businessLicenseNo).toBe("env-license-123")
         expect(s.escalateWebhookUrl).toBeUndefined()
+        expect(s.wecomWebhookUrl).toBeUndefined()
+        expect(s.dunCooldownMinutes).toBe(30)
+        expect(s.dunMinAgeMinutes).toBe(5)
+        expect(s.businessHoursWeekdays).toEqual([0, 1, 2, 3, 4, 5, 6])
     })
 
     it("treats businessHoursStart=0 as a real value, not null fallback", async () => {
@@ -119,6 +143,44 @@ describe("getSiteSettings — env fallback", () => {
         const s = await getSiteSettings()
         expect(s.businessHoursStart).toBe(0)
         expect(s.businessHoursEnd).toBe(8)
+    })
+})
+
+describe("getSiteSettings — businessHoursWeekdays parsing", () => {
+    it("returns defaults [0..6] when businessHoursWeekdays unset", async () => {
+        findUnique.mockResolvedValueOnce(null)
+        const s = await getSiteSettings()
+        expect(s.businessHoursWeekdays).toEqual([0, 1, 2, 3, 4, 5, 6])
+    })
+
+    it("parses JSON-encoded weekdays", async () => {
+        findUnique.mockResolvedValueOnce({ businessHoursWeekdays: "[1,2,3,4,5]" })
+        const s = await getSiteSettings()
+        expect(s.businessHoursWeekdays).toEqual([1, 2, 3, 4, 5])
+    })
+
+    it("falls back to defaults on malformed JSON", async () => {
+        findUnique.mockResolvedValueOnce({ businessHoursWeekdays: "not-json" })
+        const s = await getSiteSettings()
+        expect(s.businessHoursWeekdays).toEqual([0, 1, 2, 3, 4, 5, 6])
+    })
+
+    it("falls back to defaults when JSON parses to a non-array", async () => {
+        findUnique.mockResolvedValueOnce({ businessHoursWeekdays: '{"mon":true}' })
+        const s = await getSiteSettings()
+        expect(s.businessHoursWeekdays).toEqual([0, 1, 2, 3, 4, 5, 6])
+    })
+
+    it("falls back to defaults when array contains only out-of-range ints", async () => {
+        findUnique.mockResolvedValueOnce({ businessHoursWeekdays: "[7,8,-1]" })
+        const s = await getSiteSettings()
+        expect(s.businessHoursWeekdays).toEqual([0, 1, 2, 3, 4, 5, 6])
+    })
+
+    it("filters out-of-range ints while keeping valid ones", async () => {
+        findUnique.mockResolvedValueOnce({ businessHoursWeekdays: "[0,3,9,-1,6]" })
+        const s = await getSiteSettings()
+        expect(s.businessHoursWeekdays).toEqual([0, 3, 6])
     })
 })
 
