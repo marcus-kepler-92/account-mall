@@ -41,6 +41,7 @@ model User {
   announcementReads          AnnouncementRead[]
   agentKnowledge             AgentKnowledge[]
   notificationDismissals     AdminNotificationDismissal[]
+  fulfillments               OrderFulfillment[]
 
   @@index([inviterId])
 }
@@ -113,6 +114,8 @@ enum CardStatus {
 
 enum OrderStatus {
   PENDING
+  AWAITING_FULFILLMENT
+  PROCESSING
   COMPLETED
   CLOSED
 }
@@ -126,6 +129,7 @@ enum RestockSubscriptionStatus {
 enum ProductType {
   NORMAL
   AUTO_FETCH
+  MANUAL
 }
 
 model Product {
@@ -173,6 +177,7 @@ model Product {
   cardTemplates        CardTemplate[]
   crossSellTargets     ProductCrossSell[] @relation("CrossSellSource")
   crossSellSources     ProductCrossSell[] @relation("CrossSellTarget")
+  variants             ProductVariant[]
 
   @@index([sortOrder])
 }
@@ -185,6 +190,23 @@ model Tag {
   updatedAt DateTime           @updatedAt
   products  Product[]
   guides    DistributorGuide[]
+}
+
+model ProductVariant {
+  id            String   @id @default(cuid())
+  productId     String
+  name          String   @db.VarChar(200)
+  price         Decimal  @db.Decimal(10, 2)
+  unitCost      Decimal? @db.Decimal(10, 2)
+  stockQuantity Int      @default(0)
+  sortOrder     Int      @default(0)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  orders        Order[]
+
+  @@index([productId, isActive, sortOrder])
 }
 
 model Card {
@@ -231,7 +253,9 @@ model Order {
   amount                    Decimal     @db.Decimal(10, 2)
   discountPercentApplied    Decimal?     @db.Decimal(5, 2) // 下单时若使用分销员优惠码，记录当时应用的折扣比例
   productNameSnapshot       String?     @db.VarChar(500) // 下单时商品名称快照，便于历史订单展示
-  unitPriceSnapshot         Decimal?    @db.Decimal(10, 2) // 下单时商品单价快照（不含折扣）
+  /// Snapshot of the order unit price at creation time.
+  /// NORMAL/AUTO_FETCH: product.price; MANUAL: variant.price.
+  unitPriceSnapshot         Decimal?    @db.Decimal(10, 2)
   /// @deprecated Legacy per-unit cost snapshot copied from Product.costPerUnit at completion time.
   /// New orders no longer write this field; readers must fall back to (costSnapshot * quantity)
   /// only when costTotalSnapshot is NULL (historical rows). To be dropped in a future migration
@@ -254,12 +278,18 @@ model Order {
   /// AUTO_FETCH：用户已使用的换号次数
   switchAccountCount      Int         @default(0)
   paymentChannelId        String?
+  variantId               String?
+  variantNameSnapshot     String?     @db.VarChar(200)
+  dunCount                Int         @default(0)
+  lastDunAt               DateTime?
   paymentChannel          PaymentChannel? @relation(fields: [paymentChannelId], references: [id])
   product                 Product     @relation(fields: [productId], references: [id])
   distributor             User?       @relation(fields: [distributorId], references: [id])
+  variant                 ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Restrict)
   cards                   Card[]
   commissions             Commission[]
   exitDiscountUsage       ExitDiscountUsage?
+  fulfillment             OrderFulfillment?
   crossSellUsageAsSource  CrossSellUsage[] @relation("CrossSellSource")
   crossSellUsageAsTarget  CrossSellUsage?  @relation("CrossSellTarget")
 
@@ -269,6 +299,33 @@ model Order {
   @@index([fingerprintHash])
   @@index([distributorId])
   @@index([paymentChannelId])
+  @@index([variantId])
+}
+
+model OrderFulfillment {
+  id          String   @id @default(cuid())
+  orderId     String   @unique
+  content     String   @db.Text
+  fulfilledBy String
+  fulfilledAt DateTime @default(now())
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  operator    User     @relation(fields: [fulfilledBy], references: [id])
+
+  @@index([fulfilledBy])
+}
+
+model NotificationLog {
+  id        String   @id @default(cuid())
+  channel   String   @db.VarChar(32)
+  event     String   @db.VarChar(64)
+  payload   String   @db.Text
+  status    String   @db.VarChar(16)
+  error     String?  @db.Text
+  orderId   String?
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
+  @@index([createdAt])
 }
 
 model RestockSubscription {
@@ -610,6 +667,10 @@ model SiteSetting {
   businessLicenseNo     String?
   contactEmail          String?
   escalateWebhookUrl    String?
+  businessHoursWeekdays String?  // JSON array like "[1,2,3,4,5]"
+  wecomWebhookUrl       String?
+  dunCooldownMinutes    Int?
+  dunMinAgeMinutes      Int?
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 }
