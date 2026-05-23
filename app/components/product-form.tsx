@@ -14,12 +14,14 @@ import { Loader2, ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import { ProductFormBasicFields } from "./product-form-basic-fields"
 import { ProductFormPricingFields } from "./product-form-pricing-fields"
+import { ProductFormContentCards } from "./product-form-content-cards"
 import { ProductFormTagSelect } from "./product-form-tag-select"
 import { ProductFormCardTemplateSelect } from "./product-form-card-template-select"
 import { ProductFormSettings } from "./product-form-settings"
 import { ProductFormRiskWarningFields } from "./product-form-risk-warning-fields"
 import { ProductFormPurchaseLimitFields } from "./product-form-purchase-limit-fields"
 import { ProductFormVariantsField } from "./product-form-variants-field"
+import { SkuListEditor } from "@/app/admin/(main)/products/[productId]/variants/sku-list-editor"
 
 type Tag = { id: string; name: string; slug: string }
 
@@ -255,7 +257,12 @@ export function ProductForm({
                                 onSlugManualEdit={() => setSlugManuallyEdited(true)}
                             />
                             <ProductFormPricingFields isAutoFetch={isAutoFetch} isManual={isManual} sourceUrlOptions={sourceUrlOptions} />
-                            {!isEditing && isManual && <ProductFormVariantsField />}
+                            {isManual && (
+                                isEditing && product
+                                    ? <SkuListEditor mode="edit" productId={product.id} value={[]} />
+                                    : <ProductFormVariantsField />
+                            )}
+                            <ProductFormContentCards />
                             <ProductFormRiskWarningFields />
                             <ProductFormPurchaseLimitFields />
                         </div>

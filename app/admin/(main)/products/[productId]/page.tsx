@@ -4,7 +4,6 @@ import { config } from "@/lib/config"
 import { ProductForm } from "@/app/components/product-form"
 import { DeactivateProductButton } from "./product-actions"
 import { CrossSellTargetsForm } from "./cross-sell-targets-form"
-import { SkuListEditor } from "./variants/sku-list-editor"
 
 export const dynamic = "force-dynamic"
 
@@ -52,7 +51,6 @@ export default async function AdminEditProductPage({ params }: PageProps) {
     }
 
     const initialTargets = crossSellTargets.map((cs) => ({ id: cs.target.id, name: cs.target.name }))
-    const isManual = product.productType === "MANUAL"
 
     return (
         <div className="space-y-6">
@@ -66,10 +64,6 @@ export default async function AdminEditProductPage({ params }: PageProps) {
                 allCardTemplates={cardTemplates}
                 sourceUrlOptions={config.autoFetchSourceUrls}
             />
-
-            {isManual && (
-                <SkuListEditor mode="edit" productId={product.id} value={[]} />
-            )}
 
             <CrossSellTargetsForm
                 productId={productId}
