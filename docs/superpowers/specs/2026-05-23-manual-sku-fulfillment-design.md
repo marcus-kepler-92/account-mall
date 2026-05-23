@@ -164,7 +164,7 @@ model Order {
 | `dunCooldownMinutes` | `Int?` | 催发货冷却分钟数；null 时取默认 30 |
 | `dunMinAgeMinutes` | `Int?` | 订单需创建多久后才能催；null 时取默认 5 |
 
-工作时间窗口**复用** `businessHoursStart` / `businessHoursEnd`（分钟数，0–1440+）/ `businessHoursTimezone`（IANA 时区字符串，缺省 `Asia/Shanghai`）；不重新建字段。
+工作时间窗口**复用** `businessHoursStart` / `businessHoursEnd`（小时整数 0-23，[CODE: lib/site-settings.ts:16-17]）/ `businessHoursTimezone`（IANA 时区字符串，缺省 `Asia/Shanghai`）；不新建字段。跨日窗口表达：`end <= start` 即跨夜（如 start=22, end=6 → 22:00 到次日 06:00）。
 
 读取统一走 `lib/site-settings.ts:getSiteSettings()`（已有）；新加字段往该函数加默认值映射。
 
@@ -313,8 +313,9 @@ formatEtaText(now: Date, cfg: BusinessHoursConfig): string
 `BusinessHoursConfig` 取自 `getSiteSettings()`：`{ start, end, weekdays, timezone }`。
 
 边界：
-- `end > 1440` 表示跨日窗口（如 22:00-次日 06:00）
-- weekdays 用 JS 周（0=Sun, 6=Sat），与 `Date.getDay()` 对齐；null/缺省=每天
+- `start` / `end` 为小时整数（0-23）；`end <= start` 表示跨夜窗口（如 22→6）
+- 判定 `inWindow(hour)`：非跨夜 `hour >= start && hour < end`；跨夜 `hour >= start || hour < end`
+- weekdays 用 JS 周（0=Sun, 6=Sat），与 `Date.getDay()` 对齐；null/缺省=每天。跨夜时 weekday 取窗口起点那天的 weekday
 - 服务端按 `SiteSetting.businessHoursTimezone` 计算（缺省 `Asia/Shanghai`）；不读用户浏览器时区
 
 ## 通知机制
@@ -388,7 +389,7 @@ sendWecomNotification(event: WecomEvent, order: OrderWithRelations): Promise<voi
 | 同一 variant 并发下单导致超卖 | 付款回调里 `updateMany where stockQuantity >= 1` 的乐观锁；失败则订单留在 PENDING，由 admin 手工沟通处理（与第 2 节"付款回调"语义一致；现有支付通道无自动退款 API） |
 | Variant 在订单存在期间被停用 | `isActive=false` 仅影响下单可选；不影响已下单订单的关单回滚库存 |
 | Variant 在订单存在期间被删除 | `Order.variant` 关系 `onDelete: Restrict`（DB 层阻止）；admin UI 有关联订单时禁用"删除"按钮，仅显示"停用" |
-| 工作时间跨午夜 | 用 `end > 1440` 表示跨日；判定 `inWindow` 时：非跨日 `now ∈ [start, end)`；跨日 `now >= start \|\| now < end - 1440`。需对应日的 weekday 也在 weekdays 集合中（跨日时使用窗口起点那天的 weekday） |
+| 工作时间跨夜 | 用 `end <= start` 表示跨夜（小时整数 0-23）；判定 `inWindow(hour)`：非跨夜 `hour ∈ [start, end)`；跨夜 `hour >= start \|\| hour < end`。weekday 集合判定时跨夜窗口对应"窗口起点那天的 weekday" |
 | 催发货被 abuse | 后端按 dunCooldownMinutes 拦下；前端按钮跟着倒计时 |
 | 企微 webhook 配置缺失 | sendWecomNotification 直接 return，不报错；admin 在订单详情仍可正常操作 |
 | 企微推送失败（网络/限流） | 写 NotificationLog；不阻塞订单流程；本期不为失败日志做 UI（NotificationLog 留作排查时直接查库） |
