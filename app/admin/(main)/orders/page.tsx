@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma"
 import { getAdminPermissions } from "@/lib/admin-permissions"
 import { parseServerSort } from "@/lib/table-sort"
 import { formatCurrency } from "@/lib/utils"
-import { Clock, CheckCircle2, XCircle, DollarSign } from "lucide-react"
+import { Clock, CheckCircle2, XCircle, DollarSign, Package, Truck } from "lucide-react"
 import {
     parseOrderFilters,
     type OrderFiltersInput,
@@ -138,6 +138,8 @@ export default async function AdminOrdersPage({
 
     const orderStats = {
         PENDING: statusCounts.find((c) => c.status === "PENDING")?._count.id ?? 0,
+        AWAITING_FULFILLMENT: statusCounts.find((c) => c.status === "AWAITING_FULFILLMENT")?._count.id ?? 0,
+        PROCESSING: statusCounts.find((c) => c.status === "PROCESSING")?._count.id ?? 0,
         COMPLETED: statusCounts.find((c) => c.status === "COMPLETED")?._count.id ?? 0,
         CLOSED: statusCounts.find((c) => c.status === "CLOSED")?._count.id ?? 0,
     }
@@ -176,7 +178,9 @@ export default async function AdminOrdersPage({
         }
     })
 
-    const buildStatusLink = (statusKey: "PENDING" | "COMPLETED" | "CLOSED") => {
+    const buildStatusLink = (
+        statusKey: "PENDING" | "AWAITING_FULFILLMENT" | "PROCESSING" | "COMPLETED" | "CLOSED",
+    ) => {
         const params = new URLSearchParams()
         const nextList = filters.statusList.includes(statusKey)
             ? filters.statusList.filter((s) => s !== statusKey)
@@ -192,7 +196,7 @@ export default async function AdminOrdersPage({
         <div className="space-y-6">
             <PageHeader title="订单管理" description="查看和管理客户订单" />
 
-            <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">
+            <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
                 <StatCard
                     label="待完成"
                     value={orderStats.PENDING}
@@ -201,6 +205,24 @@ export default async function AdminOrdersPage({
                     iconColor="text-warning"
                     active={filters.statusList.includes("PENDING")}
                     href={buildStatusLink("PENDING")}
+                />
+                <StatCard
+                    label="待发货"
+                    value={orderStats.AWAITING_FULFILLMENT}
+                    icon={Package}
+                    borderColor="border-l-warning"
+                    iconColor="text-warning"
+                    active={filters.statusList.includes("AWAITING_FULFILLMENT")}
+                    href={buildStatusLink("AWAITING_FULFILLMENT")}
+                />
+                <StatCard
+                    label="发货中"
+                    value={orderStats.PROCESSING}
+                    icon={Truck}
+                    borderColor="border-l-warning"
+                    iconColor="text-warning"
+                    active={filters.statusList.includes("PROCESSING")}
+                    href={buildStatusLink("PROCESSING")}
                 />
                 <StatCard
                     label="已完成"

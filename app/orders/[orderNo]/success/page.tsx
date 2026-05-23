@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { verifyOrderSuccessToken } from "@/lib/order-success-token";
 import { Button } from "@/components/ui/button";
@@ -97,6 +97,16 @@ export default async function OrderSuccessPage({
   });
 
   if (!order) notFound();
+  // MANUAL products are fulfilled out-of-band by admin — the order sits in
+  // AWAITING_FULFILLMENT (not COMPLETED) when the buyer lands here from the
+  // payment flow. The /success page is built around "show your cards", which
+  // doesn't apply. Bounce them to lookup with a hint so they get a sensible
+  // "we're processing" view instead of the misleading "订单未完成" card.
+  if (order.product?.productType === "MANUAL") {
+    redirect(
+      `/orders/lookup?orderNo=${encodeURIComponent(orderNo)}&hint=processing`,
+    );
+  }
   if (order.status !== "COMPLETED") {
     return (
       <div className="flex min-h-screen flex-col">

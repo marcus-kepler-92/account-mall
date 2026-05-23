@@ -43,6 +43,8 @@ interface OrdersDataTableProps {
     total: number;
     statusCounts: {
         PENDING: number;
+        AWAITING_FULFILLMENT: number;
+        PROCESSING: number;
         COMPLETED: number;
         CLOSED: number;
     };
