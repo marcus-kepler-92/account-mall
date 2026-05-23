@@ -2,6 +2,7 @@ import {
   isWithinBusinessHours,
   nextWindowStart,
   formatEtaText,
+  formatBusinessHoursHint,
   computeInBusinessHours,
   type BusinessHoursConfig,
 } from "@/lib/business-hours"
@@ -99,5 +100,39 @@ describe("computeInBusinessHours (legacy)", () => {
 
   it("returns false when start === end", () => {
     expect(computeInBusinessHours(new Date(), "Asia/Shanghai", 9, 9)).toBe(false)
+  })
+})
+
+describe("formatBusinessHoursHint", () => {
+  const base = { timezone: SH }
+
+  it("full week → 每天", () => {
+    const cfg: BusinessHoursConfig = { ...base, start: 9, end: 22, weekdays: [0, 1, 2, 3, 4, 5, 6] }
+    expect(formatBusinessHoursHint(cfg)).toBe("工作时间：9:00–22:00（每天）")
+  })
+
+  it("Mon–Fri contiguous run", () => {
+    const cfg: BusinessHoursConfig = { ...base, start: 9, end: 18, weekdays: [1, 2, 3, 4, 5] }
+    expect(formatBusinessHoursHint(cfg)).toBe("工作时间：9:00–18:00（周一至周五）")
+  })
+
+  it("Mon–Sat contiguous run", () => {
+    const cfg: BusinessHoursConfig = { ...base, start: 10, end: 22, weekdays: [1, 2, 3, 4, 5, 6] }
+    expect(formatBusinessHoursHint(cfg)).toBe("工作时间：10:00–22:00（周一至周六）")
+  })
+
+  it("cross-night window labels as 次日", () => {
+    const cfg: BusinessHoursConfig = { ...base, start: 22, end: 9, weekdays: [0, 1, 2, 3, 4, 5, 6] }
+    expect(formatBusinessHoursHint(cfg)).toBe("工作时间：22:00–次日 9:00（每天）")
+  })
+
+  it("non-contiguous weekdays joined with 、", () => {
+    const cfg: BusinessHoursConfig = { ...base, start: 9, end: 17, weekdays: [1, 3, 5] }
+    expect(formatBusinessHoursHint(cfg)).toBe("工作时间：9:00–17:00（周一、周三、周五）")
+  })
+
+  it("includes Sunday at tail (Mon–Sun → 每天)", () => {
+    const cfg: BusinessHoursConfig = { ...base, start: 9, end: 21, weekdays: [1, 2, 3, 4, 5, 6, 0] }
+    expect(formatBusinessHoursHint(cfg)).toBe("工作时间：9:00–21:00（每天）")
   })
 })

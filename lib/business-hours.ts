@@ -76,6 +76,57 @@ export function nextWindowStart(now: Date, cfg: BusinessHoursConfig): Date {
     throw new Error("nextWindowStart: no upcoming window in 14 days")
 }
 
+// Buyer-facing Chinese label summarizing the configured business-hours window.
+// Examples:
+//   "工作时间：9:00–22:00（每天）"
+//   "工作时间：9:00–22:00（周一至周五）"
+//   "工作时间：22:00–次日 9:00（周一至周六）"
+//   "工作时间：9:00–22:00（周一、周三、周五）"
+//
+// Weekday list rendering picks contiguous runs:
+//   - full week → "每天"
+//   - single contiguous run starting from 周一 ending on 周日 → "周一至周日" (== 每天)
+//   - any contiguous run → "周X至周Y"
+//   - otherwise → comma-joined "周X、周Y、周Z"
+export function formatBusinessHoursHint(cfg: BusinessHoursConfig): string {
+    const startLabel = `${cfg.start}:00`
+    const endLabel = isCrossNight(cfg) ? `次日 ${cfg.end}:00` : `${cfg.end}:00`
+    const weekdays = renderWeekdays(cfg.weekdays)
+    return `工作时间：${startLabel}–${endLabel}（${weekdays}）`
+}
+
+// Render a Chinese label for the given weekday set. Input may be unsorted /
+// contain duplicates — we normalize then detect the largest contiguous run
+// (treating Sun=0 as the wrap-around tail of Mon..Sun for display purposes).
+function renderWeekdays(weekdays: number[]): string {
+    const unique = Array.from(new Set(weekdays.filter((n) => Number.isInteger(n) && n >= 0 && n <= 6)))
+    if (unique.length === 0) return "每天"
+    if (unique.length === 7) return "每天"
+
+    // Reorder so Mon (1)..Sun (0) for natural Chinese display ordering.
+    const orderForDisplay = (n: number) => (n === 0 ? 7 : n)
+    const sorted = [...unique].sort((a, b) => orderForDisplay(a) - orderForDisplay(b))
+
+    // Check if `sorted` forms a single contiguous run on the Mon..Sun axis.
+    let contiguous = true
+    for (let i = 1; i < sorted.length; i++) {
+        if (orderForDisplay(sorted[i]) - orderForDisplay(sorted[i - 1]) !== 1) {
+            contiguous = false
+            break
+        }
+    }
+    if (contiguous && sorted.length >= 2) {
+        return `${weekdayLabel(sorted[0])}至${weekdayLabel(sorted[sorted.length - 1])}`
+    }
+    return sorted.map(weekdayLabel).join("、")
+}
+
+const WEEKDAY_LABELS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"] as const
+
+function weekdayLabel(n: number): string {
+    return WEEKDAY_LABELS[n] ?? ""
+}
+
 // Human-readable ETA line for buyer-facing UI. In-window: reassure with a
 // "通常在 ..." promise. Out-of-window: state the next window opening in zoned
 // local time so the buyer knows when to expect fulfillment.

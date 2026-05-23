@@ -19,6 +19,9 @@ import { descriptionToPlainText } from "@/lib/description";
 import { MarkdownViewClient } from "@/app/components/markdown-view-client";
 import { RiskWarningDialog } from "./risk-warning-dialog";
 import { resolveCrossSellDiscount } from "@/lib/cross-sell";
+import { getSiteSettings } from "@/lib/site-settings";
+import { formatBusinessHoursHint } from "@/lib/business-hours";
+import type { ProductVariantOption } from "@/app/components/product-variant-selector";
 
 const PRODUCT_CACHE_TTL_SECONDS = 300;
 const STOCK_CACHE_TTL_SECONDS = 30;
@@ -121,9 +124,39 @@ export default async function ProductDetailPage({
 
   const productWithImage = product as typeof product & { image: string | null };
 
-  const stockCount = await getCachedStockCount(product.id);
-
   const isAutoFetch = product.productType === "AUTO_FETCH";
+  const isManual = product.productType === "MANUAL";
+
+  // MANUAL: stock is the sum of all active variants' stockQuantity; cards table
+  // is unused. NORMAL: stock is the count of UNSOLD cards. AUTO_FETCH: not
+  // stock-bound (treated as infinite for display purposes).
+  const variants: ProductVariantOption[] = isManual
+    ? (
+        await prisma.productVariant.findMany({
+          where: { productId: product.id, isActive: true },
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+          select: {
+            id: true,
+            name: true,
+            price: true,
+            stockQuantity: true,
+            isActive: true,
+          },
+        })
+      ).map((v) => ({
+        id: v.id,
+        name: v.name,
+        price: Number(v.price).toFixed(2),
+        stockQuantity: v.stockQuantity,
+        isActive: v.isActive,
+      }))
+    : [];
+
+  const manualStock = isManual
+    ? variants.reduce((sum, v) => sum + Math.max(v.stockQuantity, 0), 0)
+    : 0;
+  const stockCount = isManual ? manualStock : await getCachedStockCount(product.id);
+
   const isFree = isAutoFetch && Number(product.price) === 0;
   const isSoldOut = !isAutoFetch && stockCount === 0;
   const lowStockThreshold =
@@ -133,6 +166,19 @@ export default async function ProductDetailPage({
     !isSoldOut &&
     stockCount > 0 &&
     stockCount <= lowStockThreshold;
+
+  // Business-hours hint shown beneath the MANUAL order card so buyers know
+  // when human fulfillment is available. Computed from SiteSettings (DB → env).
+  let businessHoursHint: string | undefined;
+  if (isManual) {
+    const settings = await getSiteSettings();
+    businessHoursHint = formatBusinessHoursHint({
+      start: settings.businessHoursStart,
+      end: settings.businessHoursEnd,
+      weekdays: settings.businessHoursWeekdays,
+      timezone: settings.businessHoursTimezone,
+    });
+  }
   const priceNumber = Number(product.price);
   const requireTurnstile =
     Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY) &&
@@ -318,7 +364,7 @@ export default async function ProductDetailPage({
               <ProductOrderSection
                 productId={product.id}
                 productName={product.name}
-                maxQuantity={isAutoFetch ? 1 : product.maxQuantity}
+                maxQuantity={isManual ? 1 : isAutoFetch ? 1 : product.maxQuantity}
                 price={priceNumber}
                 inStock={!isSoldOut}
                 formId="product-order-form"
@@ -329,6 +375,8 @@ export default async function ProductDetailPage({
                 prefilledEmail={prefilledEmail ?? undefined}
                 cs={crossSellDiscountPercent != null ? csToken : null}
                 crossSellDiscountPercent={crossSellDiscountPercent}
+                variants={isManual ? variants : undefined}
+                businessHoursHint={businessHoursHint}
               />
             </section>
 
