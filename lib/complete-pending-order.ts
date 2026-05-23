@@ -3,6 +3,24 @@ import { prisma } from "@/lib/prisma";
 import { sendOrderCompletionEmail } from "@/lib/order-completion-email";
 import { createOrderCommissions } from "@/lib/calculate-order-commission";
 import { checkAndIssueMilestoneBonuses } from "@/lib/domains/distributors";
+import { decrementVariantStock } from "@/lib/domains/variants";
+import { sendWecomNotification } from "@/lib/wecom-notify";
+import { assertTransition } from "@/lib/order-state-machine";
+
+// Sentinel errors used inside the MANUAL transaction to force a rollback while
+// distinguishing the rollback reason from real DB failures.
+class OutOfStockSentinel extends Error {
+  constructor() {
+    super("Out of stock")
+    this.name = "OutOfStockSentinel"
+  }
+}
+class ConcurrentCompletionSentinel extends Error {
+  constructor() {
+    super("Order already completed")
+    this.name = "ConcurrentCompletionSentinel"
+  }
+}
 
 export type CompletePendingOrderResult =
   | { done: true; orderNo: string }
@@ -38,6 +56,14 @@ export async function completePendingOrder(
   }
   if (order.status !== "PENDING") {
     return { done: false, error: "Order is not pending" };
+  }
+
+  // MANUAL orders take a separate path: stock is held on a ProductVariant
+  // (not on Card rows), and the payment callback only advances the order to
+  // AWAITING_FULFILLMENT. Card/commission/email handling is deferred until
+  // the admin marks the order COMPLETED.
+  if (order.product?.productType === "MANUAL") {
+    return await completeManualOrder(order);
   }
 
   const now = new Date();
@@ -111,6 +137,101 @@ export async function completePendingOrder(
   }
 
   return { done: true, orderNo: order.orderNo };
+}
+
+/**
+ * Payment callback path for MANUAL (人工发货) orders.
+ *
+ * Atomically: decrement the SKU's stock, then flip the order PENDING →
+ * AWAITING_FULFILLMENT and snapshot the variant unit cost. Stock decrement
+ * and status update share a transaction so a sold-out SKU rolls back the
+ * status change too. After the transaction commits, fire a fire-and-forget
+ * WeCom notification so ops sees the new order.
+ *
+ * Deferred to the COMPLETED transition (Task 12): card SOLD updates,
+ * commissions, buyer email.
+ */
+async function completeManualOrder(
+  order: {
+    id: string
+    orderNo: string
+    variantId: string | null
+    status: string
+    amount: Prisma.Decimal
+    email: string | null
+    productNameSnapshot: string | null
+    variantNameSnapshot: string | null
+    product: { productType: string } | null
+  },
+): Promise<CompletePendingOrderResult> {
+  if (!order.variantId) {
+    return { done: false, error: "MANUAL order missing variantId" }
+  }
+  assertTransition("PENDING", "AWAITING_FULFILLMENT", "MANUAL")
+
+  const paidAt = new Date()
+  let stockOk = false
+
+  await prisma.$transaction(async (tx) => {
+    const variant = await tx.productVariant.findUnique({
+      where: { id: order.variantId! },
+    })
+    if (!variant) throw new Error("Variant disappeared")
+
+    const decRes = await decrementVariantStock(order.variantId!, tx)
+    if (decRes.count === 0) {
+      throw new OutOfStockSentinel()
+    }
+
+    // updateMany is required so the WHERE clause can include `status: "PENDING"`
+    // (Prisma's `update` only accepts WhereUniqueInput). Without this guard a
+    // concurrent payment retry could double-advance the order.
+    const orderUpd = await tx.order.updateMany({
+      where: { id: order.id, status: "PENDING" },
+      data: {
+        status: "AWAITING_FULFILLMENT",
+        paidAt,
+        costTotalSnapshot: variant.unitCost ?? new Prisma.Decimal(0),
+      },
+    })
+    if (orderUpd.count === 0) {
+      throw new ConcurrentCompletionSentinel()
+    }
+    stockOk = true
+  }).catch((err) => {
+    if (
+      err instanceof OutOfStockSentinel ||
+      err instanceof ConcurrentCompletionSentinel
+    ) {
+      stockOk = false
+      return
+    }
+    throw err
+  })
+
+  if (!stockOk) {
+    console.warn(
+      "[complete-manual] stock lock or status race for order",
+      order.orderNo,
+    )
+    return {
+      done: false,
+      error: "Out of stock or already completed; order left as-is",
+    }
+  }
+
+  sendWecomNotification("order.awaiting_fulfillment", {
+    id: order.id,
+    orderNo: order.orderNo,
+    amount: order.amount,
+    email: order.email,
+    status: "AWAITING_FULFILLMENT",
+    productNameSnapshot: order.productNameSnapshot,
+    variantNameSnapshot: order.variantNameSnapshot,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any).catch((err) => console.error("[wecom-notify]", err))
+
+  return { done: true, orderNo: order.orderNo }
 }
 
 async function writeExitDiscountUsage(
