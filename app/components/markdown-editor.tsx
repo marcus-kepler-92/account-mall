@@ -7,8 +7,16 @@ import { useRef, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { getCommands, type ICommand } from "@uiw/react-md-editor/commands"
+import { Skeleton } from "@/components/ui/skeleton"
 
-const MDEditor = dynamic(() => import("@uiw/react-md-editor"), { ssr: false })
+// `ssr: false` keeps the editor client-only (it touches `window`/`document`),
+// but without `loading` the wrapper height collapses to 0 until the chunk
+// arrives — the form jumps when the editor mounts. Render a same-sized
+// skeleton so the layout is stable from first paint.
+const MDEditor = dynamic(() => import("@uiw/react-md-editor"), {
+    ssr: false,
+    loading: () => <Skeleton className="h-[320px] w-full" />,
+})
 
 const UPLOAD_IMAGE_URL = "/api/upload/image"
 const IMAGE_MAX_BYTES = 2 * 1024 * 1024 // 2MB

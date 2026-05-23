@@ -22,8 +22,11 @@ export default function ProductCardsLoading() {
                 <Skeleton className="h-9 w-24" />
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-3">
-                {[1, 2, 3].map((i) => (
+            {/* grid-cols-2 sm:grid-cols-4 mirrors the real page's KPI strip
+                (page.tsx:131); previously was 3 cols which caused layout
+                shift when real data arrived. */}
+            <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">
+                {[1, 2, 3, 4].map((i) => (
                     <Skeleton key={i} className="h-24 rounded-lg" />
                 ))}
             </div>

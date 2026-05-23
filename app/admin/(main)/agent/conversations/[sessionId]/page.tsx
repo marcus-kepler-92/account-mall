@@ -85,26 +85,33 @@ export default async function AdminAgentConversationDetailPage({
                         {session.id}
                     </p>
                 </div>
-                {session.escalated && <Badge variant="destructive">已升级</Badge>}
+                {session.escalated && <Badge variant="destructive" className="shrink-0">已升级</Badge>}
             </div>
 
-            <div className="grid gap-6 md:grid-cols-[1fr_320px]">
+            {/* lg breakpoint (not md): admin sidebar eats ~250px, so at md
+                (768px) the content area only gets ~520px — splitting that
+                into 1fr+320px leaves the messages column ~200px, way too
+                narrow for chat content. lg (1024px) → content ~770px,
+                messages get ~440px which is usable.
+                minmax(0,1fr) + min-w-0: long markdown / tool JSON / IDs
+                can't push the 1fr column past the viewport. */}
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] min-w-0">
                 {/* Left: messages timeline */}
-                <div className="space-y-4">
-                    <Card>
+                <div className="space-y-4 min-w-0">
+                    <Card className="min-w-0">
                         <CardHeader>
                             <CardTitle className="text-base">
                                 消息时间线（{session.messages.length}）
                             </CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-5">
+                        <CardContent className="space-y-5 min-w-0">
                             {session.messages.length === 0 ? (
                                 <p className="text-sm text-muted-foreground">
                                     暂无消息
                                 </p>
                             ) : (
                                 session.messages.map((m) => (
-                                    <div key={m.id} className="space-y-2">
+                                    <div key={m.id} className="space-y-2 min-w-0">
                                         <div className="flex flex-wrap items-center gap-2 text-xs">
                                             <Badge variant={ROLE_VARIANT[m.role]}>
                                                 {ROLE_LABEL[m.role] ?? m.role}
@@ -135,7 +142,7 @@ export default async function AdminAgentConversationDetailPage({
                                                 </span>
                                             )}
                                         </div>
-                                        <div className="pl-3 border-l-2 border-muted">
+                                        <div className="pl-3 border-l-2 border-muted min-w-0 overflow-x-auto">
                                             {m.role === "TOOL" ? (
                                                 <details className="text-xs">
                                                     <summary className="cursor-pointer text-muted-foreground">
@@ -157,7 +164,7 @@ export default async function AdminAgentConversationDetailPage({
                 </div>
 
                 {/* Right: metadata */}
-                <div className="space-y-4">
+                <div className="space-y-4 min-w-0">
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-base">会话信息</CardTitle>

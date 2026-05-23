@@ -1,7 +1,10 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 
-const cardGrid = "grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-[repeat(2,minmax(0,1fr))]"
+// lg (not md) to match dashboard-sales-tab.tsx — md breakpoint with admin
+// sidebar leaves cards too narrow for charts; also avoids layout shift
+// when real data swaps in (real page goes 2-col at lg, skeleton must too).
+const cardGrid = "grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-[repeat(2,minmax(0,1fr))]"
 
 function PanelSkeleton() {
   return (

@@ -6,10 +6,24 @@ import dynamic from "next/dynamic"
 import { useTheme } from "next-themes"
 import { useSyncExternalStore } from "react"
 import { isLikelyHtml } from "@/lib/description"
+import { Skeleton } from "@/components/ui/skeleton"
 
+// `ssr: false` makes the preview render only after the chunk lands client-side.
+// Without `loading`, the wrapper div is empty during that window — the parent
+// page shows headers/badges/timestamps but a blank body, so users on slow
+// networks think the page is broken. The skeleton fills that hole.
 const MarkdownPreview = dynamic(
     () => import("@uiw/react-markdown-preview").then((mod) => mod.default),
-    { ssr: false }
+    {
+        ssr: false,
+        loading: () => (
+            <div className="space-y-1.5">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-5/6" />
+                <Skeleton className="h-4 w-2/3" />
+            </div>
+        ),
+    },
 )
 
 type MarkdownViewProps = {
@@ -58,9 +72,22 @@ export function MarkdownView({ content }: MarkdownViewProps) {
             <MarkdownPreview
                 source={content}
                 components={{
-                    img: ({ src, alt, ...props }) =>
-                        // eslint-disable-next-line @next/next/no-img-element
-                        src ? <img src={src} alt={alt || ""} {...props} /> : null,
+                    // Do NOT spread `...props` here — react-markdown passes its
+                    // internal `node` (an mdast object) plus other non-DOM keys
+                    // that React then renders as `node="[object Object]"` HTML
+                    // attributes. We forward only safe DOM attrs explicitly.
+                    img: ({ src, alt, title, width, height, loading }) =>
+                        src ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                                src={src}
+                                alt={alt || ""}
+                                title={title}
+                                width={width}
+                                height={height}
+                                loading={loading ?? "lazy"}
+                            />
+                        ) : null,
                 }}
             />
         </div>

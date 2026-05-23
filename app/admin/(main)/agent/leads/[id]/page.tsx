@@ -124,7 +124,7 @@ export default async function AdminAgentLeadDetailPage({ params }: PageProps) {
                 their intrinsic content width — without it, a long markdown
                 block or unbroken URL inside the snapshot pushes the grid
                 wider than the viewport. */}
-            <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_320px] min-w-0">
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] min-w-0">
                 {/* Left: live conversation window for this lead */}
                 <div className="space-y-4 min-w-0">
                     <Card className="min-w-0">

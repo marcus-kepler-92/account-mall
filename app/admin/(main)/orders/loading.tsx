@@ -10,8 +10,10 @@ export default function OrdersLoading() {
                 <Skeleton className="h-5 w-40" />
             </div>
 
-            {/* Stats cards */}
-            <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+            {/* Stats cards — sm:grid-cols-4 matches orders/page.tsx;
+                loading was on lg so the strip jumped from 2→4 cols when
+                data swapped in. */}
+            <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">
                 {[1, 2, 3, 4].map((i) => (
                     <Card key={i} className="border-l-4 border-l-muted">
                         <CardContent className="pt-4 pb-4">
