@@ -35,9 +35,15 @@ jest.mock("@/lib/wecom-notify", () => ({
     sendWecomNotification: jest.fn().mockResolvedValue(undefined),
 }))
 
+jest.mock("@/lib/rate-limit", () => ({
+    __esModule: true,
+    checkOrderQueryRateLimit: jest.fn(),
+}))
+
 import { verifyPassword } from "better-auth/crypto"
 import { getSiteSettings } from "@/lib/site-settings"
 import { sendWecomNotification } from "@/lib/wecom-notify"
+import { checkOrderQueryRateLimit } from "@/lib/rate-limit"
 
 const ORDER_ID = "cmanualorder0000000000001"
 const ORDER_NO = "FAK-MANUAL-1"
@@ -95,15 +101,40 @@ describe("POST /api/orders/[orderId]/dun", () => {
     const verifyPasswordMock = verifyPassword as jest.Mock
     const getSettingsMock = getSiteSettings as jest.Mock
     const sendWecomMock = sendWecomNotification as jest.Mock
+    const rateLimitMock = checkOrderQueryRateLimit as jest.Mock
 
     beforeEach(() => {
         verifyPasswordMock.mockReset()
         getSettingsMock.mockReset()
         sendWecomMock.mockReset()
+        rateLimitMock.mockReset()
         sendWecomMock.mockResolvedValue(undefined)
         getSettingsMock.mockResolvedValue(DEFAULT_SETTINGS)
+        rateLimitMock.mockResolvedValue(null)
         ;(prismaMock.order.findFirst as jest.Mock).mockReset()
         ;(prismaMock.order.update as jest.Mock).mockReset()
+    })
+
+    it("short-circuits with the rate-limit response without touching prisma/auth", async () => {
+        // Simulate the helper returning a 429 NextResponse — handler must
+        // bail out before parsing body, querying prisma, or running bcrypt.
+        const limited = new Response(
+            JSON.stringify({ error: "Too many requests. Please try again later." }),
+            { status: 429, headers: { "Content-Type": "application/json" } },
+        )
+        rateLimitMock.mockResolvedValueOnce(limited)
+
+        const res = await POST(
+            makeRequest({ orderNo: ORDER_NO, email: EMAIL, password: PASSWORD }),
+            makeCtx(),
+        )
+
+        expect(res).toBe(limited)
+        expect(res.status).toBe(429)
+        expect(prismaMock.order.findFirst).not.toHaveBeenCalled()
+        expect(verifyPasswordMock).not.toHaveBeenCalled()
+        expect(prismaMock.order.update).not.toHaveBeenCalled()
+        expect(sendWecomMock).not.toHaveBeenCalled()
     })
 
     it("returns 401 when password mismatches (composite lookup found, password wrong)", async () => {

@@ -4,6 +4,7 @@ import { verifyPassword } from "better-auth/crypto"
 import { prisma } from "@/lib/prisma"
 import { sendWecomNotification } from "@/lib/wecom-notify"
 import { getSiteSettings } from "@/lib/site-settings"
+import { checkOrderQueryRateLimit } from "@/lib/rate-limit"
 import {
     unauthorized,
     conflict,
@@ -34,6 +35,11 @@ const bodySchema = z.object({
  *   (fire-and-forget — admin notification must never block buyer response).
  */
 export async function POST(request: NextRequest, ctx: { params: Promise<{ orderId: string }> }) {
+    // IP-level throttle MUST run before any other work (bcrypt verifyPassword
+    // is expensive — guard brute-force on a known orderNo+email pair).
+    const rateLimitRes = await checkOrderQueryRateLimit(request)
+    if (rateLimitRes) return rateLimitRes
+
     const { orderId } = await ctx.params
 
     let body: unknown

@@ -228,6 +228,7 @@ export async function DELETE(
             const existing = await tx.order.findUnique({
                 where: { id: orderId },
                 include: {
+                    product: { select: { productType: true } },
                     cards: {
                         select: {
                             id: true,
@@ -264,6 +265,19 @@ export async function DELETE(
                         status: "UNSOLD",
                         orderId: null,
                     },
+                })
+            }
+
+            // MANUAL variant restock — mirror PATCH (CLOSED transition) logic so
+            // admin soft-close from AWAITING_FULFILLMENT/PROCESSING doesn't leak stock.
+            if (
+                existing.product?.productType === "MANUAL" &&
+                (existing.status === "AWAITING_FULFILLMENT" || existing.status === "PROCESSING") &&
+                existing.variantId
+            ) {
+                await tx.productVariant.update({
+                    where: { id: existing.variantId },
+                    data: { stockQuantity: { increment: 1 } },
                 })
             }
         })
