@@ -2,7 +2,13 @@ import * as z from "zod"
 
 // --- API schemas (orders API routes) ---
 
-export const orderStatusSchema = z.enum(["PENDING", "COMPLETED", "CLOSED"])
+export const orderStatusSchema = z.enum([
+    "PENDING",
+    "AWAITING_FULFILLMENT",
+    "PROCESSING",
+    "COMPLETED",
+    "CLOSED",
+])
 
 export const paymentMethodSchema = z.enum(["alipay", "wxpay", "qqpay"])
 export type PaymentMethod = z.infer<typeof paymentMethodSchema>

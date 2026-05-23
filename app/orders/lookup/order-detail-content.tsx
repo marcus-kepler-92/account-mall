@@ -91,6 +91,10 @@ export function OrderDetailContent({ result: initialResult, getPassword }: Props
         return resolveCardFields(card.content, templates)
     })
 
+    const isManual = result.productType === "MANUAL"
+    const isProcessing =
+        result.status === "AWAITING_FULFILLMENT" || result.status === "PROCESSING"
+
     return (
         <div className="space-y-4">
             {/* 基本信息 */}
@@ -103,7 +107,13 @@ export function OrderDetailContent({ result: initialResult, getPassword }: Props
                     <span className="text-muted-foreground">创建时间</span>
                     <span>{formatDateTime(result.createdAt)}</span>
                 </div>
-                {!result.isPending && result.cards.length > 0 && (
+                {isManual && result.variantName && (
+                    <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">规格</span>
+                        <span className="font-medium">{result.variantName}</span>
+                    </div>
+                )}
+                {!result.isPending && !isManual && result.cards.length > 0 && (
                     <div className="flex items-center justify-between">
                         <span className="text-muted-foreground">卡密数量</span>
                         <span className="font-medium">{result.cards.length} 条</span>
@@ -155,23 +165,47 @@ export function OrderDetailContent({ result: initialResult, getPassword }: Props
             )}
 
             {/* 已关闭 */}
-            {!result.isPending && result.status === "CLOSED" && result.cards.length === 0 && (
+            {!result.isPending && result.status === "CLOSED" && result.cards.length === 0 && !result.fulfillment && (
                 <div className="rounded-lg border border-muted bg-muted/50 p-3 text-sm text-muted-foreground">
                     <p className="font-medium mb-0.5">订单已关闭</p>
                     <p className="text-xs">该订单已关闭，无账号内容。</p>
                 </div>
             )}
 
-            {/* 完成但无卡密 */}
-            {!result.isPending && result.status !== "CLOSED" && result.cards.length === 0 && (
+            {/* MANUAL: 等待发货 / 卖家处理中 — Task 20 will swap this placeholder for a full timeline + dun button. */}
+            {!result.isPending && isManual && isProcessing && (
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200">
+                    <p className="font-medium mb-1">
+                        {result.status === "AWAITING_FULFILLMENT" ? "订单待发货" : "卖家处理中"}
+                    </p>
+                    <p className="text-xs">
+                        {result.status === "AWAITING_FULFILLMENT"
+                            ? "已收款，等待卖家发货，请耐心等待。"
+                            : "卖家正在为您处理订单，发货后将自动显示账号内容。"}
+                    </p>
+                </div>
+            )}
+
+            {/* MANUAL: 已发货内容（fulfillment.content） */}
+            {!result.isPending && isManual && result.fulfillment && (
+                <div className="space-y-2">
+                    <h3 className="text-sm font-semibold">账号内容</h3>
+                    <pre className="whitespace-pre-wrap break-words rounded-md border bg-muted p-4 text-sm">
+                        {result.fulfillment.content}
+                    </pre>
+                </div>
+            )}
+
+            {/* 完成但无卡密（非 MANUAL 处理中 / 非 MANUAL 已发货） */}
+            {!result.isPending && !isProcessing && !isManual && result.status !== "CLOSED" && result.cards.length === 0 && (
                 <div className="rounded-lg border border-muted bg-muted/50 p-4 text-center">
                     <Package className="size-8 mx-auto mb-2 text-muted-foreground" />
                     <p className="text-sm text-muted-foreground">暂无账号内容</p>
                 </div>
             )}
 
-            {/* 账号列表 */}
-            {!result.isPending && result.cards.length > 0 && (
+            {/* 账号列表（NORMAL / AUTO_FETCH） */}
+            {!result.isPending && !isManual && result.cards.length > 0 && (
                 <div className="space-y-2">
                     <h3 className="text-sm font-semibold">账号内容</h3>
                     <OrderCardDisplay cards={displayCards} />
@@ -203,7 +237,7 @@ export function OrderDetailContent({ result: initialResult, getPassword }: Props
             )}
 
             {/* 温馨提示 */}
-            {!result.isPending && result.cards.length > 0 && (
+            {!result.isPending && (result.cards.length > 0 || (isManual && result.fulfillment)) && (
                 <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200">
                     <p className="font-medium mb-1">温馨提示：</p>
                     <ul className="list-disc list-inside space-y-0.5">

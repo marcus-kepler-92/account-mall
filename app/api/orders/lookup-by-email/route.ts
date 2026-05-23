@@ -49,6 +49,9 @@ export async function POST(request: NextRequest) {
                 quantity: true,
                 amount: true,
                 productNameSnapshot: true,
+                variantNameSnapshot: true,
+                dunCount: true,
+                lastDunAt: true,
                 product: {
                     select: {
                         name: true,
@@ -67,6 +70,9 @@ export async function POST(request: NextRequest) {
                         content: true,
                         status: true,
                     },
+                },
+                fulfillment: {
+                    select: { content: true },
                 },
                 switchAccountCount: true,
             },
@@ -131,16 +137,44 @@ if (result.type === "single") {
                 })
             }
 
-            // For COMPLETED/CLOSED orders, return cards（AUTO_FETCH 解析为 account/password/region 等，避免前端显示 JSON 字符串）
-            const cards = order.cards
-                .filter((card) => card.status === "SOLD" || card.status === "RESERVED")
-                .map((card) => {
-                    const payload = parseAutoFetchCardContent(card.content)
-                    if (payload) {
-                        return { content: card.content, ...payload }
-                    }
-                    return { content: card.content }
+            // MANUAL intermediate states (paid but not yet fulfilled): no cards, no fulfillment content,
+            // surface variantName + dun stats so the buyer page can render the waiting timeline.
+            if (
+                order.status === "AWAITING_FULFILLMENT" ||
+                order.status === "PROCESSING"
+            ) {
+                return NextResponse.json({
+                    orderNo: order.orderNo,
+                    productName: order.productNameSnapshot ?? order.product.name,
+                    createdAt: order.createdAt instanceof Date ? order.createdAt.toISOString() : order.createdAt,
+                    status: order.status,
+                    amount: Number(order.amount),
+                    productType: "MANUAL" as const,
+                    cards: [],
+                    fulfillment: null,
+                    variantName: order.variantNameSnapshot,
+                    dunCount: order.dunCount,
+                    lastDunAt: order.lastDunAt
+                        ? (order.lastDunAt instanceof Date
+                              ? order.lastDunAt.toISOString()
+                              : order.lastDunAt)
+                        : null,
                 })
+            }
+
+            // For COMPLETED/CLOSED orders, return cards (NORMAL/AUTO_FETCH) or fulfillment (MANUAL).
+            const isManual = order.product?.productType === "MANUAL"
+            const cards = isManual
+                ? []
+                : order.cards
+                      .filter((card) => card.status === "SOLD" || card.status === "RESERVED")
+                      .map((card) => {
+                          const payload = parseAutoFetchCardContent(card.content)
+                          if (payload) {
+                              return { content: card.content, ...payload }
+                          }
+                          return { content: card.content }
+                      })
 
             const isAutoFetch = order.product?.productType === "AUTO_FETCH"
             const successToken = createOrderSuccessToken(order.orderNo)
@@ -158,7 +192,16 @@ if (result.type === "single") {
                 createdAt: order.createdAt instanceof Date ? order.createdAt.toISOString() : order.createdAt,
                 status: order.status,
                 amount: Number(order.amount),
+                productType: order.product?.productType ?? "NORMAL",
                 cards,
+                fulfillment: isManual ? (order.fulfillment ?? null) : null,
+                variantName: order.variantNameSnapshot,
+                dunCount: order.dunCount,
+                lastDunAt: order.lastDunAt
+                    ? (order.lastDunAt instanceof Date
+                          ? order.lastDunAt.toISOString()
+                          : order.lastDunAt)
+                    : null,
                 cardTemplates: order.product?.cardTemplates ?? [],
                 ...(successToken && { successToken }),
                 ...(isAutoFetch && { isAutoFetch: true }),

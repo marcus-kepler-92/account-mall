@@ -2,12 +2,31 @@ import type { AutoFetchCardPayload } from "@/lib/auto-fetch-card"
 
 export type CardItem = { content: string } | (AutoFetchCardPayload & { content: string })
 
+export type OrderResultStatus =
+    | "PENDING"
+    | "AWAITING_FULFILLMENT"
+    | "PROCESSING"
+    | "COMPLETED"
+    | "CLOSED"
+
+export type OrderProductType = "NORMAL" | "AUTO_FETCH" | "MANUAL"
+
 export interface OrderResult {
     orderNo: string
     productName: string
     createdAt: string
-    status: "PENDING" | "COMPLETED" | "CLOSED"
+    status: OrderResultStatus
     cards: CardItem[]
+    /** Product type — present on COMPLETED/CLOSED and MANUAL intermediate states. */
+    productType?: OrderProductType
+    /** MANUAL fulfillment content (admin-delivered text). null for NORMAL/AUTO_FETCH. */
+    fulfillment?: { content: string } | null
+    /** MANUAL variant snapshot, e.g. "10K 钻石". null/undefined for NORMAL/AUTO_FETCH. */
+    variantName?: string | null
+    /** MANUAL buyer-triggered "催发货" count. */
+    dunCount?: number
+    /** MANUAL last "催发货" timestamp (ISO). */
+    lastDunAt?: string | null
     isPending?: boolean
     canPay?: boolean
     /** PENDING 订单的支付截止时间 */
@@ -25,7 +44,7 @@ export interface OrderListItem {
     orderNo: string
     productName: string
     createdAt: string
-    status: "PENDING" | "COMPLETED" | "CLOSED"
+    status: OrderResultStatus
     quantity: number
     amount: number
 }

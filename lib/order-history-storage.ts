@@ -10,7 +10,22 @@ const orderHistoryItemSchema = z.object({
     productName: z.string(),
     amount: z.number(),
     createdAt: z.string(),
-    status: z.enum(["PENDING", "COMPLETED", "CLOSED"]),
+    // MANUAL fulfillment introduced AWAITING_FULFILLMENT/PROCESSING. Older entries written before
+    // this change predate those values, so legacy items still validate against the original set.
+    status: z.enum([
+        "PENDING",
+        "AWAITING_FULFILLMENT",
+        "PROCESSING",
+        "COMPLETED",
+        "CLOSED",
+    ]),
+    // MANUAL-only optional fields. Older entries (NORMAL/AUTO_FETCH) saved before MANUAL existed
+    // won't have these keys; Zod `.optional().nullable()` accepts both missing and explicit null.
+    variantName: z.string().nullable().optional(),
+    fulfillment: z
+        .object({ content: z.string() })
+        .nullable()
+        .optional(),
 })
 
 const orderHistoryArraySchema = z.array(orderHistoryItemSchema)
