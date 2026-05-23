@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useProductPriceSyncStore } from "@/lib/stores/product-price-sync"
 import { useTurnstileStore } from "@/lib/stores/turnstile"
+import type { ManualDisplay } from "@/lib/manual-display"
 
 const ORDER_FORM_LOADING_EVENT = "product-order-loading"
 
@@ -19,10 +20,10 @@ type ProductBottomBarProps = {
     // MANUAL products use per-variant pricing and have their own dun-发货 flow
     // on the order page, so the catalog price (¥0.00) and the 催货 CTA aren't
     // meaningful here. Bottom bar swaps to a min-price label + a 联系客服 CTA
-    // when the variant list is fully out of stock.
-    isManual?: boolean
-    manualPriceMin?: number | null
-    manualPriceMax?: number | null
+    // when the variant list is fully out of stock. `manual` is the derived
+    // display payload from `computeManualDisplay` — undefined for NORMAL /
+    // AUTO_FETCH products.
+    manual?: ManualDisplay
 }
 
 export function ProductBottomBar({
@@ -32,10 +33,10 @@ export function ProductBottomBar({
     formId,
     isFree,
     requireTurnstile = false,
-    isManual = false,
-    manualPriceMin = null,
-    manualPriceMax = null,
+    manual,
 }: ProductBottomBarProps) {
+    const isManual = manual?.isManual ?? false
+    const manualPriceLabel = manual?.priceLabel ?? null
     const [isSubmitting, setIsSubmitting] = useState(false)
     const d = useProductPriceSyncStore((s) => s.display)
     const turnstileStatus = useTurnstileStore((s) => s.status)
@@ -67,11 +68,12 @@ export function ProductBottomBar({
         if (isSubmitting) return
 
         if (!inStock) {
-            // MANUAL has no restock-subscription path; just scroll to the order
-            // section where the contact-customer-service hint is rendered.
+            // MANUAL has no restock-subscription path; the sold-out CTA reads
+            // 联系客服, so trigger the global customer-service FAB instead of
+            // scrolling — the order section doesn't render a buy form in this
+            // state, so scrolling is misleading.
             if (isManual) {
-                const el = document.getElementById(orderSectionId)
-                if (el) el.scrollIntoView({ behavior: "smooth", block: "start" })
+                document.dispatchEvent(new CustomEvent("open-customer-service"))
                 return
             }
             document.dispatchEvent(new CustomEvent("open-restock-dialog"))
@@ -87,14 +89,12 @@ export function ProductBottomBar({
 
     const displayFree = d ? d.isFreeShared : isFree
     // MANUAL: prefer live variant price from the sync store (driven by the
-    // variant selector); fall back to the min-price range hint if the user
-    // hasn't picked a variant yet, otherwise dash.
-    const manualFallback =
-        manualPriceMin != null && manualPriceMax != null
-            ? manualPriceMin === manualPriceMax
-                ? manualPriceMin.toFixed(2)
-                : `${manualPriceMin.toFixed(2)} 起`
-            : "—"
+    // variant selector); fall back to the helper's preformatted label if the
+    // user hasn't picked a variant yet, otherwise dash. Strip the "¥" prefix
+    // from the helper label because the JSX adds it separately.
+    const manualFallback = manualPriceLabel
+        ? manualPriceLabel.replace(/^¥/, "")
+        : "—"
     const displayPrice = d && !d.isFreeShared
         ? d.totalPrice
         : isManual

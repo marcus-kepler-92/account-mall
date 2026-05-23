@@ -21,6 +21,8 @@ import { RiskWarningDialog } from "./risk-warning-dialog";
 import { resolveCrossSellDiscount } from "@/lib/cross-sell";
 import { getSiteSettings } from "@/lib/site-settings";
 import { formatBusinessHoursHint } from "@/lib/business-hours";
+import { computeManualDisplay } from "@/lib/manual-display";
+import { ContactCustomerServiceButton } from "@/app/components/contact-customer-service-button";
 import type { ProductVariantOption } from "@/app/components/product-variant-selector";
 
 const PRODUCT_CACHE_TTL_SECONDS = 300;
@@ -157,12 +159,17 @@ export default async function ProductDetailPage({
     : 0;
   const stockCount = isManual ? manualStock : await getCachedStockCount(product.id);
 
+  // Centralized MANUAL display payload: isUnavailable, priceMin/Max, priceLabel.
+  // Drives the unavailable fallback below + price header + sticky bar.
+  const manualDisplay = computeManualDisplay(product, variants);
   // Defense-in-depth: a MANUAL product without any active variants is effectively
   // unsellable. Even if the write-side guard was bypassed (legacy data, type
   // swap, direct DB edit), the buyer page should refuse to render the order
-  // form. We render a minimal "暂时下架" notice instead and short-circuit out
-  // before computing JSON-LD, restock UI, sticky bar, etc.
-  const isManualUnavailable = isManual && variants.length === 0;
+  // form. We render a "配置中" placeholder and short-circuit out before
+  // computing JSON-LD, restock UI, sticky bar, etc. (We avoid the word "下架"
+  // here because the product is technically ACTIVE — its state is "configured
+  // but unsellable", not "taken down".)
+  const isManualUnavailable = manualDisplay.isUnavailable;
 
   const isFree = isAutoFetch && Number(product.price) === 0;
   const isSoldOut = !isAutoFetch && stockCount === 0;
@@ -187,22 +194,6 @@ export default async function ProductDetailPage({
     });
   }
   const priceNumber = Number(product.price);
-  // MANUAL: product.price is meaningless because each variant carries its own
-  // price; derive a min/max range from active variants so the header shows the
-  // real price band instead of the placeholder 0. NORMAL/AUTO_FETCH keep using
-  // product.price.
-  let manualPriceMin: number | null = null;
-  let manualPriceMax: number | null = null;
-  if (isManual && variants.length > 0) {
-    const numericPrices = variants
-      .filter((v) => v.isActive)
-      .map((v) => Number(v.price))
-      .filter((n) => Number.isFinite(n));
-    if (numericPrices.length > 0) {
-      manualPriceMin = Math.min(...numericPrices);
-      manualPriceMax = Math.max(...numericPrices);
-    }
-  }
   const requireTurnstile =
     Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY) &&
     isStorefrontTurnstileEnforced();
@@ -351,8 +342,14 @@ export default async function ProductDetailPage({
                 {product.name}
               </h1>
               <p className="text-sm text-muted-foreground">
-                商品暂时下架，如有需要请联系客服。
+                该商品暂未开放购买，如有需要请联系客服。
               </p>
+              <p className="text-xs text-muted-foreground/80">
+                商品配置中，正在准备 SKU，请稍后再来或直接联系客服为你预留。
+              </p>
+              <div className="pt-1">
+                <ContactCustomerServiceButton />
+              </div>
             </div>
           </section>
         </main>
@@ -410,8 +407,7 @@ export default async function ProductDetailPage({
               isManual={isManual}
               isLowStock={isLowStock}
               discountPercent={crossSellDiscountPercent}
-              manualPriceMin={manualPriceMin}
-              manualPriceMax={manualPriceMax}
+              manualPriceLabel={manualDisplay.priceLabel}
             />
 
             <ProductMetaNoticeSection isManual={isManual} />
@@ -470,9 +466,7 @@ export default async function ProductDetailPage({
         formId="product-order-form"
         isFree={isFree}
         requireTurnstile={requireTurnstile}
-        isManual={isManual}
-        manualPriceMin={manualPriceMin}
-        manualPriceMax={manualPriceMax}
+        manual={manualDisplay}
       />
     </div>
   );
@@ -529,9 +523,9 @@ type ProductInfoSectionProps = {
   // — keeps the displayed price consistent with what the order form will
   // actually charge.
   discountPercent?: number | null;
-  // MANUAL: derived min/max across active variants. null when no variants.
-  manualPriceMin?: number | null;
-  manualPriceMax?: number | null;
+  // MANUAL: preformatted price-band label derived by `computeManualDisplay`.
+  // null when the product is not MANUAL or has no active variants.
+  manualPriceLabel?: string | null;
 };
 
 function ProductInfoSection({
@@ -545,8 +539,7 @@ function ProductInfoSection({
   isManual,
   isLowStock,
   discountPercent,
-  manualPriceMin,
-  manualPriceMax,
+  manualPriceLabel,
 }: ProductInfoSectionProps) {
   const hasDiscount =
     !isSoldOut &&
@@ -557,16 +550,6 @@ function ProductInfoSection({
     discountPercent < 100 &&
     price > 0;
   const discountedPrice = hasDiscount ? price * (1 - discountPercent! / 100) : price;
-
-  // MANUAL price label: show a range when min!=max, single price otherwise.
-  // The "起" suffix only appears for ranged pricing so single-price MANUAL
-  // products read as a normal price.
-  const manualPriceLabel =
-    isManual && manualPriceMin != null && manualPriceMax != null
-      ? manualPriceMin === manualPriceMax
-        ? `¥${manualPriceMin.toFixed(2)}`
-        : `¥${manualPriceMin.toFixed(2)} 起`
-      : null;
 
   return (
     <section

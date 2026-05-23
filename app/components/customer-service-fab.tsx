@@ -46,6 +46,16 @@ export function CustomerServiceFab() {
         return () => clearTimeout(t)
     }, [])
 
+    // External "open customer service" entry. Any surface (e.g. MANUAL
+    // sold-out sticky bar, unavailable-product placeholder) can dispatch
+    // `open-customer-service` to programmatically pop the FAB without
+    // duplicating the popover/sheet logic.
+    useEffect(() => {
+        const handler = () => setOpen(true)
+        document.addEventListener("open-customer-service", handler)
+        return () => document.removeEventListener("open-customer-service", handler)
+    }, [])
+
     useEffect(() => {
         const raf = requestAnimationFrame(() => setPos(getInitialPos()))
         return () => cancelAnimationFrame(raf)
