@@ -107,6 +107,24 @@ export async function GET(request: NextRequest) {
 
     const stockMap = new Map(stockCounts.map((s) => [s.productId, s._count.id]));
 
+    // MANUAL products do not use the cards table — stock lives on
+    // ProductVariant.stockQuantity. Aggregate active variants' stock per
+    // product so the storefront cards display the correct "in stock" state
+    // (otherwise MANUAL products would render permanently sold-out).
+    const manualProductIds = products
+        .filter((p) => p.productType === "MANUAL")
+        .map((p) => p.id);
+    const variantStockCounts = manualProductIds.length > 0
+        ? await prisma.productVariant.groupBy({
+              by: ["productId"],
+              where: { productId: { in: manualProductIds }, isActive: true },
+              _sum: { stockQuantity: true },
+          })
+        : [];
+    const variantStockMap = new Map(
+        variantStockCounts.map((s) => [s.productId, s._sum.stockQuantity ?? 0])
+    );
+
     // Cross-sell session: when the storefront passes ?cs=<token>, mark each
     // eligible product with its applicable discountPercent so cards render
     // the discounted price. Admin requests skip this — admin views show raw
@@ -121,13 +139,20 @@ export async function GET(request: NextRequest) {
             costPerUnit?: unknown
         };
         const isAutoFetch = product.productType === "AUTO_FETCH";
+        const isManual = product.productType === "MANUAL";
         const discountPercent = discountMap.get(product.id) ?? null;
+        // AUTO_FETCH 在列表里按「有货」展示，不依赖库存数；
+        // MANUAL 使用 ProductVariant 库存聚合（无 cards 行）。
+        const stock = isAutoFetch
+            ? 1
+            : isManual
+              ? (variantStockMap.get(product.id) ?? 0)
+              : (stockMap.get(product.id) ?? 0);
         return {
             ...productRest,
             price: Number(product.price),
             productType: product.productType ?? "NORMAL",
-            // AUTO_FETCH 在列表里按「有货」展示，不依赖库存数
-            stock: isAutoFetch ? 1 : (stockMap.get(product.id) ?? 0),
+            stock,
             ...(discountPercent != null && { discountPercent }),
             ...(isAdmin && {
                 sourceUrl: sourceUrl ?? null,

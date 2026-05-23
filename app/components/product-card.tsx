@@ -20,7 +20,7 @@ export type ProductCardData = {
     image: string | null
     price: number
     stock: number
-    productType?: "NORMAL" | "AUTO_FETCH"
+    productType?: "NORMAL" | "AUTO_FETCH" | "MANUAL"
     tags: { id: string; name: string; slug: string }[]
     // Set by /api/products when ?cs=<token> is present and this product is an
     // eligible cross-sell target of the source order's product. Absent for
@@ -48,12 +48,16 @@ export function ProductCard({ product, gradientIndex = 0, className, code, cs, d
     const briefRaw = product.summary?.trim() || descriptionFallback
     const brief = briefRaw.slice(0, 80)
     const isAutoFetch = product.productType === "AUTO_FETCH"
+    const isManual = product.productType === "MANUAL"
     const isFree = isAutoFetch && product.price === 0
     const isSoldOut = !isAutoFetch && product.stock === 0
     const isLowStock = !isAutoFetch && !isSoldOut && product.stock > 0 && product.stock <= configClient.lowStockThreshold
+    // MANUAL 商品不支持到货提醒（restock-subscriptions API 拒绝），
+    // 因此即使售罄也不展示「催货」按钮 / 不在 URL 写 restock=1。
+    const canRestock = isSoldOut && !isManual
     const buildDetailHref = () => {
         const params = new URLSearchParams()
-        if (isSoldOut) params.set("restock", "1")
+        if (canRestock) params.set("restock", "1")
         if (code) params.set("code", code)
         if (cs) params.set("cs", cs)
         const query = params.toString()
@@ -217,12 +221,18 @@ export function ProductCard({ product, gradientIndex = 0, className, code, cs, d
                                 </>
                             )}
                         </div>
-                        <Button size="sm" className="shrink-0" disabled={false}>
-                            {isSoldOut ? (
+                        <Button
+                            size="sm"
+                            className="shrink-0"
+                            variant={isSoldOut && isManual ? "secondary" : "default"}
+                        >
+                            {canRestock ? (
                                 <>
                                     <Bell className="size-3.5" />
                                     <span className="text-xs sm:text-sm">催货</span>
                                 </>
+                            ) : isSoldOut ? (
+                                <span className="text-xs sm:text-sm">已售罄</span>
                             ) : isFree ? (
                                 <span className="text-xs sm:text-sm">免费领取</span>
                             ) : (

@@ -52,7 +52,7 @@ type CachedProduct = {
   summary: string | null
   image: string | null
   price: number
-  productType: "NORMAL" | "AUTO_FETCH"
+  productType: "NORMAL" | "AUTO_FETCH" | "MANUAL"
   tags: { id: string; name: string; slug: string }[]
 }
 
@@ -126,7 +126,7 @@ const getCachedProducts = unstable_cache(
       summary: p.summary ?? null,
       image: p.image,
       price: Number(p.price),
-      productType: (p.productType ?? "NORMAL") as "NORMAL" | "AUTO_FETCH",
+      productType: (p.productType ?? "NORMAL") as CachedProduct["productType"],
       tags: p.tags,
     }))
     return { products: plain, total }
@@ -151,6 +151,25 @@ const getCachedStockCounts = unstable_cache(
   { revalidate: 60, tags: ["cards", "products"] },
 )
 
+// MANUAL products track inventory on ProductVariant rows instead of Cards.
+// Aggregate active variants' stockQuantity per product so the homepage
+// catalog doesn't render MANUAL products as permanently sold-out.
+const getCachedVariantStockCounts = unstable_cache(
+  async (productIds: string[]): Promise<Record<string, number>> => {
+    if (productIds.length === 0) return {}
+    const rows = await prisma.productVariant.groupBy({
+      by: ["productId"],
+      where: { productId: { in: productIds }, isActive: true },
+      _sum: { stockQuantity: true },
+    })
+    const map: Record<string, number> = {}
+    for (const r of rows) map[r.productId] = r._sum.stockQuantity ?? 0
+    return map
+  },
+  ["home-variant-stock-counts"],
+  { revalidate: 60, tags: ["product-variants", "products"] },
+)
+
 export default async function HomePage({
     searchParams,
 }: {
@@ -171,8 +190,12 @@ export default async function HomePage({
     const { products, total } = productsResult
 
     const productIds = products.map(p => p.id)
-    const [stockCounts, csDiscountMap] = await Promise.all([
+    const manualProductIds = products
+        .filter(p => p.productType === "MANUAL")
+        .map(p => p.id)
+    const [stockCounts, variantStockCounts, csDiscountMap] = await Promise.all([
         getCachedStockCounts(productIds),
+        getCachedVariantStockCounts(manualProductIds),
         // Resolve per-product cross-sell discount for the user's current cs
         // session. Empty map for anonymous browsing / expired tokens —
         // products simply render at original price.
@@ -181,6 +204,11 @@ export default async function HomePage({
 
     const productsWithStock: ProductCardData[] = products.map(product => {
         const discountPercent = csDiscountMap.get(product.id)
+        const stock = product.productType === "AUTO_FETCH"
+            ? 1
+            : product.productType === "MANUAL"
+              ? (variantStockCounts[product.id] ?? 0)
+              : (stockCounts[product.id] ?? 0)
         return {
             id: product.id,
             name: product.name,
@@ -190,7 +218,7 @@ export default async function HomePage({
             image: product.image,
             price: product.price,
             productType: product.productType,
-            stock: product.productType === "AUTO_FETCH" ? 1 : (stockCounts[product.id] ?? 0),
+            stock,
             tags: product.tags,
             ...(discountPercent != null && { discountPercent }),
         }

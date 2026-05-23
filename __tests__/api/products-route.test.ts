@@ -36,6 +36,7 @@ describe("GET /api/products", () => {
         adminSessionMock.mockReset()
         // groupBy is called in every GET request; default to empty (no stock data)
         prismaMock.card.groupBy.mockResolvedValue([] as any)
+        prismaMock.productVariant.groupBy.mockResolvedValue([] as any)
     })
 
     it("returns only ACTIVE products for public request (no admin param)", async () => {
@@ -67,6 +68,107 @@ describe("GET /api/products", () => {
         expect(data.data).toHaveLength(1)
         expect(data.data[0].stock).toBe(3)
         expect(data.meta).toMatchObject({ total: 1, page: 1, pageSize: 9 })
+    })
+
+    it("aggregates variant stockQuantity for MANUAL products (no cards table)", async () => {
+        const products = [
+            {
+                id: "p_manual",
+                name: "Manual Product",
+                slug: "manual-product",
+                status: "ACTIVE",
+                productType: "MANUAL",
+                price: new Prisma.Decimal("50"),
+                tags: [],
+            },
+            {
+                id: "p_normal",
+                name: "Normal Product",
+                slug: "normal-product",
+                status: "ACTIVE",
+                productType: "NORMAL",
+                price: new Prisma.Decimal("100"),
+                tags: [],
+            },
+        ]
+        prismaMock.product.findMany.mockResolvedValueOnce(products as any)
+        prismaMock.product.count.mockResolvedValueOnce(products.length)
+        // NORMAL product has 2 UNSOLD cards; MANUAL has none.
+        prismaMock.card.groupBy.mockResolvedValueOnce([
+            { productId: "p_normal", _count: { id: 2 } },
+        ] as any)
+        // MANUAL product has 7 active variant stock total.
+        prismaMock.productVariant.groupBy.mockResolvedValueOnce([
+            { productId: "p_manual", _sum: { stockQuantity: 7 } },
+        ] as any)
+
+        const res = await GET(createUrlRequest("http://localhost/api/products"))
+        const data = await res.json()
+
+        expect(res.status).toBe(200)
+        expect(prismaMock.productVariant.groupBy).toHaveBeenCalledWith(
+            expect.objectContaining({
+                by: ["productId"],
+                where: { productId: { in: ["p_manual"] }, isActive: true },
+                _sum: { stockQuantity: true },
+            })
+        )
+        const manual = data.data.find((p: { id: string }) => p.id === "p_manual")
+        const normal = data.data.find((p: { id: string }) => p.id === "p_normal")
+        expect(manual.stock).toBe(7)
+        expect(manual.productType).toBe("MANUAL")
+        expect(normal.stock).toBe(2)
+    })
+
+    it("returns stock=0 for MANUAL product when no active variants exist", async () => {
+        const products = [
+            {
+                id: "p_empty_manual",
+                name: "Empty Manual",
+                slug: "empty-manual",
+                status: "ACTIVE",
+                productType: "MANUAL",
+                price: new Prisma.Decimal("9.9"),
+                tags: [],
+            },
+        ]
+        prismaMock.product.findMany.mockResolvedValueOnce(products as any)
+        prismaMock.product.count.mockResolvedValueOnce(1)
+        prismaMock.card.groupBy.mockResolvedValueOnce([] as any)
+        prismaMock.productVariant.groupBy.mockResolvedValueOnce([] as any)
+
+        const res = await GET(createUrlRequest("http://localhost/api/products"))
+        const data = await res.json()
+
+        expect(res.status).toBe(200)
+        expect(data.data[0].stock).toBe(0)
+        expect(data.data[0].productType).toBe("MANUAL")
+    })
+
+    it("skips ProductVariant.groupBy when no MANUAL products are returned", async () => {
+        const products = [
+            {
+                id: "p_normal_only",
+                name: "Normal Only",
+                slug: "normal-only",
+                status: "ACTIVE",
+                productType: "NORMAL",
+                price: new Prisma.Decimal("10"),
+                tags: [],
+            },
+        ]
+        prismaMock.product.findMany.mockResolvedValueOnce(products as any)
+        prismaMock.product.count.mockResolvedValueOnce(1)
+        prismaMock.card.groupBy.mockResolvedValueOnce([
+            { productId: "p_normal_only", _count: { id: 5 } },
+        ] as any)
+
+        const res = await GET(createUrlRequest("http://localhost/api/products"))
+        const data = await res.json()
+
+        expect(res.status).toBe(200)
+        expect(prismaMock.productVariant.groupBy).not.toHaveBeenCalled()
+        expect(data.data[0].stock).toBe(5)
     })
 
     it("returns 401 when admin=true and not authenticated", async () => {
