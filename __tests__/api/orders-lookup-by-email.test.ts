@@ -173,11 +173,14 @@ expect(data.code).toBe("VALIDATION_FAILED")
       createdAt: createdAt.toISOString(),
       status: "COMPLETED",
       amount: 50,
+      productType: "NORMAL",
       cards: [
         { content: "code-1" },
         { content: "code-2" },
       ],
       cardTemplates: [],
+      fulfillment: null,
+      lastDunAt: null,
       successToken: expect.any(String),
     })
   })
@@ -273,8 +276,11 @@ expect(data.code).toBe("VALIDATION_FAILED")
       createdAt: createdAt.toISOString(),
       status: "COMPLETED",
       amount: 50,
+      productType: "NORMAL",
       cards: [{ content: "code-1" }],
       cardTemplates: [],
+      fulfillment: null,
+      lastDunAt: null,
       successToken: expect.any(String),
     })
   })

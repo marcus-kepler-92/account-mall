@@ -187,6 +187,7 @@ describe("bulkImportCards", () => {
       name: "Test Product",
       slug: "test-product",
       price: 9.99,
+      productType: "NORMAL",
     })
   })
 
