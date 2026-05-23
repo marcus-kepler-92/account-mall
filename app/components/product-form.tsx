@@ -22,11 +22,10 @@ import { ProductFormRiskWarningFields } from "./product-form-risk-warning-fields
 import { ProductFormPurchaseLimitFields } from "./product-form-purchase-limit-fields"
 import { ProductFormVariantsField } from "./product-form-variants-field"
 import { SkuListEditor } from "@/app/admin/(main)/products/[productId]/variants/sku-list-editor"
-import { FormValidationSummary } from "./form-validation-summary"
+import type { FieldErrors } from "react-hook-form"
 
-// Labels surfaced by the top-of-form validation summary. Keep keys in sync
-// with productFormSchema field names — unknown keys fall through to the raw
-// path which is acceptable for rare edge cases.
+// Field labels surfaced in the validation toast. Keep keys in sync with
+// productFormSchema field names — unknown keys fall through to the raw path.
 const PRODUCT_FORM_FIELD_LABELS: Record<string, string> = {
     name: "商品名称",
     slug: "URL 别名",
@@ -50,6 +49,31 @@ const PRODUCT_FORM_FIELD_LABELS: Record<string, string> = {
     riskWarningConfirmText: "风险提示确认文案",
     purchaseLimitQuantity: "限购数量",
     variants: "SKU 列表",
+}
+
+// react-hook-form invalid handler: toast a short summary and scroll the first
+// errored field into view + focus it. Looks up by `name=`, then `data-field=`
+// (so non-input anchors like the SKU section can opt-in via a marker div).
+function focusFirstError<T extends Record<string, unknown>>(errors: FieldErrors<T>) {
+    const keys = Object.keys(errors)
+    if (keys.length === 0) return
+    const firstKey = keys[0]
+    const label = PRODUCT_FORM_FIELD_LABELS[firstKey] ?? firstKey
+    const firstError = errors[firstKey as keyof FieldErrors<T>]
+    const msg =
+        firstError && typeof firstError === "object" && "message" in firstError && firstError.message
+            ? String(firstError.message)
+            : "请检查表单内容"
+    const otherCount = keys.length - 1
+    toast.error(otherCount > 0 ? `${label}：${msg}（还有 ${otherCount} 项需修复）` : `${label}：${msg}`)
+    const el =
+        document.querySelector<HTMLElement>(`[name="${firstKey}"]`) ??
+        document.querySelector<HTMLElement>(`[data-field="${firstKey}"]`)
+    if (!el) return
+    el.scrollIntoView({ behavior: "smooth", block: "center" })
+    // Defer focus to after the smooth scroll starts so the browser doesn't
+    // snap back to the top.
+    window.setTimeout(() => el.focus({ preventScroll: true }), 50)
 }
 
 type Tag = { id: string; name: string; slug: string }
@@ -284,8 +308,10 @@ export function ProductForm({
             </div>
 
             <Form {...form}>
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-                    <FormValidationSummary fieldLabels={PRODUCT_FORM_FIELD_LABELS} />
+                <form
+                    onSubmit={handleSubmit(onSubmit, focusFirstError)}
+                    className="space-y-6"
+                >
                     <div className="grid gap-6 lg:grid-cols-3">
                         <div className="min-w-0 lg:col-span-2 space-y-6">
                             <ProductFormBasicFields
