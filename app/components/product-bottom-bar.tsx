@@ -16,6 +16,13 @@ type ProductBottomBarProps = {
     formId?: string
     isFree?: boolean
     requireTurnstile?: boolean
+    // MANUAL products use per-variant pricing and have their own dun-发货 flow
+    // on the order page, so the catalog price (¥0.00) and the 催货 CTA aren't
+    // meaningful here. Bottom bar swaps to a min-price label + a 联系客服 CTA
+    // when the variant list is fully out of stock.
+    isManual?: boolean
+    manualPriceMin?: number | null
+    manualPriceMax?: number | null
 }
 
 export function ProductBottomBar({
@@ -25,6 +32,9 @@ export function ProductBottomBar({
     formId,
     isFree,
     requireTurnstile = false,
+    isManual = false,
+    manualPriceMin = null,
+    manualPriceMax = null,
 }: ProductBottomBarProps) {
     const [isSubmitting, setIsSubmitting] = useState(false)
     const d = useProductPriceSyncStore((s) => s.display)
@@ -57,6 +67,13 @@ export function ProductBottomBar({
         if (isSubmitting) return
 
         if (!inStock) {
+            // MANUAL has no restock-subscription path; just scroll to the order
+            // section where the contact-customer-service hint is rendered.
+            if (isManual) {
+                const el = document.getElementById(orderSectionId)
+                if (el) el.scrollIntoView({ behavior: "smooth", block: "start" })
+                return
+            }
             document.dispatchEvent(new CustomEvent("open-restock-dialog"))
             return
         }
@@ -69,7 +86,20 @@ export function ProductBottomBar({
     const showSubmitState = inStock && isSubmitting
 
     const displayFree = d ? d.isFreeShared : isFree
-    const displayPrice = d && !d.isFreeShared ? d.totalPrice : price.toFixed(2)
+    // MANUAL: prefer live variant price from the sync store (driven by the
+    // variant selector); fall back to the min-price range hint if the user
+    // hasn't picked a variant yet, otherwise dash.
+    const manualFallback =
+        manualPriceMin != null && manualPriceMax != null
+            ? manualPriceMin === manualPriceMax
+                ? manualPriceMin.toFixed(2)
+                : `${manualPriceMin.toFixed(2)} 起`
+            : "—"
+    const displayPrice = d && !d.isFreeShared
+        ? d.totalPrice
+        : isManual
+          ? manualFallback
+          : price.toFixed(2)
     const hasDiscount = Boolean(d?.discountPercent != null && d.discountPercent > 0)
 
     return (
@@ -87,7 +117,8 @@ export function ProductBottomBar({
                         <span
                             className={cn(
                                 "text-lg font-bold tabular-nums",
-                                !inStock && "text-muted-foreground line-through"
+                                !inStock && !isManual && "text-muted-foreground line-through",
+                                !inStock && isManual && "text-muted-foreground"
                             )}
                         >
                             {displayFree ? "免费" : `¥${displayPrice}`}
@@ -97,9 +128,14 @@ export function ProductBottomBar({
                                 已享 {d.discountPercent}% 优惠
                             </span>
                         )}
-                        {!inStock && (
+                        {!inStock && !isManual && (
                             <span className="mt-0.5 text-[11px] text-muted-foreground">
                                 已售罄，催货告诉我们你要
+                            </span>
+                        )}
+                        {!inStock && isManual && (
+                            <span className="mt-0.5 text-[11px] text-muted-foreground">
+                                暂无库存，可联系客服
                             </span>
                         )}
                     </div>
@@ -122,7 +158,9 @@ export function ProductBottomBar({
                             ? "准备中…"
                             : inStock
                               ? (isFree ? "免费领取" : "立即购买")
-                              : "催货"}
+                              : isManual
+                                ? "联系客服"
+                                : "催货"}
                 </Button>
             </div>
         </div>

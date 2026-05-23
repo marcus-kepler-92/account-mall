@@ -419,6 +419,45 @@ describe("POST /api/products", () => {
         })
     })
 
+    it("rejects MANUAL + ACTIVE create with 422 (variants must exist first)", async () => {
+        superAdminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
+
+        const res = await POST(
+            createJsonRequest({
+                name: "Manual Product",
+                slug: "manual-product",
+                price: 0,
+                productType: "MANUAL",
+                status: "ACTIVE",
+            })
+        )
+        const data = await res.json()
+
+        expect(res.status).toBe(422)
+        expect(data.error).toBe("手动发货商品上架前需先创建至少一个启用的 SKU")
+        // No DB calls should have been made past the guard.
+        expect(prismaMock.product.findUnique).not.toHaveBeenCalled()
+        expect(prismaMock.product.create).not.toHaveBeenCalled()
+    })
+
+    it("rejects MANUAL create that defaults to ACTIVE status", async () => {
+        // status defaults to ACTIVE when not provided, so the guard must also
+        // catch the omit-status case.
+        superAdminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
+
+        const res = await POST(
+            createJsonRequest({
+                name: "Manual Product",
+                slug: "manual-product-default",
+                price: 0,
+                productType: "MANUAL",
+            })
+        )
+
+        expect(res.status).toBe(422)
+        expect(prismaMock.product.create).not.toHaveBeenCalled()
+    })
+
     it("creates product and returns 201 with tag relation", async () => {
         superAdminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
         prismaMock.product.findUnique.mockResolvedValueOnce(null)

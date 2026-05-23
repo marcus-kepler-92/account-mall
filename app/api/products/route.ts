@@ -197,6 +197,22 @@ export async function POST(request: NextRequest) {
     const { name, slug, description, summary, image, price, maxQuantity, status, tagIds, productType, sourceUrl, validityHours, allowAccountSwitch, accountSwitchLimit, couponEnabled, riskWarningEnabled, riskWarningTitle, riskWarningContent, riskWarningCountdown, riskWarningConfirmText, purchaseLimitEnabled, purchaseLimitQuantity, excludeFromAttribution } =
         parsed.data;
 
+    // MANUAL products require at least one active variant before they can go
+    // ACTIVE. Variants are created via a separate endpoint after the product
+    // exists, so a MANUAL+ACTIVE create is impossible — refuse upfront and let
+    // the admin create the product as INACTIVE first, add variants, then
+    // activate via PUT (which runs assertProductHasActiveVariant).
+    const targetStatus = status ?? "ACTIVE";
+    if (productType === "MANUAL" && targetStatus === "ACTIVE") {
+        return NextResponse.json(
+            {
+                error: "手动发货商品上架前需先创建至少一个启用的 SKU",
+                details: "MANUAL product cannot be created with status=ACTIVE; create as INACTIVE, add variants, then activate.",
+            },
+            { status: 422 },
+        );
+    }
+
     // Check slug uniqueness
     const existingSlug = await prisma.product.findUnique({
         where: { slug },

@@ -157,6 +157,13 @@ export default async function ProductDetailPage({
     : 0;
   const stockCount = isManual ? manualStock : await getCachedStockCount(product.id);
 
+  // Defense-in-depth: a MANUAL product without any active variants is effectively
+  // unsellable. Even if the write-side guard was bypassed (legacy data, type
+  // swap, direct DB edit), the buyer page should refuse to render the order
+  // form. We render a minimal "暂时下架" notice instead and short-circuit out
+  // before computing JSON-LD, restock UI, sticky bar, etc.
+  const isManualUnavailable = isManual && variants.length === 0;
+
   const isFree = isAutoFetch && Number(product.price) === 0;
   const isSoldOut = !isAutoFetch && stockCount === 0;
   const lowStockThreshold =
@@ -180,6 +187,22 @@ export default async function ProductDetailPage({
     });
   }
   const priceNumber = Number(product.price);
+  // MANUAL: product.price is meaningless because each variant carries its own
+  // price; derive a min/max range from active variants so the header shows the
+  // real price band instead of the placeholder 0. NORMAL/AUTO_FETCH keep using
+  // product.price.
+  let manualPriceMin: number | null = null;
+  let manualPriceMax: number | null = null;
+  if (isManual && variants.length > 0) {
+    const numericPrices = variants
+      .filter((v) => v.isActive)
+      .map((v) => Number(v.price))
+      .filter((n) => Number.isFinite(n));
+    if (numericPrices.length > 0) {
+      manualPriceMin = Math.min(...numericPrices);
+      manualPriceMax = Math.max(...numericPrices);
+    }
+  }
   const requireTurnstile =
     Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY) &&
     isStorefrontTurnstileEnforced();
@@ -298,6 +321,45 @@ export default async function ProductDetailPage({
 
   const jsonLdSafe = JSON.stringify(jsonLd).replace(/</g, "\\u003c");
 
+  if (isManualUnavailable) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <SiteHeader cs={csToken} />
+        <main className="flex-1 mx-auto w-full max-w-3xl px-4 pb-10 pt-10">
+          <section
+            aria-labelledby="product-unavailable-heading"
+            className="rounded-xl border bg-card p-6 shadow-sm sm:p-8"
+          >
+            <div className="space-y-3">
+              {product.tags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {product.tags.map((tag) => (
+                    <Badge
+                      key={tag.id}
+                      variant="secondary"
+                      className="text-[11px] font-normal opacity-80"
+                    >
+                      {tag.name}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+              <h1
+                id="product-unavailable-heading"
+                className="text-xl font-bold leading-snug tracking-tight lg:text-2xl"
+              >
+                {product.name}
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                商品暂时下架，如有需要请联系客服。
+              </p>
+            </div>
+          </section>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
       <script
@@ -321,6 +383,7 @@ export default async function ProductDetailPage({
               image={productWithImage.image}
               name={product.name}
               isSoldOut={isSoldOut}
+              isManual={isManual}
             />
             {product.description && (
               <section aria-label="商品详情">
@@ -344,11 +407,14 @@ export default async function ProductDetailPage({
               isSoldOut={isSoldOut}
               isFree={isFree}
               isAutoFetch={isAutoFetch}
+              isManual={isManual}
               isLowStock={isLowStock}
               discountPercent={crossSellDiscountPercent}
+              manualPriceMin={manualPriceMin}
+              manualPriceMax={manualPriceMax}
             />
 
-            <ProductMetaNoticeSection />
+            <ProductMetaNoticeSection isManual={isManual} />
 
             {product.riskWarningEnabled && product.riskWarningContent && (
               <RiskWarningDialog
@@ -380,7 +446,10 @@ export default async function ProductDetailPage({
               />
             </section>
 
-            {isSoldOut && (
+            {/* MANUAL skips restock subscriptions entirely — the
+                /api/restock-subscriptions endpoint rejects MANUAL and these
+                products have a dedicated 催发货 flow on the order page. */}
+            {isSoldOut && !isManual && (
               <Suspense
                 fallback={<Skeleton className="h-32 w-full rounded-lg hidden lg:block" />}
               >
@@ -401,6 +470,9 @@ export default async function ProductDetailPage({
         formId="product-order-form"
         isFree={isFree}
         requireTurnstile={requireTurnstile}
+        isManual={isManual}
+        manualPriceMin={manualPriceMin}
+        manualPriceMax={manualPriceMax}
       />
     </div>
   );
@@ -410,14 +482,20 @@ type ProductMediaSectionProps = {
   image: string | null;
   name: string;
   isSoldOut: boolean;
+  // MANUAL items pick stock per-variant via the selector; a global 售罄 banner
+  // on the image is misleading because not all SKUs are out at the same time.
+  isManual: boolean;
 };
 
 function ProductMediaSection({
   image,
   name,
   isSoldOut,
+  isManual,
 }: ProductMediaSectionProps) {
   if (!image) return null;
+
+  const showSoldOut = isSoldOut && !isManual;
 
   return (
     <section aria-label="商品图片">
@@ -427,10 +505,10 @@ function ProductMediaSection({
           alt={name}
           fill
           sizes="(max-width: 1024px) 100vw, 50vw"
-          className={cn("object-fill", isSoldOut && "grayscale")}
+          className={cn("object-fill", showSoldOut && "grayscale")}
           priority
         />
-        {isSoldOut && <SoldOutOverlay badgePosition="right-3 top-3" />}
+        {showSoldOut && <SoldOutOverlay badgePosition="right-3 top-3" />}
       </div>
     </section>
   );
@@ -444,12 +522,16 @@ type ProductInfoSectionProps = {
   isSoldOut: boolean;
   isFree?: boolean;
   isAutoFetch?: boolean;
+  isManual?: boolean;
   isLowStock?: boolean;
   // Cross-sell discount applied to this product for the current cs session.
   // When set, the price block renders strike-through original + red discounted
   // — keeps the displayed price consistent with what the order form will
   // actually charge.
   discountPercent?: number | null;
+  // MANUAL: derived min/max across active variants. null when no variants.
+  manualPriceMin?: number | null;
+  manualPriceMax?: number | null;
 };
 
 function ProductInfoSection({
@@ -460,17 +542,32 @@ function ProductInfoSection({
   isSoldOut,
   isFree,
   isAutoFetch,
+  isManual,
   isLowStock,
   discountPercent,
+  manualPriceMin,
+  manualPriceMax,
 }: ProductInfoSectionProps) {
   const hasDiscount =
     !isSoldOut &&
     !isFree &&
+    !isManual &&
     typeof discountPercent === "number" &&
     discountPercent > 0 &&
     discountPercent < 100 &&
     price > 0;
   const discountedPrice = hasDiscount ? price * (1 - discountPercent! / 100) : price;
+
+  // MANUAL price label: show a range when min!=max, single price otherwise.
+  // The "起" suffix only appears for ranged pricing so single-price MANUAL
+  // products read as a normal price.
+  const manualPriceLabel =
+    isManual && manualPriceMin != null && manualPriceMax != null
+      ? manualPriceMin === manualPriceMax
+        ? `¥${manualPriceMin.toFixed(2)}`
+        : `¥${manualPriceMin.toFixed(2)} 起`
+      : null;
+
   return (
     <section
       aria-labelledby="product-info-heading"
@@ -503,6 +600,36 @@ function ProductInfoSection({
                 <span className="text-2xl font-bold tabular-nums text-primary lg:text-3xl">
                   免费
                 </span>
+              </>
+            ) : isManual ? (
+              <>
+                {manualPriceLabel ? (
+                  <span
+                    className={cn(
+                      "text-2xl font-bold tabular-nums lg:text-3xl",
+                      isSoldOut && "text-muted-foreground",
+                    )}
+                  >
+                    {manualPriceLabel}
+                  </span>
+                ) : (
+                  <span className="text-2xl font-bold tabular-nums text-muted-foreground lg:text-3xl">
+                    —
+                  </span>
+                )}
+                {isSoldOut ? (
+                  <Badge variant="outline" className="text-xs font-normal">
+                    暂无库存，可联系客服
+                  </Badge>
+                ) : isLowStock ? (
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-orange-500 dark:text-orange-400 animate-pulse">
+                    仅剩 {stockCount} 件，手慢无！
+                  </span>
+                ) : (
+                  <span className="text-xs text-muted-foreground">
+                    库存 {stockCount} 件
+                  </span>
+                )}
               </>
             ) : (
               <>
@@ -551,23 +678,43 @@ function ProductInfoSection({
   );
 }
 
-function ProductMetaNoticeSection() {
+// MANUAL products use a human-fulfilled flow, so the "auto-deliver / 24x7"
+// pitch doesn't apply. We swap in copy that sets the right buyer expectation
+// (manual delivery, business-hours processing, dunning support).
+function ProductMetaNoticeSection({ isManual }: { isManual?: boolean }) {
   return (
     <section className="rounded-xl border bg-muted/40 p-3 sm:p-3.5">
-      <ul className="space-y-2">
-        <li className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Zap className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
-          自动发货，付款后秒到
-        </li>
-        <li className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Clock className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
-          7×24 小时自助下单，随时可买
-        </li>
-        <li className="flex items-center gap-2 text-xs text-muted-foreground">
-          <ShieldCheck className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
-          安全支付，信息加密传输
-        </li>
-      </ul>
+      {isManual ? (
+        <ul className="space-y-2">
+          <li className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Zap className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+            下单后由卖家人工发货
+          </li>
+          <li className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Clock className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+            工作时间内通常 15 分钟内处理
+          </li>
+          <li className="flex items-center gap-2 text-xs text-muted-foreground">
+            <ShieldCheck className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+            支持催发货提醒
+          </li>
+        </ul>
+      ) : (
+        <ul className="space-y-2">
+          <li className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Zap className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+            自动发货，付款后秒到
+          </li>
+          <li className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Clock className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+            7×24 小时自助下单，随时可买
+          </li>
+          <li className="flex items-center gap-2 text-xs text-muted-foreground">
+            <ShieldCheck className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+            安全支付，信息加密传输
+          </li>
+        </ul>
+      )}
     </section>
   );
 }
