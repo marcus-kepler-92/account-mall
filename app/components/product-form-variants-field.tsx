@@ -1,7 +1,9 @@
 "use client"
 
 import { useFormContext } from "react-hook-form"
+import { AlertCircle } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
     SkuListEditor,
     type VariantDraft,
@@ -32,6 +34,18 @@ export function ProductFormVariantsField() {
                 </p>
             </CardHeader>
             <CardContent className="space-y-3">
+                {/*
+                  * Marker so the FormValidationSummary's "scroll-to-field"
+                  * fallback can land here when the user clicks the SKU error
+                  * row — there's no <input name="variants"> to focus.
+                  */}
+                <div data-field="variants" tabIndex={-1} />
+                {error && (
+                    <Alert variant="destructive">
+                        <AlertCircle className="size-4" />
+                        <AlertDescription>{error}</AlertDescription>
+                    </Alert>
+                )}
                 <SkuListEditor
                     mode="create"
                     value={variants}
@@ -43,9 +57,6 @@ export function ProductFormVariantsField() {
                     }
                     trackInventory={trackInventory}
                 />
-                {error && (
-                    <p className="text-sm text-destructive">{error}</p>
-                )}
             </CardContent>
         </Card>
     )

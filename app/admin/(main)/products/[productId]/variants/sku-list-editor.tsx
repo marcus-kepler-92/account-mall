@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
-import { Loader2, Plus, Trash2, Check } from "lucide-react"
+import { AlertCircle, Loader2, Plus, Trash2, Check } from "lucide-react"
 import { z } from "zod"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -459,10 +459,14 @@ export function SkuListEditor({
     // ─── Render ───────────────────────────────────────────────────────────────
     const showEmpty = !loading && rows.length === 0
 
-    const columnCount = trackInventory ? 7 : 6
+    // Keep the column count constant regardless of trackInventory so toggling
+    // the switch never causes a column reflow. The 库存 column header stays
+    // visible (label hidden when off) and the body cell renders an invisible
+    // placeholder of the same height as a real Input.
+    const columnCount = 7
     const table = (
         <div className="rounded-md border">
-            <table className="w-full caption-bottom text-sm">
+            <table className="w-full caption-bottom text-sm table-fixed">
                 <thead className="[&_tr]:border-b">
                     <tr className="border-b">
                         <th className="text-foreground h-10 px-2 text-left align-middle font-medium">
@@ -474,11 +478,12 @@ export function SkuListEditor({
                         <th className="text-foreground h-10 px-2 text-left align-middle font-medium w-[120px]">
                             成本 (¥)
                         </th>
-                        {trackInventory && (
-                            <th className="text-foreground h-10 px-2 text-left align-middle font-medium w-[100px]">
-                                库存
-                            </th>
-                        )}
+                        <th
+                            className="text-foreground h-10 px-2 text-left align-middle font-medium w-[100px]"
+                            aria-hidden={!trackInventory}
+                        >
+                            {trackInventory ? "库存" : ""}
+                        </th>
                         <th className="text-foreground h-10 px-2 text-left align-middle font-medium w-[80px]">
                             排序
                         </th>
@@ -493,9 +498,15 @@ export function SkuListEditor({
                 <tbody className="[&_tr:last-child]:border-0">
                     {showEmpty ? (
                         <tr>
+                            {/*
+                              * Match body-row height: p-2 (8+8) + Input h-9 (36) +
+                              * mt-1 (4) + error slot min-h-[18px] = 74px → use
+                              * h-[74px] so adding/removing rows doesn't snap the
+                              * table height.
+                              */}
                             <td
                                 colSpan={columnCount}
-                                className="h-20 text-center text-muted-foreground p-2"
+                                className="h-[74px] text-center text-muted-foreground p-2"
                             >
                                 暂无 SKU，请点击下方按钮新建
                             </td>
@@ -505,7 +516,7 @@ export function SkuListEditor({
                         <tr>
                             <td
                                 colSpan={columnCount}
-                                className="h-20 text-center text-muted-foreground p-2"
+                                className="h-[74px] text-center text-muted-foreground p-2"
                             >
                                 加载中…
                             </td>
@@ -539,11 +550,7 @@ export function SkuListEditor({
                                             errors.name && "border-destructive",
                                         )}
                                     />
-                                    {errors.name && (
-                                        <p className="text-xs text-destructive mt-1">
-                                            {errors.name}
-                                        </p>
-                                    )}
+                                    <ErrorSlot message={errors.name} />
                                 </td>
                                 <td className="p-2 align-top">
                                     <Input
@@ -564,11 +571,7 @@ export function SkuListEditor({
                                                 "border-destructive",
                                         )}
                                     />
-                                    {errors.price && (
-                                        <p className="text-xs text-destructive mt-1">
-                                            {errors.price}
-                                        </p>
-                                    )}
+                                    <ErrorSlot message={errors.price} />
                                 </td>
                                 <td className="p-2 align-top">
                                     <Input
@@ -589,38 +592,38 @@ export function SkuListEditor({
                                                 "border-destructive",
                                         )}
                                     />
-                                    {errors.unitCost && (
-                                        <p className="text-xs text-destructive mt-1">
-                                            {errors.unitCost}
-                                        </p>
+                                    <ErrorSlot message={errors.unitCost} />
+                                </td>
+                                <td className="p-2 align-top">
+                                    {trackInventory ? (
+                                        <>
+                                            <Input
+                                                aria-label={`SKU 库存 ${idx + 1}`}
+                                                type="number"
+                                                min="0"
+                                                step="1"
+                                                value={row.stockQuantity}
+                                                onChange={(e) =>
+                                                    updateRow(idx, {
+                                                        stockQuantity: e.target.value,
+                                                    })
+                                                }
+                                                onBlur={() => persistRow(idx)}
+                                                className={cn(
+                                                    errors.stockQuantity &&
+                                                        "border-destructive",
+                                                )}
+                                            />
+                                            <ErrorSlot message={errors.stockQuantity} />
+                                        </>
+                                    ) : (
+                                        // Invisible placeholder preserves row
+                                        // height + column width when 跟踪库存 is
+                                        // off, avoiding reflow when the switch
+                                        // toggles.
+                                        <div aria-hidden className="h-9" />
                                     )}
                                 </td>
-                                {trackInventory && (
-                                    <td className="p-2 align-top">
-                                        <Input
-                                            aria-label={`SKU 库存 ${idx + 1}`}
-                                            type="number"
-                                            min="0"
-                                            step="1"
-                                            value={row.stockQuantity}
-                                            onChange={(e) =>
-                                                updateRow(idx, {
-                                                    stockQuantity: e.target.value,
-                                                })
-                                            }
-                                            onBlur={() => persistRow(idx)}
-                                            className={cn(
-                                                errors.stockQuantity &&
-                                                    "border-destructive",
-                                            )}
-                                        />
-                                        {errors.stockQuantity && (
-                                            <p className="text-xs text-destructive mt-1">
-                                                {errors.stockQuantity}
-                                            </p>
-                                        )}
-                                    </td>
-                                )}
                                 <td className="p-2 align-top">
                                     <Input
                                         aria-label={`SKU 排序 ${idx + 1}`}
@@ -638,14 +641,16 @@ export function SkuListEditor({
                                                 "border-destructive",
                                         )}
                                     />
-                                    {errors.sortOrder && (
-                                        <p className="text-xs text-destructive mt-1">
-                                            {errors.sortOrder}
-                                        </p>
-                                    )}
+                                    <ErrorSlot message={errors.sortOrder} />
                                 </td>
-                                <td className="p-2 text-center align-middle">
-                                    <div className="flex items-center justify-center gap-2">
+                                <td className="p-2 text-center align-top">
+                                    {/*
+                                      * Wrap Switch in a h-9 flex container so it
+                                      * sits at the same vertical baseline as the
+                                      * Input controls in the row (avoids the
+                                      * align-middle vs align-top mismatch).
+                                      */}
+                                    <div className="flex h-9 items-center justify-center gap-2">
                                         <Switch
                                             aria-label={`启用 SKU ${idx + 1}`}
                                             checked={row.isActive}
@@ -661,17 +666,19 @@ export function SkuListEditor({
                                         )}
                                     </div>
                                 </td>
-                                <td className="p-2 text-right align-middle">
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        className="size-8"
-                                        aria-label={`删除 SKU ${idx + 1}`}
-                                        onClick={() => handleRequestDelete(row)}
-                                    >
-                                        <Trash2 className="size-4 text-destructive" />
-                                    </Button>
+                                <td className="p-2 text-right align-top">
+                                    <div className="flex h-9 items-center justify-end">
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="size-8"
+                                            aria-label={`删除 SKU ${idx + 1}`}
+                                            onClick={() => handleRequestDelete(row)}
+                                        >
+                                            <Trash2 className="size-4 text-destructive" />
+                                        </Button>
+                                    </div>
                                 </td>
                             </tr>
                         )
@@ -753,6 +760,22 @@ export function SkuListEditor({
                 </AlertDialogContent>
             </AlertDialog>
         </>
+    )
+}
+
+// Reserves a fixed vertical slot under each input so row heights stay constant
+// whether or not the cell has a validation error. Without this, errors push
+// the row taller and misalign sibling cells in the same row.
+function ErrorSlot({ message }: { message?: string }) {
+    return (
+        <div className="mt-1 min-h-[18px]">
+            {message && (
+                <p className="text-xs text-destructive flex items-center gap-1">
+                    <AlertCircle className="size-3 shrink-0" />
+                    <span className="leading-tight">{message}</span>
+                </p>
+            )}
+        </div>
     )
 }
 

@@ -22,6 +22,35 @@ import { ProductFormRiskWarningFields } from "./product-form-risk-warning-fields
 import { ProductFormPurchaseLimitFields } from "./product-form-purchase-limit-fields"
 import { ProductFormVariantsField } from "./product-form-variants-field"
 import { SkuListEditor } from "@/app/admin/(main)/products/[productId]/variants/sku-list-editor"
+import { FormValidationSummary } from "./form-validation-summary"
+
+// Labels surfaced by the top-of-form validation summary. Keep keys in sync
+// with productFormSchema field names — unknown keys fall through to the raw
+// path which is acceptable for rare edge cases.
+const PRODUCT_FORM_FIELD_LABELS: Record<string, string> = {
+    name: "商品名称",
+    slug: "URL 别名",
+    description: "商品描述",
+    summary: "商品简介",
+    image: "商品图片",
+    price: "价格",
+    costPerUnit: "成本",
+    maxQuantity: "单笔最大数量",
+    productType: "商品类型",
+    sourceUrl: "来源 URL",
+    voidloginsCode: "VoidLogins 分享代码",
+    voidloginsPassword: "VoidLogins 密码",
+    validityHours: "有效时长",
+    accountSwitchLimit: "切换账号次数",
+    tagIds: "标签",
+    cardTemplateIds: "卡密模板",
+    riskWarningTitle: "风险提示标题",
+    riskWarningContent: "风险提示内容",
+    riskWarningCountdown: "风险提示倒计时",
+    riskWarningConfirmText: "风险提示确认文案",
+    purchaseLimitQuantity: "限购数量",
+    variants: "SKU 列表",
+}
 
 type Tag = { id: string; name: string; slug: string }
 
@@ -256,6 +285,7 @@ export function ProductForm({
 
             <Form {...form}>
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+                    <FormValidationSummary fieldLabels={PRODUCT_FORM_FIELD_LABELS} />
                     <div className="grid gap-6 lg:grid-cols-3">
                         <div className="min-w-0 lg:col-span-2 space-y-6">
                             <ProductFormBasicFields
