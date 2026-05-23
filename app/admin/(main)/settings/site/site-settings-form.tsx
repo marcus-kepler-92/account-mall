@@ -31,12 +31,36 @@ import {
 import { cn } from "@/lib/utils"
 import type { SiteSettings } from "@/lib/site-settings"
 import { TimezoneCombobox } from "./timezone-combobox"
+import { WecomNotifyCard } from "./wecom-notify-card"
+import { BusinessHoursWeekdayPicker } from "./business-hours-weekday-picker"
 
 // Empty string semantically means "use env fallback" on submit (server schema
 // coerces "" → null). Hour fields are stringified for stable RHF typing.
 const hourString = z
     .string()
     .refine((v) => v === "" || (/^\d+$/.test(v) && Number(v) >= 0 && Number(v) <= 23), "需为 0-23 的整数")
+
+// Minute fields: empty string means "use env fallback"; otherwise an integer
+// within the given inclusive range. Stringified for stable RHF typing.
+const minuteString = (max: number) =>
+    z
+        .string()
+        .refine(
+            (v) => v === "" || (/^\d+$/.test(v) && Number(v) >= 0 && Number(v) <= max),
+            `需为 0-${max} 的整数`,
+        )
+
+// businessHoursWeekdays is stored as a JSON-array string. Empty string means
+// "use env fallback / all days"; "[]" means "explicitly no business days".
+const weekdaysString = z.string().refine((v) => {
+    if (v === "") return true
+    try {
+        const arr = JSON.parse(v)
+        return Array.isArray(arr) && arr.every((n) => Number.isInteger(n) && n >= 0 && n <= 6)
+    } catch {
+        return false
+    }
+}, "工作日字段需为 0-6 整数 JSON 数组")
 
 const formSchema = z
     .object({
@@ -45,10 +69,14 @@ const formSchema = z
         businessHoursStart: hourString,
         businessHoursEnd: hourString,
         businessHoursTimezone: z.string().max(64),
+        businessHoursWeekdays: weekdaysString,
         businessName: z.string().max(128),
         businessLicenseNo: z.string().max(64),
         contactEmail: z.string().refine((v) => v === "" || /\S+@\S+\.\S+/.test(v), "邮箱格式无效"),
         escalateWebhookUrl: z.string().refine((v) => v === "" || /^https?:\/\//.test(v), "必须是 http(s) URL"),
+        wecomWebhookUrl: z.string().refine((v) => v === "" || /^https?:\/\//.test(v), "必须是 http(s) URL"),
+        dunCooldownMinutes: minuteString(1440),
+        dunMinAgeMinutes: minuteString(60),
     })
     .refine(
         (d) =>
@@ -66,10 +94,14 @@ type SiteSettingRow = {
     businessHoursStart: number | null
     businessHoursEnd: number | null
     businessHoursTimezone: string | null
+    businessHoursWeekdays: string | null
     businessName: string | null
     businessLicenseNo: string | null
     contactEmail: string | null
     escalateWebhookUrl: string | null
+    wecomWebhookUrl: string | null
+    dunCooldownMinutes: number | null
+    dunMinAgeMinutes: number | null
 } | null
 
 type Props = {
@@ -131,10 +163,16 @@ export function SiteSettingsForm({ row, effective }: Props) {
             businessHoursStart: row?.businessHoursStart != null ? String(row.businessHoursStart) : "",
             businessHoursEnd: row?.businessHoursEnd != null ? String(row.businessHoursEnd) : "",
             businessHoursTimezone: row?.businessHoursTimezone ?? "",
+            businessHoursWeekdays: row?.businessHoursWeekdays ?? "",
             businessName: row?.businessName ?? "",
             businessLicenseNo: row?.businessLicenseNo ?? "",
             contactEmail: row?.contactEmail ?? "",
             escalateWebhookUrl: row?.escalateWebhookUrl ?? "",
+            wecomWebhookUrl: row?.wecomWebhookUrl ?? "",
+            dunCooldownMinutes:
+                row?.dunCooldownMinutes != null ? String(row.dunCooldownMinutes) : "",
+            dunMinAgeMinutes:
+                row?.dunMinAgeMinutes != null ? String(row.dunMinAgeMinutes) : "",
         },
     })
 
@@ -418,6 +456,93 @@ export function SiteSettingsForm({ row, effective }: Props) {
                                 </FormItem>
                             )}
                         />
+
+                        <FormField
+                            control={form.control}
+                            name="businessHoursWeekdays"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>营业日</FormLabel>
+                                    <FormControl>
+                                        <BusinessHoursWeekdayPicker
+                                            value={field.value || null}
+                                            onChange={field.onChange}
+                                        />
+                                    </FormControl>
+                                    <FormDescription>
+                                        选中即视为该日营业。留空使用环境变量默认（缺省全周）。
+                                    </FormDescription>
+                                    <ResetToDefault
+                                        isCustom={field.value !== ""}
+                                        onReset={() => field.onChange("")}
+                                    />
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base">订单通知</CardTitle>
+                        <CardDescription>
+                            新订单待发货 / 买家催发货推送到企微群机器人；可调整催发货频控阈值。
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-5">
+                        <WecomNotifyCard fallback={effective.wecomWebhookUrl} />
+
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <FormField
+                                control={form.control}
+                                name="dunCooldownMinutes"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>催发货冷却（分钟）</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                inputMode="numeric"
+                                                placeholder={`默认 ${effective.dunCooldownMinutes}`}
+                                                {...field}
+                                            />
+                                        </FormControl>
+                                        <FormDescription>
+                                            两次催发货之间的最小间隔，0–1440。
+                                        </FormDescription>
+                                        <ResetToDefault
+                                            isCustom={field.value !== ""}
+                                            onReset={() => field.onChange("")}
+                                        />
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="dunMinAgeMinutes"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>下单后多久可催（分钟）</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                inputMode="numeric"
+                                                placeholder={`默认 ${effective.dunMinAgeMinutes}`}
+                                                {...field}
+                                            />
+                                        </FormControl>
+                                        <FormDescription>
+                                            订单存在 ≥ 此分钟数后买家才能催发货，0–60。
+                                        </FormDescription>
+                                        <ResetToDefault
+                                            isCustom={field.value !== ""}
+                                            onReset={() => field.onChange("")}
+                                        />
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
                     </CardContent>
                 </Card>
 
