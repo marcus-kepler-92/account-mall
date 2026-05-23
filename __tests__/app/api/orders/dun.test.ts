@@ -215,7 +215,9 @@ describe("POST /api/orders/[orderId]/dun", () => {
         const order = makeOrder()
         ;(prismaMock.order.findFirst as jest.Mock).mockResolvedValueOnce(order as any)
         verifyPasswordMock.mockResolvedValueOnce(true)
-        ;(prismaMock.order.update as jest.Mock).mockResolvedValueOnce({})
+        // Return the post-update dunCount from prisma.update — handler reads
+        // this rather than computing `order.dunCount + 1`.
+        ;(prismaMock.order.update as jest.Mock).mockResolvedValueOnce({ dunCount: 1 })
 
         const res = await POST(
             makeRequest({ orderNo: ORDER_NO, email: EMAIL, password: PASSWORD }),
@@ -232,13 +234,14 @@ describe("POST /api/orders/[orderId]/dun", () => {
             where: { id: ORDER_ID, orderNo: ORDER_NO, email: EMAIL },
         })
 
-        // atomic increment
+        // atomic increment with select so handler reads fresh dunCount
         expect(prismaMock.order.update).toHaveBeenCalledWith({
             where: { id: ORDER_ID },
             data: expect.objectContaining({
                 dunCount: { increment: 1 },
                 lastDunAt: expect.any(Date),
             }),
+            select: { dunCount: true },
         })
 
         // wecom fire-and-forget with new dunCount (= old + 1)
@@ -254,6 +257,33 @@ describe("POST /api/orders/[orderId]/dun", () => {
                 variantNameSnapshot: "Default",
             }),
         )
+    })
+
+    it("WeCom payload uses post-update dunCount (not stale snapshot)", async () => {
+        // I6 regression: under concurrent dun requests, the snapshot read at
+        // findFirst can be stale by the time `update({ increment: 1 })` returns.
+        // The payload must come from the update's returned value, not
+        // `order.dunCount + 1`.
+        const order = makeOrder({ dunCount: 1, lastDunAt: null })
+        ;(prismaMock.order.findFirst as jest.Mock).mockResolvedValueOnce(order as any)
+        verifyPasswordMock.mockResolvedValueOnce(true)
+        // Simulate another concurrent request having already incremented
+        // dunCount to 2 — so the DB returns 3 after our increment, not 2.
+        ;(prismaMock.order.update as jest.Mock).mockResolvedValueOnce({ dunCount: 3 })
+
+        const res = await POST(
+            makeRequest({ orderNo: ORDER_NO, email: EMAIL, password: PASSWORD }),
+            makeCtx(),
+        )
+
+        expect(res.status).toBe(200)
+        expect(sendWecomMock).toHaveBeenCalledWith(
+            "order.dun",
+            expect.objectContaining({ dunCount: 3 }),
+        )
+        // Critically: NOT the stale `order.dunCount + 1` (= 2).
+        const call = sendWecomMock.mock.calls[0][1] as { dunCount: number }
+        expect(call.dunCount).not.toBe(order.dunCount + 1)
     })
 
     it("returns 401 when composite (id + orderNo + email) does not match any order", async () => {

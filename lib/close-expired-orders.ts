@@ -43,6 +43,10 @@ export async function closeExpiredOrders(): Promise<CloseExpiredOrdersResult> {
         try {
             const isAutoFetch = order.product?.productType === "AUTO_FETCH"
             await prisma.$transaction(async (tx) => {
+                // Direct status write bypasses assertTransition(): the outer
+                // findMany filters to status="PENDING", and PENDING→CLOSED is
+                // legal for ALL product types per lib/order-state-machine.ts.
+                // The where-clause filter is the source-of-truth guard here.
                 await tx.order.update({
                     where: { id: order.id },
                     data: { status: "CLOSED" },

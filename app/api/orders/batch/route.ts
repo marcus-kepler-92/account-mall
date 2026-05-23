@@ -74,6 +74,10 @@ export async function POST(request: NextRequest) {
 
     if (idsToProcess.length > 0) {
         if (action === "CLOSE") {
+            // Direct status write bypasses assertTransition(): the loop above
+            // filtered idsToProcess to status="PENDING" only, and PENDING→CLOSED
+            // is legal for ALL product types per lib/order-state-machine.ts.
+            // The pre-filter is the source-of-truth guard here.
             const result = await prisma.order.updateMany({
                 where: { id: { in: idsToProcess } },
                 data: { status: "CLOSED" },

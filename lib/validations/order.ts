@@ -68,7 +68,9 @@ export type BatchOrderActionInput = z.infer<typeof batchOrderActionSchema>
 export const orderListQuerySchema = z.object({
     page: z.coerce.number().int().min(1).optional().default(1),
     pageSize: z.coerce.number().int().min(1).max(100).optional().default(20),
-    status: z.enum(["PENDING", "COMPLETED", "CLOSED", "ALL"]).optional(),
+    // Reuse orderStatusSchema so all OrderStatus values stay in sync; "ALL" is a UI sentinel
+    // (no status filter applied). Handler maps `status === "ALL"` to "no where clause".
+    status: orderStatusSchema.or(z.literal("ALL")).optional(),
     email: z.string().optional(),
     orderNo: z.string().optional(),
     productId: z.string().optional(),

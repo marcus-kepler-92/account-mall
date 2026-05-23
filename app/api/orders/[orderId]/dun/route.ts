@@ -86,12 +86,17 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ orderI
     }
 
     const now = new Date()
-    await prisma.order.update({
+    // Capture the post-update dunCount so concurrent dun requests (both passing
+    // the cooldown floor simultaneously) cannot both report a stale `+1` value.
+    // `{ increment: 1 }` is atomic at the DB level; selecting the returned value
+    // gives us the true new count for the WeCom payload.
+    const updated = await prisma.order.update({
         where: { id: orderId },
         data: {
             dunCount: { increment: 1 },
             lastDunAt: now,
         },
+        select: { dunCount: true },
     })
 
     // Fire-and-forget: admin push must never block buyer response.
@@ -103,7 +108,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ orderI
         status: order.status,
         productNameSnapshot: order.productNameSnapshot,
         variantNameSnapshot: order.variantNameSnapshot,
-        dunCount: order.dunCount + 1,
+        dunCount: updated.dunCount,
     }).catch((e) => console.error("[wecom-notify]", e))
 
     return NextResponse.json({
