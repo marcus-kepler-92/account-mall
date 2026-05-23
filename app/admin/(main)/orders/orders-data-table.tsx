@@ -53,6 +53,8 @@ interface OrdersDataTableProps {
 
 const statusOptions = [
     { label: "待完成", value: "PENDING" },
+    { label: "待发货", value: "AWAITING_FULFILLMENT" },
+    { label: "发货中", value: "PROCESSING" },
     { label: "已完成", value: "COMPLETED" },
     { label: "已关闭", value: "CLOSED" },
 ];

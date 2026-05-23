@@ -19,10 +19,16 @@ export type OrderRow = {
         id: string
         name: string
     }
+    variantNameSnapshot: string | null
     unitPriceSnapshot: number | null
     quantity: number
     amount: number
-    status: "PENDING" | "COMPLETED" | "CLOSED"
+    status:
+        | "PENDING"
+        | "AWAITING_FULFILLMENT"
+        | "PROCESSING"
+        | "COMPLETED"
+        | "CLOSED"
     paymentMethod: string | null
     paidAt: string | null
     createdAt: string
@@ -31,10 +37,15 @@ export type OrderRow = {
     soldCardsCount: number
 }
 
-const statusMap = {
-    PENDING: { label: "待完成", variant: "warning" as const },
-    COMPLETED: { label: "已完成", variant: "success" as const },
-    CLOSED: { label: "已关闭", variant: "secondary" as const },
+const statusMap: Record<
+    OrderRow["status"],
+    { label: string; variant: "warning" | "success" | "secondary" }
+> = {
+    PENDING: { label: "待完成", variant: "warning" },
+    AWAITING_FULFILLMENT: { label: "待发货", variant: "warning" },
+    PROCESSING: { label: "发货中", variant: "warning" },
+    COMPLETED: { label: "已完成", variant: "success" },
+    CLOSED: { label: "已关闭", variant: "secondary" },
 }
 
 const paymentMethodLabel: Record<string, string> = {
@@ -121,6 +132,16 @@ export function createOrdersColumns(distributors: DistributorOption[], canReassi
                 </div>
             )
         },
+        enableSorting: false,
+    },
+    {
+        accessorKey: "variantNameSnapshot",
+        header: "SKU",
+        cell: ({ row }) => (
+            <span className="text-sm">
+                {row.original.variantNameSnapshot ?? "—"}
+            </span>
+        ),
         enableSorting: false,
     },
     {

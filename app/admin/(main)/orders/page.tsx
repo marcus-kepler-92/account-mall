@@ -160,6 +160,7 @@ export default async function AdminOrdersPage({
                 id: order.product.id,
                 name: order.product.name,
             },
+            variantNameSnapshot: order.variantNameSnapshot,
             unitPriceSnapshot: order.unitPriceSnapshot != null
                 ? Number(order.unitPriceSnapshot)
                 : null,
