@@ -19,6 +19,7 @@ import { ProductFormCardTemplateSelect } from "./product-form-card-template-sele
 import { ProductFormSettings } from "./product-form-settings"
 import { ProductFormRiskWarningFields } from "./product-form-risk-warning-fields"
 import { ProductFormPurchaseLimitFields } from "./product-form-purchase-limit-fields"
+import { ProductFormVariantsField } from "./product-form-variants-field"
 
 type Tag = { id: string; name: string; slug: string }
 
@@ -100,6 +101,11 @@ export function ProductForm({
             purchaseLimitEnabled: product?.purchaseLimitEnabled ?? false,
             purchaseLimitQuantity: product?.purchaseLimitQuantity != null ? String(product.purchaseLimitQuantity) : "1",
             excludeFromAttribution: product?.excludeFromAttribution ?? false,
+            // MANUAL-only: SKUs are edited inline on the create form and
+            // submitted atomically with POST /api/products. The edit page uses
+            // a separate SkuListEditor instance in "edit" mode that talks to
+            // /api/admin/products/[id]/variants directly.
+            variants: [],
         },
     })
 
@@ -173,6 +179,31 @@ export function ProductForm({
                 ? parseInt(data.purchaseLimitQuantity, 10)
                 : 1,
             excludeFromAttribution: data.excludeFromAttribution ?? false,
+            // Atomic create: ship the MANUAL SKUs alongside the product so the
+            // server can wrap both writes in one transaction. Editing variants
+            // (edit page) uses dedicated variant endpoints — this field is
+            // only meaningful on create.
+            ...(!isEditing && isManual && {
+                variants: (data.variants ?? [])
+                    .filter((r) => r.name?.trim() && r.price !== "")
+                    .map((r) => ({
+                        name: r.name.trim(),
+                        price: parseFloat(r.price),
+                        unitCost:
+                            r.unitCost && r.unitCost !== ""
+                                ? parseFloat(r.unitCost)
+                                : null,
+                        stockQuantity:
+                            r.stockQuantity === ""
+                                ? 0
+                                : parseInt(r.stockQuantity, 10),
+                        sortOrder:
+                            r.sortOrder === ""
+                                ? 0
+                                : parseInt(r.sortOrder, 10),
+                        isActive: r.isActive,
+                    })),
+            }),
         }
 
         try {
@@ -224,6 +255,7 @@ export function ProductForm({
                                 onSlugManualEdit={() => setSlugManuallyEdited(true)}
                             />
                             <ProductFormPricingFields isAutoFetch={isAutoFetch} isManual={isManual} sourceUrlOptions={sourceUrlOptions} />
+                            {!isEditing && isManual && <ProductFormVariantsField />}
                             <ProductFormRiskWarningFields />
                             <ProductFormPurchaseLimitFields />
                         </div>

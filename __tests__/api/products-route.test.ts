@@ -17,6 +17,17 @@ jest.mock("@/lib/auth-guard", () => ({
     getSuperAdminSession: jest.fn(),
 }))
 
+// revalidateTag requires Next's static generation store, which isn't set up in
+// a bare Jest environment. We don't care about cache invalidation here — the
+// product creation path is what we're testing.
+jest.mock("@/lib/revalidate-storefront", () => ({
+    __esModule: true,
+    revalidateProducts: jest.fn(),
+    revalidateAnnouncements: jest.fn(),
+    revalidateTags: jest.fn(),
+    revalidateCards: jest.fn(),
+}))
+
 import { getAdminSession, getSuperAdminSession } from "@/lib/auth-guard"
 
 function createUrlRequest(url: string): NextRequest {
@@ -419,7 +430,7 @@ describe("POST /api/products", () => {
         })
     })
 
-    it("rejects MANUAL + ACTIVE create with 422 (variants must exist first)", async () => {
+    it("rejects MANUAL + ACTIVE create with 422 when variants[] is missing", async () => {
         superAdminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
 
         const res = await POST(
@@ -440,7 +451,7 @@ describe("POST /api/products", () => {
         expect(prismaMock.product.create).not.toHaveBeenCalled()
     })
 
-    it("rejects MANUAL create that defaults to ACTIVE status", async () => {
+    it("rejects MANUAL create that defaults to ACTIVE status with no variants", async () => {
         // status defaults to ACTIVE when not provided, so the guard must also
         // catch the omit-status case.
         superAdminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
@@ -451,6 +462,166 @@ describe("POST /api/products", () => {
                 slug: "manual-product-default",
                 price: 0,
                 productType: "MANUAL",
+            })
+        )
+
+        expect(res.status).toBe(422)
+        expect(prismaMock.product.create).not.toHaveBeenCalled()
+    })
+
+    it("rejects MANUAL + ACTIVE when all variants[] entries are isActive=false", async () => {
+        superAdminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
+
+        const res = await POST(
+            createJsonRequest({
+                name: "Manual Product",
+                slug: "manual-product-inactive-only",
+                price: 0,
+                productType: "MANUAL",
+                status: "ACTIVE",
+                variants: [
+                    {
+                        name: "1 个月",
+                        price: 29.9,
+                        stockQuantity: 10,
+                        isActive: false,
+                    },
+                ],
+            })
+        )
+
+        expect(res.status).toBe(422)
+        expect(prismaMock.product.create).not.toHaveBeenCalled()
+    })
+
+    it("creates MANUAL + ACTIVE atomically when variants are provided", async () => {
+        superAdminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
+        prismaMock.product.aggregate.mockResolvedValueOnce({
+            _max: { sortOrder: null },
+        } as any)
+
+        // $transaction(fn) gets a tx client; mirror the real Prisma signature
+        // so the handler can call tx.product.create / tx.productVariant.createMany.
+        const createdProduct = {
+            id: "prod_manual_atomic",
+            name: "Manual Atomic",
+            slug: "manual-atomic",
+            description: null,
+            image: null,
+            price: new Prisma.Decimal("0"),
+            maxQuantity: 1,
+            status: "ACTIVE",
+            productType: "MANUAL",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            tags: [],
+        }
+        const txProductCreate = jest.fn().mockResolvedValue(createdProduct)
+        const txVariantsCreateMany = jest
+            .fn()
+            .mockResolvedValue({ count: 2 })
+
+        ;(prismaMock.$transaction as unknown as jest.Mock).mockImplementation(
+            async (fn: (tx: unknown) => Promise<unknown>) =>
+                fn({
+                    product: { create: txProductCreate },
+                    productVariant: { createMany: txVariantsCreateMany },
+                }),
+        )
+
+        // Slug uniqueness check still goes through the main client.
+        prismaMock.product.findUnique.mockResolvedValueOnce(null)
+
+        const res = await POST(
+            createJsonRequest({
+                name: "Manual Atomic",
+                slug: "manual-atomic",
+                price: 0,
+                productType: "MANUAL",
+                status: "ACTIVE",
+                variants: [
+                    {
+                        name: "1 个月",
+                        price: 29.9,
+                        stockQuantity: 10,
+                        isActive: true,
+                    },
+                    {
+                        name: "3 个月",
+                        price: 79,
+                        stockQuantity: 5,
+                        sortOrder: 1,
+                        isActive: true,
+                    },
+                ],
+            })
+        )
+
+        expect(res.status).toBe(201)
+        expect(txProductCreate).toHaveBeenCalledTimes(1)
+        expect(txVariantsCreateMany).toHaveBeenCalledTimes(1)
+        const createManyArg = txVariantsCreateMany.mock.calls[0][0]
+        expect(createManyArg.data).toHaveLength(2)
+        expect(createManyArg.data[0]).toMatchObject({
+            productId: "prod_manual_atomic",
+            name: "1 个月",
+            price: 29.9,
+            stockQuantity: 10,
+            isActive: true,
+        })
+    })
+
+    it("allows MANUAL + INACTIVE without variants (fill later)", async () => {
+        superAdminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
+        prismaMock.product.findUnique.mockResolvedValueOnce(null)
+        prismaMock.product.aggregate.mockResolvedValueOnce({
+            _max: { sortOrder: null },
+        } as any)
+        prismaMock.product.create.mockResolvedValueOnce({
+            id: "prod_inactive_manual",
+            name: "Manual Inactive",
+            slug: "manual-inactive",
+            description: null,
+            image: null,
+            price: new Prisma.Decimal("0"),
+            maxQuantity: 1,
+            status: "INACTIVE",
+            productType: "MANUAL",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            tags: [],
+        } as any)
+
+        const res = await POST(
+            createJsonRequest({
+                name: "Manual Inactive",
+                slug: "manual-inactive",
+                price: 0,
+                productType: "MANUAL",
+                status: "INACTIVE",
+            })
+        )
+
+        expect(res.status).toBe(201)
+        expect(prismaMock.product.create).toHaveBeenCalled()
+    })
+
+    it("rejects NORMAL product when variants[] is non-empty (422)", async () => {
+        superAdminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
+
+        const res = await POST(
+            createJsonRequest({
+                name: "Normal With Variants",
+                slug: "normal-with-variants",
+                price: 9.9,
+                productType: "NORMAL",
+                variants: [
+                    {
+                        name: "should-not-be-here",
+                        price: 9.9,
+                        stockQuantity: 1,
+                    },
+                ],
             })
         )
 

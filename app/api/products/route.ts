@@ -194,20 +194,38 @@ export async function POST(request: NextRequest) {
         return validationError(parsed.error.flatten());
     }
 
-    const { name, slug, description, summary, image, price, maxQuantity, status, tagIds, productType, sourceUrl, validityHours, allowAccountSwitch, accountSwitchLimit, couponEnabled, riskWarningEnabled, riskWarningTitle, riskWarningContent, riskWarningCountdown, riskWarningConfirmText, purchaseLimitEnabled, purchaseLimitQuantity, excludeFromAttribution } =
+    const { name, slug, description, summary, image, price, maxQuantity, status, tagIds, productType, sourceUrl, validityHours, allowAccountSwitch, accountSwitchLimit, couponEnabled, riskWarningEnabled, riskWarningTitle, riskWarningContent, riskWarningCountdown, riskWarningConfirmText, purchaseLimitEnabled, purchaseLimitQuantity, excludeFromAttribution, variants } =
         parsed.data;
 
-    // MANUAL products require at least one active variant before they can go
-    // ACTIVE. Variants are created via a separate endpoint after the product
-    // exists, so a MANUAL+ACTIVE create is impossible — refuse upfront and let
-    // the admin create the product as INACTIVE first, add variants, then
-    // activate via PUT (which runs assertProductHasActiveVariant).
+    // MANUAL ↔ variants contract:
+    //  - MANUAL + ACTIVE: need at least one variant with isActive !== false,
+    //    otherwise the product would be visible without any sellable SKU.
+    //  - MANUAL + INACTIVE: variants optional (admin can fill them later).
+    //  - non-MANUAL + non-empty variants: refuse to prevent stray writes.
     const targetStatus = status ?? "ACTIVE";
-    if (productType === "MANUAL" && targetStatus === "ACTIVE") {
+    if (productType === "MANUAL") {
+        if (targetStatus === "ACTIVE") {
+            const activeRows = (variants ?? []).filter(
+                (v) => v.isActive !== false,
+            );
+            if (activeRows.length === 0) {
+                return NextResponse.json(
+                    {
+                        error: "手动发货商品上架前需先创建至少一个启用的 SKU",
+                        details:
+                            "MANUAL + status=ACTIVE requires at least one variant with isActive !== false in the variants[] array.",
+                    },
+                    { status: 422 },
+                );
+            }
+        }
+    } else if (variants && variants.length > 0) {
         return NextResponse.json(
             {
-                error: "手动发货商品上架前需先创建至少一个启用的 SKU",
-                details: "MANUAL product cannot be created with status=ACTIVE; create as INACTIVE, add variants, then activate.",
+                error: "仅手动发货商品（MANUAL）支持 SKU 列表",
+                details:
+                    "variants[] is only valid for productType=MANUAL; got " +
+                    (productType ?? "NORMAL"),
             },
             { status: 422 },
         );
@@ -231,42 +249,66 @@ export async function POST(request: NextRequest) {
     })
     const nextSortOrder = (maxSortOrder._max.sortOrder ?? -1) + 1
 
-    const product = await prisma.product.create({
-        data: {
-            sortOrder: nextSortOrder,
-            name,
-            slug,
-            description: description ?? null,
-            summary: summary ?? null,
-            image: image ?? null,
-            price: finalPrice,
-            maxQuantity: finalMaxQuantity,
-            status: status ?? "ACTIVE",
-            productType: productType ?? "NORMAL",
-            sourceUrl: finalSourceUrl,
-            ...(validityHours != null && { validityHours }),
-            ...(allowAccountSwitch != null && { allowAccountSwitch }),
-            ...(accountSwitchLimit != null && { accountSwitchLimit }),
-            riskWarningEnabled: riskWarningEnabled ?? false,
-            riskWarningTitle: riskWarningTitle ?? null,
-            riskWarningContent: riskWarningContent ?? null,
-            riskWarningCountdown: riskWarningCountdown ?? null,
-            riskWarningConfirmText: riskWarningConfirmText ?? null,
-            couponEnabled: couponEnabled ?? false,
-            purchaseLimitEnabled: purchaseLimitEnabled ?? false,
-            purchaseLimitQuantity: purchaseLimitQuantity ?? 1,
-            excludeFromAttribution: excludeFromAttribution ?? false,
-            tags:
-                tagIds && tagIds.length > 0
-                    ? { connect: tagIds.map((id) => ({ id })) }
-                    : undefined,
-        },
-        include: {
-            tags: {
-                select: { id: true, name: true, slug: true },
-            },
-        },
-    });
+    const productData = {
+        sortOrder: nextSortOrder,
+        name,
+        slug,
+        description: description ?? null,
+        summary: summary ?? null,
+        image: image ?? null,
+        price: finalPrice,
+        maxQuantity: finalMaxQuantity,
+        status: status ?? "ACTIVE",
+        productType: productType ?? "NORMAL",
+        sourceUrl: finalSourceUrl,
+        ...(validityHours != null && { validityHours }),
+        ...(allowAccountSwitch != null && { allowAccountSwitch }),
+        ...(accountSwitchLimit != null && { accountSwitchLimit }),
+        riskWarningEnabled: riskWarningEnabled ?? false,
+        riskWarningTitle: riskWarningTitle ?? null,
+        riskWarningContent: riskWarningContent ?? null,
+        riskWarningCountdown: riskWarningCountdown ?? null,
+        riskWarningConfirmText: riskWarningConfirmText ?? null,
+        couponEnabled: couponEnabled ?? false,
+        purchaseLimitEnabled: purchaseLimitEnabled ?? false,
+        purchaseLimitQuantity: purchaseLimitQuantity ?? 1,
+        excludeFromAttribution: excludeFromAttribution ?? false,
+        tags:
+            tagIds && tagIds.length > 0
+                ? { connect: tagIds.map((id) => ({ id })) }
+                : undefined,
+    };
+
+    // MANUAL with non-empty variants: atomic write so a half-created product
+    // (no SKUs) can never appear on the storefront.
+    const product =
+        productType === "MANUAL" && variants && variants.length > 0
+            ? await prisma.$transaction(async (tx) => {
+                  const created = await tx.product.create({
+                      data: productData,
+                      include: {
+                          tags: { select: { id: true, name: true, slug: true } },
+                      },
+                  });
+                  await tx.productVariant.createMany({
+                      data: variants.map((v) => ({
+                          productId: created.id,
+                          name: v.name,
+                          price: v.price,
+                          unitCost: v.unitCost ?? null,
+                          stockQuantity: v.stockQuantity,
+                          sortOrder: v.sortOrder ?? 0,
+                          isActive: v.isActive ?? true,
+                      })),
+                  });
+                  return created;
+              })
+            : await prisma.product.create({
+                  data: productData,
+                  include: {
+                      tags: { select: { id: true, name: true, slug: true } },
+                  },
+              });
 
     revalidateProducts();
 

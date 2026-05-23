@@ -1,4 +1,5 @@
 import * as z from "zod";
+import { variantCreateSchema } from "@/lib/domains/variants/validators";
 
 // Slug format: lowercase alphanumeric with hyphens
 const slugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -46,6 +47,12 @@ export const createProductSchema = z.object({
     purchaseLimitEnabled: z.boolean().optional(),
     purchaseLimitQuantity: z.number().int().min(1).optional(),
     excludeFromAttribution: z.boolean().optional(),
+    /**
+     * MANUAL-only: SKUs to atomically create together with the product.
+     * Ignored for NORMAL/AUTO_FETCH; the route handler additionally rejects
+     * non-empty arrays for those types to surface mistakes early.
+     */
+    variants: z.array(variantCreateSchema).optional(),
 }).refine(
     (data) => data.productType !== "AUTO_FETCH" || (data.sourceUrl && data.sourceUrl !== ""),
     { message: "Auto-fetch product must have a source URL", path: ["sourceUrl"] }
@@ -149,6 +156,25 @@ export const productFormSchema = z
         purchaseLimitEnabled: z.boolean().optional(),
         purchaseLimitQuantity: z.string().optional(),
         excludeFromAttribution: z.boolean().optional(),
+        /**
+         * MANUAL-only: SKU rows authored inline on the create form. Fields
+         * stay as strings here for Input compatibility — the submit handler
+         * converts them to numbers before POSTing.
+         */
+        variants: z
+            .array(
+                z.object({
+                    id: z.string().optional(),
+                    name: z.string(),
+                    price: z.string(),
+                    unitCost: z.string(),
+                    stockQuantity: z.string(),
+                    sortOrder: z.string(),
+                    isActive: z.boolean(),
+                    _localId: z.string().optional(),
+                }),
+            )
+            .optional(),
     })
     .superRefine((data, ctx) => {
         if (data.productType === "AUTO_FETCH") {
@@ -162,8 +188,22 @@ export const productFormSchema = z
                     ctx.addIssue({ code: "custom", message: "AUTO_FETCH 商品必须填写来源 URL", path: ["sourceUrl"] })
             }
         } else if (data.productType === "MANUAL") {
-            // MANUAL products derive price from SKU variants, so the product-level
-            // price field is unused. No additional validation here.
+            // MANUAL products derive price from SKU variants. Require at least
+            // one validly-filled row before submit so the create POST atomically
+            // delivers a usable product (price/stock both live on variants).
+            const rows = data.variants ?? []
+            const valid = rows.filter((r) => {
+                if (!r.name?.trim()) return false
+                const p = parseFloat(r.price)
+                return r.price !== "" && !Number.isNaN(p) && p >= 0
+            })
+            if (valid.length === 0) {
+                ctx.addIssue({
+                    code: "custom",
+                    message: "请至少新增一个 SKU（填写名称和售价）",
+                    path: ["variants"],
+                })
+            }
         } else {
             if (!data.price || data.price === "")
                 ctx.addIssue({ code: "custom", message: "请输入价格", path: ["price"] })

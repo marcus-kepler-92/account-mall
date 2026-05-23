@@ -4,7 +4,7 @@ import { config } from "@/lib/config"
 import { ProductForm } from "@/app/components/product-form"
 import { DeactivateProductButton } from "./product-actions"
 import { CrossSellTargetsForm } from "./cross-sell-targets-form"
-import { VariantsSection } from "./variants/variants-section"
+import { SkuListEditor } from "./variants/sku-list-editor"
 
 export const dynamic = "force-dynamic"
 
@@ -67,7 +67,9 @@ export default async function AdminEditProductPage({ params }: PageProps) {
                 sourceUrlOptions={config.autoFetchSourceUrls}
             />
 
-            {isManual && <VariantsSection productId={product.id} />}
+            {isManual && (
+                <SkuListEditor mode="edit" productId={product.id} value={[]} />
+            )}
 
             <CrossSellTargetsForm
                 productId={productId}
