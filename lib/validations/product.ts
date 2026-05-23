@@ -3,7 +3,7 @@ import * as z from "zod";
 // Slug format: lowercase alphanumeric with hyphens
 const slugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
-const productTypeEnum = z.enum(["NORMAL", "AUTO_FETCH"]);
+const productTypeEnum = z.enum(["NORMAL", "AUTO_FETCH", "MANUAL"]);
 
 export const createProductSchema = z.object({
     name: z.string().min(1, "Name is required").max(200, "Name is too long"),
@@ -127,7 +127,7 @@ export const productFormSchema = z
             "数量必须在 1-1000 之间"
         ),
         isActive: z.boolean(),
-        productType: z.enum(["NORMAL", "AUTO_FETCH"]).optional(),
+        productType: z.enum(["NORMAL", "AUTO_FETCH", "MANUAL"]).optional(),
         /** Sub-type for AUTO_FETCH: HTML scraping vs voidlogins API */
         autoFetchType: z.enum(["scrape", "voidlogins"]).optional(),
         sourceUrl: z.string().optional(),
@@ -161,6 +161,9 @@ export const productFormSchema = z
                 if (!data.sourceUrl || data.sourceUrl.trim() === "")
                     ctx.addIssue({ code: "custom", message: "AUTO_FETCH 商品必须填写来源 URL", path: ["sourceUrl"] })
             }
+        } else if (data.productType === "MANUAL") {
+            // MANUAL products derive price from SKU variants, so the product-level
+            // price field is unused. No additional validation here.
         } else {
             if (!data.price || data.price === "")
                 ctx.addIssue({ code: "custom", message: "请输入价格", path: ["price"] })

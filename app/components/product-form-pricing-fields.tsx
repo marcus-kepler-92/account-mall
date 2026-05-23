@@ -24,9 +24,11 @@ import type { ProductFormSchema } from "@/lib/validations/product"
 
 export function ProductFormPricingFields({
     isAutoFetch,
+    isManual = false,
     sourceUrlOptions,
 }: {
     isAutoFetch: boolean
+    isManual?: boolean
     sourceUrlOptions: string[]
 }) {
     const { control, watch } = useFormContext<ProductFormSchema>()
@@ -54,7 +56,7 @@ export function ProductFormPricingFields({
                                         onValueChange={(value) => {
                                             field.onChange(value)
                                         }}
-                                        className="flex gap-4"
+                                        className="flex flex-wrap gap-4"
                                     >
                                         <label className="flex items-center gap-2 cursor-pointer">
                                             <RadioGroupItem value="NORMAL" />
@@ -64,6 +66,10 @@ export function ProductFormPricingFields({
                                             <RadioGroupItem value="AUTO_FETCH" />
                                             <span className="text-sm">自动获取</span>
                                         </label>
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <RadioGroupItem value="MANUAL" />
+                                            <span className="text-sm">手动发货</span>
+                                        </label>
                                     </RadioGroup>
                                 </FormControl>
                                 <FormMessage />
@@ -71,69 +77,79 @@ export function ProductFormPricingFields({
                         )}
                     />
 
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <FormField
-                            control={control}
-                            name="price"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>
-                                        价格 (¥) {!isAutoFetch && <span className="text-destructive">*</span>}
-                                    </FormLabel>
-                                    <FormControl>
-                                        <Input
-                                            type="number"
-                                            step="0.01"
-                                            min={isAutoFetch ? "0" : "0.01"}
-                                            placeholder={isAutoFetch ? "0.00（可免费）" : "0.00"}
-                                            {...field}
-                                        />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={control}
-                            name="costPerUnit"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>采购成本（每张卡密，可选）</FormLabel>
-                                    <FormControl>
-                                        <Input
-                                            type="number"
-                                            min={0}
-                                            step="0.01"
-                                            placeholder="留空表示未设置"
-                                            value={field.value ?? ""}
-                                            onChange={(e) => {
-                                                const v = e.target.value
-                                                field.onChange(v === "" ? null : parseFloat(v))
-                                            }}
-                                        />
-                                    </FormControl>
-                                    <FormDescription>用于利润看板计算，不影响售价和用户展示</FormDescription>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        {!isAutoFetch && (
+                    {isManual && (
+                        <p className="text-sm text-muted-foreground rounded-md border bg-muted/30 p-3">
+                            手动发货商品的售价、成本与库存由下方
+                            <span className="font-medium"> SKU 管理 </span>
+                            区维护，此处无需填写。
+                        </p>
+                    )}
+
+                    {!isManual && (
+                        <div className="grid gap-4 sm:grid-cols-2">
                             <FormField
                                 control={control}
-                                name="maxQuantity"
+                                name="price"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>单笔最大购买数量</FormLabel>
+                                        <FormLabel>
+                                            价格 (¥) {!isAutoFetch && <span className="text-destructive">*</span>}
+                                        </FormLabel>
                                         <FormControl>
-                                            <Input type="number" min={1} max={1000} {...field} />
+                                            <Input
+                                                type="number"
+                                                step="0.01"
+                                                min={isAutoFetch ? "0" : "0.01"}
+                                                placeholder={isAutoFetch ? "0.00（可免费）" : "0.00"}
+                                                {...field}
+                                            />
                                         </FormControl>
-                                        <FormDescription>单笔订单最多可购买的数量</FormDescription>
                                         <FormMessage />
                                     </FormItem>
                                 )}
                             />
-                        )}
-                    </div>
+                            <FormField
+                                control={control}
+                                name="costPerUnit"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>采购成本（每张卡密，可选）</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                type="number"
+                                                min={0}
+                                                step="0.01"
+                                                placeholder="留空表示未设置"
+                                                value={field.value ?? ""}
+                                                onChange={(e) => {
+                                                    const v = e.target.value
+                                                    field.onChange(v === "" ? null : parseFloat(v))
+                                                }}
+                                            />
+                                        </FormControl>
+                                        <FormDescription>用于利润看板计算，不影响售价和用户展示</FormDescription>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            {!isAutoFetch && (
+                                <FormField
+                                    control={control}
+                                    name="maxQuantity"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>单笔最大购买数量</FormLabel>
+                                            <FormControl>
+                                                <Input type="number" min={1} max={1000} {...field} />
+                                            </FormControl>
+                                            <FormDescription>单笔订单最多可购买的数量</FormDescription>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            )}
+                        </div>
+                    )}
 
                     {isAutoFetch && (
                         <>

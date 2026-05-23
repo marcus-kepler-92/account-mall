@@ -33,7 +33,7 @@ type ProductData = {
     costPerUnit?: number | null
     maxQuantity: number
     status: string
-    productType?: "NORMAL" | "AUTO_FETCH"
+    productType?: "NORMAL" | "AUTO_FETCH" | "MANUAL"
     sourceUrl?: string | null
     validityHours?: number | null
     allowAccountSwitch?: boolean
@@ -107,6 +107,7 @@ export function ProductForm({
     const name = watch("name")
     const productType = watch("productType") ?? "NORMAL"
     const isAutoFetch = productType === "AUTO_FETCH"
+    const isManual = productType === "MANUAL"
 
     useEffect(() => {
         if (!slugManuallyEdited && !isEditing) {
@@ -127,19 +128,34 @@ export function ProductForm({
             }
         }
 
+        // MANUAL products derive price from SKU variants and don't use
+        // source URL / validity / account switch settings.
         const body = {
             name: data.name.trim(),
             slug: data.slug.trim(),
             description: data.description?.trim() || undefined,
             summary: data.summary?.trim() || null,
             image: data.image || null,
-            price: data.price === "" ? (isAutoFetch ? 0 : undefined) : parseFloat(data.price),
+            price:
+                isManual
+                    ? 0
+                    : data.price === ""
+                        ? (isAutoFetch ? 0 : undefined)
+                        : parseFloat(data.price),
             costPerUnit: data.costPerUnit ?? null,
-            maxQuantity: isAutoFetch ? 1 : (data.maxQuantity === "" ? 10 : parseInt(data.maxQuantity, 10)),
+            maxQuantity: isAutoFetch
+                ? 1
+                : isManual
+                    ? 1
+                    : (data.maxQuantity === "" ? 10 : parseInt(data.maxQuantity, 10)),
             status: data.isActive ? "ACTIVE" : "INACTIVE",
             productType: data.productType ?? "NORMAL",
-            sourceUrl: finalSourceUrl,
-            validityHours: data.validityHours && data.validityHours !== "" ? parseInt(data.validityHours, 10) : null,
+            sourceUrl: isManual ? null : finalSourceUrl,
+            validityHours: isManual
+                ? null
+                : data.validityHours && data.validityHours !== ""
+                    ? parseInt(data.validityHours, 10)
+                    : null,
             ...(isAutoFetch && {
                 allowAccountSwitch: data.allowAccountSwitch ?? true,
                 accountSwitchLimit: data.accountSwitchLimit && data.accountSwitchLimit !== "" ? parseInt(data.accountSwitchLimit, 10) : 1,
@@ -207,7 +223,7 @@ export function ProductForm({
                                 isEditing={isEditing}
                                 onSlugManualEdit={() => setSlugManuallyEdited(true)}
                             />
-                            <ProductFormPricingFields isAutoFetch={isAutoFetch} sourceUrlOptions={sourceUrlOptions} />
+                            <ProductFormPricingFields isAutoFetch={isAutoFetch} isManual={isManual} sourceUrlOptions={sourceUrlOptions} />
                             <ProductFormRiskWarningFields />
                             <ProductFormPurchaseLimitFields />
                         </div>

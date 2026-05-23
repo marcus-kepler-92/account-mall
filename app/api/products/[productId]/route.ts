@@ -5,6 +5,7 @@ import { updateProductSchema } from "@/lib/validations/product";
 import { config } from "@/lib/config";
 import { notFound, unauthorized, invalidJsonBody, validationError, conflict, badRequest } from "@/lib/api-response";
 import { revalidateProducts } from "@/lib/revalidate-storefront";
+import { assertProductHasActiveVariant } from "@/lib/domains/variants";
 
 type RouteContext = {
     params: Promise<{ productId: string }>;
@@ -143,6 +144,24 @@ export async function PUT(
     }
     if (purchaseLimitQuantity !== undefined) {
         updateData.purchaseLimitQuantity = purchaseLimitQuantity
+    }
+
+    // MANUAL products may only go ACTIVE if they have at least one active variant.
+    // Applies both when activating an existing MANUAL product and when switching a
+    // product to MANUAL + ACTIVE in the same request.
+    const targetStatus = rest.status ?? existing.status;
+    const targetType = productType ?? existing.productType;
+    if (targetStatus === "ACTIVE" && targetType === "MANUAL") {
+        try {
+            await assertProductHasActiveVariant(productId);
+        } catch (err) {
+            const message =
+                err instanceof Error ? err.message : "需先创建至少一个启用的 SKU"
+            return NextResponse.json(
+                { error: "手动发货商品上架前需先创建至少一个启用的 SKU", details: message },
+                { status: 422 }
+            )
+        }
     }
 
     const product = await prisma.product.update({

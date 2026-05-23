@@ -65,6 +65,7 @@ export function ProductRowActions({
     const [blacklistOpen, setBlacklistOpen] = useState(false)
     const isActive = status === "ACTIVE"
     const isAutoFetch = productType === "AUTO_FETCH"
+    const isManual = productType === "MANUAL"
 
     const handleDuplicate = async () => {
         setDuplicateLoading(true)
@@ -156,7 +157,7 @@ export function ProductRowActions({
                             编辑
                         </Link>
                     </DropdownMenuItem>
-                    {!isAutoFetch && (
+                    {!isAutoFetch && !isManual && (
                         <DropdownMenuItem asChild>
                             <Link href={`/admin/products/${productId}/cards`}>
                                 <CreditCard className="size-4" />
