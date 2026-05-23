@@ -552,6 +552,7 @@ export async function POST(request: NextRequest) {
             fingerprintHash,
             clientIp,
             limitQuantity: product.purchaseLimitQuantity,
+            productType: (product as unknown as { productType?: string }).productType,
         })
         if (limitResult.blocked) {
             return NextResponse.json(

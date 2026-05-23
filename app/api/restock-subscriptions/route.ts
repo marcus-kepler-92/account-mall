@@ -46,11 +46,18 @@ export async function POST(request: NextRequest) {
             name: true,
             slug: true,
             status: true,
+            productType: true,
         },
     });
 
     if (!product || product.status !== "ACTIVE") {
         return notFound("Product not found or unavailable");
+    }
+
+    // MANUAL products use Variant stock, not card inventory — restock
+    // subscriptions are a card-based feature that doesn't apply.
+    if (product.productType === "MANUAL") {
+        return badRequest("MANUAL 商品不支持到货提醒");
     }
 
     const unsoldCount = await prisma.card.count({

@@ -40,6 +40,17 @@ export async function POST(request: NextRequest) {
     const { productId, fingerprintHash } = parsed.data
     const ip = getClientIp(request)
 
+    // MANUAL products use Variant pricing/stock and require manual fulfillment —
+    // the exit-intent percent-off discount model doesn't apply (per-SKU pricing
+    // is the lever, not a blanket cart discount).
+    const product = await prisma.product.findUnique({
+        where: { id: productId },
+        select: { productType: true },
+    })
+    if (product?.productType === "MANUAL") {
+        return badRequest("MANUAL 商品不支持退出折扣")
+    }
+
     // 读取或生成持久 visitorId cookie
     const existingVisitorId = request.cookies.get(VISITOR_COOKIE)?.value?.trim()
     const visitorId = existingVisitorId || randomUUID()

@@ -10,6 +10,7 @@ type ProductInfo = {
     name: string;
     slug: string;
     price: number;
+    productType?: string;
 };
 
 /**
@@ -17,6 +18,13 @@ type ProductInfo = {
  * Called after cards are added to a product that had zero stock.
  */
 export async function notifyRestockSubscribers(product: ProductInfo): Promise<void> {
+    // MANUAL products use Variant stock and have no card inventory — restock
+    // subscriptions are unsupported (defensive: callers shouldn't reach here
+    // for MANUAL since bulkImportCards is a no-op for them).
+    if (product.productType === "MANUAL") {
+        console.log("[restock-notify] Skip MANUAL product", { productId: product.id });
+        return;
+    }
     console.log("[restock-notify] Start", { productId: product.id, productName: product.name });
 
     const subscriptions = await prisma.restockSubscription.findMany({

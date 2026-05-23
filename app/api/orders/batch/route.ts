@@ -54,6 +54,9 @@ export async function POST(request: NextRequest) {
             continue;
         }
 
+        // CLOSE is intentionally restricted to PENDING orders only (spec non-goal:
+        // no batch CLOSE on AWAITING_FULFILLMENT/PROCESSING — variant stock rollback
+        // is handled per-order, not in batch).
         if (action === "CLOSE") {
             if (status === "PENDING") {
                 idsToProcess.push(id);
