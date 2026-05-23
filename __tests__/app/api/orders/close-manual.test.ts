@@ -37,14 +37,24 @@ const PRODUCT_ID = "cmanualproduct000000000001"
 const VARIANT_ID = "cmanualvariant000000000001"
 const ORDER_ID = "cmanualorder0000000000001"
 
-function makeManualOrder(status: "AWAITING_FULFILLMENT" | "PROCESSING" | "COMPLETED" | "PENDING" | "CLOSED") {
+function makeManualOrder(
+    status: "AWAITING_FULFILLMENT" | "PROCESSING" | "COMPLETED" | "PENDING" | "CLOSED",
+    opts: { inventoryTracked?: boolean } = {},
+) {
+    const { inventoryTracked = true } = opts
     return {
         id: ORDER_ID,
         orderNo: "FAK-MANUAL-1",
         status,
         productId: PRODUCT_ID,
         variantId: VARIANT_ID,
-        product: { id: PRODUCT_ID, productType: "MANUAL", name: "Manual Product", price: 100 },
+        product: {
+            id: PRODUCT_ID,
+            productType: "MANUAL",
+            name: "Manual Product",
+            price: 100,
+            inventoryTracked,
+        },
         cards: [],
     }
 }
@@ -194,6 +204,49 @@ describe("PATCH /api/orders/[orderId] — MANUAL close restock", () => {
         expect(data.error).toBe("Invalid status transition")
         expect(prismaMock.$transaction).not.toHaveBeenCalled()
     })
+
+    it("PATCH MANUAL+untracked AWAITING_FULFILLMENT -> CLOSED closes WITHOUT restocking variant", async () => {
+        prismaMock.order.findUnique
+            .mockResolvedValueOnce(
+                makeManualOrder("AWAITING_FULFILLMENT", { inventoryTracked: false }) as any,
+            )
+            .mockResolvedValueOnce(makeReturnedOrder("CLOSED") as any)
+
+        const txCalls: { table: string; args: unknown }[] = []
+        ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: any) => {
+            const tx = {
+                order: {
+                    update: jest.fn(async (args: unknown) => {
+                        txCalls.push({ table: "order.update", args })
+                        return {}
+                    }),
+                },
+                card: {
+                    updateMany: jest.fn(async (args: unknown) => {
+                        txCalls.push({ table: "card.updateMany", args })
+                        return { count: 0 }
+                    }),
+                },
+                productVariant: {
+                    update: jest.fn(async (args: unknown) => {
+                        txCalls.push({ table: "productVariant.update", args })
+                        return {}
+                    }),
+                },
+            }
+            return fn(tx)
+        })
+
+        const res = await PATCH(
+            createJsonRequest({ status: "CLOSED" }),
+            { params: { orderId: ORDER_ID } } as any,
+        )
+
+        expect(res.status).toBe(200)
+        expect(txCalls.find((c) => c.table === "order.update")).toBeDefined()
+        // Untracked: variant must NOT be touched on close
+        expect(txCalls.find((c) => c.table === "productVariant.update")).toBeUndefined()
+    })
 })
 
 /**
@@ -208,16 +261,20 @@ describe("DELETE /api/orders/[orderId] — MANUAL soft-close restock", () => {
 
     function makeManualOrderTxFetch(
         status: "AWAITING_FULFILLMENT" | "PROCESSING" | "PENDING" | "CLOSED",
-        opts: { productType?: "MANUAL" | "NORMAL"; variantId?: string | null } = {},
+        opts: {
+            productType?: "MANUAL" | "NORMAL"
+            variantId?: string | null
+            inventoryTracked?: boolean
+        } = {},
     ) {
-        const { productType = "MANUAL", variantId = VARIANT_ID } = opts
+        const { productType = "MANUAL", variantId = VARIANT_ID, inventoryTracked = true } = opts
         return {
             id: ORDER_ID,
             orderNo: "FAK-MANUAL-1",
             status,
             productId: PRODUCT_ID,
             variantId,
-            product: { productType },
+            product: { productType, inventoryTracked },
             cards: [],
         }
     }
@@ -325,5 +382,21 @@ describe("DELETE /api/orders/[orderId] — MANUAL soft-close restock", () => {
         expect(txCalls.find((c) => c.table === "productVariant.update")).toBeUndefined()
         // PENDING still unreserves cards
         expect(txCalls.find((c) => c.table === "card.updateMany")).toBeDefined()
+    })
+
+    it("DELETE MANUAL+untracked AWAITING_FULFILLMENT closes WITHOUT restocking variant", async () => {
+        const txCalls = runTxCapturing(
+            makeManualOrderTxFetch("AWAITING_FULFILLMENT", { inventoryTracked: false }),
+        )
+        ;(prismaMock.order.findUnique as jest.Mock).mockResolvedValueOnce(makeReturnedOrder("CLOSED") as any)
+
+        const res = await DELETE(
+            {} as any as NextRequest,
+            { params: { orderId: ORDER_ID } } as any,
+        )
+
+        expect(res.status).toBe(200)
+        // Untracked: variant restock must NOT fire
+        expect(txCalls.find((c) => c.table === "productVariant.update")).toBeUndefined()
     })
 })

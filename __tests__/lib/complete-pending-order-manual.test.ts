@@ -60,6 +60,9 @@ function makeManualPendingOrder(overrides?: Record<string, unknown>) {
       name: "Netflix",
       productType: "MANUAL",
       validityHours: null,
+      // Default fixture exercises the tracked-inventory branch (decrement,
+      // sold-out guard). A dedicated untracked test below verifies the opposite.
+      inventoryTracked: true,
     },
     cards: [],
     ...overrides,
@@ -214,5 +217,79 @@ describe("completePendingOrder — MANUAL branch", () => {
     expect(result.done).toBe(false)
     expect(prismaMock.$transaction).not.toHaveBeenCalled()
     expect(wecomMock).not.toHaveBeenCalled()
+  })
+
+  describe("when product.inventoryTracked === false", () => {
+    function makeUntrackedOrder(overrides?: Record<string, unknown>) {
+      return makeManualPendingOrder({
+        product: {
+          name: "Custom Service",
+          productType: "MANUAL",
+          validityHours: null,
+          inventoryTracked: false,
+        },
+        ...overrides,
+      })
+    }
+
+    it("does NOT call decrementVariantStock", async () => {
+      prismaMock.order.findFirst.mockResolvedValue(makeUntrackedOrder())
+      prismaMock.productVariant.findUnique.mockResolvedValue({
+        id: "var_1",
+        unitCost: new Prisma.Decimal("0"),
+      } as any)
+      prismaMock.order.updateMany.mockResolvedValue({ count: 1 })
+      prismaMock.$transaction.mockImplementation((async (fn: (tx: any) => Promise<void>) => {
+        await fn(prismaMock)
+      }) as any)
+
+      const result = await completePendingOrder("manual-order-1")
+
+      expect(result).toEqual({ done: true, orderNo: "manual-order-1" })
+      expect(decStockMock).not.toHaveBeenCalled()
+    })
+
+    it("still advances PENDING → AWAITING_FULFILLMENT and fires WeCom notification", async () => {
+      prismaMock.order.findFirst.mockResolvedValue(makeUntrackedOrder())
+      prismaMock.productVariant.findUnique.mockResolvedValue({
+        id: "var_1",
+        unitCost: new Prisma.Decimal("5"),
+      } as any)
+      prismaMock.order.updateMany.mockResolvedValue({ count: 1 })
+      prismaMock.$transaction.mockImplementation((async (fn: (tx: any) => Promise<void>) => {
+        await fn(prismaMock)
+      }) as any)
+
+      await completePendingOrder("manual-order-1")
+      await Promise.resolve()
+
+      expect(prismaMock.order.updateMany).toHaveBeenCalledWith({
+        where: { id: "ord_m1", status: "PENDING" },
+        data: expect.objectContaining({ status: "AWAITING_FULFILLMENT" }),
+      })
+      expect(wecomMock).toHaveBeenCalledTimes(1)
+    })
+
+    it("still applies the concurrent-completion guard (already AWAITING returns error)", async () => {
+      prismaMock.order.findFirst.mockResolvedValue(makeUntrackedOrder())
+      prismaMock.productVariant.findUnique.mockResolvedValue({
+        id: "var_1",
+        unitCost: new Prisma.Decimal("0"),
+      } as any)
+      // Concurrent payment: another caller already advanced the order, so
+      // updateMany matches nothing.
+      prismaMock.order.updateMany.mockResolvedValue({ count: 0 })
+      prismaMock.$transaction.mockImplementation((async (fn: (tx: any) => Promise<void>) => {
+        await fn(prismaMock)
+      }) as any)
+
+      const result = await completePendingOrder("manual-order-1")
+
+      expect(result).toEqual({
+        done: false,
+        error: expect.stringMatching(/out of stock|already completed/i),
+      })
+      expect(wecomMock).not.toHaveBeenCalled()
+    })
   })
 })

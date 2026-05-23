@@ -165,6 +165,11 @@ model Product {
   purchaseLimitQuantity  Int                   @default(1)
   /// When true, orders for this product are never attributed to a distributor (no distributorId, no commission).
   excludeFromAttribution Boolean               @default(false)
+  /// MANUAL-only: when true, ProductVariant.stockQuantity is enforced (decrement
+  /// on payment, restock on close, sold-out display). When false (default),
+  /// MANUAL stock is unbounded — the field exists but is never read by business
+  /// logic. Has no effect on NORMAL/AUTO_FETCH (their stock model is separate).
+  inventoryTracked       Boolean               @default(false)
   createdAt              DateTime              @default(now())
   sortOrder              Int                   @default(0)
   updatedAt              DateTime              @updatedAt

@@ -81,7 +81,7 @@ describe("GET /api/products", () => {
         expect(data.meta).toMatchObject({ total: 1, page: 1, pageSize: 9 })
     })
 
-    it("aggregates variant stockQuantity for MANUAL products (no cards table)", async () => {
+    it("aggregates variant stockQuantity for MANUAL+tracked products (no cards table)", async () => {
         const products = [
             {
                 id: "p_manual",
@@ -89,6 +89,7 @@ describe("GET /api/products", () => {
                 slug: "manual-product",
                 status: "ACTIVE",
                 productType: "MANUAL",
+                inventoryTracked: true,
                 price: new Prisma.Decimal("50"),
                 tags: [],
             },
@@ -131,7 +132,7 @@ describe("GET /api/products", () => {
         expect(normal.stock).toBe(2)
     })
 
-    it("returns stock=0 for MANUAL product when no active variants exist", async () => {
+    it("returns stock=0 for MANUAL+tracked product when no active variants exist", async () => {
         const products = [
             {
                 id: "p_empty_manual",
@@ -139,6 +140,7 @@ describe("GET /api/products", () => {
                 slug: "empty-manual",
                 status: "ACTIVE",
                 productType: "MANUAL",
+                inventoryTracked: true,
                 price: new Prisma.Decimal("9.9"),
                 tags: [],
             },
@@ -156,6 +158,34 @@ describe("GET /api/products", () => {
         expect(data.data[0].productType).toBe("MANUAL")
     })
 
+    it("MANUAL+untracked product reports stock=1 (never sold-out) even with zero variant stock", async () => {
+        const products = [
+            {
+                id: "p_untracked_manual",
+                name: "Untracked Manual",
+                slug: "untracked-manual",
+                status: "ACTIVE",
+                productType: "MANUAL",
+                inventoryTracked: false,
+                price: new Prisma.Decimal("9.9"),
+                tags: [],
+            },
+        ]
+        prismaMock.product.findMany.mockResolvedValueOnce(products as any)
+        prismaMock.product.count.mockResolvedValueOnce(1)
+        prismaMock.card.groupBy.mockResolvedValueOnce([] as any)
+
+        const res = await GET(createUrlRequest("http://localhost/api/products"))
+        const data = await res.json()
+
+        expect(res.status).toBe(200)
+        expect(data.data[0].stock).toBe(1)
+        expect(data.data[0].productType).toBe("MANUAL")
+        // The variant.groupBy must NOT be invoked for untracked MANUAL — its
+        // result is irrelevant and the route should short-circuit to stock=1.
+        expect(prismaMock.productVariant.groupBy).not.toHaveBeenCalled()
+    })
+
     it("skips ProductVariant.groupBy when no MANUAL products are returned", async () => {
         const products = [
             {
@@ -164,6 +194,7 @@ describe("GET /api/products", () => {
                 slug: "normal-only",
                 status: "ACTIVE",
                 productType: "NORMAL",
+                inventoryTracked: false,
                 price: new Prisma.Decimal("10"),
                 tags: [],
             },

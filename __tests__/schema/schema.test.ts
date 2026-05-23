@@ -40,6 +40,7 @@ describe("Product model", () => {
     purchaseLimitEnabled: false,
     purchaseLimitQuantity: 1,
     excludeFromAttribution: false,
+    inventoryTracked: false,
     createdAt: new Date("2026-01-01"),
     updatedAt: new Date("2026-01-01"),
   };
@@ -494,6 +495,7 @@ describe("Enum default values", () => {
       purchaseLimitEnabled: false,
       purchaseLimitQuantity: 1,
       excludeFromAttribution: false,
+      inventoryTracked: false,
       createdAt: new Date(),
       updatedAt: new Date(),
     };

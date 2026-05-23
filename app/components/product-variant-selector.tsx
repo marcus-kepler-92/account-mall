@@ -19,15 +19,18 @@ type Props = {
     value: string | null
     onChange: (id: string) => void
     disabled?: boolean
+    // When false (untracked MANUAL), variant stockQuantity is meaningless —
+    // all active variants stay selectable regardless of the column's value.
+    trackInventory?: boolean
 }
 
-export function ProductVariantSelector({ variants, value, onChange, disabled }: Props) {
+export function ProductVariantSelector({ variants, value, onChange, disabled, trackInventory = true }: Props) {
     const visible = variants.filter((v) => v.isActive)
     if (visible.length === 0) return null
     return (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {visible.map((v) => {
-                const soldOut = v.stockQuantity < 1
+                const soldOut = trackInventory && v.stockQuantity < 1
                 const active = value === v.id
                 return (
                     <button

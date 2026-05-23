@@ -88,6 +88,9 @@ function makeManualProduct(overrides?: Partial<Record<string, unknown>>) {
         maxQuantity: 5,
         status: "ACTIVE",
         productType: "MANUAL",
+        // Default fixtures use tracked inventory because they exercise the
+        // stock-related branches; untracked variants get their own test below.
+        inventoryTracked: true,
         sourceUrl: null,
         validityHours: null,
         allowAccountSwitch: true,
@@ -229,6 +232,36 @@ describe("POST /api/orders — MANUAL branch", () => {
         expect(res.status).toBe(400)
         expect(data.details).toMatchObject({ variantId: expect.arrayContaining([expect.stringMatching(/售罄/)]) })
         expect(prismaMock.order.create).not.toHaveBeenCalled()
+    })
+
+    it("MANUAL+untracked allows ordering a variant with stockQuantity=0", async () => {
+        prismaMock.product.findUnique.mockResolvedValueOnce(
+            makeManualProduct({ inventoryTracked: false }) as any,
+        )
+        prismaMock.productVariant.findUnique.mockResolvedValueOnce(
+            makeVariant({ stockQuantity: 0 }) as any,
+        )
+
+        const capture: { data?: Record<string, unknown> } = {}
+        setupOrderCreateCapture(capture)
+
+        const res = await POST(
+            createJsonRequest({
+                productId: PRODUCT_ID,
+                email: "buyer@example.com",
+                orderPassword: "password123",
+                quantity: 1,
+                variantId: VARIANT_ID,
+            }),
+        )
+
+        expect(res.status).toBe(200)
+        expect(capture.data).toMatchObject({
+            productId: PRODUCT_ID,
+            variantId: VARIANT_ID,
+            quantity: 1,
+            status: "PENDING",
+        })
     })
 
     it("writes variantId / variantNameSnapshot / unitPriceSnapshot=variant.price and forces quantity to 1", async () => {

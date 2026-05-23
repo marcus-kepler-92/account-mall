@@ -43,7 +43,12 @@ export async function completePendingOrder(
     where: { orderNo },
     include: {
       product: {
-        select: { name: true, productType: true, validityHours: true },
+        select: {
+          name: true,
+          productType: true,
+          validityHours: true,
+          inventoryTracked: true,
+        },
       },
       cards: { select: { id: true, status: true, unitCost: true } },
     },
@@ -161,7 +166,7 @@ async function completeManualOrder(
     email: string | null
     productNameSnapshot: string | null
     variantNameSnapshot: string | null
-    product: { productType: string } | null
+    product: { productType: string; inventoryTracked?: boolean } | null
   },
 ): Promise<CompletePendingOrderResult> {
   if (!order.variantId) {
@@ -169,6 +174,7 @@ async function completeManualOrder(
   }
   assertTransition("PENDING", "AWAITING_FULFILLMENT", "MANUAL")
 
+  const inventoryTracked = order.product?.inventoryTracked === true
   const paidAt = new Date()
   let stockOk = false
 
@@ -178,9 +184,14 @@ async function completeManualOrder(
     })
     if (!variant) throw new Error("Variant disappeared")
 
-    const decRes = await decrementVariantStock(order.variantId!, tx)
-    if (decRes.count === 0) {
-      throw new OutOfStockSentinel()
+    // Untracked MANUAL: skip stock decrement entirely. The concurrent-
+    // completion sentinel (Order.status updateMany guard below) still applies
+    // — it protects against double-payment, not stock.
+    if (inventoryTracked) {
+      const decRes = await decrementVariantStock(order.variantId!, tx)
+      if (decRes.count === 0) {
+        throw new OutOfStockSentinel()
+      }
     }
 
     // updateMany is required so the WHERE clause can include `status: "PENDING"`

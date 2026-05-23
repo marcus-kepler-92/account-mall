@@ -53,6 +53,7 @@ type CachedProduct = {
   image: string | null
   price: number
   productType: "NORMAL" | "AUTO_FETCH" | "MANUAL"
+  inventoryTracked: boolean
   tags: { id: string; name: string; slug: string }[]
 }
 
@@ -111,6 +112,7 @@ const getCachedProducts = unstable_cache(
           image: true,
           price: true,
           productType: true,
+          inventoryTracked: true,
           tags: { select: { id: true, name: true, slug: true } },
         },
         orderBy: [{ sortOrder: "asc" }],
@@ -127,6 +129,7 @@ const getCachedProducts = unstable_cache(
       image: p.image,
       price: Number(p.price),
       productType: (p.productType ?? "NORMAL") as CachedProduct["productType"],
+      inventoryTracked: p.inventoryTracked === true,
       tags: p.tags,
     }))
     return { products: plain, total }
@@ -190,12 +193,15 @@ export default async function HomePage({
     const { products, total } = productsResult
 
     const productIds = products.map(p => p.id)
-    const manualProductIds = products
-        .filter(p => p.productType === "MANUAL")
+    // Only tracked MANUAL products contribute to the variant-stock aggregation.
+    // Untracked MANUAL is unbounded; we'll synthesize stock=1 below so the
+    // catalog never marks them as sold-out.
+    const trackedManualProductIds = products
+        .filter(p => p.productType === "MANUAL" && p.inventoryTracked === true)
         .map(p => p.id)
     const [stockCounts, variantStockCounts, csDiscountMap] = await Promise.all([
         getCachedStockCounts(productIds),
-        getCachedVariantStockCounts(manualProductIds),
+        getCachedVariantStockCounts(trackedManualProductIds),
         // Resolve per-product cross-sell discount for the user's current cs
         // session. Empty map for anonymous browsing / expired tokens —
         // products simply render at original price.
@@ -207,7 +213,9 @@ export default async function HomePage({
         const stock = product.productType === "AUTO_FETCH"
             ? 1
             : product.productType === "MANUAL"
-              ? (variantStockCounts[product.id] ?? 0)
+              ? product.inventoryTracked === true
+                  ? (variantStockCounts[product.id] ?? 0)
+                  : 1
               : (stockCounts[product.id] ?? 0)
         return {
             id: product.id,

@@ -74,6 +74,13 @@ type Props = {
     mode: Mode
     productId?: string
     onRowSaved?: (id: string) => void
+    /**
+     * When false (default for untracked MANUAL products), the 库存 column is
+     * hidden and stockQuantity is stripped from autosave/POST payloads —
+     * server treats stock as unbounded for these rows. The internal
+     * VariantDraft still carries the field for type consistency.
+     */
+    trackInventory: boolean
 }
 
 type RowMeta = {
@@ -99,7 +106,7 @@ function makeLocalId() {
     return `local-${Math.random().toString(36).slice(2, 10)}-${Date.now().toString(36)}`
 }
 
-function toPayload(draft: VariantDraft) {
+function toPayload(draft: VariantDraft, trackInventory: boolean) {
     return {
         name: draft.name.trim(),
         price: draft.price === "" ? 0 : parseFloat(draft.price),
@@ -107,16 +114,26 @@ function toPayload(draft: VariantDraft) {
             draft.unitCost && draft.unitCost !== ""
                 ? parseFloat(draft.unitCost)
                 : null,
-        stockQuantity:
-            draft.stockQuantity === "" ? 0 : parseInt(draft.stockQuantity, 10),
+        // Untracked MANUAL: omit stockQuantity so the API treats it as default
+        // (0) — the value is never read by business logic in that mode.
+        ...(trackInventory && {
+            stockQuantity:
+                draft.stockQuantity === ""
+                    ? 0
+                    : parseInt(draft.stockQuantity, 10),
+        }),
         sortOrder:
             draft.sortOrder === "" ? 0 : parseInt(draft.sortOrder, 10),
         isActive: draft.isActive,
     }
 }
 
-function validateRow(row: VariantDraft): RowErrors | null {
-    const result = rowSchema.safeParse(row)
+function validateRow(row: VariantDraft, trackInventory: boolean): RowErrors | null {
+    // Untracked mode: skip stockQuantity entirely — it's neither displayed nor
+    // submitted, so the user can't realistically be expected to maintain a
+    // valid value there.
+    const payload = trackInventory ? row : { ...row, stockQuantity: "0" }
+    const result = rowSchema.safeParse(payload)
     if (result.success) return null
     const errors: RowErrors = {}
     for (const issue of result.error.issues) {
@@ -155,6 +172,7 @@ export function SkuListEditor({
     mode,
     productId,
     onRowSaved,
+    trackInventory,
 }: Props) {
     const isEdit = mode === "edit"
     if (isEdit && !productId) {
@@ -247,7 +265,7 @@ export function SkuListEditor({
             const key = keyOf(current)
             if (!key || savingRef.current.has(key)) return
 
-            const errors = validateRow(current)
+            const errors = validateRow(current, trackInventory)
             if (errors) {
                 setRowMeta((m) => ({
                     ...m,
@@ -270,7 +288,7 @@ export function SkuListEditor({
                         {
                             method: "PATCH",
                             headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify(toPayload(current)),
+                            body: JSON.stringify(toPayload(current, trackInventory)),
                         },
                     )
                     if (!res.ok) {
@@ -306,7 +324,7 @@ export function SkuListEditor({
                         {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify(toPayload(current)),
+                            body: JSON.stringify(toPayload(current, trackInventory)),
                         },
                     )
                     if (!res.ok) {
@@ -354,7 +372,7 @@ export function SkuListEditor({
                 savingRef.current.delete(key)
             }
         },
-        [isEdit, editRows, productId, onRowSaved],
+        [isEdit, editRows, productId, onRowSaved, trackInventory],
     )
 
     // ─── Switch toggle in edit mode → immediate PATCH ─────────────────────────
@@ -441,6 +459,7 @@ export function SkuListEditor({
     // ─── Render ───────────────────────────────────────────────────────────────
     const showEmpty = !loading && rows.length === 0
 
+    const columnCount = trackInventory ? 7 : 6
     const table = (
         <div className="rounded-md border">
             <table className="w-full caption-bottom text-sm">
@@ -455,9 +474,11 @@ export function SkuListEditor({
                         <th className="text-foreground h-10 px-2 text-left align-middle font-medium w-[120px]">
                             成本 (¥)
                         </th>
-                        <th className="text-foreground h-10 px-2 text-left align-middle font-medium w-[100px]">
-                            库存
-                        </th>
+                        {trackInventory && (
+                            <th className="text-foreground h-10 px-2 text-left align-middle font-medium w-[100px]">
+                                库存
+                            </th>
+                        )}
                         <th className="text-foreground h-10 px-2 text-left align-middle font-medium w-[80px]">
                             排序
                         </th>
@@ -473,7 +494,7 @@ export function SkuListEditor({
                     {showEmpty ? (
                         <tr>
                             <td
-                                colSpan={7}
+                                colSpan={columnCount}
                                 className="h-20 text-center text-muted-foreground p-2"
                             >
                                 暂无 SKU，请点击下方按钮新建
@@ -483,7 +504,7 @@ export function SkuListEditor({
                     {loading ? (
                         <tr>
                             <td
-                                colSpan={7}
+                                colSpan={columnCount}
                                 className="h-20 text-center text-muted-foreground p-2"
                             >
                                 加载中…
@@ -574,30 +595,32 @@ export function SkuListEditor({
                                         </p>
                                     )}
                                 </td>
-                                <td className="p-2 align-top">
-                                    <Input
-                                        aria-label={`SKU 库存 ${idx + 1}`}
-                                        type="number"
-                                        min="0"
-                                        step="1"
-                                        value={row.stockQuantity}
-                                        onChange={(e) =>
-                                            updateRow(idx, {
-                                                stockQuantity: e.target.value,
-                                            })
-                                        }
-                                        onBlur={() => persistRow(idx)}
-                                        className={cn(
-                                            errors.stockQuantity &&
-                                                "border-destructive",
+                                {trackInventory && (
+                                    <td className="p-2 align-top">
+                                        <Input
+                                            aria-label={`SKU 库存 ${idx + 1}`}
+                                            type="number"
+                                            min="0"
+                                            step="1"
+                                            value={row.stockQuantity}
+                                            onChange={(e) =>
+                                                updateRow(idx, {
+                                                    stockQuantity: e.target.value,
+                                                })
+                                            }
+                                            onBlur={() => persistRow(idx)}
+                                            className={cn(
+                                                errors.stockQuantity &&
+                                                    "border-destructive",
+                                            )}
+                                        />
+                                        {errors.stockQuantity && (
+                                            <p className="text-xs text-destructive mt-1">
+                                                {errors.stockQuantity}
+                                            </p>
                                         )}
-                                    />
-                                    {errors.stockQuantity && (
-                                        <p className="text-xs text-destructive mt-1">
-                                            {errors.stockQuantity}
-                                        </p>
-                                    )}
-                                </td>
+                                    </td>
+                                )}
                                 <td className="p-2 align-top">
                                     <Input
                                         aria-label={`SKU 排序 ${idx + 1}`}

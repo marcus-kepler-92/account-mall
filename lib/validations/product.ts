@@ -48,6 +48,12 @@ export const createProductSchema = z.object({
     purchaseLimitQuantity: z.number().int().min(1).optional(),
     excludeFromAttribution: z.boolean().optional(),
     /**
+     * MANUAL-only: when true, ProductVariant.stockQuantity is enforced. Default
+     * false — most MANUAL listings (代购 / 定制 / 按需) don't track stock and
+     * shouldn't render sold-out. Ignored by non-MANUAL flows.
+     */
+    inventoryTracked: z.boolean().optional(),
+    /**
      * MANUAL-only: SKUs to atomically create together with the product.
      * Ignored for NORMAL/AUTO_FETCH; the route handler additionally rejects
      * non-empty arrays for those types to surface mistakes early.
@@ -100,6 +106,8 @@ export const updateProductSchema = z.object({
     purchaseLimitEnabled: z.boolean().optional(),
     purchaseLimitQuantity: z.number().int().min(1).optional(),
     excludeFromAttribution: z.boolean().optional(),
+    /** MANUAL-only inventory tracking toggle; see createProductSchema. */
+    inventoryTracked: z.boolean().optional(),
 });
 
 export const createTagSchema = z.object({
@@ -156,6 +164,13 @@ export const productFormSchema = z
         purchaseLimitEnabled: z.boolean().optional(),
         purchaseLimitQuantity: z.string().optional(),
         excludeFromAttribution: z.boolean().optional(),
+        /**
+         * MANUAL-only toggle: when true the buyer-side and back-end enforce
+         * variant.stockQuantity (decrement on payment, sold-out display, etc).
+         * When false (default), MANUAL products behave as unbounded — the
+         * stock column is also hidden from the SKU editor.
+         */
+        inventoryTracked: z.boolean().optional(),
         /**
          * MANUAL-only: SKU rows authored inline on the create form. Fields
          * stay as strings here for Input compatibility — the submit handler

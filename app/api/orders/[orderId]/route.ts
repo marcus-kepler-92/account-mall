@@ -111,7 +111,7 @@ export async function PATCH(
     const existing = await prisma.order.findUnique({
         where: { id: orderId },
         include: {
-            product: { select: { id: true, productType: true, name: true, price: true } },
+            product: { select: { id: true, productType: true, name: true, price: true, inventoryTracked: true } },
             cards: { select: { id: true, status: true } },
         },
     })
@@ -153,8 +153,12 @@ export async function PATCH(
                         data: { status: "UNSOLD", orderId: null },
                     })
                 }
+                // Restock only when the product has inventoryTracked=true.
+                // Untracked MANUAL products never decremented stock at payment,
+                // so there's nothing to restore on close.
                 if (
                     productType === "MANUAL" &&
+                    existing.product?.inventoryTracked === true &&
                     (currentStatus === "AWAITING_FULFILLMENT" || currentStatus === "PROCESSING") &&
                     existing.variantId
                 ) {
@@ -228,7 +232,7 @@ export async function DELETE(
             const existing = await tx.order.findUnique({
                 where: { id: orderId },
                 include: {
-                    product: { select: { productType: true } },
+                    product: { select: { productType: true, inventoryTracked: true } },
                     cards: {
                         select: {
                             id: true,
@@ -270,8 +274,11 @@ export async function DELETE(
 
             // MANUAL variant restock — mirror PATCH (CLOSED transition) logic so
             // admin soft-close from AWAITING_FULFILLMENT/PROCESSING doesn't leak stock.
+            // Only restock when the product is configured to track inventory —
+            // untracked MANUAL never decremented in the first place.
             if (
                 existing.product?.productType === "MANUAL" &&
+                existing.product?.inventoryTracked === true &&
                 (existing.status === "AWAITING_FULFILLMENT" || existing.status === "PROCESSING") &&
                 existing.variantId
             ) {

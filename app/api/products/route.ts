@@ -82,6 +82,7 @@ export async function GET(request: NextRequest) {
                 image: true,
                 price: true,
                 productType: true,
+                inventoryTracked: true,
                 status: true,
                 sortOrder: true,
                 sourceUrl: true,
@@ -111,13 +112,16 @@ export async function GET(request: NextRequest) {
     // ProductVariant.stockQuantity. Aggregate active variants' stock per
     // product so the storefront cards display the correct "in stock" state
     // (otherwise MANUAL products would render permanently sold-out).
-    const manualProductIds = products
-        .filter((p) => p.productType === "MANUAL")
+    // We only aggregate for MANUAL products with inventoryTracked=true;
+    // untracked MANUAL is unbounded and reported as in-stock unconditionally
+    // (sold-out display is driven exclusively by variant.isActive elsewhere).
+    const trackedManualProductIds = products
+        .filter((p) => p.productType === "MANUAL" && p.inventoryTracked === true)
         .map((p) => p.id);
-    const variantStockCounts = manualProductIds.length > 0
+    const variantStockCounts = trackedManualProductIds.length > 0
         ? await prisma.productVariant.groupBy({
               by: ["productId"],
-              where: { productId: { in: manualProductIds }, isActive: true },
+              where: { productId: { in: trackedManualProductIds }, isActive: true },
               _sum: { stockQuantity: true },
           })
         : [];
@@ -142,11 +146,15 @@ export async function GET(request: NextRequest) {
         const isManual = product.productType === "MANUAL";
         const discountPercent = discountMap.get(product.id) ?? null;
         // AUTO_FETCH 在列表里按「有货」展示，不依赖库存数；
-        // MANUAL 使用 ProductVariant 库存聚合（无 cards 行）。
+        // MANUAL + inventoryTracked: 使用 ProductVariant 库存聚合；
+        // MANUAL + 不跟踪库存: 报告 stock=1 让前台永远显示有货（售罄状态仅由
+        // variant.isActive 决定）。
         const stock = isAutoFetch
             ? 1
             : isManual
-              ? (variantStockMap.get(product.id) ?? 0)
+              ? product.inventoryTracked === true
+                  ? (variantStockMap.get(product.id) ?? 0)
+                  : 1
               : (stockMap.get(product.id) ?? 0);
         return {
             ...productRest,

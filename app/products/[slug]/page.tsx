@@ -154,9 +154,17 @@ export default async function ProductDetailPage({
       }))
     : [];
 
-  const manualStock = isManual
+  // MANUAL + inventoryTracked=false: stock is unbounded — never sold-out
+  // (sold-out display only fires when the product is INACTIVE or has no
+  // active variants, both handled separately). We surface a sentinel `1` so
+  // downstream sold-out comparisons stay false but no "库存 N 件" label is
+  // rendered (driven by `manualInventoryTracked` below).
+  const manualInventoryTracked = isManual && product.inventoryTracked === true;
+  const manualStock = manualInventoryTracked
     ? variants.reduce((sum, v) => sum + Math.max(v.stockQuantity, 0), 0)
-    : 0;
+    : isManual
+      ? 1
+      : 0;
   const stockCount = isManual ? manualStock : await getCachedStockCount(product.id);
 
   // Centralized MANUAL display payload: isUnavailable, priceMin/Max, priceLabel.
@@ -405,6 +413,7 @@ export default async function ProductDetailPage({
               isFree={isFree}
               isAutoFetch={isAutoFetch}
               isManual={isManual}
+              manualInventoryTracked={manualInventoryTracked}
               isLowStock={isLowStock}
               discountPercent={crossSellDiscountPercent}
               manualPriceLabel={manualDisplay.priceLabel}
@@ -439,6 +448,7 @@ export default async function ProductDetailPage({
                 crossSellDiscountPercent={crossSellDiscountPercent}
                 variants={isManual ? variants : undefined}
                 businessHoursHint={businessHoursHint}
+                inventoryTracked={manualInventoryTracked}
               />
             </section>
 
@@ -517,6 +527,10 @@ type ProductInfoSectionProps = {
   isFree?: boolean;
   isAutoFetch?: boolean;
   isManual?: boolean;
+  // MANUAL + inventoryTracked=true. When false (untracked MANUAL), the info
+  // block omits the "库存 N 件" / "暂无库存" indicators since the stock count
+  // is meaningless.
+  manualInventoryTracked?: boolean;
   isLowStock?: boolean;
   // Cross-sell discount applied to this product for the current cs session.
   // When set, the price block renders strike-through original + red discounted
@@ -537,6 +551,7 @@ function ProductInfoSection({
   isFree,
   isAutoFetch,
   isManual,
+  manualInventoryTracked,
   isLowStock,
   discountPercent,
   manualPriceLabel,
@@ -600,19 +615,21 @@ function ProductInfoSection({
                     —
                   </span>
                 )}
-                {isSoldOut ? (
-                  <Badge variant="outline" className="text-xs font-normal">
-                    暂无库存，可联系客服
-                  </Badge>
-                ) : isLowStock ? (
-                  <span className="inline-flex items-center gap-1 text-xs font-medium text-orange-500 dark:text-orange-400 animate-pulse">
-                    仅剩 {stockCount} 件，手慢无！
-                  </span>
-                ) : (
-                  <span className="text-xs text-muted-foreground">
-                    库存 {stockCount} 件
-                  </span>
-                )}
+                {manualInventoryTracked ? (
+                  isSoldOut ? (
+                    <Badge variant="outline" className="text-xs font-normal">
+                      暂无库存，可联系客服
+                    </Badge>
+                  ) : isLowStock ? (
+                    <span className="inline-flex items-center gap-1 text-xs font-medium text-orange-500 dark:text-orange-400 animate-pulse">
+                      仅剩 {stockCount} 件，手慢无！
+                    </span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">
+                      库存 {stockCount} 件
+                    </span>
+                  )
+                ) : null}
               </>
             ) : (
               <>

@@ -45,7 +45,7 @@ describe("SkuListEditor (create mode)", () => {
     it("renders an empty body with no rows", () => {
         const onChange = jest.fn()
         render(
-            <SkuListEditor mode="create" value={[]} onChange={onChange} />,
+            <SkuListEditor mode="create" value={[]} onChange={onChange} trackInventory={true} />,
         )
         expect(screen.getByText(/暂无 SKU/)).toBeInTheDocument()
         expect(screen.getByRole("button", { name: /新增 SKU/ })).toBeInTheDocument()
@@ -54,7 +54,7 @@ describe("SkuListEditor (create mode)", () => {
     it("appends a row when the 新增 SKU button is clicked", () => {
         const onChange = jest.fn()
         render(
-            <SkuListEditor mode="create" value={[]} onChange={onChange} />,
+            <SkuListEditor mode="create" value={[]} onChange={onChange} trackInventory={true} />,
         )
         fireEvent.click(screen.getByRole("button", { name: /新增 SKU/ }))
         expect(onChange).toHaveBeenCalledTimes(1)
@@ -69,7 +69,7 @@ describe("SkuListEditor (create mode)", () => {
         const fetchSpy = jest.fn()
         global.fetch = fetchSpy as unknown as typeof fetch
         render(
-            <SkuListEditor mode="create" value={[]} onChange={jest.fn()} />,
+            <SkuListEditor mode="create" value={[]} onChange={jest.fn()} trackInventory={true} />,
         )
         expect(fetchSpy).not.toHaveBeenCalled()
     })
@@ -88,7 +88,7 @@ describe("SkuListEditor (create mode)", () => {
             },
         ]
         render(
-            <SkuListEditor mode="create" value={initial} onChange={onChange} />,
+            <SkuListEditor mode="create" value={initial} onChange={onChange} trackInventory={true} />,
         )
         fireEvent.change(screen.getByLabelText("SKU 名称 1"), {
             target: { value: "1 个月" },
@@ -112,7 +112,7 @@ describe("SkuListEditor (create mode)", () => {
             },
         ]
         render(
-            <SkuListEditor mode="create" value={initial} onChange={onChange} />,
+            <SkuListEditor mode="create" value={initial} onChange={onChange} trackInventory={true} />,
         )
         fireEvent.click(screen.getByLabelText("删除 SKU 1"))
         fireEvent.click(await screen.findByRole("button", { name: /^删除$/ }))
@@ -145,7 +145,7 @@ describe("SkuListEditor (edit mode)", () => {
             return {}
         })
 
-        render(<SkuListEditor mode="edit" productId="p1" value={[]} />)
+        render(<SkuListEditor mode="edit" productId="p1" value={[]} trackInventory={true} />)
         const nameInput = await screen.findByLabelText("SKU 名称 1")
         expect(nameInput).toHaveValue("1 个月")
         expect(screen.getByLabelText("SKU 库存 1")).toHaveValue(5)
@@ -182,7 +182,7 @@ describe("SkuListEditor (edit mode)", () => {
             }
         })
 
-        render(<SkuListEditor mode="edit" productId="p1" value={[]} />)
+        render(<SkuListEditor mode="edit" productId="p1" value={[]} trackInventory={true} />)
         const nameInput = await screen.findByLabelText("SKU 名称 1")
         fireEvent.change(nameInput, { target: { value: "3 个月" } })
         fireEvent.blur(nameInput)
@@ -217,7 +217,7 @@ describe("SkuListEditor (edit mode)", () => {
             return {}
         })
 
-        render(<SkuListEditor mode="edit" productId="p1" value={[]} />)
+        render(<SkuListEditor mode="edit" productId="p1" value={[]} trackInventory={true} />)
         // Wait for initial load to complete.
         await screen.findByText(/暂无 SKU/)
         await act(async () => {
@@ -261,7 +261,7 @@ describe("SkuListEditor (edit mode)", () => {
             return {}
         })
 
-        render(<SkuListEditor mode="edit" productId="p1" value={[]} />)
+        render(<SkuListEditor mode="edit" productId="p1" value={[]} trackInventory={true} />)
         await screen.findByLabelText("SKU 名称 1")
         fireEvent.click(screen.getByLabelText("删除 SKU 1"))
         fireEvent.click(await screen.findByRole("button", { name: /^删除$/ }))

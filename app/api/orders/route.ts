@@ -42,6 +42,7 @@ type ProductForAutoFetch = {
     sourceUrl: string | null
     productType: string | null
     validityHours: number | null
+    inventoryTracked?: boolean
 }
 
 /**
@@ -584,7 +585,11 @@ export async function POST(request: NextRequest) {
         if (!variant.isActive) {
             return validationError({ variantId: ["该规格已停售"] })
         }
-        if (variant.stockQuantity < 1) {
+        // Stock-quantity check is gated by the product-level inventoryTracked
+        // flag. Untracked MANUAL products are intentionally unbounded (代购 /
+        // 定制 / 按需类商品 — 卖家手动控制是否接单)；sold-out display is
+        // driven exclusively by variant.isActive.
+        if (productWithType.inventoryTracked && variant.stockQuantity < 1) {
             return validationError({ variantId: ["该规格已售罄"] })
         }
         manualVariant = variant

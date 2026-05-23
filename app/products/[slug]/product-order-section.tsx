@@ -25,6 +25,12 @@ type ProductOrderSectionProps = {
     variants?: ProductVariantOption[]
     /** Buyer-facing business-hours hint (e.g. "工作时间：9:00–22:00（每天）"). */
     businessHoursHint?: string
+    /**
+     * MANUAL only: when true the buyer-side selector honors stockQuantity
+     * (sold-out dimming) and the back-end enforces the stock check at
+     * submit time. Default false — untracked MANUAL products are unbounded.
+     */
+    inventoryTracked?: boolean
 }
 
 /**
@@ -47,14 +53,18 @@ export function ProductOrderSection({
     crossSellDiscountPercent = null,
     variants,
     businessHoursHint,
+    inventoryTracked = false,
 }: ProductOrderSectionProps) {
     const [exitDiscountToken, setExitDiscountToken] = useState<string | null>(null)
     const [exitDiscountPercent, setExitDiscountPercent] = useState<number | null>(null)
-    // MANUAL: preselect the first in-stock active variant for a less-friction
-    // first paint. Buyer can switch via the selector.
+    // MANUAL: preselect the first active variant for a less-friction first
+    // paint. When stock is tracked, also require stockQuantity > 0; otherwise
+    // (untracked) any active variant works since stock is meaningless.
     const [selectedVariantId, setSelectedVariantId] = useState<string | null>(() => {
         if (productType !== "MANUAL" || !variants) return null
-        const firstAvailable = variants.find((v) => v.isActive && v.stockQuantity > 0)
+        const firstAvailable = inventoryTracked
+            ? variants.find((v) => v.isActive && v.stockQuantity > 0)
+            : variants.find((v) => v.isActive)
         return firstAvailable?.id ?? null
     })
 
@@ -102,6 +112,7 @@ export function ProductOrderSection({
                 variants={variants}
                 selectedVariantId={selectedVariantId}
                 onVariantChange={setSelectedVariantId}
+                inventoryTracked={inventoryTracked}
             />
             {/* MANUAL 商品在下单卡片底部展示工作时间提示，告知人工发货的处理时段。 */}
             {isManual && businessHoursHint && (

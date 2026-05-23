@@ -87,14 +87,41 @@ export function ProductFormPricingFields({
                 />
 
                 {isManual && (
-                    <div className="flex items-start gap-2 rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
-                        <Info className="size-4 shrink-0 mt-0.5" />
-                        <p>
-                            手动发货商品的价格、成本与库存由下方
-                            <span className="font-medium"> SKU 管理 </span>
-                            配置，此处无需填写。
-                        </p>
-                    </div>
+                    <>
+                        <div className="flex items-start gap-2 rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
+                            <Info className="size-4 shrink-0 mt-0.5" />
+                            <p>
+                                手动发货商品的价格、成本与库存由下方
+                                <span className="font-medium"> SKU 管理 </span>
+                                配置，此处无需填写。
+                            </p>
+                        </div>
+                        <FormField
+                            control={control}
+                            name="inventoryTracked"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div className="space-y-1">
+                                            <FormLabel>跟踪库存</FormLabel>
+                                            <FormDescription>
+                                                {field.value
+                                                    ? "买家下单时校验库存数量；售罄后买家不可下单"
+                                                    : "买家随时可下单；售罄状态仅由 SKU 启用开关控制"}
+                                            </FormDescription>
+                                        </div>
+                                        <FormControl>
+                                            <Switch
+                                                checked={field.value ?? false}
+                                                onCheckedChange={field.onChange}
+                                            />
+                                        </FormControl>
+                                    </div>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </>
                 )}
 
                 {!isManual && (

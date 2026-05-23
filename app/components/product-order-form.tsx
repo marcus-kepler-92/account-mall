@@ -93,6 +93,12 @@ type ProductOrderFormProps = {
     selectedVariantId?: string | null
     /** MANUAL only: notified when user picks a variant. */
     onVariantChange?: (id: string) => void
+    /**
+     * MANUAL only: whether the product tracks per-variant stock. When false
+     * (default), the selector ignores stockQuantity (no sold-out dimming) and
+     * orders skip the stock-check at submit time.
+     */
+    inventoryTracked?: boolean
 }
 
 export function ProductOrderForm({
@@ -114,6 +120,7 @@ export function ProductOrderForm({
     variants,
     selectedVariantId = null,
     onVariantChange,
+    inventoryTracked = false,
 }: ProductOrderFormProps) {
     const [showOrderPassword, setShowOrderPassword] = useState(false)
     const [discountCode, setDiscountCode] = useState("")
@@ -341,6 +348,7 @@ export function ProductOrderForm({
                                 value={selectedVariantId}
                                 onChange={(id) => onVariantChange?.(id)}
                                 disabled={!inStock}
+                                trackInventory={inventoryTracked}
                             />
                             {manualVariantMissing && (
                                 <p className="text-xs text-muted-foreground">请选择一个规格后继续下单</p>
