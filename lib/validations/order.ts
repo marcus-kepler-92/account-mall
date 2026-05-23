@@ -38,6 +38,10 @@ export const createOrderSchema = z.object({
     exitDiscountToken: z.string().optional(),
     cs: z.string().optional(),
     fingerprintHash: z.string().max(128).optional(),
+    /// MANUAL products only: the selected ProductVariant id.
+    /// Required when product.productType === "MANUAL"; validated against
+    /// variant.productId / isActive / stockQuantity in the handler.
+    variantId: z.cuid().optional(),
 })
 
 /**
