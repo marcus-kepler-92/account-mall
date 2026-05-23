@@ -18,8 +18,10 @@ jest.mock("@/lib/email", () => ({
   sendMail: jest.fn().mockResolvedValue({ success: true }),
 }))
 
+// Capture props passed into the OrderCompletion template via the render() call.
+const renderMock = jest.fn().mockResolvedValue("<html><body>order stub</body></html>")
 jest.mock("@react-email/render", () => ({
-  render: jest.fn().mockResolvedValue("<html><body>order stub</body></html>"),
+  render: (...args: unknown[]) => renderMock(...args),
 }))
 
 import { sendMail } from "@/lib/email"
@@ -27,9 +29,16 @@ import { sendOrderCompletionEmail } from "@/lib/order-completion-email"
 
 type DeepMockPrisma = typeof prismaMock & PrismaClient
 
+function getLastRenderProps(): Record<string, unknown> {
+  const lastCall = renderMock.mock.calls[renderMock.mock.calls.length - 1]
+  const element = lastCall?.[0] as { props: Record<string, unknown> } | undefined
+  return element?.props ?? {}
+}
+
 describe("sendOrderCompletionEmail", () => {
   beforeEach(() => {
     ;(sendMail as jest.Mock).mockClear()
+    renderMock.mockClear()
   })
 
   it("does not send when orderCompletionEmailEnabled is false", async () => {
@@ -42,8 +51,9 @@ describe("sendOrderCompletionEmail", () => {
       email: "buyer@example.com",
       status: "COMPLETED",
       quantity: 1,
-      product: { name: "Test Product" },
+      product: { name: "Test Product", productType: "NORMAL" },
       cards: [{ content: "card1" }],
+      fulfillment: null,
     } as any)
 
     await sendOrderCompletionEmail("order_1")
@@ -67,8 +77,9 @@ describe("sendOrderCompletionEmail", () => {
       email: "buyer@example.com",
       status: "PENDING",
       quantity: 1,
-      product: { name: "Test Product" },
+      product: { name: "Test Product", productType: "NORMAL" },
       cards: [],
+      fulfillment: null,
     } as any)
 
     await sendOrderCompletionEmail("order_1")
@@ -85,8 +96,9 @@ describe("sendOrderCompletionEmail", () => {
       email: "buyer@example.com",
       status: "COMPLETED",
       quantity: 1,
-      product: { name: "Test Product" },
+      product: { name: "Test Product", productType: "NORMAL" },
       cards: [{ content: "card1" }],
+      fulfillment: null,
     } as any)
 
     await sendOrderCompletionEmail("order_1")
@@ -99,29 +111,68 @@ describe("sendOrderCompletionEmail", () => {
     consoleSpy.mockRestore()
   })
 
-  it("sends email with order and card info when order is COMPLETED", async () => {
+  it("assembles accountContent from cards for NORMAL order", async () => {
     ;(prismaMock as DeepMockPrisma).order.findUnique.mockResolvedValue({
-      id: "order_1",
+      id: "ord1",
       orderNo: "ORD001",
       email: "buyer@example.com",
       status: "COMPLETED",
       quantity: 2,
-      product: { name: "Test Product" },
+      product: { name: "Test Product", productType: "NORMAL" },
       cards: [
-        { content: "account1:password1" },
-        { content: "account2:password2" },
+        { content: "card1-content" },
+        { content: "card2-content" },
       ],
+      fulfillment: null,
     } as any)
 
-    await sendOrderCompletionEmail("order_1")
+    await sendOrderCompletionEmail("ord1")
 
     expect(sendMail).toHaveBeenCalledTimes(1)
-    expect(sendMail).toHaveBeenCalledWith(
-      expect.objectContaining({
-        to: "buyer@example.com",
-        subject: "[Account Mall] 订单已完成：您的账号信息",
-        html: "<html><body>order stub</body></html>",
-      }),
+    const props = getLastRenderProps()
+    expect(props.accountContent).toBe("card1-content\n\ncard2-content")
+    expect(props.cards).toBeUndefined()
+  })
+
+  it("assembles accountContent from fulfillment for MANUAL order", async () => {
+    ;(prismaMock as DeepMockPrisma).order.findUnique.mockResolvedValue({
+      id: "ord2",
+      orderNo: "ORD002",
+      email: "buyer@example.com",
+      status: "COMPLETED",
+      quantity: 1,
+      product: { name: "Manual Product", productType: "MANUAL" },
+      cards: [],
+      fulfillment: { content: "manual-content" },
+    } as any)
+
+    await sendOrderCompletionEmail("ord2")
+
+    expect(sendMail).toHaveBeenCalledTimes(1)
+    const props = getLastRenderProps()
+    expect(props.accountContent).toBe("manual-content")
+  })
+
+  it("warns and skips send when accountContent is empty", async () => {
+    const consoleWarnSpy = jest.spyOn(console, "warn").mockImplementation(() => {})
+    ;(prismaMock as DeepMockPrisma).order.findUnique.mockResolvedValue({
+      id: "ord3",
+      orderNo: "ORD003",
+      email: "buyer@example.com",
+      status: "COMPLETED",
+      quantity: 1,
+      product: { name: "Manual Product", productType: "MANUAL" },
+      cards: [],
+      fulfillment: null,
+    } as any)
+
+    await sendOrderCompletionEmail("ord3")
+
+    expect(sendMail).not.toHaveBeenCalled()
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      "[order-completion-email] empty accountContent for order",
+      "ord3",
     )
+    consoleWarnSpy.mockRestore()
   })
 })

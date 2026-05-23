@@ -13,11 +13,12 @@ export async function sendOrderCompletionEmail(orderId: string): Promise<void> {
     const order = await prisma.order.findUnique({
         where: { id: orderId },
         include: {
-            product: { select: { name: true } },
+            product: { select: { name: true, productType: true } },
             cards: {
                 where: { status: "SOLD" },
                 select: { content: true },
             },
+            fulfillment: { select: { content: true } },
         },
     });
 
@@ -29,6 +30,15 @@ export async function sendOrderCompletionEmail(orderId: string): Promise<void> {
         return;
     }
 
+    const accountContent = order.product.productType === "MANUAL"
+        ? order.fulfillment?.content ?? ""
+        : order.cards.map((c) => c.content).join("\n\n");
+
+    if (!accountContent) {
+        console.warn("[order-completion-email] empty accountContent for order", orderId);
+        return;
+    }
+
     const lookupUrl = `${config.siteUrl}/orders/lookup?mode=orderNo&orderNo=${encodeURIComponent(order.orderNo)}`;
 
     const html = await render(
@@ -36,7 +46,7 @@ export async function sendOrderCompletionEmail(orderId: string): Promise<void> {
             orderNo: order.orderNo,
             productName: order.productNameSnapshot ?? order.product.name,
             quantity: order.quantity,
-            cards: order.cards.map((c) => ({ content: c.content })),
+            accountContent,
             lookupUrl,
             brandName: config.siteName,
         }),
