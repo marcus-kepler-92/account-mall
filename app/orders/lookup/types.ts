@@ -17,6 +17,10 @@ export interface OrderResult {
     createdAt: string
     status: OrderResultStatus
     cards: CardItem[]
+    /** Order primary id — MANUAL intermediate states only (powers the dun button URL). */
+    id?: string
+    /** Buyer email — MANUAL intermediate states only (powers the dun-button auth body). */
+    email?: string
     /** Product type — present on COMPLETED/CLOSED and MANUAL intermediate states. */
     productType?: OrderProductType
     /** MANUAL fulfillment content (admin-delivered text). null for NORMAL/AUTO_FETCH. */
@@ -27,6 +31,14 @@ export interface OrderResult {
     dunCount?: number
     /** MANUAL last "催发货" timestamp (ISO). */
     lastDunAt?: string | null
+    /** MANUAL server-rendered ETA hint, e.g. "卖家通常在 15 分钟内发货". */
+    etaText?: string
+    /** MANUAL: SiteSettings.dunMinAgeMinutes in seconds. */
+    dunMinAgeSeconds?: number
+    /** MANUAL: seconds elapsed since order was created (used to seed the dun-button countdown). */
+    orderAgeSeconds?: number
+    /** MANUAL: initial dun-button cooldown remaining in seconds. */
+    initialCooldownSeconds?: number
     isPending?: boolean
     canPay?: boolean
     /** PENDING 订单的支付截止时间 */

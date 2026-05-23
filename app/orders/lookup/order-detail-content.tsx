@@ -10,6 +10,8 @@ import { resolveCardFields } from "@/lib/card-format"
 import { OrderCardDisplay, type CardDisplayItem } from "@/app/components/order-detail/card-display"
 import { OrderAutoFetchTroubleshoot } from "@/app/components/order-detail/auto-fetch-troubleshoot"
 import { useCountdown, formatCountdown } from "@/app/components/order-detail/use-countdown"
+import { ManualStatusTimeline } from "@/app/orders/[orderNo]/manual-status-timeline"
+import { ManualDunButton } from "@/app/orders/[orderNo]/manual-dun-button"
 import type { OrderResult } from "./types"
 
 async function fetchApi(endpoint: string, body: Record<string, string>) {
@@ -172,17 +174,38 @@ export function OrderDetailContent({ result: initialResult, getPassword }: Props
                 </div>
             )}
 
-            {/* MANUAL: 等待发货 / 卖家处理中 — Task 20 will swap this placeholder for a full timeline + dun button. */}
+            {/* MANUAL: 等待发货 / 卖家处理中 — 5-state timeline + ETA + dun button (Task 20) */}
             {!result.isPending && isManual && isProcessing && (
-                <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200">
-                    <p className="font-medium mb-1">
-                        {result.status === "AWAITING_FULFILLMENT" ? "订单待发货" : "卖家处理中"}
-                    </p>
-                    <p className="text-xs">
-                        {result.status === "AWAITING_FULFILLMENT"
-                            ? "已收款，等待卖家发货，请耐心等待。"
-                            : "卖家正在为您处理订单，发货后将自动显示账号内容。"}
-                    </p>
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200 space-y-3">
+                    <div className="space-y-1">
+                        <p className="font-medium">
+                            {result.status === "AWAITING_FULFILLMENT" ? "订单待发货" : "卖家处理中"}
+                        </p>
+                        <p className="text-xs">
+                            {result.status === "AWAITING_FULFILLMENT"
+                                ? "已收款，等待卖家发货。"
+                                : "卖家正在为您处理订单，发货后将自动显示账号内容。"}
+                        </p>
+                    </div>
+                    <ManualStatusTimeline current={result.status} etaText={result.etaText} />
+                    {result.id && result.email && (
+                        <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:items-center sm:justify-between">
+                            <span className="text-xs text-muted-foreground">
+                                {result.dunCount && result.dunCount > 0
+                                    ? `已催 ${result.dunCount} 次`
+                                    : "若超出预计时间未发货，可点击催发货"}
+                            </span>
+                            <ManualDunButton
+                                orderId={result.id}
+                                orderNo={result.orderNo}
+                                email={result.email}
+                                password={getPassword()}
+                                initialCooldownSeconds={result.initialCooldownSeconds ?? 0}
+                                minAgeSeconds={result.dunMinAgeSeconds ?? 0}
+                                orderAgeSeconds={result.orderAgeSeconds ?? 0}
+                            />
+                        </div>
+                    )}
                 </div>
             )}
 

@@ -6,17 +6,26 @@ import Link from "next/link"
 import { AlertCircle, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ManualStatusTimeline } from "@/app/orders/[orderNo]/manual-status-timeline"
 
 // Delays (ms) between consecutive polls: 9 gaps → 10 total polls over ~64 seconds
 const POLL_SCHEDULE = [3000, 3000, 5000, 5000, 8000, 8000, 10000, 10000, 12000]
 
-type Phase = "processing" | "failed" | "timeout"
+type Phase = "processing" | "failed" | "timeout" | "awaiting_fulfillment"
 
-export function AwaitingPaymentClient({ orderNo }: { orderNo: string }) {
+type ManualStatus = "AWAITING_FULFILLMENT" | "PROCESSING"
+
+type Props = {
+    orderNo: string
+    etaText?: string
+}
+
+export function AwaitingPaymentClient({ orderNo, etaText }: Props) {
     const router = useRouter()
     const searchParams = useSearchParams()
     const token = searchParams.get("token") ?? ""
     const [phase, setPhase] = useState<Phase>("processing")
+    const [manualStatus, setManualStatus] = useState<ManualStatus | null>(null)
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const attemptRef = useRef(0)
 
@@ -64,6 +73,14 @@ export function AwaitingPaymentClient({ orderNo }: { orderNo: string }) {
                 return
             }
 
+            // MANUAL paid path: payment confirmed, but admin must still fulfill.
+            // We stop polling and hand off to the timeline + lookup CTA below.
+            if (status === "AWAITING_FULFILLMENT" || status === "PROCESSING") {
+                setManualStatus(status)
+                setPhase("awaiting_fulfillment")
+                return
+            }
+
             // PENDING or transient error: schedule next attempt
             if (attempt >= POLL_SCHEDULE.length) {
                 setPhase("timeout")
@@ -90,6 +107,32 @@ export function AwaitingPaymentClient({ orderNo }: { orderNo: string }) {
                         <p className="mt-1 text-sm text-muted-foreground">
                             请稍候，系统正在处理中，通常不超过 1 分钟
                         </p>
+                    </div>
+                </CardContent>
+            </Card>
+        )
+    }
+
+    if (phase === "awaiting_fulfillment" && manualStatus) {
+        return (
+            <Card>
+                <CardHeader>
+                    <CardTitle>支付已完成，等待发货</CardTitle>
+                    <CardDescription>
+                        卖家收到通知后会尽快为您发货，发货后可通过订单号 + 查询密码查看账号内容。
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <ManualStatusTimeline current={manualStatus} etaText={etaText} />
+                    <div className="flex flex-col gap-2">
+                        <Button asChild>
+                            <Link href={`/orders/lookup?orderNo=${encodeURIComponent(orderNo)}`}>
+                                查询订单 / 催发货
+                            </Link>
+                        </Button>
+                        <Button asChild variant="outline">
+                            <Link href="/">返回首页</Link>
+                        </Button>
                     </div>
                 </CardContent>
             </Card>

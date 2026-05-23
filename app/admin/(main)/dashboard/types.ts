@@ -2,6 +2,8 @@ import type { OrderStatus } from "@prisma/client"
 
 export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
   PENDING: "待支付",
+  AWAITING_FULFILLMENT: "待发货",
+  PROCESSING: "处理中",
   COMPLETED: "已完成",
   CLOSED: "已关闭",
 }

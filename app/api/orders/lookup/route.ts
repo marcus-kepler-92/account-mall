@@ -17,6 +17,8 @@ import {
 } from "@/lib/api-response";
 import { config } from "@/lib/config";
 import { parseAutoFetchCardContent } from "@/lib/auto-fetch-card";
+import { getSiteSettings } from "@/lib/site-settings";
+import { isWithinBusinessHours, formatEtaText } from "@/lib/business-hours";
 
 type LookupBody = z.infer<typeof publicOrderLookupSchema>;
 type OrderStatus = z.infer<typeof orderStatusSchema>;
@@ -46,14 +48,28 @@ interface LookupResponsePending extends LookupResponseBase {
 /**
  * MANUAL 中间态（AWAITING_FULFILLMENT / PROCESSING）：未发货时仅有产品/订单元信息，
  * 不包含 cards 与 fulfillment.content。前端据此渲染等待时间线 + 催发货控件。
+ *
+ * `id` and `email` are exposed (in addition to the password the buyer enters in
+ * the form) so the buyer-facing 催发货 button can call POST /api/orders/[id]/dun
+ * with the full lookup-credential triple. `etaText` is precomputed server-side
+ * with the runtime business-hours window — client must NOT import business-hours.
  */
 interface LookupResponseProcessing extends LookupResponseBase {
+    id: string;
+    email: string;
     productType: "MANUAL";
     cards: [];
     fulfillment: null;
     variantName: string | null;
     dunCount: number;
     lastDunAt: string | null;
+    etaText: string;
+    /** SiteSettings.dunMinAgeMinutes in seconds — used by the dun button countdown. */
+    dunMinAgeSeconds: number;
+    /** Seconds since order was created — used by the dun button initial countdown. */
+    orderAgeSeconds: number;
+    /** Remaining cooldown seconds based on lastDunAt + dunCooldownMinutes. */
+    initialCooldownSeconds: number;
 }
 
 /** 卡密：普通为 content；AUTO_FETCH 为 content(JSON) + account/password/region/lastCheckedAt */
@@ -184,7 +200,29 @@ export async function POST(request: NextRequest) {
             order.status === "AWAITING_FULFILLMENT" ||
             order.status === "PROCESSING"
         ) {
+            const settings = await getSiteSettings();
+            const cfg = {
+                start: settings.businessHoursStart,
+                end: settings.businessHoursEnd,
+                weekdays: settings.businessHoursWeekdays,
+                timezone: settings.businessHoursTimezone,
+            };
+            const now = new Date();
+            const etaText = isWithinBusinessHours(now, cfg)
+                ? "卖家通常在 15 分钟内发货"
+                : formatEtaText(now, cfg);
+            const orderAgeSeconds = Math.floor((now.getTime() - order.createdAt.getTime()) / 1000);
+            const dunMinAgeSeconds = settings.dunMinAgeMinutes * 60;
+            const cooldownMs = settings.dunCooldownMinutes * 60_000;
+            const initialCooldownSeconds = order.lastDunAt
+                ? Math.max(
+                      0,
+                      Math.ceil((order.lastDunAt.getTime() + cooldownMs - now.getTime()) / 1000),
+                  )
+                : 0;
             const payload: LookupResponseProcessing = {
+                id: order.id,
+                email: order.email,
                 orderNo: order.orderNo,
                 productName: order.productNameSnapshot ?? order.product.name,
                 createdAt: order.createdAt,
@@ -196,6 +234,10 @@ export async function POST(request: NextRequest) {
                 variantName: order.variantNameSnapshot,
                 dunCount: order.dunCount,
                 lastDunAt: order.lastDunAt?.toISOString() ?? null,
+                etaText,
+                dunMinAgeSeconds,
+                orderAgeSeconds,
+                initialCooldownSeconds,
             };
             return NextResponse.json(payload);
         }
