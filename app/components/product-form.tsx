@@ -104,6 +104,7 @@ type ProductData = {
     purchaseLimitQuantity?: number
     excludeFromAttribution?: boolean
     inventoryTracked?: boolean
+    emailOnFulfill?: boolean
     tags: Tag[]
     cardTemplates: { id: string; name: string; template: string }[]
 }
@@ -158,6 +159,7 @@ export function ProductForm({
             purchaseLimitQuantity: product?.purchaseLimitQuantity != null ? String(product.purchaseLimitQuantity) : "1",
             excludeFromAttribution: product?.excludeFromAttribution ?? false,
             inventoryTracked: product?.inventoryTracked ?? false,
+            emailOnFulfill: product?.emailOnFulfill ?? false,
             // MANUAL-only: SKUs are edited inline on the create form and
             // submitted atomically with POST /api/products. The edit page uses
             // a separate SkuListEditor instance in "edit" mode that talks to
@@ -244,6 +246,9 @@ export function ProductForm({
             // ship it unconditionally so the column stays consistent across
             // type swaps.
             inventoryTracked: data.inventoryTracked ?? false,
+            // Per-product order-completion email toggle. Default off — the
+            // global env still gates whether any email is sent at all.
+            emailOnFulfill: data.emailOnFulfill ?? false,
             // Atomic create: ship the MANUAL SKUs alongside the product so the
             // server can wrap both writes in one transaction. Editing variants
             // (edit page) uses dedicated variant endpoints — this field is

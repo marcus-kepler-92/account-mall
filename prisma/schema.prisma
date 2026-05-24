@@ -170,6 +170,10 @@ model Product {
   /// MANUAL stock is unbounded — the field exists but is never read by business
   /// logic. Has no effect on NORMAL/AUTO_FETCH (their stock model is separate).
   inventoryTracked       Boolean               @default(false)
+  /// When true AND the global ORDER_COMPLETION_EMAIL_ENABLED is true, the
+  /// buyer receives an order-completion email at fulfillment time. Default
+  /// false: orders complete silently and buyers查 through the lookup page.
+  emailOnFulfill         Boolean               @default(false)
   createdAt              DateTime              @default(now())
   sortOrder              Int                   @default(0)
   updatedAt              DateTime              @updatedAt

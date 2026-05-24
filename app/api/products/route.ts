@@ -235,7 +235,7 @@ export async function POST(request: NextRequest) {
         return validationError(parsed.error.flatten());
     }
 
-    const { name, slug, description, summary, image, price, maxQuantity, status, tagIds, productType, sourceUrl, validityHours, allowAccountSwitch, accountSwitchLimit, couponEnabled, riskWarningEnabled, riskWarningTitle, riskWarningContent, riskWarningCountdown, riskWarningConfirmText, purchaseLimitEnabled, purchaseLimitQuantity, excludeFromAttribution, variants } =
+    const { name, slug, description, summary, image, price, maxQuantity, status, tagIds, productType, sourceUrl, validityHours, allowAccountSwitch, accountSwitchLimit, couponEnabled, riskWarningEnabled, riskWarningTitle, riskWarningContent, riskWarningCountdown, riskWarningConfirmText, purchaseLimitEnabled, purchaseLimitQuantity, excludeFromAttribution, emailOnFulfill, variants } =
         parsed.data;
 
     // MANUAL ↔ variants contract:
@@ -314,6 +314,7 @@ export async function POST(request: NextRequest) {
         purchaseLimitEnabled: purchaseLimitEnabled ?? false,
         purchaseLimitQuantity: purchaseLimitQuantity ?? 1,
         excludeFromAttribution: excludeFromAttribution ?? false,
+        emailOnFulfill: emailOnFulfill ?? false,
         tags:
             tagIds && tagIds.length > 0
                 ? { connect: tagIds.map((id) => ({ id })) }

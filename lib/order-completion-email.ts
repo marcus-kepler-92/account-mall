@@ -13,7 +13,7 @@ export async function sendOrderCompletionEmail(orderId: string): Promise<void> {
     const order = await prisma.order.findUnique({
         where: { id: orderId },
         include: {
-            product: { select: { name: true, productType: true } },
+            product: { select: { name: true, productType: true, emailOnFulfill: true } },
             cards: {
                 where: { status: "SOLD" },
                 select: { content: true },
@@ -27,6 +27,13 @@ export async function sendOrderCompletionEmail(orderId: string): Promise<void> {
     }
 
     if (!config.orderCompletionEmailEnabled) {
+        return;
+    }
+
+    // Per-product opt-in (default false). Sellers wanting to promise email
+    // delivery flip the toggle on the product edit page; otherwise the order
+    // completes silently and the buyer self-serves via the lookup page.
+    if (!order.product?.emailOnFulfill) {
         return;
     }
 

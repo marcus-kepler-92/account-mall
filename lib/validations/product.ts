@@ -54,6 +54,12 @@ export const createProductSchema = z.object({
      */
     inventoryTracked: z.boolean().optional(),
     /**
+     * When true AND the global ORDER_COMPLETION_EMAIL_ENABLED is true, the
+     * buyer receives an order-completion email at fulfillment time. Default
+     * false: orders complete silently and buyers自查 through the lookup page.
+     */
+    emailOnFulfill: z.boolean().optional(),
+    /**
      * MANUAL-only: SKUs to atomically create together with the product.
      * Ignored for NORMAL/AUTO_FETCH; the route handler additionally rejects
      * non-empty arrays for those types to surface mistakes early.
@@ -108,6 +114,8 @@ export const updateProductSchema = z.object({
     excludeFromAttribution: z.boolean().optional(),
     /** MANUAL-only inventory tracking toggle; see createProductSchema. */
     inventoryTracked: z.boolean().optional(),
+    /** Per-product order-completion email toggle; see createProductSchema. */
+    emailOnFulfill: z.boolean().optional(),
 });
 
 export const createTagSchema = z.object({
@@ -171,6 +179,12 @@ export const productFormSchema = z
          * stock column is also hidden from the SKU editor.
          */
         inventoryTracked: z.boolean().optional(),
+        /**
+         * Per-product gate for the order-completion email. Default false. The
+         * mail still only fires when the global ORDER_COMPLETION_EMAIL_ENABLED
+         * env is also true (two-tier kill switch).
+         */
+        emailOnFulfill: z.boolean().optional(),
         /**
          * MANUAL-only: SKU rows authored inline on the create form. Fields
          * stay as strings here for Input compatibility — the submit handler

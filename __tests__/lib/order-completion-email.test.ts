@@ -51,12 +51,67 @@ describe("sendOrderCompletionEmail", () => {
       email: "buyer@example.com",
       status: "COMPLETED",
       quantity: 1,
-      product: { name: "Test Product", productType: "NORMAL" },
+      product: { name: "Test Product", productType: "NORMAL", emailOnFulfill: true },
       cards: [{ content: "card1" }],
       fulfillment: null,
     } as any)
 
     await sendOrderCompletionEmail("order_1")
+
+    expect(sendMail).not.toHaveBeenCalled()
+    config.orderCompletionEmailEnabled = true
+  })
+
+  it("does not send when product.emailOnFulfill is false (global enabled)", async () => {
+    ;(prismaMock as DeepMockPrisma).order.findUnique.mockResolvedValue({
+      id: "order_optout",
+      orderNo: "ORD-OPTOUT",
+      email: "buyer@example.com",
+      status: "COMPLETED",
+      quantity: 1,
+      product: { name: "Silent Product", productType: "NORMAL", emailOnFulfill: false },
+      cards: [{ content: "card1" }],
+      fulfillment: null,
+    } as any)
+
+    await sendOrderCompletionEmail("order_optout")
+
+    expect(sendMail).not.toHaveBeenCalled()
+  })
+
+  it("sends when both global flag and product.emailOnFulfill are true", async () => {
+    ;(prismaMock as DeepMockPrisma).order.findUnique.mockResolvedValue({
+      id: "order_optin",
+      orderNo: "ORD-OPTIN",
+      email: "buyer@example.com",
+      status: "COMPLETED",
+      quantity: 1,
+      product: { name: "Loud Product", productType: "NORMAL", emailOnFulfill: true },
+      cards: [{ content: "card1" }],
+      fulfillment: null,
+    } as any)
+
+    await sendOrderCompletionEmail("order_optin")
+
+    expect(sendMail).toHaveBeenCalledTimes(1)
+  })
+
+  it("does not send when product.emailOnFulfill is true but global is false", async () => {
+    const { config } = require("@/lib/config") as { config: { orderCompletionEmailEnabled: boolean } }
+    config.orderCompletionEmailEnabled = false
+
+    ;(prismaMock as DeepMockPrisma).order.findUnique.mockResolvedValue({
+      id: "order_globaloff",
+      orderNo: "ORD-GLOBALOFF",
+      email: "buyer@example.com",
+      status: "COMPLETED",
+      quantity: 1,
+      product: { name: "Test Product", productType: "NORMAL", emailOnFulfill: true },
+      cards: [{ content: "card1" }],
+      fulfillment: null,
+    } as any)
+
+    await sendOrderCompletionEmail("order_globaloff")
 
     expect(sendMail).not.toHaveBeenCalled()
     config.orderCompletionEmailEnabled = true
@@ -96,7 +151,7 @@ describe("sendOrderCompletionEmail", () => {
       email: "buyer@example.com",
       status: "COMPLETED",
       quantity: 1,
-      product: { name: "Test Product", productType: "NORMAL" },
+      product: { name: "Test Product", productType: "NORMAL", emailOnFulfill: true },
       cards: [{ content: "card1" }],
       fulfillment: null,
     } as any)
@@ -118,7 +173,7 @@ describe("sendOrderCompletionEmail", () => {
       email: "buyer@example.com",
       status: "COMPLETED",
       quantity: 2,
-      product: { name: "Test Product", productType: "NORMAL" },
+      product: { name: "Test Product", productType: "NORMAL", emailOnFulfill: true },
       cards: [
         { content: "card1-content" },
         { content: "card2-content" },
@@ -141,7 +196,7 @@ describe("sendOrderCompletionEmail", () => {
       email: "buyer@example.com",
       status: "COMPLETED",
       quantity: 1,
-      product: { name: "Manual Product", productType: "MANUAL" },
+      product: { name: "Manual Product", productType: "MANUAL", emailOnFulfill: true },
       cards: [],
       fulfillment: { content: "manual-content" },
     } as any)
@@ -161,7 +216,7 @@ describe("sendOrderCompletionEmail", () => {
       email: "buyer@example.com",
       status: "COMPLETED",
       quantity: 1,
-      product: { name: "Manual Product", productType: "MANUAL" },
+      product: { name: "Manual Product", productType: "MANUAL", emailOnFulfill: true },
       cards: [],
       fulfillment: null,
     } as any)
