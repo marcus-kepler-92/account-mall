@@ -26,6 +26,10 @@ export type ProductCardData = {
     priceMax?: number | null
     stock: number
     productType?: "NORMAL" | "AUTO_FETCH" | "MANUAL"
+    // MANUAL only: when false (default), the buyer side treats stock as
+    // unbounded — no "已售罄" / "仅剩 N 件" labels (sellers don't maintain a
+    // numeric count). When true, normal low-stock / sold-out rules apply.
+    inventoryTracked?: boolean
     tags: { id: string; name: string; slug: string }[]
     // Set by /api/products when ?cs=<token> is present and this product is an
     // eligible cross-sell target of the source order's product. Absent for
@@ -54,9 +58,14 @@ export function ProductCard({ product, gradientIndex = 0, className, code, cs, d
     const brief = briefRaw.slice(0, 80)
     const isAutoFetch = product.productType === "AUTO_FETCH"
     const isManual = product.productType === "MANUAL"
+    const isUntrackedManual = isManual && product.inventoryTracked !== true
     const isFree = isAutoFetch && product.price === 0
-    const isSoldOut = !isAutoFetch && product.stock === 0
-    const isLowStock = !isAutoFetch && !isSoldOut && product.stock > 0 && product.stock <= configClient.lowStockThreshold
+    // Untracked MANUAL is treated as always-in-stock — sold-out is gated only
+    // by variant.isActive (handled upstream by setting stock=1 sentinel).
+    const isSoldOut = !isAutoFetch && !isUntrackedManual && product.stock === 0
+    // Untracked MANUAL also skips the low-stock label: the stock=1 sentinel
+    // would otherwise be mis-read as "仅剩 1 件".
+    const isLowStock = !isAutoFetch && !isUntrackedManual && !isSoldOut && product.stock > 0 && product.stock <= configClient.lowStockThreshold
     // MANUAL 商品不支持到货提醒（restock-subscriptions API 拒绝），
     // 因此即使售罄也不展示「催货」按钮 / 不在 URL 写 restock=1。
     const canRestock = isSoldOut && !isManual
