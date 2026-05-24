@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { verifyPassword } from "better-auth/crypto"
+import { backfillFingerprintIfMissing } from "@/lib/order-password-fingerprint"
 import { prisma } from "@/lib/prisma"
 import { sendWecomNotification } from "@/lib/wecom-notify"
 import { getSiteSettings } from "@/lib/site-settings"
@@ -66,6 +67,11 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ orderI
         password: parsed.data.password,
     }).catch(() => false)
     if (!ok) return unauthorized()
+
+    // Lazy backfill: legacy orders (passwordFingerprint=null) get their
+    // fingerprint written so future lookup-by-email lands in the fast path.
+    // Fire-and-forget.
+    backfillFingerprintIfMissing(order.id, order.email, parsed.data.password)
 
     if (order.status !== "AWAITING_FULFILLMENT" && order.status !== "PROCESSING") {
         return conflict("当前订单状态不允许催发货")

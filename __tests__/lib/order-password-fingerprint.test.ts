@@ -7,7 +7,12 @@ jest.mock("@/lib/config", () => ({
     config: { lookupFingerprintPepper: "test-pepper-32characters-long-xx" },
 }))
 
-import { computePasswordFingerprint } from "@/lib/order-password-fingerprint"
+jest.mock("@/lib/prisma", () => ({
+    prisma: { order: { updateMany: jest.fn() } },
+}))
+
+import { computePasswordFingerprint, backfillFingerprintIfMissing } from "@/lib/order-password-fingerprint"
+import { prisma } from "@/lib/prisma"
 
 describe("computePasswordFingerprint", () => {
     it("returns a 64-char hex SHA-256 string", () => {
@@ -46,5 +51,38 @@ describe("computePasswordFingerprint", () => {
         const a = computePasswordFingerprint("buyer@example.com", "secret123")
         const b = computePasswordFingerprint("buyer@example.com", " secret123 ")
         expect(a).not.toBe(b)
+    })
+})
+
+describe("backfillFingerprintIfMissing", () => {
+    const updateMany = prisma.order.updateMany as jest.Mock
+
+    beforeEach(() => {
+        updateMany.mockReset()
+    })
+
+    it("updates only orders where passwordFingerprint is null", async () => {
+        updateMany.mockResolvedValue({ count: 1 })
+        await backfillFingerprintIfMissing("ord-1", "buyer@example.com", "secret123")
+        expect(updateMany).toHaveBeenCalledWith({
+            where: { id: "ord-1", passwordFingerprint: null },
+            data: { passwordFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/) },
+        })
+    })
+
+    it("is a no-op (count=0) when the order already has a fingerprint — idempotent", async () => {
+        updateMany.mockResolvedValue({ count: 0 })
+        await expect(
+            backfillFingerprintIfMissing("ord-2", "buyer@example.com", "secret123"),
+        ).resolves.toBeUndefined()
+        // Still attempted (one query); the `where` guard prevents over-write.
+        expect(updateMany).toHaveBeenCalledTimes(1)
+    })
+
+    it("swallows errors so a failed backfill never breaks the verify response", async () => {
+        updateMany.mockRejectedValue(new Error("connection lost"))
+        await expect(
+            backfillFingerprintIfMissing("ord-3", "buyer@example.com", "secret123"),
+        ).resolves.toBeUndefined()
     })
 })

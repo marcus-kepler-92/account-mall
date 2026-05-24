@@ -1,5 +1,6 @@
 import { createHash } from "crypto"
 import { config } from "@/lib/config"
+import { prisma } from "@/lib/prisma"
 
 /**
  * SHA-256 pre-filter hash used to narrow lookup-by-email candidates before the
@@ -26,4 +27,29 @@ export function computePasswordFingerprint(email: string, password: string): str
     return createHash("sha256")
         .update(`${email.trim().toLowerCase()}:${password}:${PEPPER}`)
         .digest("hex")
+}
+
+/**
+ * Lazy backfill: write `passwordFingerprint` on an order that currently lacks
+ * one, after the caller has already successfully scrypt-verified the password.
+ * The `where: { passwordFingerprint: null }` guard makes this idempotent — calls
+ * against orders that already have a fingerprint are a no-op (count=0).
+ *
+ * Fire-and-forget: never blocks the caller's response. Errors are logged but
+ * not propagated; the worst case is "fingerprint stays null this round" — the
+ * legacy fallback will continue to handle the order.
+ */
+export async function backfillFingerprintIfMissing(
+    orderId: string,
+    email: string,
+    password: string,
+): Promise<void> {
+    try {
+        await prisma.order.updateMany({
+            where: { id: orderId, passwordFingerprint: null },
+            data: { passwordFingerprint: computePasswordFingerprint(email, password) },
+        })
+    } catch (err) {
+        console.error("[fingerprint-backfill]", err)
+    }
 }

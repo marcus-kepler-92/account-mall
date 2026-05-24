@@ -6,7 +6,7 @@ import { checkOrderQueryRateLimit } from "@/lib/rate-limit"
 import { invalidJsonBody, validationError, badRequest, internalServerError } from "@/lib/api-response"
 import { parseAutoFetchCardContent } from "@/lib/auto-fetch-card"
 import { createOrderSuccessToken } from "@/lib/order-success-token"
-import { computePasswordFingerprint } from "@/lib/order-password-fingerprint"
+import { computePasswordFingerprint, backfillFingerprintIfMissing } from "@/lib/order-password-fingerprint"
 import { config } from "@/lib/config"
 
 /**
@@ -168,6 +168,12 @@ export async function POST(request: NextRequest) {
                 )
                 .map((r) => r.value!)
             total = matchingOrders.length
+
+            // Lazy backfill: verified-but-legacy orders now get a fingerprint
+            // so future lookups by this email + password hit the fast path.
+            for (const o of matchingOrders) {
+                backfillFingerprintIfMissing(o.id, normalizedEmail, trimmedPassword)
+            }
         }
 
         if (matchingOrders.length === 0) {
