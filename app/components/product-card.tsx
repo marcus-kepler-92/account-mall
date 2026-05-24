@@ -228,7 +228,7 @@ export function ProductCard({ product, gradientIndex = 0, className, code, cs, d
                                             {displayPrice.label}
                                         </span>
                                     )}
-                                    {isAutoFetch ? (
+                                    {isAutoFetch || isUntrackedManual ? (
                                         <span className="ml-1.5 block text-[11px] text-muted-foreground">
                                             有货
                                         </span>
