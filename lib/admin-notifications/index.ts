@@ -2,7 +2,12 @@ import type { PrismaClient } from "@prisma/client"
 import type { LucideIcon } from "lucide-react"
 import type { InventorySubtype } from "@/lib/inventory"
 
-export const SOURCE_KEYS = ["withdrawals", "agentLeads", "inventoryAlerts"] as const
+export const SOURCE_KEYS = [
+  "withdrawals",
+  "agentLeads",
+  "inventoryAlerts",
+  "manualPendingOrders",
+] as const
 export type SourceKey = (typeof SOURCE_KEYS)[number]
 
 export type WithdrawalItem = {
@@ -31,6 +36,18 @@ export type InventoryAlertItem = {
   subtype: InventorySubtype
 }
 
+export type ManualPendingOrderItem = {
+  id: string
+  fingerprint: string
+  orderNo: string
+  productName: string
+  variantName: string | null
+  amount: number
+  status: "AWAITING_FULFILLMENT" | "PROCESSING"
+  dunCount: number
+  createdAt: string
+}
+
 export type SourceResult =
   | { key: "withdrawals"; count: number; items: WithdrawalItem[] }
   | { key: "agentLeads"; count: number; items: AgentLeadItem[] }
@@ -39,6 +56,11 @@ export type SourceResult =
       count: number
       breakdown: { outOfStock: number; lowStock: number; restockWaiting: number }
       items: InventoryAlertItem[]
+    }
+  | {
+      key: "manualPendingOrders"
+      count: number
+      items: ManualPendingOrderItem[]
     }
 
 type ResultByKey<K extends SourceKey> = Omit<Extract<SourceResult, { key: K }>, "key">
@@ -73,3 +95,6 @@ registerSource(agentLeadsSource)
 
 import { inventoryAlertsSource } from "./sources/inventory-alerts"
 registerSource(inventoryAlertsSource)
+
+import { manualPendingOrdersSource } from "./sources/manual-pending-orders"
+registerSource(manualPendingOrdersSource)

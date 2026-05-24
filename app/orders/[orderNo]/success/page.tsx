@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { verifyOrderSuccessToken } from "@/lib/order-success-token";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,9 @@ import {
 } from "@/lib/cross-sell";
 import { appendCsParam } from "@/lib/cs-params";
 import { CrossSellSection } from "./cross-sell-section";
+import { ManualSuccessView } from "./manual-success-view";
+import { getSiteSettings } from "@/lib/site-settings";
+import { formatEtaText } from "@/lib/business-hours";
 
 type PageProps = {
   params: Promise<{ orderNo: string }>;
@@ -97,15 +100,41 @@ export default async function OrderSuccessPage({
   });
 
   if (!order) notFound();
-  // MANUAL products are fulfilled out-of-band by admin — the order sits in
-  // AWAITING_FULFILLMENT (not COMPLETED) when the buyer lands here from the
-  // payment flow. The /success page is built around "show your cards", which
-  // doesn't apply. Bounce them to lookup with a hint so they get a sensible
-  // "we're processing" view instead of the misleading "订单未完成" card.
+  // MANUAL products are fulfilled out-of-band by admin. After payment the order
+  // sits in AWAITING_FULFILLMENT (and later PROCESSING) — render a dedicated
+  // "等待发货" view with timeline + ETA instead of the cards-centric layout,
+  // and short-circuit before the COMPLETED guard below (status won't match yet).
+  // If the order has already been fulfilled by the time the buyer lands here
+  // we still want the success view (it renders the completed timeline state).
   if (order.product?.productType === "MANUAL") {
-    redirect(
-      `/orders/lookup?orderNo=${encodeURIComponent(orderNo)}&hint=processing`,
-    );
+    const settings = await getSiteSettings();
+    const etaText = formatEtaText(new Date(), {
+      start: settings.businessHoursStart,
+      end: settings.businessHoursEnd,
+      weekdays: settings.businessHoursWeekdays,
+      timezone: settings.businessHoursTimezone,
+    });
+    if (
+      order.status === "AWAITING_FULFILLMENT" ||
+      order.status === "PROCESSING" ||
+      order.status === "COMPLETED"
+    ) {
+      return (
+        <ManualSuccessView
+          orderNo={order.orderNo}
+          status={order.status}
+          productName={
+            order.productNameSnapshot ?? order.product?.name ?? "商品"
+          }
+          variantName={order.variantNameSnapshot}
+          amount={Number(order.amount)}
+          email={order.email}
+          etaText={etaText}
+          cs={incomingCs}
+        />
+      );
+    }
+    // PENDING / CLOSED falls through to the generic "订单未完成" card below.
   }
   if (order.status !== "COMPLETED") {
     return (

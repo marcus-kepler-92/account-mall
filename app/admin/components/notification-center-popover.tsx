@@ -112,6 +112,48 @@ function renderItems(source: SourceResult, onDismiss: DismissFn): ReactNode {
           </Row>
         )
       })
+    case "manualPendingOrders":
+      return source.items.slice(0, POPOVER_ITEM_LIMIT).map((it) => {
+        const waitMin = Math.max(
+          0,
+          Math.floor((Date.now() - new Date(it.createdAt).getTime()) / 60_000),
+        )
+        const waitLabel =
+          waitMin < 60
+            ? `${waitMin} 分钟`
+            : waitMin < 60 * 24
+              ? `${Math.floor(waitMin / 60)} 小时`
+              : `${Math.floor(waitMin / (60 * 24))} 天`
+        const display = it.variantName ?? it.productName
+        return (
+          <Row
+            key={it.id}
+            sourceKey={source.key}
+            itemId={it.id}
+            fingerprint={it.fingerprint}
+            onDismiss={onDismiss}
+          >
+            <Link
+              href={`/admin/orders/${it.id}`}
+              className="block hover:underline"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate">
+                  {display} · {formatCurrency(it.amount)}
+                </span>
+                <span className="text-muted-foreground tabular-nums shrink-0">
+                  已等 {waitLabel}
+                </span>
+              </div>
+              {it.dunCount > 0 && (
+                <div className="mt-0.5 text-xs font-medium text-destructive">
+                  已催 {it.dunCount} 次
+                </div>
+              )}
+            </Link>
+          </Row>
+        )
+      })
   }
 }
 
