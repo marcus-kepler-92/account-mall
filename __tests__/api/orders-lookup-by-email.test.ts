@@ -45,8 +45,11 @@ describe("POST /api/orders/lookup-by-email", () => {
   }
 
   // Helper: configure the legacy fallback (passwordFingerprint = null) query.
-  // The route only calls this when the fast path returned zero on page 1.
-  function setLegacyFallback(orders: any[]) {
+  // The route runs count + findMany in parallel when the fast path returns
+  // zero (on any page — legacy is paginated too so the buyer can reach all
+  // of their historical orders).
+  function setLegacyFallback(orders: any[], total?: number) {
+    ;(prismaMock.order.count as jest.Mock).mockResolvedValueOnce(total ?? orders.length)
     ;(prismaMock.order.findMany as jest.Mock).mockResolvedValueOnce(orders)
   }
 
@@ -494,10 +497,11 @@ describe("POST /api/orders/lookup-by-email", () => {
     expect(data.orderNo).toBe("OLD001")
   })
 
-  it("does NOT trigger legacy fallback on page > 1", async () => {
-    // Fast path empty on page 2 — legacy fallback must NOT run to avoid
-    // double cost when paginating through old data.
+  it("triggers paginated legacy fallback on page > 1 so buyer can reach all historical orders", async () => {
+    // Fast path empty on page 2 — legacy now also paginates so the buyer
+    // can reach orders beyond page 1 of their (uncfingerprinted) history.
     setFingerprintMatches([])
+    setLegacyFallback([], 0)
 
     const req = createJsonRequest({
       email: "user@example.com",
@@ -510,8 +514,11 @@ describe("POST /api/orders/lookup-by-email", () => {
 
     expect(res.status).toBe(400)
     expect(data).toEqual({ error: "Order not found or password incorrect" })
-    // count + 1 fast-path findMany, no legacy findMany.
-    expect((prismaMock.order.findMany as jest.Mock).mock.calls).toHaveLength(1)
+    // count + fast-path findMany + legacy count + legacy findMany.
+    expect((prismaMock.order.findMany as jest.Mock).mock.calls).toHaveLength(2)
+    const legacyFindMany = (prismaMock.order.findMany as jest.Mock).mock.calls[1][0]
+    expect(legacyFindMany.skip).toBe(10)  // (page-1) * pageSize
+    expect(legacyFindMany.take).toBe(10)
   })
 
   it("returns 500 when single order has no product (LOOKUP_FAILED)", async () => {

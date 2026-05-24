@@ -139,17 +139,28 @@ export async function POST(request: NextRequest) {
         }
 
         // Legacy fallback: orders predating the fingerprint column have
-        // passwordFingerprint = null and never match the fast path. Only run
-        // this on page=1 when the fast path returned zero; otherwise pagination
-        // through old data would double-cost. Capped at LEGACY_MAX candidates.
-        if (matchingOrders.length === 0 && page === 1) {
-            const LEGACY_MAX = 10
-            const legacy = await prisma.order.findMany({
-                where: { email: normalizedEmail, passwordFingerprint: null },
-                select: orderSelect,
-                orderBy: { createdAt: "desc" },
-                take: LEGACY_MAX,
-            })
+        // passwordFingerprint = null and never match the fast path. When the
+        // fast path returned zero, we degrade gracefully to a paginated scan
+        // over the buyer's legacy orders — each page costs ~5s in scrypt
+        // (pageSize × ~500ms / 4 workers), which is acceptable once and lets
+        // the buyer reach all of their historical orders. Lazy backfill on
+        // each verified row gradually migrates the buyer onto the fast path.
+        //
+        // `total` reflects the count of email+null-fingerprint rows; it can be
+        // an over-estimate if some legacy rows belong to a different password
+        // (rare: buyers typically reuse one password across their orders).
+        if (matchingOrders.length === 0) {
+            const legacyWhere = { email: normalizedEmail, passwordFingerprint: null }
+            const [legacyTotal, legacy] = await Promise.all([
+                prisma.order.count({ where: legacyWhere }),
+                prisma.order.findMany({
+                    where: legacyWhere,
+                    select: orderSelect,
+                    orderBy: { createdAt: "desc" },
+                    skip: (page - 1) * pageSize,
+                    take: pageSize,
+                }),
+            ])
             const legacyResults = await Promise.allSettled(
                 legacy.map(async (o) => {
                     if (!o.passwordHash || typeof o.passwordHash !== "string") return null
@@ -167,7 +178,7 @@ export async function POST(request: NextRequest) {
                         r.status === "fulfilled" && r.value !== null,
                 )
                 .map((r) => r.value!)
-            total = matchingOrders.length
+            total = legacyTotal
 
             // Lazy backfill: verified-but-legacy orders now get a fingerprint
             // so future lookups by this email + password hit the fast path.
