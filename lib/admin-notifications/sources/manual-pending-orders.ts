@@ -40,7 +40,12 @@ export const manualPendingOrdersSource: NotificationSource<"manualPendingOrders"
       count,
       items: rows.map((r) => ({
         id: r.id,
-        fingerprint: "v1",
+        // Fingerprint = dunCount so a dismissed entry re-surfaces whenever the
+        // buyer dunns again. Status changes (AWAITING→PROCESSING) intentionally
+        // don't bump the fingerprint — admin's own take action shouldn't spam
+        // them. COMPLETED/CLOSED naturally drop out via the source's where
+        // filter so they don't need fingerprint coverage.
+        fingerprint: `v1:${r.dunCount}`,
         orderNo: r.orderNo,
         productName: r.productNameSnapshot ?? r.product.name,
         variantName: r.variantNameSnapshot,
