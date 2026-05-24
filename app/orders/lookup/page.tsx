@@ -21,7 +21,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { Skeleton } from "@/components/ui/skeleton"
 import { SiteHeader } from "@/app/components/site-header"
 import { useSiteName } from "@/app/components/site-name-provider"
-import { Copy, Eye, EyeOff, Loader2, Mail, Hash, Package, Search, Zap } from "lucide-react"
+import { ChevronLeft, ChevronRight, Copy, Eye, EyeOff, Loader2, Mail, Hash, Package, Search, Zap } from "lucide-react"
 import { toast } from "sonner"
 import { addOrUpdateOrder } from "@/lib/order-history-storage"
 import { formatDateTime } from "@/lib/utils"
@@ -63,6 +63,13 @@ async function fetchApi(endpoint: string, body: Record<string, string>, timeoutM
 /*  Query form                                                         */
 /* ------------------------------------------------------------------ */
 
+interface PaginationMeta {
+    total: number
+    page: number
+    pageSize: number
+    totalPages: number
+}
+
 interface OrderLookupFormProps {
     lookupMode: LookupMode
     formRef: React.MutableRefObject<UseFormReturn<OrderLookupFormValues> | null>
@@ -75,12 +82,15 @@ interface OrderLookupFormProps {
     setOrderList: React.Dispatch<React.SetStateAction<OrderListItem[] | null>>
     setLoading: React.Dispatch<React.SetStateAction<boolean>>
     setSheetOpen: React.Dispatch<React.SetStateAction<boolean>>
+    setPagination: React.Dispatch<React.SetStateAction<PaginationMeta | null>>
 }
+
+const EMAIL_LOOKUP_PAGE_SIZE = 10
 
 function OrderLookupForm({
     lookupMode, formRef, initialOrderNo, initialEmail, loading,
     showPassword, setShowPassword,
-    setResult, setOrderList, setLoading, setSheetOpen,
+    setResult, setOrderList, setLoading, setSheetOpen, setPagination,
 }: OrderLookupFormProps) {
     const passwordInputRef = useRef<HTMLInputElement>(null)
 
@@ -114,6 +124,7 @@ function OrderLookupForm({
         const isOrderMode = lookupMode === "orderNo"
         setResult(null)
         setOrderList(null)
+        setPagination(null)
         form.clearErrors()
         setLoading(true)
         try {
@@ -121,7 +132,12 @@ function OrderLookupForm({
                 isOrderMode ? "/api/orders/lookup" : "/api/orders/lookup-by-email",
                 isOrderMode
                     ? { orderNo: data.orderNo.trim(), password: data.password.trim() }
-                    : { email: data.email.trim().toLowerCase(), password: data.password.trim() },
+                    : {
+                        email: data.email.trim().toLowerCase(),
+                        password: data.password.trim(),
+                        page: "1",
+                        pageSize: String(EMAIL_LOOKUP_PAGE_SIZE),
+                    },
                 isOrderMode ? 15_000 : 40_000,
             )
             if (!res.ok) {
@@ -135,7 +151,14 @@ function OrderLookupForm({
             }
             if (Array.isArray(res.data.orders)) {
                 setOrderList(res.data.orders)
-                toast.success(`找到 ${res.data.orders.length} 个相关订单`)
+                const total = typeof res.data.total === "number" ? res.data.total : res.data.orders.length
+                const page = typeof res.data.page === "number" ? res.data.page : 1
+                const pageSize = typeof res.data.pageSize === "number" ? res.data.pageSize : EMAIL_LOOKUP_PAGE_SIZE
+                const totalPages = typeof res.data.totalPages === "number"
+                    ? res.data.totalPages
+                    : Math.max(1, Math.ceil(total / pageSize))
+                setPagination({ total, page, pageSize, totalPages })
+                toast.success(`找到 ${total} 个相关订单`)
                 return
             }
             if (!res.data.orderNo) {
@@ -234,12 +257,50 @@ function OrderLookupPageContent() {
     const [loading, setLoading] = useState(false)
     const [result, setResult] = useState<OrderResult | null>(null)
     const [orderList, setOrderList] = useState<OrderListItem[] | null>(null)
+    const [pagination, setPagination] = useState<PaginationMeta | null>(null)
+    const [pageLoading, setPageLoading] = useState(false)
     const [sheetOpen, setSheetOpen] = useState(false)
     const [loadingOrderNo, setLoadingOrderNo] = useState<string | null>(null)
     const [sheetLoading, setSheetLoading] = useState(false)
 
     const formRef = useRef<UseFormReturn<OrderLookupFormValues> | null>(null)
     const getPassword = useCallback(() => formRef.current?.getValues("password") ?? "", [])
+    const getEmail = useCallback(() => formRef.current?.getValues("email") ?? "", [])
+
+    const fetchPage = useCallback(async (targetPage: number) => {
+        const email = getEmail().trim().toLowerCase()
+        const password = getPassword().trim()
+        if (!email || !password || !pagination) return
+        setPageLoading(true)
+        try {
+            const res = await fetchApi(
+                "/api/orders/lookup-by-email",
+                {
+                    email,
+                    password,
+                    page: String(targetPage),
+                    pageSize: String(pagination.pageSize),
+                },
+                40_000,
+            )
+            if (!res.ok || !Array.isArray(res.data.orders)) {
+                toast.error("加载下一页失败，请稍后重试")
+                return
+            }
+            setOrderList(res.data.orders)
+            const total = typeof res.data.total === "number" ? res.data.total : res.data.orders.length
+            const page = typeof res.data.page === "number" ? res.data.page : targetPage
+            const pageSize = typeof res.data.pageSize === "number" ? res.data.pageSize : pagination.pageSize
+            const totalPages = typeof res.data.totalPages === "number"
+                ? res.data.totalPages
+                : Math.max(1, Math.ceil(total / pageSize))
+            setPagination({ total, page, pageSize, totalPages })
+        } catch {
+            toast.error("网络错误，请稍后重试")
+        } finally {
+            setPageLoading(false)
+        }
+    }, [getEmail, getPassword, pagination])
 
     useEffect(() => {
         // URL is the single source of truth for initial query state.
@@ -265,6 +326,7 @@ function OrderLookupPageContent() {
         setLookupMode(mode)
         setResult(null)
         setOrderList(null)
+        setPagination(null)
     }, [])
 
     const handleOrderClick = useCallback(async (clickedOrderNo: string) => {
@@ -343,6 +405,7 @@ function OrderLookupPageContent() {
                                 setOrderList={setOrderList}
                                 setLoading={setLoading}
                                 setSheetOpen={setSheetOpen}
+                                setPagination={setPagination}
                             />
 
                             {/* 邮箱查询结果列表 */}
@@ -350,7 +413,7 @@ function OrderLookupPageContent() {
                                 <div className="space-y-3 border-t pt-4">
                                     <div className="space-y-1">
                                         <h3 className="text-base font-semibold flex items-center gap-2">
-                                            <Package className="size-4" />找到 {orderList.length} 个订单
+                                            <Package className="size-4" />找到 {pagination?.total ?? orderList.length} 个订单
                                         </h3>
                                         <p className="text-xs text-muted-foreground">点击任意订单查看详情</p>
                                     </div>
@@ -381,6 +444,32 @@ function OrderLookupPageContent() {
                                             )
                                         })}
                                     </div>
+                                    {pagination && pagination.totalPages > 1 && (
+                                        <div className="flex items-center justify-between gap-3 pt-1 text-xs text-muted-foreground">
+                                            <span>第 {pagination.page} / {pagination.totalPages} 页</span>
+                                            <div className="flex items-center gap-2">
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    disabled={pagination.page <= 1 || pageLoading}
+                                                    onClick={() => fetchPage(pagination.page - 1)}
+                                                >
+                                                    <ChevronLeft className="size-3.5" />上一页
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    disabled={pagination.page >= pagination.totalPages || pageLoading}
+                                                    onClick={() => fetchPage(pagination.page + 1)}
+                                                >
+                                                    下一页<ChevronRight className="size-3.5" />
+                                                </Button>
+                                                {pageLoading && <Loader2 className="size-3.5 animate-spin" />}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </CardContent>

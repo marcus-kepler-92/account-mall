@@ -32,8 +32,23 @@ describe("POST /api/orders/lookup-by-email", () => {
 
   beforeEach(() => {
     verifyPasswordMock.mockReset()
-    ;(prismaMock.$transaction as jest.Mock).mockReset()
+    ;(prismaMock.order.count as jest.Mock).mockReset()
+    ;(prismaMock.order.findMany as jest.Mock).mockReset()
   })
+
+  // Helper: configure the fingerprint fast-path query results.
+  // The route fires `count` + `findMany` in parallel; both should reflect the
+  // fingerprint-matched set.
+  function setFingerprintMatches(orders: any[]) {
+    ;(prismaMock.order.count as jest.Mock).mockResolvedValueOnce(orders.length)
+    ;(prismaMock.order.findMany as jest.Mock).mockResolvedValueOnce(orders)
+  }
+
+  // Helper: configure the legacy fallback (passwordFingerprint = null) query.
+  // The route only calls this when the fast path returned zero on page 1.
+  function setLegacyFallback(orders: any[]) {
+    ;(prismaMock.order.findMany as jest.Mock).mockResolvedValueOnce(orders)
+  }
 
   it("returns 400 when JSON body is invalid", async () => {
     const badReq = {
@@ -56,7 +71,7 @@ describe("POST /api/orders/lookup-by-email", () => {
 
     expect(res.status).toBe(400)
     expect(data.error).toBe("Validation failed")
-expect(data.code).toBe("VALIDATION_FAILED")
+    expect(data.code).toBe("VALIDATION_FAILED")
   })
 
   it("returns 400 when email is invalid", async () => {
@@ -66,15 +81,12 @@ expect(data.code).toBe("VALIDATION_FAILED")
 
     expect(res.status).toBe(400)
     expect(data.error).toBe("Validation failed")
-expect(data.code).toBe("VALIDATION_FAILED")
+    expect(data.code).toBe("VALIDATION_FAILED")
   })
 
-  it("returns 400 with fuzzy error when order does not exist", async () => {
-    ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: any) =>
-      fn(prismaMock),
-    )
-
-    prismaMock.order.findMany.mockResolvedValueOnce([])
+  it("returns 400 with fuzzy error when no fingerprint match and no legacy fallback", async () => {
+    setFingerprintMatches([])
+    setLegacyFallback([])
 
     const req = createJsonRequest({ email: "user@example.com", password: "secret123" })
     const res = await POST(req)
@@ -84,28 +96,32 @@ expect(data.code).toBe("VALIDATION_FAILED")
     expect(data).toEqual({
       error: "Order not found or password incorrect",
     })
+    // Confirm pre-filter is in effect: the count + findMany must filter on
+    // passwordFingerprint (not just email).
+    const countCall = (prismaMock.order.count as jest.Mock).mock.calls[0]?.[0]
+    expect(countCall.where).toMatchObject({
+      email: "user@example.com",
+      passwordFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
+    })
   })
 
-  it("returns 400 with fuzzy error when password is incorrect", async () => {
-    ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: any) =>
-      fn(prismaMock),
-    )
-
-    prismaMock.order.findMany.mockResolvedValueOnce([
+  it("returns 400 when fingerprint matches but verifyPassword rejects (defense in depth)", async () => {
+    // Fingerprint mismatches are SQL-prefiltered, but a verify can still
+    // reject in pathological scenarios (collision, corrupt hash). Confirm we
+    // do not leak access.
+    setFingerprintMatches([
       {
         id: "order_1",
         orderNo: "FAK202402130001",
         email: "user@example.com",
         passwordHash: "hash",
         status: "PENDING",
-        product: {
-          name: "Test Product",
-        },
+        product: { name: "Test Product" },
         cards: [],
         createdAt: new Date(),
       },
-    ] as any)
-
+    ])
+    setLegacyFallback([])
     verifyPasswordMock.mockResolvedValueOnce(false)
 
     const req = createJsonRequest({
@@ -121,14 +137,10 @@ expect(data.code).toBe("VALIDATION_FAILED")
     })
   })
 
-  it("finds the most recent order by email and returns it when password is correct", async () => {
-    ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: any) =>
-      fn(prismaMock),
-    )
-
+  it("fast path: returns single order when fingerprint matches and password verifies", async () => {
     const createdAt = new Date("2024-02-13T00:00:00.000Z")
 
-    prismaMock.order.findMany.mockResolvedValueOnce([
+    setFingerprintMatches([
       {
         id: "order_1",
         orderNo: "FAK202402130001",
@@ -136,33 +148,27 @@ expect(data.code).toBe("VALIDATION_FAILED")
         passwordHash: "hash",
         status: "COMPLETED",
         amount: 50,
-        product: {
-          name: "Test Product",
-        },
+        product: { name: "Test Product" },
         cards: [
           { id: "card_1", content: "code-1", status: "SOLD" },
           { id: "card_2", content: "code-2", status: "RESERVED" },
         ],
         createdAt,
       },
-    ] as any)
-
+    ])
     verifyPasswordMock.mockResolvedValueOnce(true)
 
     const req = createJsonRequest({ email: "User@Example.com", password: "secret123" })
     const res = await POST(req)
     const data = await res.json()
 
-    expect(prismaMock.order.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          email: "user@example.com",
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
-      }),
-    )
+    // Fingerprint pre-filter must be applied to the findMany query.
+    const findManyCall = (prismaMock.order.findMany as jest.Mock).mock.calls[0][0]
+    expect(findManyCall.where).toMatchObject({
+      email: "user@example.com",
+      passwordFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
+    })
+    expect(findManyCall.orderBy).toEqual({ createdAt: "desc" })
 
     expect(verifyPasswordMock).toHaveBeenCalledWith({ hash: "hash", password: "secret123" })
 
@@ -186,13 +192,9 @@ expect(data.code).toBe("VALIDATION_FAILED")
   })
 
   it("returns single PENDING order with isPending when password is correct", async () => {
-    ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: any) =>
-      fn(prismaMock),
-    )
-
     const createdAt = new Date("2024-02-13T00:00:00.000Z")
 
-    prismaMock.order.findMany.mockResolvedValueOnce([
+    setFingerprintMatches([
       {
         id: "order_1",
         orderNo: "FAK202402130001",
@@ -200,17 +202,14 @@ expect(data.code).toBe("VALIDATION_FAILED")
         passwordHash: "hash",
         status: "PENDING",
         amount: 100,
-        product: {
-          name: "Test Product",
-        },
+        product: { name: "Test Product" },
         cards: [
           { id: "card_1", content: "code-1", status: "RESERVED" },
           { id: "card_2", content: "code-2", status: "UNSOLD" },
         ],
         createdAt,
       },
-    ] as any)
-
+    ])
     verifyPasswordMock.mockResolvedValueOnce(true)
 
     const req = createJsonRequest({ email: "user@example.com", password: "secret123" })
@@ -236,13 +235,9 @@ expect(data.code).toBe("VALIDATION_FAILED")
   })
 
   it("returns existing COMPLETED order without changing status on lookup", async () => {
-    ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: any) =>
-      fn(prismaMock),
-    )
-
     const createdAt = new Date("2024-02-13T00:00:00.000Z")
 
-    prismaMock.order.findMany.mockResolvedValueOnce([
+    setFingerprintMatches([
       {
         id: "order_1",
         orderNo: "FAK202402130001",
@@ -250,16 +245,13 @@ expect(data.code).toBe("VALIDATION_FAILED")
         passwordHash: "hash",
         status: "COMPLETED",
         amount: 50,
-        product: {
-          name: "Test Product",
-        },
+        product: { name: "Test Product" },
         cards: [
           { id: "card_1", content: "code-1", status: "SOLD" },
         ],
         createdAt,
       },
-    ] as any)
-
+    ])
     verifyPasswordMock.mockResolvedValueOnce(true)
 
     const req = createJsonRequest({ email: "user@example.com", password: "secret123" })
@@ -286,27 +278,20 @@ expect(data.code).toBe("VALIDATION_FAILED")
   })
 
   it("normalizes email to lowercase when querying", async () => {
-    ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: any) =>
-      fn(prismaMock),
-    )
-
     const createdAt = new Date("2024-02-13T00:00:00.000Z")
 
-    prismaMock.order.findMany.mockResolvedValueOnce([
+    setFingerprintMatches([
       {
         id: "order_1",
         orderNo: "FAK202402130001",
         email: "user@example.com",
         passwordHash: "hash",
         status: "COMPLETED",
-        product: {
-          name: "Test Product",
-        },
+        product: { name: "Test Product" },
         cards: [],
         createdAt,
       },
-    ] as any)
-
+    ])
     verifyPasswordMock.mockResolvedValueOnce(true)
 
     const req = createJsonRequest({ email: "User@Example.COM", password: "secret123" })
@@ -314,9 +299,9 @@ expect(data.code).toBe("VALIDATION_FAILED")
 
     expect(prismaMock.order.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: {
+        where: expect.objectContaining({
           email: "user@example.com",
-        },
+        }),
       }),
     )
 
@@ -324,22 +309,16 @@ expect(data.code).toBe("VALIDATION_FAILED")
   })
 
   it("only returns cards with SOLD or RESERVED status", async () => {
-    ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: any) =>
-      fn(prismaMock),
-    )
-
     const createdAt = new Date("2024-02-13T00:00:00.000Z")
 
-    prismaMock.order.findMany.mockResolvedValueOnce([
+    setFingerprintMatches([
       {
         id: "order_1",
         orderNo: "FAK202402130001",
         email: "user@example.com",
         passwordHash: "hash",
         status: "COMPLETED",
-        product: {
-          name: "Test Product",
-        },
+        product: { name: "Test Product" },
         cards: [
           { id: "card_1", content: "code-1", status: "SOLD" },
           { id: "card_2", content: "code-2", status: "RESERVED" },
@@ -347,8 +326,7 @@ expect(data.code).toBe("VALIDATION_FAILED")
         ],
         createdAt,
       },
-    ] as any)
-
+    ])
     verifyPasswordMock.mockResolvedValueOnce(true)
 
     const req = createJsonRequest({ email: "user@example.com", password: "secret123" })
@@ -372,8 +350,9 @@ expect(data.code).toBe("VALIDATION_FAILED")
     expect(prismaMock.order.findMany).not.toHaveBeenCalled()
   })
 
-  it("returns multiple orders list when more than one order matches email and password", async () => {
-    prismaMock.order.findMany.mockResolvedValueOnce([
+  it("returns paginated list with totals when more than one order matches", async () => {
+    ;(prismaMock.order.count as jest.Mock).mockResolvedValueOnce(2)
+    ;(prismaMock.order.findMany as jest.Mock).mockResolvedValueOnce([
       {
         id: "order_1",
         orderNo: "FAK001",
@@ -398,7 +377,7 @@ expect(data.code).toBe("VALIDATION_FAILED")
         quantity: 2,
         amount: 100,
       },
-    ] as any)
+    ])
     verifyPasswordMock.mockResolvedValueOnce(true).mockResolvedValueOnce(true)
 
     const req = createJsonRequest({ email: "user@example.com", password: "secret123" })
@@ -407,6 +386,10 @@ expect(data.code).toBe("VALIDATION_FAILED")
 
     expect(res.status).toBe(200)
     expect(data.orders).toHaveLength(2)
+    expect(data.total).toBe(2)
+    expect(data.page).toBe(1)
+    expect(data.pageSize).toBe(10)
+    expect(data.totalPages).toBe(1)
     expect(data.orders[0]).toMatchObject({
       orderNo: "FAK001",
       productName: "Product A",
@@ -423,8 +406,116 @@ expect(data.code).toBe("VALIDATION_FAILED")
     })
   })
 
+  it("respects pageSize=2 and reports totalPages correctly when total exceeds pageSize", async () => {
+    ;(prismaMock.order.count as jest.Mock).mockResolvedValueOnce(5)
+    ;(prismaMock.order.findMany as jest.Mock).mockResolvedValueOnce([
+      {
+        id: "order_a",
+        orderNo: "FAK00A",
+        email: "user@example.com",
+        passwordHash: "hash",
+        status: "COMPLETED",
+        product: { name: "P" },
+        cards: [],
+        createdAt: new Date("2024-02-13T00:00:00.000Z"),
+        quantity: 1,
+        amount: 10,
+      },
+      {
+        id: "order_b",
+        orderNo: "FAK00B",
+        email: "user@example.com",
+        passwordHash: "hash",
+        status: "COMPLETED",
+        product: { name: "P" },
+        cards: [],
+        createdAt: new Date("2024-02-12T00:00:00.000Z"),
+        quantity: 1,
+        amount: 10,
+      },
+    ])
+    verifyPasswordMock.mockResolvedValue(true)
+
+    const req = createJsonRequest({
+      email: "user@example.com",
+      password: "secret123",
+      page: 1,
+      pageSize: 2,
+    })
+    const res = await POST(req)
+    const data = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(data.total).toBe(5)
+    expect(data.page).toBe(1)
+    expect(data.pageSize).toBe(2)
+    expect(data.totalPages).toBe(3)
+    expect(data.orders).toHaveLength(2)
+
+    // Confirm skip/take were derived from page/pageSize.
+    const findManyCall = (prismaMock.order.findMany as jest.Mock).mock.calls[0][0]
+    expect(findManyCall.skip).toBe(0)
+    expect(findManyCall.take).toBe(2)
+  })
+
+  it("falls back to legacy (passwordFingerprint=null) when fast path is empty on page 1", async () => {
+    // Fast path returns zero (covered by setFingerprintMatches([])):
+    setFingerprintMatches([])
+    // Legacy fallback is called next:
+    const createdAt = new Date("2023-01-01T00:00:00.000Z")
+    setLegacyFallback([
+      {
+        id: "legacy_1",
+        orderNo: "OLD001",
+        email: "user@example.com",
+        passwordHash: "legacy-hash",
+        status: "COMPLETED",
+        amount: 25,
+        product: { name: "Legacy Product" },
+        cards: [{ id: "card_1", content: "x", status: "SOLD" }],
+        createdAt,
+      },
+    ])
+    verifyPasswordMock.mockResolvedValueOnce(true)
+
+    const req = createJsonRequest({ email: "user@example.com", password: "secret123" })
+    const res = await POST(req)
+    const data = await res.json()
+
+    // Second findMany call (the legacy fallback) must filter by null fingerprint.
+    const legacyCall = (prismaMock.order.findMany as jest.Mock).mock.calls[1][0]
+    expect(legacyCall.where).toMatchObject({
+      email: "user@example.com",
+      passwordFingerprint: null,
+    })
+    expect(legacyCall.take).toBe(10)
+
+    expect(res.status).toBe(200)
+    expect(data.orderNo).toBe("OLD001")
+  })
+
+  it("does NOT trigger legacy fallback on page > 1", async () => {
+    // Fast path empty on page 2 — legacy fallback must NOT run to avoid
+    // double cost when paginating through old data.
+    setFingerprintMatches([])
+
+    const req = createJsonRequest({
+      email: "user@example.com",
+      password: "secret123",
+      page: 2,
+      pageSize: 10,
+    })
+    const res = await POST(req)
+    const data = await res.json()
+
+    expect(res.status).toBe(400)
+    expect(data).toEqual({ error: "Order not found or password incorrect" })
+    // count + 1 fast-path findMany, no legacy findMany.
+    expect((prismaMock.order.findMany as jest.Mock).mock.calls).toHaveLength(1)
+  })
+
   it("returns 500 when single order has no product (LOOKUP_FAILED)", async () => {
-    prismaMock.order.findMany.mockResolvedValueOnce([
+    setFingerprintMatches([
       {
         id: "order_1",
         orderNo: "FAK001",
@@ -437,7 +528,7 @@ expect(data.code).toBe("VALIDATION_FAILED")
         quantity: 1,
         amount: 50,
       },
-    ] as any)
+    ])
     verifyPasswordMock.mockResolvedValueOnce(true)
     const req = createJsonRequest({ email: "user@example.com", password: "secret123" })
     const res = await POST(req)
@@ -446,8 +537,8 @@ expect(data.code).toBe("VALIDATION_FAILED")
     expect(data.error).toBeDefined()
   })
 
-  it("skips order with corrupt password hash and continues to next", async () => {
-    prismaMock.order.findMany.mockResolvedValueOnce([
+  it("skips order with corrupt password hash and reports not found", async () => {
+    setFingerprintMatches([
       {
         id: "order_1",
         orderNo: "FAK001",
@@ -460,7 +551,8 @@ expect(data.code).toBe("VALIDATION_FAILED")
         quantity: 1,
         amount: 50,
       },
-    ] as any)
+    ])
+    setLegacyFallback([])
     verifyPasswordMock.mockRejectedValueOnce(new Error("corrupt hash"))
 
     const req = createJsonRequest({ email: "user@example.com", password: "secret123" })

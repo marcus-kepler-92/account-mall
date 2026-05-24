@@ -54,6 +54,10 @@ const envSchema = z
     orderSuccessTokenSecret: z.string().optional(),
     /** Cross-sell 折扣 token 签名密钥，至少 16 位 */
     crossSellTokenSecret: z.string().optional(),
+    /** Stable pepper mixed into the lookup-by-email password fingerprint hash.
+     * Rotation invalidates all existing fingerprints — pre-rollout orders fall
+     * back to the slow scrypt-verify path. Generate via `openssl rand -hex 32`. */
+    lookupFingerprintPepper: z.string().optional(),
     turnstileSiteKey: z.string().optional(),
     turnstileSecretKey: z.string().optional(),
     /** AUTO_FETCH：爬取结果缓存时间（毫秒），同一 sourceUrl 在此时间内复用 */
@@ -274,6 +278,20 @@ const envSchema = z
         "[config] CROSS_SELL_TOKEN_SECRET missing or too short; using dev default. Set 16+ chars in production.",
       )
     }
+    const lookupFingerprintRaw = data.lookupFingerprintPepper?.trim();
+    const lookupFingerprintPepper =
+      lookupFingerprintRaw && lookupFingerprintRaw.length >= 16
+        ? lookupFingerprintRaw
+        : "dev-lookup-fingerprint-pepper-32chars";
+    if (
+      data.nodeEnv === "production" &&
+      (!lookupFingerprintRaw || lookupFingerprintRaw.length < 16)
+    ) {
+      warnOnce(
+        "LOOKUP_FINGERPRINT_PEPPER",
+        "[config] LOOKUP_FINGERPRINT_PEPPER missing or too short in production; using dev default. Lookup-by-email fast path still works, but rotating away from the dev value will invalidate existing fingerprints.",
+      )
+    }
     const siteUrl =
       data.betterAuthUrl?.trim() ||
       (data.vercelUrl ? `https://${data.vercelUrl}` : "http://localhost:3000");
@@ -284,6 +302,7 @@ const envSchema = z
       siteUrl,
       orderSuccessTokenSecret,
       crossSellTokenSecret,
+      lookupFingerprintPepper,
     };
   });
 
@@ -320,6 +339,7 @@ function getEnvInput() {
     maxPendingOrdersPerIp: e.MAX_PENDING_ORDERS_PER_IP,
     orderSuccessTokenSecret: e.ORDER_SUCCESS_TOKEN_SECRET,
     crossSellTokenSecret: e.CROSS_SELL_TOKEN_SECRET,
+    lookupFingerprintPepper: e.LOOKUP_FINGERPRINT_PEPPER,
     turnstileSiteKey: e.TURNSTILE_SITE_KEY,
     turnstileSecretKey: e.TURNSTILE_SECRET_KEY,
     autoFetchScrapeCacheTtlMs:

@@ -299,6 +299,12 @@ model Order {
   dunCount               Int                @default(0)
   /// Timestamp of the most recent dun event; null until first dun. Used for cooldown calculation.
   lastDunAt              DateTime?
+  /// Fast SHA-256(email + ":" + password + ":" + LOOKUP_FINGERPRINT_PEPPER) used to
+  /// pre-filter lookup-by-email candidates before the expensive scrypt verify.
+  /// Null on legacy orders predating this field — those orders fall through to
+  /// the slow path (capped at 10 candidates). Not authoritative; passwordHash +
+  /// verifyPassword remain the source of truth.
+  passwordFingerprint    String?            @db.VarChar(64)
   paymentChannel         PaymentChannel?    @relation(fields: [paymentChannelId], references: [id])
   product                Product            @relation(fields: [productId], references: [id])
   distributor            User?              @relation(fields: [distributorId], references: [id])
@@ -311,6 +317,7 @@ model Order {
   crossSellUsageAsTarget CrossSellUsage?    @relation("CrossSellTarget")
 
   @@index([email])
+  @@index([email, passwordFingerprint, createdAt])
   @@index([status, createdAt])
   @@index([clientIp, status])
   @@index([fingerprintHash])

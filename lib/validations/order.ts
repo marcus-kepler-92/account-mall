@@ -27,6 +27,10 @@ export const publicOrderLookupSchema = z.object({
 export const publicOrderLookupByEmailSchema = z.object({
     email: z.string().min(1).pipe(z.email()),
     password: z.string().min(6),
+    // Pagination on the fingerprint-matched set (the buyer's own orders).
+    // Defaults: page=1, pageSize=10. pageSize is clamped to [1, 50] in the handler.
+    page: z.coerce.number().int().min(1).optional(),
+    pageSize: z.coerce.number().int().min(1).max(50).optional(),
 })
 
 export const updateOrderStatusSchema = z.object({
