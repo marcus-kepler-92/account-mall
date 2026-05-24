@@ -128,7 +128,6 @@ export default async function OrderSuccessPage({
           }
           variantName={order.variantNameSnapshot}
           amount={Number(order.amount)}
-          email={order.email}
           etaText={etaText}
           cs={incomingCs}
         />

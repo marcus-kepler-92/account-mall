@@ -375,7 +375,13 @@ export function ProductOrderForm({
                                 <FormControl>
                         <Input
                                     type="email"
-                                    placeholder={isFree ? "用于订单记录与查询" : "用于接收卡密"}
+                                    placeholder={
+                                        isFree
+                                            ? "用于订单记录与查询"
+                                            : isManual
+                                                ? "用于订单查询"
+                                                : "用于接收卡密"
+                                    }
                                         disabled={!inStock}
                                         {...field}
                                     />

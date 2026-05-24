@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Copy, Mail } from "lucide-react"
+import { Copy } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
@@ -21,19 +21,8 @@ type Props = {
     productName: string
     variantName: string | null
     amount: number
-    email: string
     etaText: string
     cs?: string
-}
-
-// Mask the buyer email for display (e.g. "k***le@gmail.com"). Showing the full
-// address feels invasive on a public page; this preserves enough to confirm the
-// right inbox without leaking the full identifier.
-function maskEmail(email: string): string {
-    const [local, domain] = email.split("@")
-    if (!local || !domain) return email
-    if (local.length <= 2) return `${local[0]}*@${domain}`
-    return `${local[0]}***${local[local.length - 1]}@${domain}`
 }
 
 /**
@@ -53,7 +42,6 @@ export function ManualSuccessView({
     productName,
     variantName,
     amount,
-    email,
     etaText,
     cs,
 }: Props) {
@@ -117,15 +105,6 @@ export function ManualSuccessView({
                                     current={status}
                                     etaText={isCompleted ? undefined : etaText}
                                 />
-                            </div>
-
-                            <div className="rounded-lg border bg-muted/50 p-3 text-sm text-muted-foreground">
-                                <p className="flex items-center gap-2">
-                                    <Mail className="size-4 shrink-0" />
-                                    {isCompleted
-                                        ? `发货邮件已发送至 ${maskEmail(email)}`
-                                        : `发货完成时会邮件通知 ${maskEmail(email)}`}
-                                </p>
                             </div>
                         </CardContent>
                     </Card>
