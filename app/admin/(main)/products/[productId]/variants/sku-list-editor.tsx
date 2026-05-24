@@ -293,7 +293,7 @@ export function SkuListEditor({
                     )
                     if (!res.ok) {
                         const data = await res.json().catch(() => ({}))
-                        toast.error(data?.error ?? "保存失败")
+                        toast.error(formatRowSaveError(data, "保存失败"))
                         setRowMeta((m) => ({
                             ...m,
                             [key]: {
@@ -329,7 +329,7 @@ export function SkuListEditor({
                     )
                     if (!res.ok) {
                         const data = await res.json().catch(() => ({}))
-                        toast.error(data?.error ?? "创建失败")
+                        toast.error(formatRowSaveError(data, "创建失败"))
                         setRowMeta((m) => ({
                             ...m,
                             [key]: {
@@ -463,7 +463,7 @@ export function SkuListEditor({
     // the switch never causes a column reflow. The 库存 column header stays
     // visible (label hidden when off) and the body cell renders an invisible
     // placeholder of the same height as a real Input.
-    const columnCount = 7
+    const columnCount = trackInventory ? 7 : 6
     const table = (
         <div className="rounded-md border">
             <table className="w-full caption-bottom text-sm table-fixed">
@@ -478,12 +478,11 @@ export function SkuListEditor({
                         <th className="text-foreground h-10 px-2 text-left align-middle font-medium w-[120px]">
                             成本 (¥)
                         </th>
-                        <th
-                            className="text-foreground h-10 px-2 text-left align-middle font-medium w-[100px]"
-                            aria-hidden={!trackInventory}
-                        >
-                            {trackInventory ? "库存" : ""}
-                        </th>
+                        {trackInventory && (
+                            <th className="text-foreground h-10 px-2 text-left align-middle font-medium w-[100px]">
+                                库存
+                            </th>
+                        )}
                         <th className="text-foreground h-10 px-2 text-left align-middle font-medium w-[80px]">
                             排序
                         </th>
@@ -594,36 +593,28 @@ export function SkuListEditor({
                                     />
                                     <ErrorSlot message={errors.unitCost} />
                                 </td>
-                                <td className="p-2 align-top">
-                                    {trackInventory ? (
-                                        <>
-                                            <Input
-                                                aria-label={`SKU 库存 ${idx + 1}`}
-                                                type="number"
-                                                min="0"
-                                                step="1"
-                                                value={row.stockQuantity}
-                                                onChange={(e) =>
-                                                    updateRow(idx, {
-                                                        stockQuantity: e.target.value,
-                                                    })
-                                                }
-                                                onBlur={() => persistRow(idx)}
-                                                className={cn(
-                                                    errors.stockQuantity &&
-                                                        "border-destructive",
-                                                )}
-                                            />
-                                            <ErrorSlot message={errors.stockQuantity} />
-                                        </>
-                                    ) : (
-                                        // Invisible placeholder preserves row
-                                        // height + column width when 跟踪库存 is
-                                        // off, avoiding reflow when the switch
-                                        // toggles.
-                                        <div aria-hidden className="h-9" />
-                                    )}
-                                </td>
+                                {trackInventory && (
+                                    <td className="p-2 align-top">
+                                        <Input
+                                            aria-label={`SKU 库存 ${idx + 1}`}
+                                            type="number"
+                                            min="0"
+                                            step="1"
+                                            value={row.stockQuantity}
+                                            onChange={(e) =>
+                                                updateRow(idx, {
+                                                    stockQuantity: e.target.value,
+                                                })
+                                            }
+                                            onBlur={() => persistRow(idx)}
+                                            className={cn(
+                                                errors.stockQuantity &&
+                                                    "border-destructive",
+                                            )}
+                                        />
+                                        <ErrorSlot message={errors.stockQuantity} />
+                                    </td>
+                                )}
                                 <td className="p-2 align-top">
                                     <Input
                                         aria-label={`SKU 排序 ${idx + 1}`}
@@ -794,4 +785,40 @@ function extractFieldErrors(data: {
         }
     }
     return Object.keys(errors).length ? errors : undefined
+}
+
+// Chinese label for toast messages. Falls back to the raw field name for
+// unknown keys so we never silently drop info.
+const FIELD_LABEL: Record<string, string> = {
+    name: "名称",
+    price: "售价",
+    unitCost: "成本",
+    stockQuantity: "库存",
+    sortOrder: "排序",
+    isActive: "启用",
+}
+
+// Pick the most useful toast text from an autosave failure response. Priority:
+// 1) first field-level error from server validation (translated to Chinese)
+// 2) server-supplied `error` only if it's already a Chinese / human message
+// 3) generic fallback
+function formatRowSaveError(
+    data: { error?: string; details?: { fieldErrors?: Record<string, string[]> } },
+    fallback: string,
+): string {
+    const fieldErrors = data?.details?.fieldErrors
+    if (fieldErrors) {
+        for (const [field, msgs] of Object.entries(fieldErrors)) {
+            const msg = Array.isArray(msgs) ? msgs[0] : String(msgs)
+            if (!msg) continue
+            const label = FIELD_LABEL[field] ?? field
+            return `${label}：${msg}`
+        }
+    }
+    const raw = data?.error?.trim()
+    // Drop generic English errors like "Validation failed" — they tell the
+    // user nothing actionable. A Chinese message means the backend gave us
+    // something user-facing, surface it as-is.
+    if (raw && /[一-鿿]/.test(raw)) return raw
+    return fallback
 }

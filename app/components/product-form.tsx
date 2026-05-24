@@ -163,6 +163,10 @@ export function ProductForm({
             // a separate SkuListEditor instance in "edit" mode that talks to
             // /api/admin/products/[id]/variants directly.
             variants: [],
+            // Hidden marker so the form schema's MANUAL+variants superRefine
+            // knows to skip the "≥1 SKU" check on edit (where SKUs are owned
+            // by SkuListEditor autosave, not the form's variants[]).
+            _isEditing: isEditing,
         },
     })
 

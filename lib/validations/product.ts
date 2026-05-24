@@ -190,6 +190,14 @@ export const productFormSchema = z
                 }),
             )
             .optional(),
+        /**
+         * Hidden flag set by ProductForm when editing an existing product.
+         * Edit mode uses SkuListEditor in autosave-to-/api/admin/.../variants
+         * mode — the form's own `variants` field stays empty by design, so the
+         * "≥1 SKU" check below must be skipped or it falsely triggers on every
+         * existing MANUAL product with SKUs already on the server.
+         */
+        _isEditing: z.boolean().optional(),
     })
     .superRefine((data, ctx) => {
         if (data.productType === "AUTO_FETCH") {
@@ -203,9 +211,14 @@ export const productFormSchema = z
                     ctx.addIssue({ code: "custom", message: "AUTO_FETCH 商品必须填写来源 URL", path: ["sourceUrl"] })
             }
         } else if (data.productType === "MANUAL") {
-            // MANUAL products derive price from SKU variants. Require at least
-            // one validly-filled row before submit so the create POST atomically
-            // delivers a usable product (price/stock both live on variants).
+            // Edit mode: SKU rows live in SkuListEditor autosave, not in the
+            // form's variants[] — skip the "≥1 SKU" check to avoid a false
+            // positive on every existing MANUAL product.
+            if (data._isEditing) return
+            // Create mode: MANUAL products derive price from SKU variants.
+            // Require at least one validly-filled row before submit so the
+            // create POST atomically delivers a usable product (price/stock
+            // both live on variants).
             const rows = data.variants ?? []
             const valid = rows.filter((r) => {
                 if (!r.name?.trim()) return false
