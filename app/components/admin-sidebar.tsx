@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation"
 import {
     LayoutDashboard,
     Package,
+    PackageCheck,
     ShoppingCart,
     CreditCard,
     LogOut,
@@ -63,6 +64,7 @@ const allNavItems = [
     { title: "联推折扣", href: "/admin/settings/cross-sell", icon: Sparkles },
     // 数据
     { title: "订单管理", href: "/admin/orders", icon: ShoppingCart },
+    { title: "人工发货", href: "/admin/fulfillment", icon: PackageCheck },
     // 提现
     { title: "提现管理", href: "/admin/withdrawals", icon: Wallet },
     // 公告

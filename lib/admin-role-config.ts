@@ -6,6 +6,7 @@ export const ADMIN_ROLE_CONFIG = {
     allowedMenus: [
       "/admin/products",
       "/admin/orders",
+      "/admin/fulfillment",
       "/admin/announcements",
       "/admin/guides",
       "/admin/files",

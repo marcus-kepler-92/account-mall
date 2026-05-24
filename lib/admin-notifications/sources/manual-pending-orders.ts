@@ -6,10 +6,11 @@ export const manualPendingOrdersSource: NotificationSource<"manualPendingOrders"
   key: "manualPendingOrders",
   label: "待发货订单",
   icon: PackageCheck,
-  menuHref: "/admin/orders",
-  // Land on the in-progress filtered list. The orders page status enum is already
-  // widened to accept AWAITING_FULFILLMENT.
-  viewAllHref: "/admin/orders?status=AWAITING_FULFILLMENT",
+  // Dedicated 人工发货 center handles MANUAL fulfillment exclusively; sidebar
+  // badge and notification "view all" both land users in the in_progress filter
+  // (default) so AWAITING_FULFILLMENT + PROCESSING rows surface immediately.
+  menuHref: "/admin/fulfillment",
+  viewAllHref: "/admin/fulfillment",
   async fetch(prisma) {
     const where: Prisma.OrderWhereInput = {
       status: { in: [OrderStatus.AWAITING_FULFILLMENT, OrderStatus.PROCESSING] },
