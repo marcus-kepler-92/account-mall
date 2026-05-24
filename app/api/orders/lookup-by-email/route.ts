@@ -302,7 +302,8 @@ export async function POST(request: NextRequest) {
             pageSize,
             totalPages,
         })
-    } catch {
+    } catch (err) {
+        console.error("[lookup-by-email]", err)
         return internalServerError()
     }
 }
