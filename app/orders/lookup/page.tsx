@@ -17,16 +17,30 @@ import {
     FormLabel,
     FormMessage,
 } from "@/components/ui/form"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import { SiteHeader } from "@/app/components/site-header"
 import { useSiteName } from "@/app/components/site-name-provider"
-import { ChevronLeft, ChevronRight, Copy, Eye, EyeOff, Loader2, Mail, Hash, Package, Search, Zap } from "lucide-react"
+import { ChevronLeft, ChevronRight, Copy, Eye, EyeOff, Loader2, Mail, Hash, Package, Search, Zap, ArrowLeft } from "lucide-react"
 import { toast } from "sonner"
 import { addOrUpdateOrder } from "@/lib/order-history-storage"
 import { formatDateTime } from "@/lib/utils"
 import { applyFieldErrors } from "@/lib/form-utils"
-import { orderNoLookupSchema, emailLookupSchema, type OrderLookupFormValues } from "@/lib/validations/lookup"
+import {
+    orderNoLookupSchema,
+    emailLookupSchema,
+    orderDetailPasswordSchema,
+    type OrderLookupFormValues,
+    type OrderDetailPasswordValues,
+} from "@/lib/validations/lookup"
 import { OrderDetailContent } from "./order-detail-content"
 import type { OrderResult, OrderListItem, LookupMode } from "./types"
 
@@ -34,9 +48,11 @@ import type { OrderResult, OrderListItem, LookupMode } from "./types"
 /*  Utilities                                                          */
 /* ------------------------------------------------------------------ */
 
-const STATUS_CONFIG: Record<string, { label: string; variant: "default" | "secondary" | "outline" }> = {
+const STATUS_CONFIG: Record<string, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
     COMPLETED: { label: "已完成", variant: "default" },
     PENDING: { label: "待支付", variant: "secondary" },
+    AWAITING_FULFILLMENT: { label: "等待发货", variant: "secondary" },
+    PROCESSING: { label: "发货中", variant: "secondary" },
     CLOSED: { label: "已关闭", variant: "outline" },
 }
 
@@ -46,7 +62,12 @@ type ApiOk = { ok: true; data: Record<string, any> }
 type ApiErr = { ok: false; error: string; raw: Record<string, any> }
 type ApiResult = ApiOk | ApiErr
 
-async function fetchApi(endpoint: string, body: Record<string, string>, timeoutMs = 15_000): Promise<ApiResult> {
+async function fetchApi(
+    endpoint: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    body: Record<string, any>,
+    timeoutMs = 15_000,
+): Promise<ApiResult> {
     const { fetchWithTimeout } = await import("@/lib/fetch-with-timeout")
     const res = await fetchWithTimeout(endpoint, {
         method: "POST",
@@ -57,6 +78,55 @@ async function fetchApi(endpoint: string, body: Record<string, string>, timeoutM
     const data = await res.json().catch(() => ({}))
     if (!res.ok) return { ok: false, error: data?.error ?? "", raw: data }
     return { ok: true, data }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Per-email password cache (sessionStorage, per-tab)                 */
+/*                                                                     */
+/*  Buyers typically reuse one password across all their orders. When  */
+/*  the buyer successfully opens detail for one row, cache that        */
+/*  (email, password) — subsequent rows can skip the password Dialog   */
+/*  and just hit the detail API directly. If detail fails (wrong       */
+/*  password — extremely rare since the same password worked), we fall */
+/*  back to the Dialog. Cleared on 「换邮箱」.                          */
+/* ------------------------------------------------------------------ */
+
+const PASSWORD_CACHE_KEY = "account-mall-lookup-pw-cache"
+
+function readPasswordCache(email: string): string | null {
+    if (typeof window === "undefined") return null
+    try {
+        const raw = window.sessionStorage.getItem(PASSWORD_CACHE_KEY)
+        if (!raw) return null
+        const parsed = JSON.parse(raw) as { email?: string; password?: string }
+        if (parsed.email === email && typeof parsed.password === "string") {
+            return parsed.password
+        }
+        return null
+    } catch {
+        return null
+    }
+}
+
+function writePasswordCache(email: string, password: string): void {
+    if (typeof window === "undefined") return
+    try {
+        window.sessionStorage.setItem(
+            PASSWORD_CACHE_KEY,
+            JSON.stringify({ email, password }),
+        )
+    } catch {
+        // sessionStorage may be unavailable (privacy mode) — silently skip.
+    }
+}
+
+function clearPasswordCache(): void {
+    if (typeof window === "undefined") return
+    try {
+        window.sessionStorage.removeItem(PASSWORD_CACHE_KEY)
+    } catch {
+        // ignore
+    }
 }
 
 /* ------------------------------------------------------------------ */
@@ -80,6 +150,7 @@ interface OrderLookupFormProps {
     setShowPassword: React.Dispatch<React.SetStateAction<boolean>>
     setResult: React.Dispatch<React.SetStateAction<OrderResult | null>>
     setOrderList: React.Dispatch<React.SetStateAction<OrderListItem[] | null>>
+    setListEmail: React.Dispatch<React.SetStateAction<string | null>>
     setLoading: React.Dispatch<React.SetStateAction<boolean>>
     setSheetOpen: React.Dispatch<React.SetStateAction<boolean>>
     setPagination: React.Dispatch<React.SetStateAction<PaginationMeta | null>>
@@ -90,7 +161,7 @@ const EMAIL_LOOKUP_PAGE_SIZE = 10
 function OrderLookupForm({
     lookupMode, formRef, initialOrderNo, initialEmail, loading,
     showPassword, setShowPassword,
-    setResult, setOrderList, setLoading, setSheetOpen, setPagination,
+    setResult, setOrderList, setListEmail, setLoading, setSheetOpen, setPagination,
 }: OrderLookupFormProps) {
     const passwordInputRef = useRef<HTMLInputElement>(null)
 
@@ -112,10 +183,8 @@ function OrderLookupForm({
         // each mount needs to re-apply both values from props).
         if (initialOrderNo) form.setValue("orderNo", initialOrderNo)
         if (initialEmail) form.setValue("email", initialEmail)
-        const currentModeFilled =
-            (lookupMode === "orderNo" && initialOrderNo) ||
-            (lookupMode === "email" && initialEmail)
-        if (currentModeFilled) {
+        // Auto-focus password only in orderNo mode (email mode has no pwd field).
+        if (lookupMode === "orderNo" && initialOrderNo) {
             setTimeout(() => passwordInputRef.current?.focus(), 100)
         }
     }, [initialOrderNo, initialEmail, lookupMode, form])
@@ -128,55 +197,76 @@ function OrderLookupForm({
         form.clearErrors()
         setLoading(true)
         try {
+            if (isOrderMode) {
+                const res = await fetchApi(
+                    "/api/orders/lookup",
+                    { orderNo: data.orderNo.trim(), password: data.password.trim() },
+                    15_000,
+                )
+                if (!res.ok) {
+                    applyFieldErrors(res.raw, form.setError)
+                    form.setError("password", {
+                        message: res.error === "Order not found or password incorrect"
+                            ? "订单不存在或密码错误"
+                            : res.error || "查询失败，请稍后重试",
+                    })
+                    return
+                }
+                if (!res.data.orderNo) {
+                    form.setError("password", { message: "订单不存在或密码错误" })
+                    return
+                }
+                setResult(res.data as OrderResult)
+                setSheetOpen(true)
+                addOrUpdateOrder({
+                    orderNo: res.data.orderNo,
+                    productName: res.data.productName ?? "商品",
+                    amount: res.data.amount ?? 0,
+                    createdAt: typeof res.data.createdAt === "string" ? res.data.createdAt : new Date().toISOString(),
+                    status: res.data.status ?? "PENDING",
+                })
+                toast.success("查询成功")
+                return
+            }
+
+            // Email mode → list-only fetch. New contract: never returns a single
+            // order detail — always { orders, total, page, pageSize, totalPages }.
+            const normalizedEmail = data.email.trim().toLowerCase()
             const res = await fetchApi(
-                isOrderMode ? "/api/orders/lookup" : "/api/orders/lookup-by-email",
-                isOrderMode
-                    ? { orderNo: data.orderNo.trim(), password: data.password.trim() }
-                    : {
-                        email: data.email.trim().toLowerCase(),
-                        password: data.password.trim(),
-                        page: "1",
-                        pageSize: String(EMAIL_LOOKUP_PAGE_SIZE),
-                    },
-                isOrderMode ? 15_000 : 40_000,
+                "/api/orders/lookup-by-email",
+                {
+                    email: normalizedEmail,
+                    page: 1,
+                    pageSize: EMAIL_LOOKUP_PAGE_SIZE,
+                },
+                20_000,
             )
             if (!res.ok) {
                 applyFieldErrors(res.raw, form.setError)
-                form.setError("password", {
-                    message: res.error === "Order not found or password incorrect"
-                        ? "订单不存在或密码错误"
-                        : res.error || "查询失败，请稍后重试",
+                form.setError("email", {
+                    message: res.error || "查询失败，请稍后重试",
                 })
                 return
             }
-            if (Array.isArray(res.data.orders)) {
-                setOrderList(res.data.orders)
-                const total = typeof res.data.total === "number" ? res.data.total : res.data.orders.length
-                const page = typeof res.data.page === "number" ? res.data.page : 1
-                const pageSize = typeof res.data.pageSize === "number" ? res.data.pageSize : EMAIL_LOOKUP_PAGE_SIZE
-                const totalPages = typeof res.data.totalPages === "number"
-                    ? res.data.totalPages
-                    : Math.max(1, Math.ceil(total / pageSize))
-                setPagination({ total, page, pageSize, totalPages })
-                toast.success(`找到 ${total} 个相关订单`)
+            const orders: OrderListItem[] = Array.isArray(res.data.orders) ? res.data.orders : []
+            const total = typeof res.data.total === "number" ? res.data.total : orders.length
+            const page = typeof res.data.page === "number" ? res.data.page : 1
+            const pageSize = typeof res.data.pageSize === "number" ? res.data.pageSize : EMAIL_LOOKUP_PAGE_SIZE
+            const totalPages = typeof res.data.totalPages === "number"
+                ? res.data.totalPages
+                : Math.max(1, Math.ceil(total / pageSize))
+            setOrderList(orders)
+            setListEmail(normalizedEmail)
+            setPagination({ total, page, pageSize, totalPages })
+            // Switching emails invalidates any cached per-row password.
+            clearPasswordCache()
+            if (total === 0) {
+                // Empty list is rendered inline below — no field error.
                 return
             }
-            if (!res.data.orderNo) {
-                form.setError("password", { message: "订单不存在或密码错误" })
-                return
-            }
-            setResult(res.data as OrderResult)
-            setSheetOpen(true)
-            addOrUpdateOrder({
-                orderNo: res.data.orderNo,
-                productName: res.data.productName ?? "商品",
-                amount: res.data.amount ?? 0,
-                createdAt: typeof res.data.createdAt === "string" ? res.data.createdAt : new Date().toISOString(),
-                status: res.data.status ?? "PENDING",
-            })
-            toast.success("查询成功")
+            toast.success(`找到 ${total} 个相关订单`)
         } catch {
-            form.setError("password", { message: "网络错误，请稍后重试" })
+            form.setError(isOrderMode ? "password" : "email", { message: "网络错误，请稍后重试" })
         } finally {
             setLoading(false)
         }
@@ -206,41 +296,146 @@ function OrderLookupForm({
                         </FormItem>
                     )} />
                 )}
-                <FormField control={form.control} name="password" render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>查询密码</FormLabel>
-                        <FormControl>
-                            <div className="relative">
-                                <Input
-                                    type={showPassword ? "text" : "password"}
-                                    placeholder="请输入下单时设置的查询密码"
-                                    className="pr-10"
-                                    {...field}
-                                    ref={(el) => {
-                                        passwordInputRef.current = el
-                                        if (typeof field.ref === "function") field.ref(el)
-                                    }}
-                                />
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                                    onClick={() => setShowPassword((v) => !v)}
-                                    tabIndex={-1}
-                                >
-                                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                                </Button>
-                            </div>
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                )} />
+                {lookupMode === "orderNo" && (
+                    <FormField control={form.control} name="password" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>查询密码</FormLabel>
+                            <FormControl>
+                                <div className="relative">
+                                    <Input
+                                        type={showPassword ? "text" : "password"}
+                                        placeholder="请输入下单时设置的查询密码"
+                                        className="pr-10"
+                                        {...field}
+                                        ref={(el) => {
+                                            passwordInputRef.current = el
+                                            if (typeof field.ref === "function") field.ref(el)
+                                        }}
+                                    />
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                                        onClick={() => setShowPassword((v) => !v)}
+                                        tabIndex={-1}
+                                    >
+                                        {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                                    </Button>
+                                </div>
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )} />
+                )}
                 <Button type="submit" className="w-full" disabled={loading}>
                     {loading ? <><Loader2 className="mr-2 size-4 animate-spin" />查询中...</> : <><Search className="mr-2 size-4" />查询订单</>}
                 </Button>
+                {lookupMode === "email" && (
+                    <p className="text-xs text-muted-foreground">
+                        邮箱查询只需邮箱地址；查看任意订单详情时再输入对应的查询密码。
+                    </p>
+                )}
             </form>
         </Form>
+    )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Per-row password Dialog                                            */
+/* ------------------------------------------------------------------ */
+
+interface PasswordDialogProps {
+    open: boolean
+    onOpenChange: (open: boolean) => void
+    orderNo: string | null
+    onSubmit: (password: string) => Promise<{ ok: boolean; error?: string }>
+}
+
+function OrderDetailPasswordDialog({ open, onOpenChange, orderNo, onSubmit }: PasswordDialogProps) {
+    const [showPassword, setShowPassword] = useState(false)
+    const [submitting, setSubmitting] = useState(false)
+    const form = useForm<OrderDetailPasswordValues>({
+        resolver: zodResolver(orderDetailPasswordSchema),
+        defaultValues: { password: "" },
+    })
+
+    // Reset on open/close so leftover values from a previous click don't
+    // surface against a different order.
+    useEffect(() => {
+        if (!open) {
+            form.reset({ password: "" })
+            setSubmitting(false)
+            setShowPassword(false)
+        }
+    }, [open, form])
+
+    const handleSubmit = form.handleSubmit(async ({ password }) => {
+        setSubmitting(true)
+        try {
+            const res = await onSubmit(password.trim())
+            if (!res.ok) {
+                form.setError("password", { message: res.error || "密码错误" })
+                return
+            }
+            onOpenChange(false)
+        } finally {
+            setSubmitting(false)
+        }
+    })
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>查询密码</DialogTitle>
+                    <DialogDescription>
+                        {orderNo
+                            ? <>查看订单 <span className="font-mono">{orderNo}</span> 需要输入对应的查询密码。</>
+                            : "查看订单需要输入对应的查询密码。"}
+                    </DialogDescription>
+                </DialogHeader>
+                <Form {...form}>
+                    <form onSubmit={handleSubmit} className="space-y-3">
+                        <FormField control={form.control} name="password" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className="sr-only">查询密码</FormLabel>
+                                <FormControl>
+                                    <div className="relative">
+                                        <Input
+                                            type={showPassword ? "text" : "password"}
+                                            placeholder="请输入下单时设置的查询密码"
+                                            className="pr-10"
+                                            autoFocus
+                                            {...field}
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                                            onClick={() => setShowPassword((v) => !v)}
+                                            tabIndex={-1}
+                                        >
+                                            {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                                        </Button>
+                                    </div>
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )} />
+                        <DialogFooter className="gap-2 sm:gap-0">
+                            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                                取消
+                            </Button>
+                            <Button type="submit" disabled={submitting}>
+                                {submitting ? <><Loader2 className="mr-2 size-4 animate-spin" />验证中</> : "确认"}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </Form>
+            </DialogContent>
+        </Dialog>
     )
 }
 
@@ -257,37 +452,44 @@ function OrderLookupPageContent() {
     const [loading, setLoading] = useState(false)
     const [result, setResult] = useState<OrderResult | null>(null)
     const [orderList, setOrderList] = useState<OrderListItem[] | null>(null)
+    const [listEmail, setListEmail] = useState<string | null>(null)
     const [pagination, setPagination] = useState<PaginationMeta | null>(null)
     const [pageLoading, setPageLoading] = useState(false)
     const [sheetOpen, setSheetOpen] = useState(false)
-    const [loadingOrderNo, setLoadingOrderNo] = useState<string | null>(null)
     const [sheetLoading, setSheetLoading] = useState(false)
+    // Detail-password Dialog state.
+    const [pwDialogOpen, setPwDialogOpen] = useState(false)
+    const [pendingOrderNo, setPendingOrderNo] = useState<string | null>(null)
+    const [loadingOrderNo, setLoadingOrderNo] = useState<string | null>(null)
+    // Cached password for the detail flow — preferred over the form's password
+    // because the email-mode form has no password field. Keeps OrderDetailContent's
+    // getPassword() callback working for downstream actions (dun / check-payment).
+    const [detailPassword, setDetailPassword] = useState<string>("")
 
     const formRef = useRef<UseFormReturn<OrderLookupFormValues> | null>(null)
-    const getPassword = useCallback(() => formRef.current?.getValues("password") ?? "", [])
-    const getEmail = useCallback(() => formRef.current?.getValues("email") ?? "", [])
+    const getPassword = useCallback(
+        () => detailPassword || formRef.current?.getValues("password") || "",
+        [detailPassword],
+    )
 
     const fetchPage = useCallback(async (targetPage: number) => {
-        const email = getEmail().trim().toLowerCase()
-        const password = getPassword().trim()
-        if (!email || !password || !pagination) return
+        if (!listEmail || !pagination) return
         setPageLoading(true)
         try {
             const res = await fetchApi(
                 "/api/orders/lookup-by-email",
                 {
-                    email,
-                    password,
-                    page: String(targetPage),
-                    pageSize: String(pagination.pageSize),
+                    email: listEmail,
+                    page: targetPage,
+                    pageSize: pagination.pageSize,
                 },
-                40_000,
+                20_000,
             )
             if (!res.ok || !Array.isArray(res.data.orders)) {
                 toast.error("加载下一页失败，请稍后重试")
                 return
             }
-            setOrderList(res.data.orders)
+            setOrderList(res.data.orders as OrderListItem[])
             const total = typeof res.data.total === "number" ? res.data.total : res.data.orders.length
             const page = typeof res.data.page === "number" ? res.data.page : targetPage
             const pageSize = typeof res.data.pageSize === "number" ? res.data.pageSize : pagination.pageSize
@@ -300,7 +502,7 @@ function OrderLookupPageContent() {
         } finally {
             setPageLoading(false)
         }
-    }, [getEmail, getPassword, pagination])
+    }, [listEmail, pagination])
 
     useEffect(() => {
         // URL is the single source of truth for initial query state.
@@ -326,26 +528,52 @@ function OrderLookupPageContent() {
         setLookupMode(mode)
         setResult(null)
         setOrderList(null)
+        setListEmail(null)
         setPagination(null)
+        setDetailPassword("")
+        clearPasswordCache()
     }, [])
 
-    const handleOrderClick = useCallback(async (clickedOrderNo: string) => {
-        const password = getPassword()
-        setLoadingOrderNo(clickedOrderNo)
+    const resetEmail = useCallback(() => {
+        // 「换邮箱」 — back to State A (form input).
+        setOrderList(null)
+        setListEmail(null)
+        setPagination(null)
+        setResult(null)
+        setDetailPassword("")
+        clearPasswordCache()
+    }, [])
+
+    /**
+     * Open detail Sheet for a row. Tries the sessionStorage password cache
+     * first — most buyers use one password for all orders, so the second click
+     * onward should skip the Dialog entirely.
+     */
+    const openDetailWithPassword = useCallback(async (
+        targetOrderNo: string,
+        password: string,
+    ): Promise<{ ok: boolean; error?: string }> => {
+        setLoadingOrderNo(targetOrderNo)
         setSheetLoading(true)
         setSheetOpen(true)
         setResult(null)
         try {
-            const res = await fetchApi("/api/orders/lookup", {
-                orderNo: clickedOrderNo.trim(),
-                password: password.trim(),
-            })
+            const res = await fetchApi(
+                "/api/orders/lookup",
+                { orderNo: targetOrderNo.trim(), password: password.trim() },
+                15_000,
+            )
             if (!res.ok || !res.data.orderNo) {
-                toast.error("订单详情获取失败")
                 setSheetOpen(false)
-                return
+                setResult(null)
+                const msg = res.ok === false && res.error === "Order not found or password incorrect"
+                    ? "密码错误"
+                    : (res.ok === false ? res.error : "") || "查询失败，请稍后重试"
+                return { ok: false, error: msg }
             }
             setResult(res.data as OrderResult)
+            setDetailPassword(password)
+            if (listEmail) writePasswordCache(listEmail, password)
             addOrUpdateOrder({
                 orderNo: res.data.orderNo,
                 productName: res.data.productName ?? "商品",
@@ -353,14 +581,36 @@ function OrderLookupPageContent() {
                 createdAt: typeof res.data.createdAt === "string" ? res.data.createdAt : new Date().toISOString(),
                 status: res.data.status ?? "PENDING",
             })
+            return { ok: true }
         } catch {
-            toast.error("网络错误，请稍后重试")
             setSheetOpen(false)
+            setResult(null)
+            return { ok: false, error: "网络错误，请稍后重试" }
         } finally {
             setSheetLoading(false)
             setLoadingOrderNo(null)
         }
-    }, [getPassword])
+    }, [listEmail])
+
+    const handleOrderClick = useCallback(async (clickedOrderNo: string) => {
+        // Try the cached password first (per-tab, scoped to current email).
+        const cached = listEmail ? readPasswordCache(listEmail) : null
+        if (cached) {
+            const res = await openDetailWithPassword(clickedOrderNo, cached)
+            if (res.ok) return
+            // Cached password no longer valid (rotated? wrong order?) — wipe
+            // it and fall through to the Dialog.
+            clearPasswordCache()
+            setDetailPassword("")
+        }
+        setPendingOrderNo(clickedOrderNo)
+        setPwDialogOpen(true)
+    }, [listEmail, openDetailWithPassword])
+
+    const handlePasswordDialogSubmit = useCallback(async (password: string) => {
+        if (!pendingOrderNo) return { ok: false, error: "请重新选择订单" }
+        return openDetailWithPassword(pendingOrderNo, password)
+    }, [pendingOrderNo, openDetailWithPassword])
 
     return (
         <div className="flex min-h-screen flex-col">
@@ -371,7 +621,7 @@ function OrderLookupPageContent() {
                     <Card>
                         <CardHeader className="pb-4">
                             <CardTitle>订单查询</CardTitle>
-                            <CardDescription>输入订单号或邮箱，以及下单时设置的查询密码，查看账号内容。</CardDescription>
+                            <CardDescription>输入订单号或邮箱查看你的订单与账号内容。</CardDescription>
                             {searchParams.get("fromPay") === "1" && searchParams.get("orderNo") && (
                                 <div className="mt-3 rounded-lg border border-green-500/50 bg-green-500/10 p-3 text-sm text-green-700 dark:text-green-400">
                                     支付已完成！若未自动展示账号，请输入查询密码并点击「查询订单」。
@@ -391,86 +641,110 @@ function OrderLookupPageContent() {
                                 </Button>
                             </div>
 
-                            {/* 查询表单 */}
-                            <OrderLookupForm
-                                key={lookupMode}
-                                lookupMode={lookupMode}
-                                formRef={formRef}
-                                initialOrderNo={searchParams.get("orderNo")}
-                                initialEmail={searchParams.get("email")}
-                                loading={loading}
-                                showPassword={showPassword}
-                                setShowPassword={setShowPassword}
-                                setResult={setResult}
-                                setOrderList={setOrderList}
-                                setLoading={setLoading}
-                                setSheetOpen={setSheetOpen}
-                                setPagination={setPagination}
-                            />
-
-                            {/* 邮箱查询结果列表 */}
-                            {orderList && orderList.length > 0 && (
-                                <div className="space-y-3 border-t pt-4">
-                                    <div className="space-y-1">
-                                        <h3 className="text-base font-semibold flex items-center gap-2">
-                                            <Package className="size-4" />找到 {pagination?.total ?? orderList.length} 个订单
-                                        </h3>
-                                        <p className="text-xs text-muted-foreground">点击任意订单查看详情</p>
+                            {/* State A / B-header: form unless we're showing a list, then header */}
+                            {lookupMode === "email" && orderList !== null && listEmail ? (
+                                <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted/30 p-3">
+                                    <div className="min-w-0">
+                                        <p className="text-sm">
+                                            邮箱 <span className="font-mono">{listEmail}</span> 下的订单
+                                            <span className="ml-1 text-muted-foreground">（共 {pagination?.total ?? orderList.length} 单）</span>
+                                        </p>
                                     </div>
-                                    <div className="grid gap-2 sm:grid-cols-2">
-                                        {orderList.map((order) => {
-                                            const cfg = STATUS_CONFIG[order.status]
-                                            const isLoadingThis = loadingOrderNo === order.orderNo
-                                            const isSelected = result?.orderNo === order.orderNo && sheetOpen
-                                            return (
-                                                <Button
-                                                    key={order.orderNo}
-                                                    variant="outline"
-                                                    className={`h-auto w-full min-w-0 flex-col items-start gap-1.5 p-3 text-left ${isSelected ? "border-primary" : ""}`}
-                                                    onClick={() => handleOrderClick(order.orderNo)}
-                                                    disabled={isLoadingThis}
-                                                >
-                                                    <div className="flex w-full items-center justify-between gap-2">
-                                                        <span className="truncate text-sm font-medium">{order.productName}</span>
-                                                        {isLoadingThis
-                                                            ? <Loader2 className="size-3.5 shrink-0 animate-spin" />
-                                                            : <Badge variant={cfg?.variant ?? "outline"} className="text-[10px] shrink-0">{cfg?.label ?? order.status}</Badge>}
-                                                    </div>
-                                                    <div className="flex w-full items-center justify-between gap-2 text-xs text-muted-foreground">
-                                                        <span className="font-mono truncate">{order.orderNo}</span>
-                                                        <span className="shrink-0">{formatDateTime(order.createdAt)}</span>
-                                                    </div>
-                                                </Button>
-                                            )
-                                        })}
-                                    </div>
-                                    {pagination && pagination.totalPages > 1 && (
-                                        <div className="flex items-center justify-between gap-3 pt-1 text-xs text-muted-foreground">
-                                            <span>第 {pagination.page} / {pagination.totalPages} 页</span>
-                                            <div className="flex items-center gap-2">
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    disabled={pagination.page <= 1 || pageLoading}
-                                                    onClick={() => fetchPage(pagination.page - 1)}
-                                                >
-                                                    <ChevronLeft className="size-3.5" />上一页
-                                                </Button>
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    disabled={pagination.page >= pagination.totalPages || pageLoading}
-                                                    onClick={() => fetchPage(pagination.page + 1)}
-                                                >
-                                                    下一页<ChevronRight className="size-3.5" />
-                                                </Button>
-                                                {pageLoading && <Loader2 className="size-3.5 animate-spin" />}
-                                            </div>
-                                        </div>
-                                    )}
+                                    <Button type="button" variant="outline" size="sm" onClick={resetEmail}>
+                                        <ArrowLeft className="size-3.5" />换邮箱
+                                    </Button>
                                 </div>
+                            ) : (
+                                <OrderLookupForm
+                                    key={lookupMode}
+                                    lookupMode={lookupMode}
+                                    formRef={formRef}
+                                    initialOrderNo={searchParams.get("orderNo")}
+                                    initialEmail={searchParams.get("email")}
+                                    loading={loading}
+                                    showPassword={showPassword}
+                                    setShowPassword={setShowPassword}
+                                    setResult={setResult}
+                                    setOrderList={setOrderList}
+                                    setListEmail={setListEmail}
+                                    setLoading={setLoading}
+                                    setSheetOpen={setSheetOpen}
+                                    setPagination={setPagination}
+                                />
+                            )}
+
+                            {/* State B: email lookup results list */}
+                            {lookupMode === "email" && orderList !== null && (
+                                orderList.length === 0 ? (
+                                    <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+                                        该邮箱下没有订单。请确认邮箱地址是否填写正确。
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        <div className="space-y-1">
+                                            <h3 className="flex items-center gap-2 text-base font-semibold">
+                                                <Package className="size-4" />共 {pagination?.total ?? orderList.length} 个订单
+                                            </h3>
+                                            <p className="text-xs text-muted-foreground">点击任意订单，输入对应查询密码后查看详情</p>
+                                        </div>
+                                        <div className="grid gap-2 sm:grid-cols-2">
+                                            {orderList.map((order) => {
+                                                const cfg = STATUS_CONFIG[order.status]
+                                                const isLoadingThis = loadingOrderNo === order.orderNo
+                                                const isSelected = result?.orderNo === order.orderNo && sheetOpen
+                                                return (
+                                                    <Button
+                                                        key={order.orderNo}
+                                                        variant="outline"
+                                                        className={`h-auto w-full min-w-0 flex-col items-start gap-1.5 p-3 text-left ${isSelected ? "border-primary" : ""}`}
+                                                        onClick={() => handleOrderClick(order.orderNo)}
+                                                        disabled={isLoadingThis}
+                                                    >
+                                                        <div className="flex w-full items-center justify-between gap-2">
+                                                            <div className="min-w-0 truncate text-sm font-medium">
+                                                                {order.productName}
+                                                                {order.variantName ? <span className="ml-1 text-muted-foreground">· {order.variantName}</span> : null}
+                                                            </div>
+                                                            {isLoadingThis
+                                                                ? <Loader2 className="size-3.5 shrink-0 animate-spin" />
+                                                                : <Badge variant={cfg?.variant ?? "outline"} className="shrink-0 text-[10px]">{cfg?.label ?? order.status}</Badge>}
+                                                        </div>
+                                                        <div className="flex w-full items-center justify-between gap-2 text-xs text-muted-foreground">
+                                                            <span className="truncate font-mono">{order.orderNo}</span>
+                                                            <span className="shrink-0">{formatDateTime(order.createdAt)}</span>
+                                                        </div>
+                                                    </Button>
+                                                )
+                                            })}
+                                        </div>
+                                        {pagination && pagination.totalPages > 1 && (
+                                            <div className="flex items-center justify-between gap-3 pt-1 text-xs text-muted-foreground">
+                                                <span>第 {pagination.page} / {pagination.totalPages} 页</span>
+                                                <div className="flex items-center gap-2">
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        disabled={pagination.page <= 1 || pageLoading}
+                                                        onClick={() => fetchPage(pagination.page - 1)}
+                                                    >
+                                                        <ChevronLeft className="size-3.5" />上一页
+                                                    </Button>
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        disabled={pagination.page >= pagination.totalPages || pageLoading}
+                                                        onClick={() => fetchPage(pagination.page + 1)}
+                                                    >
+                                                        下一页<ChevronRight className="size-3.5" />
+                                                    </Button>
+                                                    {pageLoading && <Loader2 className="size-3.5 animate-spin" />}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )
                             )}
                         </CardContent>
                     </Card>
@@ -496,9 +770,17 @@ function OrderLookupPageContent() {
                 </div>
             </footer>
 
+            {/* 详情密码 Dialog（State C） */}
+            <OrderDetailPasswordDialog
+                open={pwDialogOpen}
+                onOpenChange={setPwDialogOpen}
+                orderNo={pendingOrderNo}
+                onSubmit={handlePasswordDialogSubmit}
+            />
+
             {/* 订单详情 Sheet */}
             <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-                <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto overflow-x-hidden">
+                <SheetContent side="right" className="w-full overflow-y-auto overflow-x-hidden sm:max-w-md">
                     {sheetLoading ? (
                         <>
                             <SheetHeader>
@@ -519,8 +801,8 @@ function OrderLookupPageContent() {
                         <>
                             <SheetHeader className="border-b pr-10">
                                 <SheetTitle>订单详情</SheetTitle>
-                                <div className="flex items-center gap-1.5 min-w-0">
-                                    <SheetDescription className="font-mono text-xs truncate min-w-0 flex-1">
+                                <div className="flex min-w-0 items-center gap-1.5">
+                                    <SheetDescription className="min-w-0 flex-1 truncate font-mono text-xs">
                                         {result.orderNo}
                                     </SheetDescription>
                                     <Button

@@ -55,10 +55,14 @@ export interface OrderResult {
 export interface OrderListItem {
     orderNo: string
     productName: string
+    /** MANUAL variant snapshot; null for NORMAL/AUTO_FETCH. */
+    variantName?: string | null
     createdAt: string
     status: OrderResultStatus
     quantity: number
     amount: number
+    /** Used for the MANUAL "等待发货" hint on the list row. */
+    productType?: OrderProductType
 }
 
 export type LookupMode = "orderNo" | "email"

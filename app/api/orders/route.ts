@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server"
 import { randomUUID } from "crypto"
 import { prisma } from "@/lib/prisma"
 import { hashPassword } from "better-auth/crypto"
-import { computePasswordFingerprint } from "@/lib/order-password-fingerprint"
 import { getAdminSession } from "@/lib/auth-guard"
 import { createOrderSchema, orderListQuerySchema } from "@/lib/validations/order"
 import { getPaymentUrlForOrder } from "@/lib/get-payment-url"
@@ -108,7 +107,6 @@ async function createAutoFetchOrder(params: {
     const cardPayload = sharedAccountToCardPayload(picked)
     const cardContent = toCardContentJson(cardPayload)
     const passwordHash = await hashPassword(orderPassword)
-    const passwordFingerprint = computePasswordFingerprint(email, orderPassword)
 
     // Discounts are mutually exclusive: cross-sell takes precedence over all others
     const effectiveDistributorPct = crossSellDiscountPercent != null ? null : distributorDiscountPercent
@@ -152,7 +150,6 @@ async function createAutoFetchOrder(params: {
                         unitPriceSnapshot: 0,
                         email: email.trim().toLowerCase(),
                         passwordHash,
-                        passwordFingerprint,
                         quantity: 1,
                         amount: 0,
                         status: "COMPLETED",
@@ -215,7 +212,6 @@ async function createAutoFetchOrder(params: {
                         unitPriceSnapshot: params.price,
                         email: email.trim().toLowerCase(),
                         passwordHash,
-                        passwordFingerprint,
                         quantity: 1,
                         amount,
                         status: "PENDING",
@@ -706,7 +702,6 @@ export async function POST(request: NextRequest) {
         }
 
         const passwordHash = await hashPassword(orderPassword)
-        const passwordFingerprint = computePasswordFingerprint(email, orderPassword)
         const channel = await selectPaymentChannel(paymentMethod)
         const orderNo = generateOrderNo()
 
@@ -722,7 +717,6 @@ export async function POST(request: NextRequest) {
                     unitPriceSnapshot: variantPrice,
                     email: email.trim().toLowerCase(),
                     passwordHash,
-                    passwordFingerprint,
                     quantity: 1,
                     amount: amountRounded,
                     ...(discountPercentApplied != null && { discountPercentApplied }),
@@ -805,7 +799,6 @@ export async function POST(request: NextRequest) {
         return badRequest("Invalid order amount")
     }
     const passwordHash = await hashPassword(orderPassword)
-    const passwordFingerprint = computePasswordFingerprint(email, orderPassword)
 
     const channel = await selectPaymentChannel(paymentMethod)
 
@@ -829,7 +822,6 @@ export async function POST(request: NextRequest) {
                         ...(distributorId && { distributorId }),
                         email: email.trim().toLowerCase(),
                         passwordHash,
-                        passwordFingerprint,
                         quantity,
                         amount: amountRounded,
                         ...(discountPercentApplied != null && { discountPercentApplied }),

@@ -7,7 +7,6 @@ import {
 } from "@/lib/validations/order";
 import type { z } from "zod";
 import { verifyPassword } from "better-auth/crypto";
-import { backfillFingerprintIfMissing } from "@/lib/order-password-fingerprint";
 import { createOrderSuccessToken } from "@/lib/order-success-token";
 import { checkOrderQueryRateLimit } from "@/lib/rate-limit";
 import {
@@ -170,11 +169,6 @@ export async function POST(request: NextRequest) {
             if (!passwordOk) {
                 throw new Error("LOOKUP_FAILED");
             }
-
-            // Lazy backfill: legacy orders (passwordFingerprint=null) get
-            // their fingerprint written so future lookup-by-email lands in
-            // the fast path. Fire-and-forget.
-            backfillFingerprintIfMissing(existing.id, existing.email, password.trim());
 
             return existing;
         });
