@@ -53,12 +53,16 @@ export async function GET(request: NextRequest) {
         };
     }
 
-    // Search by name
+    // Search by product name OR active variant SKU name.
+    // For MANUAL products the SKU label (e.g. "一个月 Pro") is what buyers
+    // recall, not always the product name — match either to cover both cases.
+    // Non-MANUAL products have no variants, so the OR branch is a no-op for them.
     if (search.trim()) {
-        where.name = {
-            contains: search.trim(),
-            mode: "insensitive",
-        };
+        const q = search.trim();
+        where.OR = [
+            { name: { contains: q, mode: "insensitive" } },
+            { variants: { some: { name: { contains: q, mode: "insensitive" }, isActive: true } } },
+        ];
     }
 
     const orderBy =
@@ -129,6 +133,32 @@ export async function GET(request: NextRequest) {
         variantStockCounts.map((s) => [s.productId, s._sum.stockQuantity ?? 0])
     );
 
+    // MANUAL products carry pricing on variants, not on Product.price (which
+    // stays at 0). Aggregate min/max active variant price per MANUAL product
+    // so cards can render "¥{min}" or "¥{min} 起" instead of ¥0.00. This runs
+    // for ALL MANUAL products regardless of inventoryTracked — pricing display
+    // is independent of stock tracking.
+    const manualProductIds = products
+        .filter((p) => p.productType === "MANUAL")
+        .map((p) => p.id);
+    const variantPrices = manualProductIds.length > 0
+        ? await prisma.productVariant.findMany({
+              where: { productId: { in: manualProductIds }, isActive: true },
+              select: { productId: true, price: true },
+          })
+        : [];
+    const variantPriceMap = new Map<string, { min: number; max: number }>();
+    for (const v of variantPrices) {
+        const p = Number(v.price);
+        const cur = variantPriceMap.get(v.productId);
+        if (!cur) {
+            variantPriceMap.set(v.productId, { min: p, max: p });
+        } else {
+            cur.min = Math.min(cur.min, p);
+            cur.max = Math.max(cur.max, p);
+        }
+    }
+
     // Cross-sell session: when the storefront passes ?cs=<token>, mark each
     // eligible product with its applicable discountPercent so cards render
     // the discounted price. Admin requests skip this — admin views show raw
@@ -156,9 +186,12 @@ export async function GET(request: NextRequest) {
                   ? (variantStockMap.get(product.id) ?? 0)
                   : 1
               : (stockMap.get(product.id) ?? 0);
+        const manualPrices = isManual ? (variantPriceMap.get(product.id) ?? null) : null;
         return {
             ...productRest,
             price: Number(product.price),
+            priceMin: manualPrices?.min ?? null,
+            priceMax: manualPrices?.max ?? null,
             productType: product.productType ?? "NORMAL",
             stock,
             ...(discountPercent != null && { discountPercent }),

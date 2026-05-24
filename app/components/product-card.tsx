@@ -19,6 +19,11 @@ export type ProductCardData = {
     summary?: string | null
     image: string | null
     price: number
+    // MANUAL products price on variants (Product.price is always 0). Populated
+    // by /api/products and the homepage server fetch with the min/max active
+    // variant price. null when no active variants exist (degenerate case).
+    priceMin?: number | null
+    priceMax?: number | null
     stock: number
     productType?: "NORMAL" | "AUTO_FETCH" | "MANUAL"
     tags: { id: string; name: string; slug: string }[]
@@ -64,7 +69,20 @@ export function ProductCard({ product, gradientIndex = 0, className, code, cs, d
         return `/products/${product.slug}${query ? `?${query}` : ""}`
     }
     const detailHref = href ?? buildDetailHref()
-    const hasDiscount = typeof discountPercent === "number" && discountPercent > 0 && discountPercent <= 99 && product.price > 0
+    // For MANUAL products with active variants we show the variant min price
+    // (Product.price is always 0 for MANUAL). When min !== max we suffix "起"
+    // to signal a range. `basePrice` is the numeric value the discount math
+    // applies to — either the variant min or the legacy Product.price.
+    const displayPrice: { label: string; basePrice: number; suffix: string } =
+        isManual && product.priceMin != null
+            ? product.priceMin === product.priceMax
+                ? { label: `¥${product.priceMin.toFixed(2)}`, basePrice: product.priceMin, suffix: "" }
+                : { label: `¥${product.priceMin.toFixed(2)} 起`, basePrice: product.priceMin, suffix: " 起" }
+            : { label: `¥${product.price.toFixed(2)}`, basePrice: product.price, suffix: "" }
+    const hasDiscount = typeof discountPercent === "number" && discountPercent > 0 && discountPercent <= 99 && displayPrice.basePrice > 0
+    const discountedLabel = hasDiscount
+        ? `¥${(displayPrice.basePrice * (1 - discountPercent! / 100)).toFixed(2)}${displayPrice.suffix}`
+        : null
 
     if (horizontal) {
         const firstTag = product.tags[0]
@@ -106,12 +124,12 @@ export function ProductCard({ product, gradientIndex = 0, className, code, cs, d
                             <span className="text-sm font-bold text-primary">免费</span>
                         ) : !isSoldOut && hasDiscount ? (
                             <>
-                                <p className="text-[11px] text-muted-foreground line-through leading-tight">¥{product.price.toFixed(2)}</p>
-                                <p className="text-sm font-bold text-destructive leading-tight">¥{(product.price * (1 - discountPercent! / 100)).toFixed(2)}</p>
+                                <p className="text-[11px] text-muted-foreground line-through leading-tight">{displayPrice.label}</p>
+                                <p className="text-sm font-bold text-destructive leading-tight">{discountedLabel}</p>
                             </>
                         ) : (
                             <span className={cn("text-sm font-bold", isSoldOut && "text-muted-foreground line-through")}>
-                                ¥{product.price.toFixed(2)}
+                                {displayPrice.label}
                             </span>
                         )}
                     </div>
@@ -188,8 +206,8 @@ export function ProductCard({ product, gradientIndex = 0, className, code, cs, d
                                 <>
                                     {!isSoldOut && hasDiscount ? (
                                         <span className="flex flex-col leading-tight">
-                                            <span className="line-through text-muted-foreground text-[11px]">¥{product.price.toFixed(2)}</span>
-                                            <span className="font-bold text-destructive text-base tabular-nums sm:text-lg">¥{(product.price * (1 - discountPercent! / 100)).toFixed(2)}</span>
+                                            <span className="line-through text-muted-foreground text-[11px]">{displayPrice.label}</span>
+                                            <span className="font-bold text-destructive text-base tabular-nums sm:text-lg">{discountedLabel}</span>
                                         </span>
                                     ) : (
                                         <span
@@ -198,7 +216,7 @@ export function ProductCard({ product, gradientIndex = 0, className, code, cs, d
                                                 isSoldOut && "text-muted-foreground line-through"
                                             )}
                                         >
-                                            ¥{product.price.toFixed(2)}
+                                            {displayPrice.label}
                                         </span>
                                     )}
                                     {isAutoFetch ? (

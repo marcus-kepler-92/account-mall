@@ -48,6 +48,9 @@ describe("GET /api/products", () => {
         // groupBy is called in every GET request; default to empty (no stock data)
         prismaMock.card.groupBy.mockResolvedValue([] as any)
         prismaMock.productVariant.groupBy.mockResolvedValue([] as any)
+        // MANUAL price aggregation: default to empty so tests without MANUAL
+        // products (or that don't care about variant pricing) don't blow up.
+        prismaMock.productVariant.findMany.mockResolvedValue([] as any)
     })
 
     it("returns only ACTIVE products for public request (no admin param)", async () => {
@@ -186,6 +189,102 @@ describe("GET /api/products", () => {
         expect(prismaMock.productVariant.groupBy).not.toHaveBeenCalled()
     })
 
+    it("aggregates MANUAL variant min/max price into priceMin/priceMax response fields", async () => {
+        const products = [
+            {
+                id: "p_manual_priced",
+                name: "Manual Priced",
+                slug: "manual-priced",
+                status: "ACTIVE",
+                productType: "MANUAL",
+                inventoryTracked: false,
+                price: new Prisma.Decimal("0"),
+                tags: [],
+            },
+            {
+                id: "p_normal_priced",
+                name: "Normal Priced",
+                slug: "normal-priced",
+                status: "ACTIVE",
+                productType: "NORMAL",
+                price: new Prisma.Decimal("199"),
+                tags: [],
+            },
+        ]
+        prismaMock.product.findMany.mockResolvedValueOnce(products as any)
+        prismaMock.product.count.mockResolvedValueOnce(products.length)
+        prismaMock.productVariant.findMany.mockResolvedValueOnce([
+            { productId: "p_manual_priced", price: new Prisma.Decimal("29.9") },
+            { productId: "p_manual_priced", price: new Prisma.Decimal("168") },
+            { productId: "p_manual_priced", price: new Prisma.Decimal("79") },
+        ] as any)
+
+        const res = await GET(createUrlRequest("http://localhost/api/products"))
+        const data = await res.json()
+
+        expect(res.status).toBe(200)
+        // Variant price query MUST run for ALL MANUAL products regardless of
+        // inventoryTracked — pricing display is independent of stock tracking.
+        expect(prismaMock.productVariant.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { productId: { in: ["p_manual_priced"] }, isActive: true },
+                select: { productId: true, price: true },
+            })
+        )
+        const manual = data.data.find((p: { id: string }) => p.id === "p_manual_priced")
+        const normal = data.data.find((p: { id: string }) => p.id === "p_normal_priced")
+        expect(manual.priceMin).toBe(29.9)
+        expect(manual.priceMax).toBe(168)
+        // NORMAL products carry null/null — they price on Product.price directly.
+        expect(normal.priceMin).toBeNull()
+        expect(normal.priceMax).toBeNull()
+    })
+
+    it("MANUAL with no active variants returns priceMin/priceMax = null", async () => {
+        const products = [
+            {
+                id: "p_manual_empty",
+                name: "Manual Empty",
+                slug: "manual-empty",
+                status: "ACTIVE",
+                productType: "MANUAL",
+                inventoryTracked: false,
+                price: new Prisma.Decimal("0"),
+                tags: [],
+            },
+        ]
+        prismaMock.product.findMany.mockResolvedValueOnce(products as any)
+        prismaMock.product.count.mockResolvedValueOnce(1)
+        prismaMock.productVariant.findMany.mockResolvedValueOnce([] as any)
+
+        const res = await GET(createUrlRequest("http://localhost/api/products"))
+        const data = await res.json()
+
+        expect(res.status).toBe(200)
+        expect(data.data[0].priceMin).toBeNull()
+        expect(data.data[0].priceMax).toBeNull()
+    })
+
+    it("skips ProductVariant.findMany when no MANUAL products are returned", async () => {
+        prismaMock.product.findMany.mockResolvedValueOnce([
+            {
+                id: "p_normal_only",
+                name: "Normal Only",
+                slug: "normal-only",
+                status: "ACTIVE",
+                productType: "NORMAL",
+                inventoryTracked: false,
+                price: new Prisma.Decimal("10"),
+                tags: [],
+            },
+        ] as any)
+        prismaMock.product.count.mockResolvedValueOnce(1)
+
+        await GET(createUrlRequest("http://localhost/api/products"))
+
+        expect(prismaMock.productVariant.findMany).not.toHaveBeenCalled()
+    })
+
     it("skips ProductVariant.groupBy when no MANUAL products are returned", async () => {
         const products = [
             {
@@ -302,7 +401,7 @@ describe("GET /api/products", () => {
         )
     })
 
-    it("applies search and pagination", async () => {
+    it("applies search and pagination — matches product name OR active variant SKU name", async () => {
         prismaMock.product.findMany.mockResolvedValueOnce([])
         prismaMock.product.count.mockResolvedValueOnce(0)
 
@@ -315,7 +414,17 @@ describe("GET /api/products", () => {
         expect(prismaMock.product.findMany).toHaveBeenCalledWith(
             expect.objectContaining({
                 where: expect.objectContaining({
-                    name: { contains: "test", mode: "insensitive" },
+                    OR: [
+                        { name: { contains: "test", mode: "insensitive" } },
+                        {
+                            variants: {
+                                some: {
+                                    name: { contains: "test", mode: "insensitive" },
+                                    isActive: true,
+                                },
+                            },
+                        },
+                    ],
                 }),
                 skip: 5,
                 take: 5,

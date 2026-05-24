@@ -52,6 +52,8 @@ type CachedProduct = {
   summary: string | null
   image: string | null
   price: number
+  priceMin: number | null
+  priceMax: number | null
   productType: "NORMAL" | "AUTO_FETCH" | "MANUAL"
   inventoryTracked: boolean
   tags: { id: string; name: string; slug: string }[]
@@ -128,6 +130,10 @@ const getCachedProducts = unstable_cache(
       summary: p.summary ?? null,
       image: p.image,
       price: Number(p.price),
+      // priceMin/priceMax are populated by the variant-price aggregator below;
+      // null at cache-read time and filled in by the caller before rendering.
+      priceMin: null,
+      priceMax: null,
       productType: (p.productType ?? "NORMAL") as CachedProduct["productType"],
       inventoryTracked: p.inventoryTracked === true,
       tags: p.tags,
@@ -173,6 +179,33 @@ const getCachedVariantStockCounts = unstable_cache(
   { revalidate: 60, tags: ["product-variants", "products"] },
 )
 
+// MANUAL products carry pricing on variants. Aggregate min/max active variant
+// price per product so cards can render "¥{min}" or "¥{min} 起" instead of the
+// stub Product.price (always 0 for MANUAL). Runs for ALL MANUAL products
+// regardless of inventoryTracked — pricing display is independent of tracking.
+const getCachedVariantPriceRange = unstable_cache(
+  async (productIds: string[]): Promise<Record<string, { min: number; max: number }>> => {
+    if (productIds.length === 0) return {}
+    const rows = await prisma.productVariant.findMany({
+      where: { productId: { in: productIds }, isActive: true },
+      select: { productId: true, price: true },
+    })
+    const map: Record<string, { min: number; max: number }> = {}
+    for (const r of rows) {
+      const p = Number(r.price)
+      const cur = map[r.productId]
+      if (!cur) map[r.productId] = { min: p, max: p }
+      else {
+        cur.min = Math.min(cur.min, p)
+        cur.max = Math.max(cur.max, p)
+      }
+    }
+    return map
+  },
+  ["home-variant-price-range"],
+  { revalidate: 60, tags: ["product-variants", "products"] },
+)
+
 export default async function HomePage({
     searchParams,
 }: {
@@ -199,9 +232,15 @@ export default async function HomePage({
     const trackedManualProductIds = products
         .filter(p => p.productType === "MANUAL" && p.inventoryTracked === true)
         .map(p => p.id)
-    const [stockCounts, variantStockCounts, csDiscountMap] = await Promise.all([
+    // Pricing aggregation, however, runs for ALL MANUAL products regardless of
+    // tracking — untracked MANUAL still has a variant price to display.
+    const manualProductIds = products
+        .filter(p => p.productType === "MANUAL")
+        .map(p => p.id)
+    const [stockCounts, variantStockCounts, variantPriceRange, csDiscountMap] = await Promise.all([
         getCachedStockCounts(productIds),
         getCachedVariantStockCounts(trackedManualProductIds),
+        getCachedVariantPriceRange(manualProductIds),
         // Resolve per-product cross-sell discount for the user's current cs
         // session. Empty map for anonymous browsing / expired tokens —
         // products simply render at original price.
@@ -217,6 +256,9 @@ export default async function HomePage({
                   ? (variantStockCounts[product.id] ?? 0)
                   : 1
               : (stockCounts[product.id] ?? 0)
+        const manualPrices = product.productType === "MANUAL"
+            ? (variantPriceRange[product.id] ?? null)
+            : null
         return {
             id: product.id,
             name: product.name,
@@ -225,6 +267,8 @@ export default async function HomePage({
             summary: product.summary,
             image: product.image,
             price: product.price,
+            priceMin: manualPrices?.min ?? null,
+            priceMax: manualPrices?.max ?? null,
             productType: product.productType,
             stock,
             tags: product.tags,
