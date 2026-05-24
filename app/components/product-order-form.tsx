@@ -198,10 +198,20 @@ export function ProductOrderForm({
             ? crossSellDiscountPercent
             : null
 
+    // MANUAL prices on the variant; product.price is always 0. Resolve the
+    // selected variant's price for the total / sticky bar; fall back to the
+    // product.price when nothing is selected yet (which gates submit anyway).
+    const effectiveUnitPrice = isManual
+        ? (() => {
+            const v = variants?.find((x) => x.id === selectedVariantId)
+            return v ? Number(v.price) : 0
+        })()
+        : price
+
     const totalPrice = isFree
         ? "0.00"
         : (() => {
-            let amt = price * effectiveQuantity
+            let amt = effectiveUnitPrice * effectiveQuantity
             const promo = promoValidation?.valid ? promoValidation.discountPercent : null
             if (promo != null) amt = amt * (1 - promo / 100)
             if (activeExitDiscount != null) amt = amt * (1 - activeExitDiscount / 100)
