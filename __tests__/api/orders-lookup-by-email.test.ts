@@ -36,21 +36,22 @@ describe("POST /api/orders/lookup-by-email", () => {
     ;(prismaMock.order.findMany as jest.Mock).mockReset()
   })
 
-  // Helper: configure the fingerprint fast-path query results.
-  // The route fires `count` + `findMany` in parallel; both should reflect the
-  // fingerprint-matched set.
-  function setFingerprintMatches(orders: any[]) {
-    ;(prismaMock.order.count as jest.Mock).mockResolvedValueOnce(orders.length)
-    ;(prismaMock.order.findMany as jest.Mock).mockResolvedValueOnce(orders)
-  }
-
-  // Helper: configure the legacy fallback (passwordFingerprint = null) query.
-  // The route runs count + findMany in parallel when the fast path returns
-  // zero (on any page — legacy is paginated too so the buyer can reach all
-  // of their historical orders).
-  function setLegacyFallback(orders: any[], total?: number) {
+  // Helper: configure the unified paginated query results.
+  // The route fires `count` + `findMany` in parallel over `where: { email }`
+  // (no SQL-level fingerprint filter); per-row verify decides match. Helpers
+  // kept under the old names as thin aliases so existing tests keep reading
+  // naturally — `setFingerprintMatches` configures the row set that the
+  // route will iterate; rows with `passwordFingerprint` matching the request
+  // skip scrypt, others go through scrypt.
+  function setEmailOrders(orders: any[], total?: number) {
     ;(prismaMock.order.count as jest.Mock).mockResolvedValueOnce(total ?? orders.length)
     ;(prismaMock.order.findMany as jest.Mock).mockResolvedValueOnce(orders)
+  }
+  const setFingerprintMatches = setEmailOrders
+  const setLegacyFallback = (_orders: any[], _total?: number) => {
+    // No-op: legacy fallback is merged into the unified query. Tests that
+    // previously seeded a second mock layer for "fast empty → legacy" can
+    // still call this without effect.
   }
 
   it("returns 400 when JSON body is invalid", async () => {
@@ -87,9 +88,8 @@ describe("POST /api/orders/lookup-by-email", () => {
     expect(data.code).toBe("VALIDATION_FAILED")
   })
 
-  it("returns 400 with fuzzy error when no fingerprint match and no legacy fallback", async () => {
-    setFingerprintMatches([])
-    setLegacyFallback([])
+  it("returns 400 with fuzzy error when no orders exist for the email", async () => {
+    setEmailOrders([])
 
     const req = createJsonRequest({ email: "user@example.com", password: "secret123" })
     const res = await POST(req)
@@ -99,13 +99,10 @@ describe("POST /api/orders/lookup-by-email", () => {
     expect(data).toEqual({
       error: "Order not found or password incorrect",
     })
-    // Confirm pre-filter is in effect: the count + findMany must filter on
-    // passwordFingerprint (not just email).
+    // Unified query: count + findMany filter only on email so the pager can
+    // reach legacy-null rows in the same paginated stream.
     const countCall = (prismaMock.order.count as jest.Mock).mock.calls[0]?.[0]
-    expect(countCall.where).toMatchObject({
-      email: "user@example.com",
-      passwordFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
-    })
+    expect(countCall.where).toEqual({ email: "user@example.com" })
   })
 
   it("returns 400 when fingerprint matches but verifyPassword rejects (defense in depth)", async () => {
@@ -140,15 +137,20 @@ describe("POST /api/orders/lookup-by-email", () => {
     })
   })
 
-  it("fast path: returns single order when fingerprint matches and password verifies", async () => {
+  it("fast path: row whose passwordFingerprint matches the request hash skips scrypt", async () => {
     const createdAt = new Date("2024-02-13T00:00:00.000Z")
+    // Compute the same fingerprint the route would for ("user@example.com",
+    // "secret123") so we can pre-seed it on the mock row.
+    const { computePasswordFingerprint } = await import("@/lib/order-password-fingerprint")
+    const fp = computePasswordFingerprint("user@example.com", "secret123")
 
-    setFingerprintMatches([
+    setEmailOrders([
       {
         id: "order_1",
         orderNo: "FAK202402130001",
         email: "user@example.com",
         passwordHash: "hash",
+        passwordFingerprint: fp,
         status: "COMPLETED",
         amount: 50,
         product: { name: "Test Product" },
@@ -159,21 +161,20 @@ describe("POST /api/orders/lookup-by-email", () => {
         createdAt,
       },
     ])
-    verifyPasswordMock.mockResolvedValueOnce(true)
 
     const req = createJsonRequest({ email: "User@Example.com", password: "secret123" })
     const res = await POST(req)
     const data = await res.json()
 
-    // Fingerprint pre-filter must be applied to the findMany query.
+    // Unified query filters on email only — fingerprint pre-filter happens
+    // per-row, after findMany.
     const findManyCall = (prismaMock.order.findMany as jest.Mock).mock.calls[0][0]
-    expect(findManyCall.where).toMatchObject({
-      email: "user@example.com",
-      passwordFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
-    })
+    expect(findManyCall.where).toEqual({ email: "user@example.com" })
     expect(findManyCall.orderBy).toEqual({ createdAt: "desc" })
 
-    expect(verifyPasswordMock).toHaveBeenCalledWith({ hash: "hash", password: "secret123" })
+    // Fast path: scrypt is NOT called when the row's stored fingerprint
+    // matches the request fingerprint.
+    expect(verifyPasswordMock).not.toHaveBeenCalled()
 
     expect(res.status).toBe(200)
     expect(data).toEqual({
@@ -461,17 +462,15 @@ describe("POST /api/orders/lookup-by-email", () => {
     expect(findManyCall.take).toBe(2)
   })
 
-  it("falls back to legacy (passwordFingerprint=null) when fast path is empty on page 1", async () => {
-    // Fast path returns zero (covered by setFingerprintMatches([])):
-    setFingerprintMatches([])
-    // Legacy fallback is called next:
+  it("legacy row (passwordFingerprint=null) reaches scrypt and returns when verify passes", async () => {
     const createdAt = new Date("2023-01-01T00:00:00.000Z")
-    setLegacyFallback([
+    setEmailOrders([
       {
         id: "legacy_1",
         orderNo: "OLD001",
         email: "user@example.com",
         passwordHash: "legacy-hash",
+        passwordFingerprint: null,
         status: "COMPLETED",
         amount: 25,
         product: { name: "Legacy Product" },
@@ -485,23 +484,17 @@ describe("POST /api/orders/lookup-by-email", () => {
     const res = await POST(req)
     const data = await res.json()
 
-    // Second findMany call (the legacy fallback) must filter by null fingerprint.
-    const legacyCall = (prismaMock.order.findMany as jest.Mock).mock.calls[1][0]
-    expect(legacyCall.where).toMatchObject({
-      email: "user@example.com",
-      passwordFingerprint: null,
-    })
-    expect(legacyCall.take).toBe(10)
+    // Legacy row → scrypt was invoked as authoritative verify.
+    expect(verifyPasswordMock).toHaveBeenCalledWith({ hash: "legacy-hash", password: "secret123" })
 
     expect(res.status).toBe(200)
     expect(data.orderNo).toBe("OLD001")
   })
 
-  it("triggers paginated legacy fallback on page > 1 so buyer can reach all historical orders", async () => {
-    // Fast path empty on page 2 — legacy now also paginates so the buyer
-    // can reach orders beyond page 1 of their (uncfingerprinted) history.
-    setFingerprintMatches([])
-    setLegacyFallback([], 0)
+  it("paginates by email so the buyer can reach all orders across mixed fingerprint/null rows", async () => {
+    // page > 1 still runs the unified count + findMany pair — no behavior
+    // difference between pages, no double-cost-vs-fast-path distinction.
+    setEmailOrders([], 0)
 
     const req = createJsonRequest({
       email: "user@example.com",
@@ -514,11 +507,12 @@ describe("POST /api/orders/lookup-by-email", () => {
 
     expect(res.status).toBe(400)
     expect(data).toEqual({ error: "Order not found or password incorrect" })
-    // count + fast-path findMany + legacy count + legacy findMany.
-    expect((prismaMock.order.findMany as jest.Mock).mock.calls).toHaveLength(2)
-    const legacyFindMany = (prismaMock.order.findMany as jest.Mock).mock.calls[1][0]
-    expect(legacyFindMany.skip).toBe(10)  // (page-1) * pageSize
-    expect(legacyFindMany.take).toBe(10)
+    // Single unified count + findMany, no separate legacy path.
+    expect((prismaMock.order.findMany as jest.Mock).mock.calls).toHaveLength(1)
+    const findMany = (prismaMock.order.findMany as jest.Mock).mock.calls[0][0]
+    expect(findMany.skip).toBe(10) // (page-1) * pageSize
+    expect(findMany.take).toBe(10)
+    expect(findMany.where).toEqual({ email: "user@example.com" })
   })
 
   it("returns 500 when single order has no product (LOOKUP_FAILED)", async () => {

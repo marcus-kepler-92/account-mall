@@ -58,6 +58,7 @@ export async function POST(request: NextRequest) {
         orderNo: true,
         email: true,
         passwordHash: true,
+        passwordFingerprint: true,
         status: true,
         createdAt: true,
         expiresAt: true,
@@ -95,15 +96,23 @@ export async function POST(request: NextRequest) {
     try {
         const fingerprint = computePasswordFingerprint(normalizedEmail, trimmedPassword)
 
-        // Fast path: indexed (email, passwordFingerprint, createdAt) lookup.
-        // No scrypt needed to narrow the candidate set — typically returns 0
-        // or 1–5 rows, even for buyers with many orders.
-        const [fingerprintTotal, fingerprintOrders] = await Promise.all([
-            prisma.order.count({
-                where: { email: normalizedEmail, passwordFingerprint: fingerprint },
-            }),
+        // Unified paginated query over { email } — does NOT pre-filter by
+        // fingerprint at the SQL layer. This way `total` reflects every order
+        // for the email (fast-path-matched + legacy-null mixed), so the pager
+        // can reach all of them. Per-row, we either skip scrypt (fingerprint
+        // matches — fast) or run scrypt (legacy / mismatch — slow), so cost
+        // per page degrades gracefully as lazy backfill migrates more rows.
+        //
+        // `total` is an over-estimate when some orders belong to a different
+        // password — rare, since buyers typically reuse one password across
+        // their orders. UX trade-off: pager may show pages with zero verified
+        // rows. Acceptable for now; tightening would require a fingerprint
+        // column for "verified-mismatch" which is not in scope.
+        const emailWhere = { email: normalizedEmail }
+        const [total, pageOrders] = await Promise.all([
+            prisma.order.count({ where: emailWhere }),
             prisma.order.findMany({
-                where: { email: normalizedEmail, passwordFingerprint: fingerprint },
+                where: emailWhere,
                 select: orderSelect,
                 orderBy: { createdAt: "desc" },
                 skip: (page - 1) * pageSize,
@@ -111,78 +120,34 @@ export async function POST(request: NextRequest) {
             }),
         ])
 
-        let matchingOrders = fingerprintOrders
-        let total = fingerprintTotal
-
-        // Belt-and-suspenders: even on the fast path, verify each candidate.
-        // The fingerprint match is cheap and (cryptographically) accurate, but
-        // scrypt is the authoritative check. With the pre-filter the set is
-        // tiny so the verify cost is bounded.
-        if (fingerprintOrders.length > 0) {
-            const verifyResults = await Promise.allSettled(
-                fingerprintOrders.map(async (o) => {
-                    if (!o.passwordHash || typeof o.passwordHash !== "string") return null
-                    try {
-                        const ok = await verifyPassword({ hash: o.passwordHash, password: trimmedPassword })
-                        return ok ? o : null
-                    } catch {
-                        return null
-                    }
-                }),
+        const verifyResults = await Promise.allSettled(
+            pageOrders.map(async (o) => {
+                if (!o.passwordHash || typeof o.passwordHash !== "string") return null
+                // Fast path: fingerprint match — skip scrypt entirely.
+                if (o.passwordFingerprint && o.passwordFingerprint === fingerprint) {
+                    return o
+                }
+                // Slow path (legacy null OR password mismatch): authoritative
+                // scrypt. backfill happens after on success.
+                try {
+                    const ok = await verifyPassword({ hash: o.passwordHash, password: trimmedPassword })
+                    return ok ? o : null
+                } catch {
+                    return null
+                }
+            }),
+        )
+        const matchingOrders = verifyResults
+            .filter(
+                (r): r is PromiseFulfilledResult<typeof pageOrders[number]> =>
+                    r.status === "fulfilled" && r.value !== null,
             )
-            matchingOrders = verifyResults
-                .filter(
-                    (r): r is PromiseFulfilledResult<typeof fingerprintOrders[number]> =>
-                        r.status === "fulfilled" && r.value !== null,
-                )
-                .map((r) => r.value!)
-        }
+            .map((r) => r.value!)
 
-        // Legacy fallback: orders predating the fingerprint column have
-        // passwordFingerprint = null and never match the fast path. When the
-        // fast path returned zero, we degrade gracefully to a paginated scan
-        // over the buyer's legacy orders — each page costs ~5s in scrypt
-        // (pageSize × ~500ms / 4 workers), which is acceptable once and lets
-        // the buyer reach all of their historical orders. Lazy backfill on
-        // each verified row gradually migrates the buyer onto the fast path.
-        //
-        // `total` reflects the count of email+null-fingerprint rows; it can be
-        // an over-estimate if some legacy rows belong to a different password
-        // (rare: buyers typically reuse one password across their orders).
-        if (matchingOrders.length === 0) {
-            const legacyWhere = { email: normalizedEmail, passwordFingerprint: null }
-            const [legacyTotal, legacy] = await Promise.all([
-                prisma.order.count({ where: legacyWhere }),
-                prisma.order.findMany({
-                    where: legacyWhere,
-                    select: orderSelect,
-                    orderBy: { createdAt: "desc" },
-                    skip: (page - 1) * pageSize,
-                    take: pageSize,
-                }),
-            ])
-            const legacyResults = await Promise.allSettled(
-                legacy.map(async (o) => {
-                    if (!o.passwordHash || typeof o.passwordHash !== "string") return null
-                    try {
-                        const ok = await verifyPassword({ hash: o.passwordHash, password: trimmedPassword })
-                        return ok ? o : null
-                    } catch {
-                        return null
-                    }
-                }),
-            )
-            matchingOrders = legacyResults
-                .filter(
-                    (r): r is PromiseFulfilledResult<typeof legacy[number]> =>
-                        r.status === "fulfilled" && r.value !== null,
-                )
-                .map((r) => r.value!)
-            total = legacyTotal
-
-            // Lazy backfill: verified-but-legacy orders now get a fingerprint
-            // so future lookups by this email + password hit the fast path.
-            for (const o of matchingOrders) {
+        // Lazy backfill: any verified-but-fingerprint-missing order gets its
+        // fingerprint written so future lookups skip scrypt for it.
+        for (const o of matchingOrders) {
+            if (!o.passwordFingerprint) {
                 backfillFingerprintIfMissing(o.id, normalizedEmail, trimmedPassword)
             }
         }
