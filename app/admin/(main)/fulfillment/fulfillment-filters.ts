@@ -1,61 +1,69 @@
 import { OrderStatus } from "@prisma/client"
 
-export const STATUS_VALUES = [
-    "in_progress",
-    "awaiting",
-    "processing",
-    "completed",
-    "closed",
-    "all",
+/**
+ * MANUAL fulfillment center supports a 4-state status filter — same enum
+ * values as the global Orders center to keep filter URLs / KPI links
+ * portable. PENDING is excluded by definition (this center only deals
+ * with paid MANUAL orders).
+ */
+const FULFILLMENT_STATUS_VALUES = [
+    OrderStatus.AWAITING_FULFILLMENT,
+    OrderStatus.PROCESSING,
+    OrderStatus.COMPLETED,
+    OrderStatus.CLOSED,
 ] as const
 
-export type FulfillmentStatusFilter = (typeof STATUS_VALUES)[number]
+export type FulfillmentStatusFilter = (typeof FULFILLMENT_STATUS_VALUES)[number]
 
 export type FulfillmentFiltersInput = {
+    page?: string | null
+    pageSize?: string | null
     status?: string | null
     dunnedOnly?: string | null
 }
 
 export type FulfillmentFiltersState = {
-    status: FulfillmentStatusFilter
+    page: number
+    pageSize: number
+    /** Active status: empty → no status filter (all 4). */
+    status: FulfillmentStatusFilter | ""
+    statusList: FulfillmentStatusFilter[]
     dunnedOnly: boolean
-    statusList: OrderStatus[]
 }
 
 export const DEFAULT_FULFILLMENT_FILTERS: FulfillmentFiltersState = {
-    status: "in_progress",
+    page: 1,
+    pageSize: 20,
+    status: "",
+    statusList: [],
     dunnedOnly: false,
-    statusList: [OrderStatus.AWAITING_FULFILLMENT, OrderStatus.PROCESSING],
 }
 
-function statusToList(status: FulfillmentStatusFilter): OrderStatus[] {
-    switch (status) {
-        case "awaiting":
-            return [OrderStatus.AWAITING_FULFILLMENT]
-        case "processing":
-            return [OrderStatus.PROCESSING]
-        case "completed":
-            return [OrderStatus.COMPLETED]
-        case "closed":
-            return [OrderStatus.CLOSED]
-        case "all":
-            return []
-        case "in_progress":
-        default:
-            return [OrderStatus.AWAITING_FULFILLMENT, OrderStatus.PROCESSING]
-    }
-}
+export function parseFulfillmentFilters(
+    input: FulfillmentFiltersInput,
+): FulfillmentFiltersState {
+    const page = Math.max(
+        1,
+        parseInt(input.page ?? "", 10) || DEFAULT_FULFILLMENT_FILTERS.page,
+    )
+    const rawPageSize =
+        parseInt(input.pageSize ?? "", 10) || DEFAULT_FULFILLMENT_FILTERS.pageSize
+    const pageSize = Math.min(100, Math.max(1, rawPageSize))
 
-export function parseFulfillmentFilters(input: FulfillmentFiltersInput): FulfillmentFiltersState {
-    const raw = (input.status ?? "").trim().toLowerCase()
-    const status: FulfillmentStatusFilter =
-        (STATUS_VALUES as readonly string[]).includes(raw)
-            ? (raw as FulfillmentStatusFilter)
-            : "in_progress"
-    const dunnedOnly = (input.dunnedOnly ?? "").trim().toLowerCase() === "true"
+    const statusRaw = (input.status ?? "").trim()
+    const status: FulfillmentFiltersState["status"] =
+        (FULFILLMENT_STATUS_VALUES as readonly string[]).includes(statusRaw)
+            ? (statusRaw as FulfillmentStatusFilter)
+            : ""
+
+    const dunnedOnly =
+        (input.dunnedOnly ?? "").trim().toLowerCase() === "true"
+
     return {
+        page,
+        pageSize,
         status,
+        statusList: status ? [status] : [],
         dunnedOnly,
-        statusList: statusToList(status),
     }
 }

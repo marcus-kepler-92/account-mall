@@ -1,6 +1,6 @@
 import { Bell, CheckCircle2, Inbox, Truck } from "lucide-react"
 import { StatCard } from "@/app/admin/components"
-import type { FulfillmentStatusFilter } from "./fulfillment-filters"
+import type { FulfillmentFiltersState } from "./fulfillment-filters"
 
 interface FulfillmentKpisProps {
     counts: {
@@ -9,11 +9,11 @@ interface FulfillmentKpisProps {
         dunned: number
         completedToday: number
     }
-    currentStatus: FulfillmentStatusFilter
+    status: FulfillmentFiltersState["status"]
     dunnedOnly: boolean
 }
 
-export function FulfillmentKpis({ counts, currentStatus, dunnedOnly }: FulfillmentKpisProps) {
+export function FulfillmentKpis({ counts, status, dunnedOnly }: FulfillmentKpisProps) {
     return (
         <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
             <StatCard
@@ -22,8 +22,8 @@ export function FulfillmentKpis({ counts, currentStatus, dunnedOnly }: Fulfillme
                 icon={Inbox}
                 borderColor="border-l-warning"
                 iconColor="text-warning"
-                active={currentStatus === "awaiting" && !dunnedOnly}
-                href="/admin/fulfillment?status=awaiting"
+                active={status === "AWAITING_FULFILLMENT" && !dunnedOnly}
+                href="/admin/fulfillment?status=AWAITING_FULFILLMENT"
             />
             <StatCard
                 label="处理中"
@@ -31,8 +31,8 @@ export function FulfillmentKpis({ counts, currentStatus, dunnedOnly }: Fulfillme
                 icon={Truck}
                 borderColor="border-l-warning"
                 iconColor="text-warning"
-                active={currentStatus === "processing" && !dunnedOnly}
-                href="/admin/fulfillment?status=processing"
+                active={status === "PROCESSING" && !dunnedOnly}
+                href="/admin/fulfillment?status=PROCESSING"
             />
             <StatCard
                 label="被催"

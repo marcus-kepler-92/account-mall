@@ -6,12 +6,16 @@ import {
     type FulfillmentFiltersInput,
 } from "./fulfillment-filters"
 import { FulfillmentKpis } from "./fulfillment-kpis"
-import { FulfillmentList, type FulfillmentRow } from "./fulfillment-list"
+import { FulfillmentDataTable } from "./fulfillment-data-table"
+import type { FulfillmentRow } from "./fulfillment-columns"
 
 export const dynamic = "force-dynamic"
 
 type SearchParams = Promise<{
+    page?: string
+    pageSize?: string
     status?: string
+    search?: string
     dunnedOnly?: string
 }>
 
@@ -28,6 +32,7 @@ export default async function AdminFulfillmentPage({
 }) {
     const raw = await searchParams
     const filters = parseFulfillmentFilters(raw as FulfillmentFiltersInput)
+    const search = (raw.search ?? "").trim()
 
     // Base scope: MANUAL products only — this center never shows NORMAL/AUTO_FETCH.
     const manualScope: Prisma.OrderWhereInput = {
@@ -41,10 +46,16 @@ export default async function AdminFulfillmentPage({
     if (filters.dunnedOnly) {
         where.dunCount = { gt: 0 }
     }
+    if (search) {
+        where.OR = [
+            { email: { contains: search, mode: "insensitive" } },
+            { orderNo: { contains: search, mode: "insensitive" } },
+        ]
+    }
 
     const today = startOfToday()
 
-    const [orders, awaitingCount, processingCount, dunnedCount, completedTodayCount] =
+    const [orders, total, awaitingCount, processingCount, dunnedCount, completedTodayCount] =
         await Promise.all([
             prisma.order.findMany({
                 where,
@@ -52,8 +63,10 @@ export default async function AdminFulfillmentPage({
                     product: { select: { id: true, name: true } },
                 },
                 orderBy: [{ dunCount: "desc" }, { createdAt: "asc" }],
-                take: 200,
+                skip: (filters.page - 1) * filters.pageSize,
+                take: filters.pageSize,
             }),
+            prisma.order.count({ where }),
             prisma.order.count({
                 where: { ...manualScope, status: OrderStatus.AWAITING_FULFILLMENT },
             }),
@@ -107,15 +120,11 @@ export default async function AdminFulfillmentPage({
                     dunned: dunnedCount,
                     completedToday: completedTodayCount,
                 }}
-                currentStatus={filters.status}
+                status={filters.status}
                 dunnedOnly={filters.dunnedOnly}
             />
 
-            <FulfillmentList
-                orders={rows}
-                currentStatus={filters.status}
-                dunnedOnly={filters.dunnedOnly}
-            />
+            <FulfillmentDataTable data={rows} total={total} />
         </div>
     )
 }
