@@ -3,7 +3,6 @@
 import Link from "next/link"
 import type { ColumnDef } from "@tanstack/react-table"
 import { GripVertical, AlertTriangle } from "lucide-react"
-import { formatCurrency } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { DataTableColumnHeader } from "@/app/admin/components"
 import { ProductRowActions } from "./product-row-actions"
@@ -14,9 +13,18 @@ export type ProductRow = {
     slug: string
     status: "ACTIVE" | "INACTIVE"
     productType: string
+    // Sortable numeric value. For MANUAL: min active-variant price; for
+    // AUTO_FETCH/NORMAL: product.price. Display goes through priceLabel.
     price: number
+    // Pre-formatted label. MANUAL may show "¥9.90 起" or "—"; AUTO_FETCH/NORMAL
+    // show "¥X.XX".
+    priceLabel: string
     tags: { id: string; name: string; slug: string }[]
+    // Sortable numeric stock. Unlimited rows (AUTO_FETCH, untracked MANUAL) use
+    // Number.MAX_SAFE_INTEGER as a sentinel so they sort to the high end.
     stock: number
+    // Pre-formatted label: count for NORMAL/tracked MANUAL, "不限" for the rest.
+    stockLabel: string
     sales: number
     subscriberCount: number
     hasAlert: boolean
@@ -65,11 +73,12 @@ return [
     {
         accessorKey: "price",
         header: ({ column }) => <DataTableColumnHeader column={column} title="价格" />,
-        cell: ({ row }) => formatCurrency(row.original.price),
+        cell: ({ row }) => row.original.priceLabel,
     },
     {
         accessorKey: "stock",
         header: ({ column }) => <DataTableColumnHeader column={column} title="库存" />,
+        cell: ({ row }) => row.original.stockLabel,
     },
     {
         accessorKey: "sales",
