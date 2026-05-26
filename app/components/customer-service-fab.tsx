@@ -19,6 +19,7 @@ import {
 import { useIsMobile } from "@/hooks/use-mobile"
 import { useKeyboardInset } from "@/hooks/use-keyboard-inset"
 import { ChatPanel } from "./agent-chat/chat-panel"
+import { ChatPanelErrorBoundary } from "./agent-chat/error-boundary"
 
 const BTN = 48 // button size px
 const DRAG_THRESHOLD = 4 // px moved before treating as drag
@@ -153,7 +154,9 @@ export function CustomerServiceFab() {
                 collisionPadding={8}
                 className="h-[600px] w-[380px] p-0"
             >
-                <ChatPanel />
+                <ChatPanelErrorBoundary>
+                    <ChatPanel />
+                </ChatPanelErrorBoundary>
             </PopoverContent>
         </Popover>
     )
@@ -186,7 +189,9 @@ function MobileSheetContent() {
                 </SheetDescription>
             </SheetHeader>
             <div className="min-h-0 flex-1">
-                <ChatPanel />
+                <ChatPanelErrorBoundary>
+                    <ChatPanel />
+                </ChatPanelErrorBoundary>
             </div>
         </SheetContent>
     )

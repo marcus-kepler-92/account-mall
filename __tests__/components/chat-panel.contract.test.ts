@@ -48,6 +48,23 @@ describe("ChatPanel transport contract", () => {
         expect(SOURCE).toMatch(/status === 504/)
     })
 
+    it("treats any other non-2xx as a neutral fallback (catches 400/410/429/5xx)", () => {
+        // Anti-abuse may return 400 (message-too-large) / 410 (session-
+        // expired) / 429 (rate-limit), and upstream can return 5xx — none
+        // of those match the three explicit codes, so without this generic
+        // !res.ok branch the user would see an empty assistant bubble
+        // instead of FallbackQR.
+        expect(SOURCE).toMatch(/!res\.ok[\s\S]{0,40}onFallback\("timeout"\)/)
+    })
+
+    it("routes useChatRuntime stream-level errors to the same fallback", () => {
+        // DeepSeek 4xx/5xx surfaces AFTER the HTTP response started, so the
+        // outer fetch sees 200; only the assistant-ui onError hook can
+        // catch it. Without this, a model-level rejection leaves the user
+        // staring at a blank bubble.
+        expect(SOURCE).toMatch(/useChatRuntime\(\{[\s\S]*?onError:\s*\(/)
+    })
+
     it("waits for /api/agent/session/start to settle before flipping sessionReady", () => {
         // Without an awaited /session/start, a fast user click races the
         // server-side AgentSession row creation and chat returns 410
@@ -55,6 +72,29 @@ describe("ChatPanel transport contract", () => {
         // await wiring stays in place.
         expect(SOURCE).toMatch(/await fetch\("\/api\/agent\/session\/start"/)
         expect(SOURCE).toMatch(/setSessionReady\(true\)/)
+    })
+
+    it("bounds prelude fetches with a timeout so a hung network can't trap the user on the spinner", () => {
+        // session/start AND messages must both abort within a finite
+        // window. Without these, a stalled fetch leaves sessionReady /
+        // historyReady false forever and the user sees Loader2 indefinitely
+        // — no error path, no QR. We look for AbortSignal.timeout within a
+        // ~400-char window after each fetch invocation rather than trying
+        // to balance nested braces with regex.
+        expect(SOURCE).toMatch(
+            /fetch\("\/api\/agent\/session\/start"[\s\S]{0,800}AbortSignal\.timeout\(/,
+        )
+        expect(SOURCE).toMatch(
+            /fetch\(\s*`\/api\/agent\/messages\?sessionId=[\s\S]{0,800}AbortSignal\.timeout\(/,
+        )
+    })
+
+    it("explicitly disables the assistant-ui attachments adapter", () => {
+        // useChatRuntime defaults to injecting vercelAttachmentAdapter,
+        // which flips capabilities.attachments → true → ComposerPrimitive
+        // accepts pasted clipboard images → file part → DeepSeek 400. This
+        // override is the first of two layers that close the gap.
+        expect(SOURCE).toMatch(/adapters:\s*\{[\s\S]*?attachments:\s*undefined/)
     })
 
     it("rehydrates chat history from the server before mounting the runtime", () => {

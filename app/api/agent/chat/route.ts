@@ -109,8 +109,21 @@ export async function POST(req: Request) {
   const trimmedMessages =
     messages.length > MAX_LLM_HISTORY ? messages.slice(-MAX_LLM_HISTORY) : messages
 
+  // Sanitize user-message parts: only keep text parts. DeepSeek-chat is text-
+  // only — non-text parts (file/image) get serialized as `image_url` content
+  // parts by convertToModelMessages, which DeepSeek rejects with
+  // `unknown variant image_url`. The client-side adapter is disabled too,
+  // but this server-side filter is the durable guard against any future
+  // path that smuggles attachments in (incl. already-polluted sessions
+  // re-sending old messages from in-memory thread state).
+  const sanitized = trimmedMessages.map((m) =>
+    m.role === "user"
+      ? { ...m, parts: m.parts.filter((p) => p.type === "text") }
+      : m,
+  )
+
   // AI SDK v6: convertToModelMessages returns Promise<ModelMessage[]>
-  const modelMessages = await convertToModelMessages(trimmedMessages)
+  const modelMessages = await convertToModelMessages(sanitized)
 
   // 6. Stream
   const result = streamText({

@@ -74,6 +74,9 @@ export function ComposerBar() {
       <ComposerPrimitive.Input
         autoFocus
         rows={1}
+        // 第二道防线: 即使将来误开启 attachments capability, 也别让粘贴的
+        // 图片自动塞进 user message — DeepSeek-chat 不支持 vision.
+        addAttachmentOnPaste={false}
         className={cn(
           "max-h-32 min-h-10 flex-1 resize-none rounded-md border bg-transparent px-3 py-2 text-base md:text-sm",
           "outline-none placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring",

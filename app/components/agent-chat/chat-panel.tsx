@@ -88,6 +88,12 @@ export function ChatPanel() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sessionId }),
+          // 8s timeout so a hung network never traps the user on the
+          // spinner. Downstream chat requests still have their own
+          // session-validity guard (410 → !res.ok → FallbackQR), so a
+          // missed start just means the first chat turn falls back —
+          // not a permanent loader.
+          signal: AbortSignal.timeout(8000),
         })
         if (res.ok) {
           // Pick up the runtime handoff info (QR URL + wechat id) so
@@ -125,6 +131,7 @@ export function ChatPanel() {
       try {
         const res = await fetch(
           `/api/agent/messages?sessionId=${encodeURIComponent(sessionId)}`,
+          { signal: AbortSignal.timeout(8000) },
         )
         if (res.ok) {
           const data = (await res.json().catch(() => null)) as
@@ -211,7 +218,13 @@ function ChatPanelInner({
   onFallback,
 }: InnerProps) {
   // Custom fetch intercepts HTTP fallback codes (423 budget, 503 daily-cap,
-  // 504 timeout) before the AI SDK tries to stream the response.
+  // 504 timeout) before the AI SDK tries to stream the response. Any other
+  // non-2xx (400 message-too-large / 410 session-expired / 429 rate-limited
+  // / 5xx) falls back under the neutral "timeout" copy — the actual reason
+  // is in the server log; user just needs a visible escape hatch instead of
+  // a silent blank bubble. DeepSeek-style errors that surface AFTER the
+  // stream starts (HTTP is already 200) are caught by useChatRuntime's
+  // onError below, not here.
   const transport = useMemo(
     () =>
       new AssistantChatTransport({
@@ -222,6 +235,7 @@ function ChatPanelInner({
           if (res.status === 423) onFallback("budget")
           else if (res.status === 503) onFallback("daily-cap")
           else if (res.status === 504) onFallback("timeout")
+          else if (!res.ok) onFallback("timeout")
           return res
         },
       }),
@@ -247,7 +261,20 @@ function ChatPanelInner({
   const runtime = useChatRuntime({
     transport,
     messages: initialMessages.length > 0 ? initialMessages : undefined,
-    adapters: { feedback },
+    // attachments: undefined 显式覆盖 useAISDKRuntime 默认注入的
+    // vercelAttachmentAdapter — 我们不支持 vision (DeepSeek 文本-only),
+    // 不关掉的话 ComposerPrimitive.Input 会拦截 paste 把剪贴板图片塞成
+    // file part, convertToModelMessages 序列化为 image_url 后被 DeepSeek
+    // 400 拒绝, 整个会话死锁 (see route.ts onError logs).
+    adapters: { feedback, attachments: undefined },
+    // Stream-level errors (HTTP=200 but stream emits error chunk) — the only
+    // place we can catch DeepSeek invalid_request / 5xx that surfaces inside
+    // streamText. Without this, the assistant bubble just sits empty and the
+    // user sees "AI 不回复". Treat as the same neutral fallback.
+    onError: (err) => {
+      console.error("[agent-chat] runtime error", err)
+      onFallback("timeout")
+    },
   })
 
   // Trigger the handoff card only when escalate_to_human's result says
