@@ -39,24 +39,40 @@ describe("ManualStatusTimeline", () => {
         expect(screen.queryByText("已完成")).not.toBeInTheDocument()
     })
 
-    it("marks the PENDING step as active when current = PENDING", () => {
+    it("marks the PENDING step as active (in-progress, blue) when current = PENDING", () => {
         const { container } = render(<ManualStatusTimeline current="PENDING" />)
         const items = container.querySelectorAll("li")
         // The four step items + (no eta) → 4 items total.
         expect(items).toHaveLength(4)
-        // PENDING (index 0) carries `text-primary` (active); future steps carry
-        // `text-muted-foreground`.
+        // PENDING is in-progress (non-terminal) → primary blue;
+        // future steps stay muted.
         expect(items[0].className).toContain("text-primary")
         expect(items[1].className).toContain("text-muted-foreground")
     })
 
-    it("marks earlier steps done and the COMPLETED step as active when current = COMPLETED", () => {
+    it("paints the entire chain success-green when current = COMPLETED (terminal)", () => {
         const { container } = render(<ManualStatusTimeline current="COMPLETED" />)
         const items = container.querySelectorAll("li")
-        // 待付款 / 待发货 / 处理中 are done (text-foreground); 已完成 is the active step.
-        expect(items[0].className).toContain("text-foreground")
-        expect(items[1].className).toContain("text-foreground")
-        expect(items[2].className).toContain("text-foreground")
-        expect(items[3].className).toContain("text-primary")
+        // 待付款 / 待发货 / 处理中 (done) and 已完成 (active+terminal) all
+        // use the success token — the visual reads "fully done", not "still
+        // running on the last step".
+        expect(items[0].className).toContain("text-success")
+        expect(items[1].className).toContain("text-success")
+        expect(items[2].className).toContain("text-success")
+        expect(items[3].className).toContain("text-success")
+    })
+
+    it("renders a checkmark (not a spinner) on the COMPLETED step because it is terminal", () => {
+        const { container } = render(<ManualStatusTimeline current="COMPLETED" />)
+        // No spinning loader anywhere — COMPLETED is a terminal success state,
+        // not a "we're working on it" state. The active step icon should be a
+        // checkmark, matching the visual contract of "done".
+        expect(container.querySelector(".animate-spin")).toBeNull()
+    })
+
+    it("renders a spinner on the active step for intermediate states (PROCESSING)", () => {
+        const { container } = render(<ManualStatusTimeline current="PROCESSING" />)
+        // PROCESSING is intermediate — the active node should show a spinner.
+        expect(container.querySelector(".animate-spin")).not.toBeNull()
     })
 })

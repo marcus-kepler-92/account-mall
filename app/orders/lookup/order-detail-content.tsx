@@ -113,14 +113,18 @@ export function OrderDetailContent({ result: initialResult, getPassword }: Props
         enabled: isManual && isProcessing,
     })
     useEffect(() => {
-        // Swap in the fresh detail once admin ships (cards/fulfillment
-        // populated). Closed/timeout intentionally do not auto-swap —
-        // we keep the existing view and let the manual-refresh hint
-        // below prompt the buyer.
-        if (pollPhase === "fulfilled" && refreshed) {
-            setResult(refreshed)
-        }
-    }, [pollPhase, refreshed])
+        // Swap in any fresh detail so the timeline + body follow real
+        // state. Polling auto-stops on COMPLETED/CLOSED inside the hook,
+        // so we won't bounce back to an intermediate state after fulfill.
+        // Guard against redundant setState by comparing status — refetch
+        // creates a new object reference every cycle.
+        if (!refreshed) return
+        setResult((prev) =>
+            prev.status === refreshed.status && pollPhase !== "fulfilled"
+                ? prev
+                : refreshed,
+        )
+    }, [refreshed, pollPhase])
 
     const hasPasswordForPoll = !!getPassword()
 
@@ -203,12 +207,12 @@ export function OrderDetailContent({ result: initialResult, getPassword }: Props
 
             {/* MANUAL: 等待发货 / 卖家处理中 — 5-state timeline + ETA + dun button (Task 20) */}
             {!result.isPending && isManual && isProcessing && (
-                <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200 space-y-3">
+                <div className="rounded-lg border border-border/60 bg-muted/40 p-4 text-sm space-y-3">
                     <div className="space-y-1">
                         <p className="font-medium">
                             {result.status === "AWAITING_FULFILLMENT" ? "订单待发货" : "卖家处理中"}
                         </p>
-                        <p className="text-xs">
+                        <p className="text-xs text-foreground/70">
                             {result.status === "AWAITING_FULFILLMENT"
                                 ? "已收款，等待卖家发货。"
                                 : "卖家正在为您处理订单，发货后将自动显示账号内容。"}
@@ -216,7 +220,7 @@ export function OrderDetailContent({ result: initialResult, getPassword }: Props
                     </div>
                     <ManualStatusTimeline current={result.status} etaText={result.etaText} />
                     {hasPasswordForPoll && pollPhase === "polling" && (
-                        <p className="text-xs text-blue-700 dark:text-blue-300">
+                        <p className="text-xs text-muted-foreground">
                             正在等待发货，自动检测中…
                         </p>
                     )}
@@ -327,8 +331,8 @@ export function OrderDetailContent({ result: initialResult, getPassword }: Props
 
             {/* 温馨提示 */}
             {!result.isPending && (result.cards.length > 0 || (isManual && result.fulfillment)) && (
-                <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200">
-                    <p className="font-medium mb-1">温馨提示：</p>
+                <div className="rounded-lg border border-border/60 bg-muted/40 p-3 text-xs text-foreground/80">
+                    <p className="font-medium mb-1 text-foreground">温馨提示：</p>
                     <ul className="list-disc list-inside space-y-0.5">
                         <li>请妥善保管订单号和查询密码</li>
                         <li>账号内容请及时保存，避免丢失</li>

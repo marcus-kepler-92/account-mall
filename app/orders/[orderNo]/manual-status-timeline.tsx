@@ -41,27 +41,36 @@ export function ManualStatusTimeline({
         )
     }
     const currentIdx = STEPS.findIndex((s) => s.status === current)
+    // The last step (COMPLETED) is a terminal success state, not a "we're working
+    // on it" state — render the active checkmark instead of the in-progress spinner.
+    const isTerminal = current === "COMPLETED"
     return (
         <ol className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
             {STEPS.map((s, i) => {
                 const done = i < currentIdx
                 const active = i === currentIdx
+                const inProgress = active && !isTerminal
+                // Color semantics:
+                //   done    → success green (past, finished)
+                //   active (in-progress) → primary blue (currently moving)
+                //   active (terminal)    → success green (successfully done)
+                //   pending → muted (not yet)
+                const tone = done
+                    ? "text-success"
+                    : active
+                      ? isTerminal
+                          ? "text-success"
+                          : "text-primary"
+                      : "text-muted-foreground"
                 return (
                     <li
                         key={s.status}
-                        className={cn(
-                            "flex items-center gap-1",
-                            done
-                                ? "text-foreground"
-                                : active
-                                  ? "text-primary"
-                                  : "text-muted-foreground",
-                        )}
+                        className={cn("flex items-center gap-1", tone)}
                     >
-                        {done ? (
-                            <CheckCircle2 className="size-4" />
-                        ) : active ? (
+                        {inProgress ? (
                             <Loader2 className="size-4 animate-spin" />
+                        ) : done || active ? (
+                            <CheckCircle2 className="size-4" />
                         ) : (
                             <Circle className="size-4" />
                         )}

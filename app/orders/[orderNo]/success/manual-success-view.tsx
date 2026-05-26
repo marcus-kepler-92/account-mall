@@ -41,13 +41,41 @@ type Props = {
  */
 export function ManualSuccessView({
     orderNo,
-    status,
+    status: initialStatus,
     productName,
     variantName,
     amount,
     etaText,
     cs,
 }: Props) {
+    const router = useRouter()
+    const searchParams = useSearchParams()
+    const token = searchParams.get("token")
+
+    // Live status from the buyer-side poller. The server-rendered prop is
+    // a point-in-time snapshot — once admin advances state the timeline /
+    // title / subtitle need to follow, which means render must read from
+    // the hook. When the transition reaches COMPLETED we kick off a single
+    // RSC refresh so the page swaps in fulfillment content from the server.
+    const { status: liveStatus } = useManualStatusPoll(orderNo, token, {
+        enabled: initialStatus !== "COMPLETED",
+    })
+
+    // Server snapshot is the floor; prefer the live polled status whenever
+    // it has landed and resolved to one of the valid view states.
+    const status: Props["status"] =
+        liveStatus === "AWAITING_FULFILLMENT" ||
+        liveStatus === "PROCESSING" ||
+        liveStatus === "COMPLETED"
+            ? liveStatus
+            : initialStatus
+
+    useEffect(() => {
+        if (liveStatus === "COMPLETED" && initialStatus !== "COMPLETED") {
+            router.refresh()
+        }
+    }, [liveStatus, initialStatus, router])
+
     const isCompleted = status === "COMPLETED"
     const title = isCompleted ? "卖家已发货" : "下单成功，等待卖家发货"
     const subtitle = isCompleted
@@ -58,15 +86,12 @@ export function ManualSuccessView({
 
     return (
         <div className="flex min-h-screen flex-col">
-            {!isCompleted && (
-                <FulfillmentRefresher orderNo={orderNo} />
-            )}
             <SiteHeader cs={cs} />
             <main className="flex-1 py-8">
                 <div className="mx-auto max-w-2xl space-y-4 px-4 pb-8">
                     <div className="text-center">
                         <h1 className="text-2xl font-bold">{title}</h1>
-                        <p className="mt-1 text-muted-foreground">{subtitle}</p>
+                        <p className="mt-1 text-sm text-foreground/70">{subtitle}</p>
                     </div>
 
                     <Card>
@@ -78,7 +103,7 @@ export function ManualSuccessView({
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-                                <dt className="text-muted-foreground">订单号</dt>
+                                <dt className="text-foreground/60">订单号</dt>
                                 <dd className="flex items-center gap-2 font-mono tabular-nums">
                                     <span className="truncate">{orderNo}</span>
                                     <Button
@@ -94,19 +119,19 @@ export function ManualSuccessView({
                                         <Copy className="size-3" />
                                     </Button>
                                 </dd>
-                                <dt className="text-muted-foreground">商品</dt>
+                                <dt className="text-foreground/60">商品</dt>
                                 <dd className="truncate">{productName}</dd>
                                 {variantName && (
                                     <>
-                                        <dt className="text-muted-foreground">规格</dt>
+                                        <dt className="text-foreground/60">规格</dt>
                                         <dd className="truncate">{variantName}</dd>
                                     </>
                                 )}
-                                <dt className="text-muted-foreground">金额</dt>
+                                <dt className="text-foreground/60">金额</dt>
                                 <dd className="tabular-nums">{formatCurrency(amount)}</dd>
                             </dl>
 
-                            <div className="rounded-lg border bg-muted/30 p-3">
+                            <div className="rounded-lg border border-border/60 bg-muted/40 p-3">
                                 <ManualStatusTimeline
                                     current={status}
                                     etaText={isCompleted ? undefined : etaText}
@@ -131,24 +156,3 @@ export function ManualSuccessView({
     )
 }
 
-/**
- * Polls token-gated status while the buyer is parked on the
- * non-COMPLETED MANUAL success view. When admin ships, calls
- * router.refresh() so the RSC re-renders into the COMPLETED branch with
- * fulfillment content. Only mounted when status !== "COMPLETED" so we
- * never trigger an infinite refresh loop.
- */
-function FulfillmentRefresher({ orderNo }: { orderNo: string }) {
-    const router = useRouter()
-    const searchParams = useSearchParams()
-    const token = searchParams.get("token")
-    const { phase } = useManualStatusPoll(orderNo, token)
-
-    useEffect(() => {
-        if (phase === "fulfilled") {
-            router.refresh()
-        }
-    }, [phase, router])
-
-    return null
-}
