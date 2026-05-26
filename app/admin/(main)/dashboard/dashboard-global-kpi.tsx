@@ -19,7 +19,17 @@ export function DashboardGlobalKPI({ kpi }: { kpi: GlobalKPI }) {
               <span title="部分商品未设成本，利润偏高" className="cursor-help">⚠</span>
             )}
           </p>
-          <p className="mt-1 text-xl font-bold text-green-600">{formatCurrency(kpi.todayProfit)}</p>
+          <p
+            className={`mt-1 text-xl font-bold ${
+              kpi.todayProfit < 0
+                ? "text-destructive"
+                : kpi.todayProfit > 0
+                  ? "text-success"
+                  : "text-foreground"
+            }`}
+          >
+            {formatCurrency(kpi.todayProfit)}
+          </p>
         </CardContent>
       </Card>
       <Card>
