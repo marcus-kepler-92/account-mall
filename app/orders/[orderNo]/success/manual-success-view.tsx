@@ -1,6 +1,8 @@
 "use client"
 
+import { useEffect } from "react"
 import Link from "next/link"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Copy } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -13,6 +15,7 @@ import {
 } from "@/components/ui/card"
 import { SiteHeader } from "@/app/components/site-header"
 import { ManualStatusTimeline } from "@/app/orders/[orderNo]/manual-status-timeline"
+import { useManualStatusPoll } from "@/app/orders/[orderNo]/use-manual-status-poll"
 import { formatCurrency } from "@/lib/utils"
 
 type Props = {
@@ -55,6 +58,9 @@ export function ManualSuccessView({
 
     return (
         <div className="flex min-h-screen flex-col">
+            {!isCompleted && (
+                <FulfillmentRefresher orderNo={orderNo} />
+            )}
             <SiteHeader cs={cs} />
             <main className="flex-1 py-8">
                 <div className="mx-auto max-w-2xl space-y-4 px-4 pb-8">
@@ -123,4 +129,26 @@ export function ManualSuccessView({
             </main>
         </div>
     )
+}
+
+/**
+ * Polls token-gated status while the buyer is parked on the
+ * non-COMPLETED MANUAL success view. When admin ships, calls
+ * router.refresh() so the RSC re-renders into the COMPLETED branch with
+ * fulfillment content. Only mounted when status !== "COMPLETED" so we
+ * never trigger an infinite refresh loop.
+ */
+function FulfillmentRefresher({ orderNo }: { orderNo: string }) {
+    const router = useRouter()
+    const searchParams = useSearchParams()
+    const token = searchParams.get("token")
+    const { phase } = useManualStatusPoll(orderNo, token)
+
+    useEffect(() => {
+        if (phase === "fulfilled") {
+            router.refresh()
+        }
+    }, [phase, router])
+
+    return null
 }

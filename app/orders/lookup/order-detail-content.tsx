@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import { Loader2, Package, CreditCard } from "lucide-react"
+import { Loader2, Package, CreditCard, RefreshCw } from "lucide-react"
 import { toast } from "sonner"
 import { formatDateTime, formatDateTimeShort } from "@/lib/utils"
 import { type AutoFetchCardPayload, isAutoFetchCard, toCardContentJson } from "@/lib/auto-fetch-card"
@@ -12,6 +12,7 @@ import { OrderAutoFetchTroubleshoot } from "@/app/components/order-detail/auto-f
 import { useCountdown, formatCountdown } from "@/app/components/order-detail/use-countdown"
 import { ManualStatusTimeline } from "@/app/orders/[orderNo]/manual-status-timeline"
 import { ManualDunButton } from "@/app/orders/[orderNo]/manual-dun-button"
+import { useManualDetailPoll } from "./use-manual-detail-poll"
 import type { OrderResult } from "./types"
 
 async function fetchApi(endpoint: string, body: Record<string, string>) {
@@ -96,6 +97,32 @@ export function OrderDetailContent({ result: initialResult, getPassword }: Props
     const isManual = result.productType === "MANUAL"
     const isProcessing =
         result.status === "AWAITING_FULFILLMENT" || result.status === "PROCESSING"
+
+    // Background poller: keep MANUAL processing orders fresh so buyer
+    // sees fulfillment content (cards/content) the moment admin ships,
+    // without manual refresh. Gracefully no-ops when password is
+    // unavailable (rare deep-link scenario). 60s cadence, 30min cap,
+    // visibility-aware — all enforced by the hook itself.
+    const detailGetPassword = useCallback(
+        () => getPassword() || null,
+        [getPassword],
+    )
+    const { refreshed, phase: pollPhase } = useManualDetailPoll({
+        orderNo: result.orderNo,
+        getPassword: detailGetPassword,
+        enabled: isManual && isProcessing,
+    })
+    useEffect(() => {
+        // Swap in the fresh detail once admin ships (cards/fulfillment
+        // populated). Closed/timeout intentionally do not auto-swap —
+        // we keep the existing view and let the manual-refresh hint
+        // below prompt the buyer.
+        if (pollPhase === "fulfilled" && refreshed) {
+            setResult(refreshed)
+        }
+    }, [pollPhase, refreshed])
+
+    const hasPasswordForPoll = !!getPassword()
 
     return (
         <div className="space-y-4">
@@ -188,6 +215,45 @@ export function OrderDetailContent({ result: initialResult, getPassword }: Props
                         </p>
                     </div>
                     <ManualStatusTimeline current={result.status} etaText={result.etaText} />
+                    {hasPasswordForPoll && pollPhase === "polling" && (
+                        <p className="text-xs text-blue-700 dark:text-blue-300">
+                            正在等待发货，自动检测中…
+                        </p>
+                    )}
+                    {hasPasswordForPoll && pollPhase === "stopped_timeout" && (
+                        <div className="flex items-center justify-between gap-2 text-xs">
+                            <span className="text-muted-foreground">
+                                长时间未发货，自动检测已暂停
+                            </span>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 gap-1 px-2"
+                                onClick={() => window.location.reload()}
+                            >
+                                <RefreshCw className="size-3" />
+                                刷新
+                            </Button>
+                        </div>
+                    )}
+                    {!hasPasswordForPoll && (
+                        <div className="flex items-center justify-between gap-2 text-xs">
+                            <span className="text-muted-foreground">
+                                请手动刷新以获取最新状态
+                            </span>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 gap-1 px-2"
+                                onClick={() => window.location.reload()}
+                            >
+                                <RefreshCw className="size-3" />
+                                刷新
+                            </Button>
+                        </div>
+                    )}
                     {result.id && result.email && (
                         <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:items-center sm:justify-between">
                             <span className="text-xs text-muted-foreground">

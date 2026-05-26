@@ -42,6 +42,11 @@ import {
     type OrderDetailPasswordValues,
 } from "@/lib/validations/lookup"
 import { OrderDetailContent } from "./order-detail-content"
+import {
+    clearLookupPasswordCache,
+    readLookupPasswordCache,
+    writeLookupPasswordCache,
+} from "./lookup-password-cache"
 import type { OrderResult, OrderListItem, LookupMode } from "./types"
 
 /* ------------------------------------------------------------------ */
@@ -78,55 +83,6 @@ async function fetchApi(
     const data = await res.json().catch(() => ({}))
     if (!res.ok) return { ok: false, error: data?.error ?? "", raw: data }
     return { ok: true, data }
-}
-
-/* ------------------------------------------------------------------ */
-/*  Per-email password cache (sessionStorage, per-tab)                 */
-/*                                                                     */
-/*  Buyers typically reuse one password across all their orders. When  */
-/*  the buyer successfully opens detail for one row, cache that        */
-/*  (email, password) — subsequent rows can skip the password Dialog   */
-/*  and just hit the detail API directly. If detail fails (wrong       */
-/*  password — extremely rare since the same password worked), we fall */
-/*  back to the Dialog. Cleared on 「换邮箱」.                          */
-/* ------------------------------------------------------------------ */
-
-const PASSWORD_CACHE_KEY = "account-mall-lookup-pw-cache"
-
-function readPasswordCache(email: string): string | null {
-    if (typeof window === "undefined") return null
-    try {
-        const raw = window.sessionStorage.getItem(PASSWORD_CACHE_KEY)
-        if (!raw) return null
-        const parsed = JSON.parse(raw) as { email?: string; password?: string }
-        if (parsed.email === email && typeof parsed.password === "string") {
-            return parsed.password
-        }
-        return null
-    } catch {
-        return null
-    }
-}
-
-function writePasswordCache(email: string, password: string): void {
-    if (typeof window === "undefined") return
-    try {
-        window.sessionStorage.setItem(
-            PASSWORD_CACHE_KEY,
-            JSON.stringify({ email, password }),
-        )
-    } catch {
-        // sessionStorage may be unavailable (privacy mode) — silently skip.
-    }
-}
-
-function clearPasswordCache(): void {
-    if (typeof window === "undefined") return
-    try {
-        window.sessionStorage.removeItem(PASSWORD_CACHE_KEY)
-    } catch {
-        // ignore
-    }
 }
 
 /* ------------------------------------------------------------------ */
@@ -259,7 +215,7 @@ function OrderLookupForm({
             setListEmail(normalizedEmail)
             setPagination({ total, page, pageSize, totalPages })
             // Switching emails invalidates any cached per-row password.
-            clearPasswordCache()
+            clearLookupPasswordCache()
             if (total === 0) {
                 // Empty list is rendered inline below — no field error.
                 return
@@ -531,7 +487,7 @@ function OrderLookupPageContent() {
         setListEmail(null)
         setPagination(null)
         setDetailPassword("")
-        clearPasswordCache()
+        clearLookupPasswordCache()
     }, [])
 
     const resetEmail = useCallback(() => {
@@ -541,7 +497,7 @@ function OrderLookupPageContent() {
         setPagination(null)
         setResult(null)
         setDetailPassword("")
-        clearPasswordCache()
+        clearLookupPasswordCache()
     }, [])
 
     /**
@@ -573,7 +529,7 @@ function OrderLookupPageContent() {
             }
             setResult(res.data as OrderResult)
             setDetailPassword(password)
-            if (listEmail) writePasswordCache(listEmail, password)
+            if (listEmail) writeLookupPasswordCache(listEmail, password)
             addOrUpdateOrder({
                 orderNo: res.data.orderNo,
                 productName: res.data.productName ?? "商品",
@@ -594,13 +550,13 @@ function OrderLookupPageContent() {
 
     const handleOrderClick = useCallback(async (clickedOrderNo: string) => {
         // Try the cached password first (per-tab, scoped to current email).
-        const cached = listEmail ? readPasswordCache(listEmail) : null
+        const cached = listEmail ? readLookupPasswordCache(listEmail) : null
         if (cached) {
             const res = await openDetailWithPassword(clickedOrderNo, cached)
             if (res.ok) return
             // Cached password no longer valid (rotated? wrong order?) — wipe
             // it and fall through to the Dialog.
-            clearPasswordCache()
+            clearLookupPasswordCache()
             setDetailPassword("")
         }
         setPendingOrderNo(clickedOrderNo)
