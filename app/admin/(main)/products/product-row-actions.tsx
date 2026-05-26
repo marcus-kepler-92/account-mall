@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { useInvalidateAdminNotifications } from "@/app/admin/hooks/use-admin-notifications"
 import { useState } from "react"
 import {
     MoreHorizontal,
@@ -57,6 +58,7 @@ export function ProductRowActions({
     isSuperAdmin = false,
 }: ProductRowActionsProps) {
     const router = useRouter()
+    const invalidateNotifications = useInvalidateAdminNotifications()
     const [loading, setLoading] = useState(false)
     const [duplicateLoading, setDuplicateLoading] = useState(false)
     const [statusDialogOpen, setStatusDialogOpen] = useState(false)
@@ -74,6 +76,7 @@ export function ProductRowActions({
             if (res.ok) {
                 toast.success("商品已复制")
                 router.refresh()
+                invalidateNotifications()
             } else {
                 const data = await res.json().catch(() => ({}))
                 toast.error(data?.error ?? "复制失败")
@@ -107,6 +110,7 @@ export function ProductRowActions({
                 setStatusDialogOpen(false)
                 toast.success(isActive ? "商品已下架" : "商品已上架")
                 router.refresh()
+                invalidateNotifications()
             } else {
                 const data = await res.json().catch(() => ({}))
                 toast.error(data?.error ?? "操作失败")
@@ -128,6 +132,7 @@ export function ProductRowActions({
                 setDeleteOpen(false)
                 toast.success("商品已删除")
                 router.refresh()
+                invalidateNotifications()
             } else if (res.status === 400) {
                 const data = await res.json().catch(() => ({}))
                 toast.error(data?.error ?? "该商品存在关联订单，无法删除")

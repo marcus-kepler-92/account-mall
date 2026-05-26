@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { useInvalidateAdminNotifications } from "@/app/admin/hooks/use-admin-notifications"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -34,6 +35,7 @@ export function ManualFulfillmentPanel({
     lastDunAt,
 }: Props) {
     const router = useRouter()
+    const invalidateNotifications = useInvalidateAdminNotifications()
     const [content, setContent] = useState("")
     const [confirmOpen, setConfirmOpen] = useState(false)
     const [busy, setBusy] = useState(false)
@@ -66,6 +68,7 @@ export function ManualFulfillmentPanel({
         }
         toast.success("已接单")
         router.refresh()
+        invalidateNotifications()
     }
 
     const fulfill = async () => {
@@ -84,6 +87,7 @@ export function ManualFulfillmentPanel({
         }
         toast.success("已发货")
         router.refresh()
+        invalidateNotifications()
     }
 
     return (

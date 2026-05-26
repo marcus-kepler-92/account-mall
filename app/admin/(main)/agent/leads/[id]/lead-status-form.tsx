@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Loader2 } from "lucide-react"
+import { useInvalidateAdminNotifications } from "@/app/admin/hooks/use-admin-notifications"
 
 type LeadStatus =
     | "PENDING_CONTACT"
@@ -54,6 +55,7 @@ export function LeadStatusForm({
     initialNotes,
 }: LeadStatusFormProps) {
     const router = useRouter()
+    const invalidateNotifications = useInvalidateAdminNotifications()
     const [notes, setNotes] = useState(initialNotes)
     const [savingNotes, setSavingNotes] = useState(false)
     const [pendingStatus, setPendingStatus] = useState<LeadStatus | null>(null)
@@ -91,6 +93,7 @@ export function LeadStatusForm({
             await patch({ status: next })
             toast.success(`状态已更新为「${LABEL[next]}」`)
             router.refresh()
+            invalidateNotifications()
         } catch (e) {
             toast.error(e instanceof Error ? e.message : "操作失败")
         } finally {

@@ -17,6 +17,7 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog"
 import { Upload, Loader2 } from "lucide-react"
+import { useInvalidateAdminNotifications } from "@/app/admin/hooks/use-admin-notifications"
 
 type BulkImportCardsProps = {
     productId: string
@@ -31,6 +32,7 @@ const MAX_LINES = 500
 
 export function BulkImportCards({ productId, defaultUnitCost = null, trigger, defaultOpen = false }: BulkImportCardsProps) {
     const router = useRouter()
+    const invalidateNotifications = useInvalidateAdminNotifications()
     const pathname = usePathname()
     const [open, setOpen] = useState(defaultOpen)
 
@@ -86,6 +88,7 @@ export function BulkImportCards({ productId, defaultUnitCost = null, trigger, de
             setText("")
             resetUnitCost()
             router.refresh()
+            invalidateNotifications()
         } catch {
             toast.error("导入失败")
         } finally {

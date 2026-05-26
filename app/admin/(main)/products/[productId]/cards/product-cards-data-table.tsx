@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useInvalidateAdminNotifications } from "@/app/admin/hooks/use-admin-notifications";
 import { toast } from "sonner";
 import { CardDetailSheet } from "@/app/admin/(main)/cards/card-detail-sheet";
 import {
@@ -61,6 +62,7 @@ const SORT_DEFAULTS = { sort: "createdAt", sortDir: "desc" } as const;
 
 export function ProductCardsDataTable({ data, total, statusCounts, actions }: ProductCardsDataTableProps) {
     const router = useRouter();
+    const invalidateNotifications = useInvalidateAdminNotifications();
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
     const [selectedCard, setSelectedCard] = useState<ProductCardRow | null>(null);
@@ -131,6 +133,7 @@ export function ProductCardsDataTable({ data, total, statusCounts, actions }: Pr
             toast.success(`成功${actionLabel} ${result.success} 条${result.skipped > 0 ? `，跳过 ${result.skipped} 条` : ""}`);
             setRowSelection({});
             router.refresh();
+            invalidateNotifications();
         } catch {
             toast.error("操作失败");
         } finally {
