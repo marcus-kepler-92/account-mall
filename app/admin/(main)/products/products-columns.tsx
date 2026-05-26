@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import type { ColumnDef } from "@tanstack/react-table"
-import { GripVertical } from "lucide-react"
+import { GripVertical, AlertTriangle } from "lucide-react"
 import { formatCurrency } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { DataTableColumnHeader } from "@/app/admin/components"
@@ -20,6 +20,10 @@ export type ProductRow = {
     sales: number
     subscriberCount: number
     hasAlert: boolean
+    // Active variant count — only meaningful for MANUAL products. Used to
+    // surface a "缺 SKU" warning badge when a MANUAL product is ACTIVE but
+    // has zero active variants (misconfigured row that can't be sold).
+    activeVariantCount: number
 }
 
 const statusMap: Record<ProductRow["status"], { label: string; variant: "default" | "secondary" }> = {
@@ -76,7 +80,25 @@ return [
         header: "状态",
         cell: ({ row }) => {
             const { label, variant } = statusMap[row.original.status]
-            return <Badge variant={variant}>{label}</Badge>
+            const missingSku =
+                row.original.productType === "MANUAL" &&
+                row.original.status === "ACTIVE" &&
+                row.original.activeVariantCount === 0
+            return (
+                <div className="flex flex-wrap items-center gap-1">
+                    <Badge variant={variant}>{label}</Badge>
+                    {missingSku && (
+                        <Badge
+                            variant="destructive"
+                            className="gap-1"
+                            title="MANUAL 商品当前为「上架」但没有任何启用的 SKU，无法被购买。请补充 SKU 或将商品下架。"
+                        >
+                            <AlertTriangle className="size-3" />
+                            缺 SKU
+                        </Badge>
+                    )}
+                </div>
+            )
         },
         filterFn: (row, id, value: string) => !value || row.getValue(id) === value,
     },

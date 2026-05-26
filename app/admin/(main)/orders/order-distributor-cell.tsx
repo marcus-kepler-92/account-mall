@@ -29,7 +29,12 @@ export type DistributorOption = {
 
 interface OrderDistributorCellProps {
   orderId: string
-  orderStatus: "PENDING" | "COMPLETED" | "CLOSED"
+  orderStatus:
+    | "PENDING"
+    | "AWAITING_FULFILLMENT"
+    | "PROCESSING"
+    | "COMPLETED"
+    | "CLOSED"
   distributor: { id: string; name: string; distributorCode: string | null } | null
   distributors: DistributorOption[]
   readOnly?: boolean

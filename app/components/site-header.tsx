@@ -4,7 +4,6 @@ import Link from "next/link"
 import { Zap, Search, LayoutDashboard } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/app/components/theme-toggle"
-import { MyOrderHistory } from "@/app/components/my-order-history"
 import { useSiteName } from "@/app/components/site-name-provider"
 import { appendCsParam } from "@/lib/cs-params"
 
@@ -47,7 +46,6 @@ export function SiteHeader({ cs }: SiteHeaderProps = {}) {
                             <span className="hidden sm:inline">订单查询</span>
                         </Link>
                     </Button>
-                    <MyOrderHistory />
                     <Button variant="ghost" size="sm" className="h-9 shrink-0 px-2 sm:px-3 touch-manipulation" asChild>
                         <Link
                             href="/distributor"

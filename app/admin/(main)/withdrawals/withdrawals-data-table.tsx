@@ -21,6 +21,7 @@ import { useIsMobile } from "@/hooks/use-mobile"
 import { withdrawalsColumns, type WithdrawalRow } from "./withdrawals-columns"
 import type { WithdrawalFiltersState } from "./withdrawals-filters"
 import { WithdrawalProcessSheet } from "./withdrawal-process-sheet"
+import { useInvalidateAdminNotifications } from "@/app/admin/hooks/use-admin-notifications"
 
 interface WithdrawalsDataTableProps {
     data: WithdrawalRow[]
@@ -49,6 +50,7 @@ export function WithdrawalsDataTable({
     total,
 }: WithdrawalsDataTableProps) {
     const router = useRouter()
+    const invalidateNotifications = useInvalidateAdminNotifications()
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
     const isMobile = useIsMobile()
 
@@ -119,7 +121,10 @@ export function WithdrawalsDataTable({
                     setSheetOpen(o)
                     if (!o) setSelectedRow(null)
                 }}
-                onSuccess={() => router.refresh()}
+                onSuccess={() => {
+                    router.refresh()
+                    invalidateNotifications()
+                }}
             />
         </>
     )

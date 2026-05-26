@@ -1,11 +1,23 @@
-const ORDER_STATUS_VALUES = ["PENDING", "COMPLETED", "CLOSED"] as const
+const ORDER_STATUS_VALUES = [
+    "PENDING",
+    "AWAITING_FULFILLMENT",
+    "PROCESSING",
+    "COMPLETED",
+    "CLOSED",
+] as const
 export type OrderStatusFilter = (typeof ORDER_STATUS_VALUES)[number]
 
 export type OrderFiltersState = {
     page: number
     pageSize: number
     /** Comma-separated in URL; parsed to statusList */
-    status: "ALL" | "PENDING" | "COMPLETED" | "CLOSED"
+    status:
+        | "ALL"
+        | "PENDING"
+        | "AWAITING_FULFILLMENT"
+        | "PROCESSING"
+        | "COMPLETED"
+        | "CLOSED"
     statusList: OrderStatusFilter[]
     search: string
     email: string

@@ -1,9 +1,10 @@
 import * as z from "zod";
+import { variantCreateSchema } from "@/lib/domains/variants/validators";
 
 // Slug format: lowercase alphanumeric with hyphens
 const slugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
-const productTypeEnum = z.enum(["NORMAL", "AUTO_FETCH"]);
+const productTypeEnum = z.enum(["NORMAL", "AUTO_FETCH", "MANUAL"]);
 
 export const createProductSchema = z.object({
     name: z.string().min(1, "Name is required").max(200, "Name is too long"),
@@ -46,6 +47,24 @@ export const createProductSchema = z.object({
     purchaseLimitEnabled: z.boolean().optional(),
     purchaseLimitQuantity: z.number().int().min(1).optional(),
     excludeFromAttribution: z.boolean().optional(),
+    /**
+     * MANUAL-only: when true, ProductVariant.stockQuantity is enforced. Default
+     * false — most MANUAL listings (代购 / 定制 / 按需) don't track stock and
+     * shouldn't render sold-out. Ignored by non-MANUAL flows.
+     */
+    inventoryTracked: z.boolean().optional(),
+    /**
+     * When true AND the global ORDER_COMPLETION_EMAIL_ENABLED is true, the
+     * buyer receives an order-completion email at fulfillment time. Default
+     * false: orders complete silently and buyers自查 through the lookup page.
+     */
+    emailOnFulfill: z.boolean().optional(),
+    /**
+     * MANUAL-only: SKUs to atomically create together with the product.
+     * Ignored for NORMAL/AUTO_FETCH; the route handler additionally rejects
+     * non-empty arrays for those types to surface mistakes early.
+     */
+    variants: z.array(variantCreateSchema).optional(),
 }).refine(
     (data) => data.productType !== "AUTO_FETCH" || (data.sourceUrl && data.sourceUrl !== ""),
     { message: "Auto-fetch product must have a source URL", path: ["sourceUrl"] }
@@ -93,6 +112,10 @@ export const updateProductSchema = z.object({
     purchaseLimitEnabled: z.boolean().optional(),
     purchaseLimitQuantity: z.number().int().min(1).optional(),
     excludeFromAttribution: z.boolean().optional(),
+    /** MANUAL-only inventory tracking toggle; see createProductSchema. */
+    inventoryTracked: z.boolean().optional(),
+    /** Per-product order-completion email toggle; see createProductSchema. */
+    emailOnFulfill: z.boolean().optional(),
 });
 
 export const createTagSchema = z.object({
@@ -127,7 +150,7 @@ export const productFormSchema = z
             "数量必须在 1-1000 之间"
         ),
         isActive: z.boolean(),
-        productType: z.enum(["NORMAL", "AUTO_FETCH"]).optional(),
+        productType: z.enum(["NORMAL", "AUTO_FETCH", "MANUAL"]).optional(),
         /** Sub-type for AUTO_FETCH: HTML scraping vs voidlogins API */
         autoFetchType: z.enum(["scrape", "voidlogins"]).optional(),
         sourceUrl: z.string().optional(),
@@ -149,6 +172,46 @@ export const productFormSchema = z
         purchaseLimitEnabled: z.boolean().optional(),
         purchaseLimitQuantity: z.string().optional(),
         excludeFromAttribution: z.boolean().optional(),
+        /**
+         * MANUAL-only toggle: when true the buyer-side and back-end enforce
+         * variant.stockQuantity (decrement on payment, sold-out display, etc).
+         * When false (default), MANUAL products behave as unbounded — the
+         * stock column is also hidden from the SKU editor.
+         */
+        inventoryTracked: z.boolean().optional(),
+        /**
+         * Per-product gate for the order-completion email. Default false. The
+         * mail still only fires when the global ORDER_COMPLETION_EMAIL_ENABLED
+         * env is also true (two-tier kill switch).
+         */
+        emailOnFulfill: z.boolean().optional(),
+        /**
+         * MANUAL-only: SKU rows authored inline on the create form. Fields
+         * stay as strings here for Input compatibility — the submit handler
+         * converts them to numbers before POSTing.
+         */
+        variants: z
+            .array(
+                z.object({
+                    id: z.string().optional(),
+                    name: z.string(),
+                    price: z.string(),
+                    unitCost: z.string(),
+                    stockQuantity: z.string(),
+                    sortOrder: z.string(),
+                    isActive: z.boolean(),
+                    _localId: z.string().optional(),
+                }),
+            )
+            .optional(),
+        /**
+         * Hidden flag set by ProductForm when editing an existing product.
+         * Edit mode uses SkuListEditor in autosave-to-/api/admin/.../variants
+         * mode — the form's own `variants` field stays empty by design, so the
+         * "≥1 SKU" check below must be skipped or it falsely triggers on every
+         * existing MANUAL product with SKUs already on the server.
+         */
+        _isEditing: z.boolean().optional(),
     })
     .superRefine((data, ctx) => {
         if (data.productType === "AUTO_FETCH") {
@@ -160,6 +223,28 @@ export const productFormSchema = z
             } else {
                 if (!data.sourceUrl || data.sourceUrl.trim() === "")
                     ctx.addIssue({ code: "custom", message: "AUTO_FETCH 商品必须填写来源 URL", path: ["sourceUrl"] })
+            }
+        } else if (data.productType === "MANUAL") {
+            // Edit mode: SKU rows live in SkuListEditor autosave, not in the
+            // form's variants[] — skip the "≥1 SKU" check to avoid a false
+            // positive on every existing MANUAL product.
+            if (data._isEditing) return
+            // Create mode: MANUAL products derive price from SKU variants.
+            // Require at least one validly-filled row before submit so the
+            // create POST atomically delivers a usable product (price/stock
+            // both live on variants).
+            const rows = data.variants ?? []
+            const valid = rows.filter((r) => {
+                if (!r.name?.trim()) return false
+                const p = parseFloat(r.price)
+                return r.price !== "" && !Number.isNaN(p) && p >= 0
+            })
+            if (valid.length === 0) {
+                ctx.addIssue({
+                    code: "custom",
+                    message: "请至少新增一个 SKU（填写名称和售价）",
+                    path: ["variants"],
+                })
             }
         } else {
             if (!data.price || data.price === "")

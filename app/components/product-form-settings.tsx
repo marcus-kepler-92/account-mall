@@ -11,6 +11,7 @@ export function ProductFormSettings() {
     const isActive = watch("isActive") ?? false
     const couponEnabled = watch("couponEnabled") ?? false
     const excludeFromAttribution = watch("excludeFromAttribution") ?? false
+    const emailOnFulfill = watch("emailOnFulfill") ?? false
 
     return (
         <Card>
@@ -42,6 +43,21 @@ export function ProductFormSettings() {
                         id="coupon-enabled"
                         checked={couponEnabled}
                         onCheckedChange={(v) => setValue("couponEnabled", v)}
+                    />
+                </div>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <Label htmlFor="email-on-fulfill">发货后邮件通知买家</Label>
+                        <p className="text-xs text-muted-foreground">
+                            {emailOnFulfill
+                                ? "订单完成时向买家邮箱发送账号信息或卡密"
+                                : "默认关闭：完成订单不发邮件，买家自行查订单"}
+                        </p>
+                    </div>
+                    <Switch
+                        id="email-on-fulfill"
+                        checked={emailOnFulfill}
+                        onCheckedChange={(v) => setValue("emailOnFulfill", v)}
                     />
                 </div>
                 <div className="flex items-center justify-between">

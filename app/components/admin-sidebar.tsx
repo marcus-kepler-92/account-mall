@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation"
 import {
     LayoutDashboard,
     Package,
+    PackageCheck,
     ShoppingCart,
     CreditCard,
     LogOut,
@@ -14,6 +15,7 @@ import {
     Layers,
     Wallet,
     BookOpen,
+    BellRing,
     FolderOpen,
     FlaskConical,
     Mail,
@@ -54,6 +56,7 @@ import { sourceFor } from "@/lib/admin-notifications"
 const allNavItems = [
     // 总览
     { title: "仪表盘", href: "/admin/dashboard", icon: LayoutDashboard },
+    { title: "通知中心", href: "/admin/notifications", icon: BellRing },
     // 商品
     { title: "商品管理", href: "/admin/products", icon: Package },
     { title: "卡密管理", href: "/admin/cards", icon: CreditCard },
@@ -63,6 +66,7 @@ const allNavItems = [
     { title: "联推折扣", href: "/admin/settings/cross-sell", icon: Sparkles },
     // 数据
     { title: "订单管理", href: "/admin/orders", icon: ShoppingCart },
+    { title: "人工发货", href: "/admin/fulfillment", icon: PackageCheck },
     // 提现
     { title: "提现管理", href: "/admin/withdrawals", icon: Wallet },
     // 公告

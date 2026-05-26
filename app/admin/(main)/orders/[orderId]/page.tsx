@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, CreditCard, ShoppingCart } from "lucide-react"
 import { resolveAdminCard } from "@/lib/card-format"
 import { OrderCardsTable } from "@/app/admin/(main)/orders/[orderId]/order-cards-table"
+import { ManualFulfillmentPanel } from "@/app/admin/(main)/orders/[orderId]/manual-fulfillment-panel"
 
 export const dynamic = "force-dynamic"
 
@@ -26,6 +27,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
                     id: true,
                     name: true,
                     slug: true,
+                    productType: true,
                     cardTemplates: {
                         orderBy: { sortOrder: "asc" },
                         select: { template: true },
@@ -34,6 +36,9 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
             },
             cards: {
                 orderBy: { createdAt: "asc" },
+            },
+            fulfillment: {
+                select: { content: true },
             },
         },
     })
@@ -45,9 +50,22 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
     const statusLabel =
         order.status === "PENDING"
             ? "待完成"
-            : order.status === "COMPLETED"
-              ? "已完成"
-              : "已关闭"
+            : order.status === "AWAITING_FULFILLMENT"
+              ? "待发货"
+              : order.status === "PROCESSING"
+                ? "发货中"
+                : order.status === "COMPLETED"
+                  ? "已完成"
+                  : "已关闭"
+
+    const statusBadgeClass =
+        order.status === "COMPLETED"
+            ? "border-success/50 bg-success/10 text-success"
+            : order.status === "PENDING" ||
+                order.status === "AWAITING_FULFILLMENT" ||
+                order.status === "PROCESSING"
+              ? "border-warning/50 bg-warning/10 text-warning"
+              : "border-muted-foreground/30 bg-muted text-muted-foreground"
 
     const cardTemplates = order.product.cardTemplates
     const serializedCards = order.cards.map((c) => ({
@@ -77,16 +95,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
                         订单详情
                     </p>
                 </div>
-                <Badge
-                    variant="outline"
-                    className={
-                        order.status === "COMPLETED"
-                            ? "border-success/50 bg-success/10 text-success"
-                            : order.status === "PENDING"
-                              ? "border-warning/50 bg-warning/10 text-warning"
-                              : "border-muted-foreground/30 bg-muted text-muted-foreground"
-                    }
-                >
+                <Badge variant="outline" className={statusBadgeClass}>
                     {statusLabel}
                 </Badge>
             </div>
@@ -120,6 +129,12 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
                                 </span>
                             </p>
                         </div>
+                        {order.variantNameSnapshot && (
+                            <div>
+                                <p className="text-muted-foreground">SKU</p>
+                                <p>{order.variantNameSnapshot}</p>
+                            </div>
+                        )}
                         <div>
                             <p className="text-muted-foreground">数量</p>
                             <p>{order.quantity}</p>
@@ -160,18 +175,37 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
                 </CardContent>
             </Card>
 
+            {/* Manual fulfillment */}
+            {order.product.productType === "MANUAL" && (
+                <ManualFulfillmentPanel
+                    orderId={order.id}
+                    status={
+                        order.status as
+                            | "AWAITING_FULFILLMENT"
+                            | "PROCESSING"
+                            | "COMPLETED"
+                            | "CLOSED"
+                    }
+                    existingContent={order.fulfillment?.content ?? null}
+                    dunCount={order.dunCount}
+                    lastDunAt={order.lastDunAt?.toISOString() ?? null}
+                />
+            )}
+
             {/* Cards */}
-            <Card>
-                <CardHeader>
-                    <CardTitle className="text-base flex items-center gap-2">
-                        <CreditCard className="size-4" />
-                        卡密（{serializedCards.length} 条）
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <OrderCardsTable cards={serializedCards} />
-                </CardContent>
-            </Card>
+            {order.product.productType !== "MANUAL" && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base flex items-center gap-2">
+                            <CreditCard className="size-4" />
+                            卡密（{serializedCards.length} 条）
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <OrderCardsTable cards={serializedCards} />
+                    </CardContent>
+                </Card>
+            )}
         </div>
     )
 }

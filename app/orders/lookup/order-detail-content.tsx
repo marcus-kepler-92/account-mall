@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import { Loader2, Package, CreditCard } from "lucide-react"
+import { Loader2, Package, CreditCard, RefreshCw } from "lucide-react"
 import { toast } from "sonner"
 import { formatDateTime, formatDateTimeShort } from "@/lib/utils"
 import { type AutoFetchCardPayload, isAutoFetchCard, toCardContentJson } from "@/lib/auto-fetch-card"
@@ -10,6 +10,9 @@ import { resolveCardFields } from "@/lib/card-format"
 import { OrderCardDisplay, type CardDisplayItem } from "@/app/components/order-detail/card-display"
 import { OrderAutoFetchTroubleshoot } from "@/app/components/order-detail/auto-fetch-troubleshoot"
 import { useCountdown, formatCountdown } from "@/app/components/order-detail/use-countdown"
+import { ManualStatusTimeline } from "@/app/orders/[orderNo]/manual-status-timeline"
+import { ManualDunButton } from "@/app/orders/[orderNo]/manual-dun-button"
+import { useManualDetailPoll } from "./use-manual-detail-poll"
 import type { OrderResult } from "./types"
 
 async function fetchApi(endpoint: string, body: Record<string, string>) {
@@ -91,6 +94,40 @@ export function OrderDetailContent({ result: initialResult, getPassword }: Props
         return resolveCardFields(card.content, templates)
     })
 
+    const isManual = result.productType === "MANUAL"
+    const isProcessing =
+        result.status === "AWAITING_FULFILLMENT" || result.status === "PROCESSING"
+
+    // Background poller: keep MANUAL processing orders fresh so buyer
+    // sees fulfillment content (cards/content) the moment admin ships,
+    // without manual refresh. Gracefully no-ops when password is
+    // unavailable (rare deep-link scenario). 60s cadence, 30min cap,
+    // visibility-aware — all enforced by the hook itself.
+    const detailGetPassword = useCallback(
+        () => getPassword() || null,
+        [getPassword],
+    )
+    const { refreshed, phase: pollPhase } = useManualDetailPoll({
+        orderNo: result.orderNo,
+        getPassword: detailGetPassword,
+        enabled: isManual && isProcessing,
+    })
+    useEffect(() => {
+        // Swap in any fresh detail so the timeline + body follow real
+        // state. Polling auto-stops on COMPLETED/CLOSED inside the hook,
+        // so we won't bounce back to an intermediate state after fulfill.
+        // Guard against redundant setState by comparing status — refetch
+        // creates a new object reference every cycle.
+        if (!refreshed) return
+        setResult((prev) =>
+            prev.status === refreshed.status && pollPhase !== "fulfilled"
+                ? prev
+                : refreshed,
+        )
+    }, [refreshed, pollPhase])
+
+    const hasPasswordForPoll = !!getPassword()
+
     return (
         <div className="space-y-4">
             {/* 基本信息 */}
@@ -103,7 +140,13 @@ export function OrderDetailContent({ result: initialResult, getPassword }: Props
                     <span className="text-muted-foreground">创建时间</span>
                     <span>{formatDateTime(result.createdAt)}</span>
                 </div>
-                {!result.isPending && result.cards.length > 0 && (
+                {isManual && result.variantName && (
+                    <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">规格</span>
+                        <span className="font-medium">{result.variantName}</span>
+                    </div>
+                )}
+                {!result.isPending && !isManual && result.cards.length > 0 && (
                     <div className="flex items-center justify-between">
                         <span className="text-muted-foreground">卡密数量</span>
                         <span className="font-medium">{result.cards.length} 条</span>
@@ -155,23 +198,107 @@ export function OrderDetailContent({ result: initialResult, getPassword }: Props
             )}
 
             {/* 已关闭 */}
-            {!result.isPending && result.status === "CLOSED" && result.cards.length === 0 && (
+            {!result.isPending && result.status === "CLOSED" && result.cards.length === 0 && !result.fulfillment && (
                 <div className="rounded-lg border border-muted bg-muted/50 p-3 text-sm text-muted-foreground">
                     <p className="font-medium mb-0.5">订单已关闭</p>
                     <p className="text-xs">该订单已关闭，无账号内容。</p>
                 </div>
             )}
 
-            {/* 完成但无卡密 */}
-            {!result.isPending && result.status !== "CLOSED" && result.cards.length === 0 && (
+            {/* MANUAL: 等待发货 / 卖家处理中 — 5-state timeline + ETA + dun button (Task 20) */}
+            {!result.isPending && isManual && isProcessing && (
+                <div className="rounded-lg border border-border/60 bg-muted/40 p-4 text-sm space-y-3">
+                    <div className="space-y-1">
+                        <p className="font-medium">
+                            {result.status === "AWAITING_FULFILLMENT" ? "订单待发货" : "卖家处理中"}
+                        </p>
+                        <p className="text-xs text-foreground/70">
+                            {result.status === "AWAITING_FULFILLMENT"
+                                ? "已收款，等待卖家发货。"
+                                : "卖家正在为您处理订单，发货后将自动显示账号内容。"}
+                        </p>
+                    </div>
+                    <ManualStatusTimeline current={result.status} etaText={result.etaText} />
+                    {hasPasswordForPoll && pollPhase === "polling" && (
+                        <p className="text-xs text-muted-foreground">
+                            正在等待发货，自动检测中…
+                        </p>
+                    )}
+                    {hasPasswordForPoll && pollPhase === "stopped_timeout" && (
+                        <div className="flex items-center justify-between gap-2 text-xs">
+                            <span className="text-muted-foreground">
+                                长时间未发货，自动检测已暂停
+                            </span>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 gap-1 px-2"
+                                onClick={() => window.location.reload()}
+                            >
+                                <RefreshCw className="size-3" />
+                                刷新
+                            </Button>
+                        </div>
+                    )}
+                    {!hasPasswordForPoll && (
+                        <div className="flex items-center justify-between gap-2 text-xs">
+                            <span className="text-muted-foreground">
+                                请手动刷新以获取最新状态
+                            </span>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 gap-1 px-2"
+                                onClick={() => window.location.reload()}
+                            >
+                                <RefreshCw className="size-3" />
+                                刷新
+                            </Button>
+                        </div>
+                    )}
+                    {result.id && result.email && (
+                        <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:items-center sm:justify-between">
+                            <span className="text-xs text-muted-foreground">
+                                {result.dunCount && result.dunCount > 0
+                                    ? `已催 ${result.dunCount} 次`
+                                    : "若超出预计时间未发货，可点击催发货"}
+                            </span>
+                            <ManualDunButton
+                                orderId={result.id}
+                                orderNo={result.orderNo}
+                                email={result.email}
+                                password={getPassword()}
+                                initialCooldownSeconds={result.initialCooldownSeconds ?? 0}
+                                minAgeSeconds={result.dunMinAgeSeconds ?? 0}
+                                orderAgeSeconds={result.orderAgeSeconds ?? 0}
+                            />
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* MANUAL: 已发货内容（fulfillment.content） */}
+            {!result.isPending && isManual && result.fulfillment && (
+                <div className="space-y-2">
+                    <h3 className="text-sm font-semibold">账号内容</h3>
+                    <pre className="whitespace-pre-wrap break-words rounded-md border bg-muted p-4 text-sm">
+                        {result.fulfillment.content}
+                    </pre>
+                </div>
+            )}
+
+            {/* 完成但无卡密（非 MANUAL 处理中 / 非 MANUAL 已发货） */}
+            {!result.isPending && !isProcessing && !isManual && result.status !== "CLOSED" && result.cards.length === 0 && (
                 <div className="rounded-lg border border-muted bg-muted/50 p-4 text-center">
                     <Package className="size-8 mx-auto mb-2 text-muted-foreground" />
                     <p className="text-sm text-muted-foreground">暂无账号内容</p>
                 </div>
             )}
 
-            {/* 账号列表 */}
-            {!result.isPending && result.cards.length > 0 && (
+            {/* 账号列表（NORMAL / AUTO_FETCH） */}
+            {!result.isPending && !isManual && result.cards.length > 0 && (
                 <div className="space-y-2">
                     <h3 className="text-sm font-semibold">账号内容</h3>
                     <OrderCardDisplay cards={displayCards} />
@@ -203,9 +330,9 @@ export function OrderDetailContent({ result: initialResult, getPassword }: Props
             )}
 
             {/* 温馨提示 */}
-            {!result.isPending && result.cards.length > 0 && (
-                <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200">
-                    <p className="font-medium mb-1">温馨提示：</p>
+            {!result.isPending && (result.cards.length > 0 || (isManual && result.fulfillment)) && (
+                <div className="rounded-lg border border-border/60 bg-muted/40 p-3 text-xs text-foreground/80">
+                    <p className="font-medium mb-1 text-foreground">温馨提示：</p>
                     <ul className="list-disc list-inside space-y-0.5">
                         <li>请妥善保管订单号和查询密码</li>
                         <li>账号内容请及时保存，避免丢失</li>

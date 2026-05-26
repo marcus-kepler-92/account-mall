@@ -23,6 +23,7 @@ const STATUS_DEFAULT_MESSAGE: Partial<Record<number, string>> = {
     401: "Unauthorized",
     404: "Not found",
     409: "Conflict",
+    429: "Too many requests",
     500: "Internal server error",
     503: "Service unavailable",
 }
@@ -38,6 +39,7 @@ const _400 = withStatus(400)
 const _401 = withStatus(401)
 const _404 = withStatus(404)
 const _409 = withStatus(409)
+const _429 = withStatus(429)
 const _500 = withStatus(500)
 const _503 = withStatus(503)
 
@@ -52,6 +54,9 @@ export function badRequest(message?: string, opts?: JsonErrorOptions) {
 }
 export function conflict(message?: string, opts?: JsonErrorOptions) {
     return _409(message, opts)
+}
+export function tooManyRequests(message?: string, opts?: JsonErrorOptions) {
+    return _429(message, opts)
 }
 export function internalServerError(message?: string, opts?: JsonErrorOptions) {
     return _500(message, opts)

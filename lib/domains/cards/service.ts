@@ -79,6 +79,7 @@ export async function bulkImportCards(
       name: product.name,
       slug: product.slug,
       price: Number(product.price),
+      productType: product.productType,
     }).catch((err) => {
       console.error("[restock-notify] Failed to send restock emails", { productId, error: err })
     })

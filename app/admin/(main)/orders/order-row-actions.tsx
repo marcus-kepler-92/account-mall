@@ -4,6 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { useInvalidateAdminNotifications } from "@/app/admin/hooks/use-admin-notifications"
 import { MoreHorizontal, Eye, Copy, XCircle, Trash2, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -27,6 +28,7 @@ import type { OrderRow } from "./orders-columns"
 
 export function OrderRowActions({ order }: { order: OrderRow }) {
     const router = useRouter()
+    const invalidateNotifications = useInvalidateAdminNotifications()
     const [closeDialogOpen, setCloseDialogOpen] = useState(false)
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
     const [closing, setClosing] = useState(false)
@@ -53,6 +55,7 @@ export function OrderRowActions({ order }: { order: OrderRow }) {
                 setCloseDialogOpen(false)
                 toast.success("订单已关闭")
                 router.refresh()
+                invalidateNotifications()
             } else {
                 const data = await res.json().catch(() => ({}))
                 toast.error(data?.error ?? "关闭失败")
@@ -76,6 +79,7 @@ export function OrderRowActions({ order }: { order: OrderRow }) {
                 setDeleteDialogOpen(false)
                 toast.success("订单已删除")
                 router.refresh()
+                invalidateNotifications()
             } else {
                 const data = await res.json().catch(() => ({}))
                 toast.error(data?.error ?? "删除失败")

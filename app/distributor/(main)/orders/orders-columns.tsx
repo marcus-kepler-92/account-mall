@@ -12,7 +12,12 @@ export type DistributorOrderRow = {
     productName: string
     quantity: number
     amount: number
-    status: "PENDING" | "COMPLETED" | "CLOSED"
+    // MANUAL fulfillment added AWAITING_FULFILLMENT / PROCESSING to the order
+    // state machine. Distributor view still filters its UI to PENDING / COMPLETED
+    // / CLOSED (those are the only states that affect commissions), but the row
+    // type needs to accept the full Prisma OrderStatus union to satisfy
+    // `Order.status` widening in page.tsx.
+    status: "PENDING" | "AWAITING_FULFILLMENT" | "PROCESSING" | "COMPLETED" | "CLOSED"
     commissionAmount: number | null
     createdAt: string
 }
@@ -33,10 +38,12 @@ export function CommissionCell({ row }: { row: { original: Pick<DistributorOrder
     )
 }
 
-const statusMap = {
-    PENDING: { label: "待支付", variant: "warning" as const },
-    COMPLETED: { label: "已完成", variant: "success" as const },
-    CLOSED: { label: "已关闭", variant: "secondary" as const },
+const statusMap: Record<DistributorOrderRow["status"], { label: string; variant: "warning" | "success" | "secondary" | "outline" }> = {
+    PENDING: { label: "待支付", variant: "warning" },
+    AWAITING_FULFILLMENT: { label: "待发货", variant: "outline" },
+    PROCESSING: { label: "处理中", variant: "outline" },
+    COMPLETED: { label: "已完成", variant: "success" },
+    CLOSED: { label: "已关闭", variant: "secondary" },
 }
 
 export const distributorOrdersColumns: ColumnDef<DistributorOrderRow>[] = [

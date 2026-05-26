@@ -19,7 +19,7 @@ export default async function AdminProductsPage({
     const perms = await getAdminPermissions()
     const isSuperAdmin = perms?.isSuperAdmin ?? false
 
-    const [products, stockCounts, salesCounts, subCounts] = await Promise.all([
+    const [products, stockCounts, salesCounts, subCounts, activeVariantCounts] = await Promise.all([
         prisma.product.findMany({
             include: {
                 tags: { select: { id: true, name: true, slug: true } },
@@ -41,15 +41,24 @@ export default async function AdminProductsPage({
             where: { status: "PENDING" },
             _count: { id: true },
         }),
+        // Active variant count per product (only matters for MANUAL but
+        // grouping unconditionally is cheap and keeps the loader symmetric).
+        prisma.productVariant.groupBy({
+            by: ["productId"],
+            where: { isActive: true },
+            _count: { id: true },
+        }),
     ])
 
     const stockMap = new Map(stockCounts.map((s) => [s.productId, s._count.id]))
     const salesMap = new Map(salesCounts.map((s) => [s.productId, s._sum.quantity ?? 0]))
     const subMap = new Map(subCounts.map((s) => [s.productId, s._count.id]))
+    const variantMap = new Map(activeVariantCounts.map((v) => [v.productId, v._count.id]))
 
     const data: ProductRow[] = products.map((p) => {
         const stock = stockMap.get(p.id) ?? 0
         const subscriberCount = subMap.get(p.id) ?? 0
+        const activeVariantCount = variantMap.get(p.id) ?? 0
         const isNormalActive = p.productType === "NORMAL" && p.status === "ACTIVE"
         const hasAlert = isNormalActive && resolveInventorySubtype(stock, subscriberCount) !== null
         return {
@@ -64,6 +73,7 @@ export default async function AdminProductsPage({
             sales: salesMap.get(p.id) ?? 0,
             subscriberCount,
             hasAlert,
+            activeVariantCount,
         }
     })
 

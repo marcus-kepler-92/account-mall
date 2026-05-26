@@ -191,6 +191,30 @@ describe("GET /api/orders (admin list)", () => {
     )
   })
 
+  it.each(["AWAITING_FULFILLMENT", "PROCESSING"])(
+    "accepts %s as a valid status filter (I4 — enum widened to all OrderStatus values)",
+    async (status) => {
+      adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
+
+      prismaMock.order.findMany.mockResolvedValue([])
+      prismaMock.order.count.mockResolvedValue(0)
+
+      const req = createUrlRequest(
+        `http://localhost/api/orders?page=1&pageSize=20&status=${status}`,
+      )
+      const res = await GET(req)
+
+      // Pre-fix: orderListQuerySchema rejected these values → 400 (validation).
+      // Post-fix: handler should accept and pass through to Prisma `where.status`.
+      expect(res.status).toBe(200)
+      expect(prismaMock.order.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ status }),
+        }),
+      )
+    },
+  )
+
   it("does not apply status filter when status is ALL", async () => {
     adminSessionMock.mockResolvedValueOnce({ id: "admin_1" })
 

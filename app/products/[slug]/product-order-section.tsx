@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Info } from "lucide-react"
 import { ProductOrderForm } from "@/app/components/product-order-form"
+import type { ProductVariantOption } from "@/app/components/product-variant-selector"
 import { ExitIntentDialog } from "./exit-intent-dialog"
 
 type ProductOrderSectionProps = {
@@ -12,7 +13,7 @@ type ProductOrderSectionProps = {
     price: number
     inStock: boolean
     formId?: string
-    productType?: "NORMAL" | "AUTO_FETCH"
+    productType?: "NORMAL" | "AUTO_FETCH" | "MANUAL"
     /** AUTO_FETCH 商品的账号有效时长（小时），用于展示限领规则 */
     validityHours?: number | null
     couponEnabled?: boolean
@@ -20,6 +21,16 @@ type ProductOrderSectionProps = {
     prefilledEmail?: string
     cs?: string | null
     crossSellDiscountPercent?: number | null
+    /** MANUAL only: available variants for the buyer to pick. */
+    variants?: ProductVariantOption[]
+    /** Buyer-facing business-hours hint (e.g. "工作时间：9:00–22:00（每天）"). */
+    businessHoursHint?: string
+    /**
+     * MANUAL only: when true the buyer-side selector honors stockQuantity
+     * (sold-out dimming) and the back-end enforces the stock check at
+     * submit time. Default false — untracked MANUAL products are unbounded.
+     */
+    inventoryTracked?: boolean
 }
 
 /**
@@ -40,9 +51,22 @@ export function ProductOrderSection({
     prefilledEmail,
     cs = null,
     crossSellDiscountPercent = null,
+    variants,
+    businessHoursHint,
+    inventoryTracked = false,
 }: ProductOrderSectionProps) {
     const [exitDiscountToken, setExitDiscountToken] = useState<string | null>(null)
     const [exitDiscountPercent, setExitDiscountPercent] = useState<number | null>(null)
+    // MANUAL: preselect the first active variant for a less-friction first
+    // paint. When stock is tracked, also require stockQuantity > 0; otherwise
+    // (untracked) any active variant works since stock is meaningless.
+    const [selectedVariantId, setSelectedVariantId] = useState<string | null>(() => {
+        if (productType !== "MANUAL" || !variants) return null
+        const firstAvailable = inventoryTracked
+            ? variants.find((v) => v.isActive && v.stockQuantity > 0)
+            : variants.find((v) => v.isActive)
+        return firstAvailable?.id ?? null
+    })
 
     const handleDiscount = (token: string, discountPercent: number) => {
         setExitDiscountToken(token)
@@ -55,6 +79,7 @@ export function ProductOrderSection({
     }
 
     const isFreeAutoFetch = productType === "AUTO_FETCH" && price === 0
+    const isManual = productType === "MANUAL"
     const displayValidityHours = validityHours ?? 24
 
     return (
@@ -84,8 +109,19 @@ export function ProductOrderSection({
                 onExitDiscountConsumed={handleConsumed}
                 cs={cs}
                 crossSellDiscountPercent={crossSellDiscountPercent}
+                variants={variants}
+                selectedVariantId={selectedVariantId}
+                onVariantChange={setSelectedVariantId}
+                inventoryTracked={inventoryTracked}
             />
-            {price > 0 && !cs && (
+            {/* MANUAL 商品在下单卡片底部展示工作时间提示，告知人工发货的处理时段。 */}
+            {isManual && businessHoursHint && (
+                <p className="mt-2 text-center text-xs text-muted-foreground">
+                    {businessHoursHint}
+                </p>
+            )}
+            {/* MANUAL 商品跳过 exit-intent 折扣（与 Task 15 的入口守卫保持一致：人工发货不参与营销叠加）。 */}
+            {price > 0 && !cs && !isManual && (
                 <ExitIntentDialog
                     productId={productId}
                     productName={productName}

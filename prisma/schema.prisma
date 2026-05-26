@@ -13,34 +13,35 @@ enum UserRole {
 }
 
 model User {
-  id               String        @id @default(cuid())
-  email            String?       @unique
-  username         String?       @unique
-  name             String
-  emailVerified    Boolean
-  image            String?
-  role             UserRole      @default(DISTRIBUTOR)
-  distributorCode     String?   @unique @db.VarChar(64)
-  discountCodeEnabled Boolean   @default(true) // 是否启用该分销员的优惠码折扣（含平台基础折扣），默认开启
-  discountPercent     Decimal?  @db.Decimal(5, 2) // 折扣比例，如 5 表示 5%；启用优惠码时填写
-  disabledAt          DateTime? // 分销员停用时设置，归因与登录可据此判断
-  adminRole          String?   @db.VarChar(64)    // null = super admin; "SYSTEM_OPS" = system ops admin
-  mustChangePassword Boolean   @default(false)     // true = force password change on next login
-  inviterId            String?   // 邀请人（上级分销员），仅分销员有意义
-  createdAt        DateTime
-  updatedAt        DateTime
-  sessions         Session[]
-  accounts         Account[]
-  inviter          User?         @relation("InviterToInvitee", fields: [inviterId], references: [id])
-  invitees         User[]        @relation("InviterToInvitee")
-  ordersAsDistributor Order[]
-  commissions      Commission[]
-  withdrawals      Withdrawal[]
-  distributorInvitationsSent DistributorInvitation[] @relation("DistributorInvitationInviter")
-  inviterMilestoneBonuses InvitationMilestoneBonus[] @relation("InviterMilestoneBonuses")
+  id                         String                       @id @default(cuid())
+  email                      String?                      @unique
+  username                   String?                      @unique
+  name                       String
+  emailVerified              Boolean
+  image                      String?
+  role                       UserRole                     @default(DISTRIBUTOR)
+  distributorCode            String?                      @unique @db.VarChar(64)
+  discountCodeEnabled        Boolean                      @default(true) // 是否启用该分销员的优惠码折扣（含平台基础折扣），默认开启
+  discountPercent            Decimal?                     @db.Decimal(5, 2) // 折扣比例，如 5 表示 5%；启用优惠码时填写
+  disabledAt                 DateTime? // 分销员停用时设置，归因与登录可据此判断
+  adminRole                  String?                      @db.VarChar(64) // null = super admin; "SYSTEM_OPS" = system ops admin
+  mustChangePassword         Boolean                      @default(false) // true = force password change on next login
+  inviterId                  String? // 邀请人（上级分销员），仅分销员有意义
+  createdAt                  DateTime
+  updatedAt                  DateTime
+  sessions                   Session[]
+  accounts                   Account[]
+  inviter                    User?                        @relation("InviterToInvitee", fields: [inviterId], references: [id])
+  invitees                   User[]                       @relation("InviterToInvitee")
+  ordersAsDistributor        Order[]
+  commissions                Commission[]
+  withdrawals                Withdrawal[]
+  distributorInvitationsSent DistributorInvitation[]      @relation("DistributorInvitationInviter")
+  inviterMilestoneBonuses    InvitationMilestoneBonus[]   @relation("InviterMilestoneBonuses")
   announcementReads          AnnouncementRead[]
   agentKnowledge             AgentKnowledge[]
   notificationDismissals     AdminNotificationDismissal[]
+  fulfillments               OrderFulfillment[]
 
   @@index([inviterId])
 }
@@ -113,6 +114,8 @@ enum CardStatus {
 
 enum OrderStatus {
   PENDING
+  AWAITING_FULFILLMENT
+  PROCESSING
   COMPLETED
   CLOSED
 }
@@ -126,53 +129,64 @@ enum RestockSubscriptionStatus {
 enum ProductType {
   NORMAL
   AUTO_FETCH
+  MANUAL
 }
 
 model Product {
-  id               String        @id @default(cuid())
-  name             String
-  slug             String        @unique
-  summary          String?       @db.VarChar(300)
-  description      String?
-  image            String?       @db.Text
-  price            Decimal       @db.Decimal(10, 2)
+  id                     String                @id @default(cuid())
+  name                   String
+  slug                   String                @unique
+  summary                String?               @db.VarChar(300)
+  description            String?
+  image                  String?               @db.Text
+  price                  Decimal               @db.Decimal(10, 2)
   /// Default unit cost prefilled into the bulk card import dialog for NORMAL products.
   /// Not consumed by the order completion logic anymore — use Card.unitCost instead.
-  costPerUnit      Decimal?      @db.Decimal(10, 2)
-  maxQuantity      Int           @default(10)
-  status           ProductStatus @default(ACTIVE)
-  productType      ProductType   @default(NORMAL)
-  sourceUrl        String?       @db.Text
+  costPerUnit            Decimal?              @db.Decimal(10, 2)
+  maxQuantity            Int                   @default(10)
+  status                 ProductStatus         @default(ACTIVE)
+  productType            ProductType           @default(NORMAL)
+  sourceUrl              String?               @db.Text
   /// AUTO_FETCH 商品的有效期（小时），默认 24；null 表示使用系统默认值
-  validityHours    Int?
+  validityHours          Int?
   /// AUTO_FETCH：是否允许用户换号
-  allowAccountSwitch Boolean     @default(true)
+  allowAccountSwitch     Boolean               @default(true)
   /// AUTO_FETCH：每个订单允许换号的最大次数
-  accountSwitchLimit Int         @default(1)
+  accountSwitchLimit     Int                   @default(1)
   /// Whether promo/coupon codes are accepted for this product
-  couponEnabled          Boolean   @default(false)
+  couponEnabled          Boolean               @default(false)
   /// Risk warning dialog shown to users before they can proceed (configurable per product)
-  riskWarningEnabled     Boolean   @default(false)
-  riskWarningTitle       String?   @db.VarChar(100)
-  riskWarningContent     String?   @db.Text
+  riskWarningEnabled     Boolean               @default(false)
+  riskWarningTitle       String?               @db.VarChar(100)
+  riskWarningContent     String?               @db.Text
   riskWarningCountdown   Int?
-  riskWarningConfirmText String?   @db.VarChar(50)
-  purchaseLimitEnabled  Boolean @default(false)
-  purchaseLimitQuantity Int     @default(1)
+  riskWarningConfirmText String?               @db.VarChar(50)
+  purchaseLimitEnabled   Boolean               @default(false)
+  purchaseLimitQuantity  Int                   @default(1)
   /// When true, orders for this product are never attributed to a distributor (no distributorId, no commission).
-  excludeFromAttribution Boolean @default(false)
-  createdAt        DateTime      @default(now())
-  sortOrder        Int           @default(0)
-  updatedAt        DateTime      @updatedAt
-  cards                Card[]
-  orders               Order[]
-  tags                 Tag[]
-  restockSubscriptions RestockSubscription[]
-  exitDiscountUsages   ExitDiscountUsage[]
-  accountBlacklist     AccountBlacklist[]
-  cardTemplates        CardTemplate[]
-  crossSellTargets     ProductCrossSell[] @relation("CrossSellSource")
-  crossSellSources     ProductCrossSell[] @relation("CrossSellTarget")
+  excludeFromAttribution Boolean               @default(false)
+  /// MANUAL-only: when true, ProductVariant.stockQuantity is enforced (decrement
+  /// on payment, restock on close, sold-out display). When false (default),
+  /// MANUAL stock is unbounded — the field exists but is never read by business
+  /// logic. Has no effect on NORMAL/AUTO_FETCH (their stock model is separate).
+  inventoryTracked       Boolean               @default(false)
+  /// When true AND the global ORDER_COMPLETION_EMAIL_ENABLED is true, the
+  /// buyer receives an order-completion email at fulfillment time. Default
+  /// false: orders complete silently and buyers查 through the lookup page.
+  emailOnFulfill         Boolean               @default(false)
+  createdAt              DateTime              @default(now())
+  sortOrder              Int                   @default(0)
+  updatedAt              DateTime              @updatedAt
+  cards                  Card[]
+  orders                 Order[]
+  tags                   Tag[]
+  restockSubscriptions   RestockSubscription[]
+  exitDiscountUsages     ExitDiscountUsage[]
+  accountBlacklist       AccountBlacklist[]
+  cardTemplates          CardTemplate[]
+  crossSellTargets       ProductCrossSell[]    @relation("CrossSellSource")
+  crossSellSources       ProductCrossSell[]    @relation("CrossSellTarget")
+  variants               ProductVariant[]
 
   @@index([sortOrder])
 }
@@ -187,22 +201,42 @@ model Tag {
   guides    DistributorGuide[]
 }
 
+model ProductVariant {
+  id            String   @id @default(cuid())
+  productId     String
+  name          String   @db.VarChar(200)
+  price         Decimal  @db.Decimal(10, 2)
+  /// Per-variant procurement cost. NULL is treated as 0 at aggregation (same convention as Card.unitCost).
+  unitCost      Decimal? @db.Decimal(10, 2)
+  /// Integer stock counter. Decremented on payment success (in lib/complete-pending-order.ts MANUAL branch);
+  /// restored on order CLOSED if order was in AWAITING_FULFILLMENT/PROCESSING.
+  stockQuantity Int      @default(0)
+  sortOrder     Int      @default(0)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  orders        Order[]
+
+  @@index([productId, isActive, sortOrder])
+}
+
 model Card {
-  id                  String               @id @default(cuid())
-  productId           String
-  content             String
-  status              CardStatus           @default(UNSOLD)
-  orderId             String?
+  id              String     @id @default(cuid())
+  productId       String
+  content         String
+  status          CardStatus @default(UNSOLD)
+  orderId         String?
   /// Per-card procurement cost. Captured at card import time for NORMAL products.
   /// AUTO_FETCH cards are written with 0 (scraped at runtime, no procurement cost).
   /// Legacy cards prior to this column rollout remain NULL and are treated as 0 at aggregation.
-  unitCost            Decimal?             @db.Decimal(10, 2)
+  unitCost        Decimal?   @db.Decimal(10, 2)
   /// AUTO_FETCH：上次刷新时间，用于限流（1 分钟/次）
-  lastRefreshedAt     DateTime?
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
-  product             Product              @relation(fields: [productId], references: [id])
-  order               Order?               @relation(fields: [orderId], references: [id])
+  lastRefreshedAt DateTime?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  product         Product    @relation(fields: [productId], references: [id])
+  order           Order?     @relation(fields: [orderId], references: [id])
 
   @@index([productId, status])
   @@index([orderId])
@@ -221,66 +255,111 @@ model CardTemplate {
 }
 
 model Order {
-  id                      String      @id @default(cuid())
-  orderNo                 String      @unique
-  productId               String
-  distributorId           String?
-  email                   String
-  passwordHash            String
-  quantity                  Int
-  amount                    Decimal     @db.Decimal(10, 2)
-  discountPercentApplied    Decimal?     @db.Decimal(5, 2) // 下单时若使用分销员优惠码，记录当时应用的折扣比例
-  productNameSnapshot       String?     @db.VarChar(500) // 下单时商品名称快照，便于历史订单展示
-  unitPriceSnapshot         Decimal?    @db.Decimal(10, 2) // 下单时商品单价快照（不含折扣）
+  id                     String             @id @default(cuid())
+  orderNo                String             @unique
+  productId              String
+  distributorId          String?
+  email                  String
+  passwordHash           String
+  quantity               Int
+  amount                 Decimal            @db.Decimal(10, 2)
+  discountPercentApplied Decimal?           @db.Decimal(5, 2) // 下单时若使用分销员优惠码，记录当时应用的折扣比例
+  productNameSnapshot    String?            @db.VarChar(500) // 下单时商品名称快照，便于历史订单展示
+  /// Snapshot of the order unit price at creation time.
+  /// NORMAL/AUTO_FETCH: product.price; MANUAL: variant.price.
+  unitPriceSnapshot      Decimal?           @db.Decimal(10, 2)
   /// @deprecated Legacy per-unit cost snapshot copied from Product.costPerUnit at completion time.
   /// New orders no longer write this field; readers must fall back to (costSnapshot * quantity)
   /// only when costTotalSnapshot is NULL (historical rows). To be dropped in a future migration
   /// after data backfill (see plan).
-  costSnapshot              Decimal?    @db.Decimal(10, 2)
+  costSnapshot           Decimal?           @db.Decimal(10, 2)
   /// Sum of unitCost across cards consumed by this order, written when the order transitions
   /// to COMPLETED. Authoritative cost field; legacy costSnapshot only used as fallback.
-  costTotalSnapshot         Decimal?    @db.Decimal(10, 2)
-  status                    OrderStatus @default(PENDING)
-  paidAt                  DateTime?
+  costTotalSnapshot      Decimal?           @db.Decimal(10, 2)
+  status                 OrderStatus        @default(PENDING)
+  paidAt                 DateTime?
   /// AUTO_FETCH：订单有效期截止时间；免费=创建时+validityHours，收费=支付时+validityHours
-  expiresAt               DateTime?
-  promoCode               String?     // 下单时使用的推荐码（冗余存储，便于查询）
-  createdAt               DateTime    @default(now())
-  updatedAt               DateTime    @updatedAt
-  paymentMethod           String?     @default("alipay") // 支付渠道: alipay, wxpay, qqpay
-  clientIp                String?     // For rate limit: max PENDING orders per IP
-  fingerprintHash         String?     // 浏览器指纹，用于免费商品多因素领取限制
-  exitDiscountMeta        String?     @db.Text // Exit intent 折扣信号 JSON，订单 COMPLETED 后转存到 ExitDiscountUsage
+  expiresAt              DateTime?
+  promoCode              String? // 下单时使用的推荐码（冗余存储，便于查询）
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+  paymentMethod          String?            @default("alipay") // 支付渠道: alipay, wxpay, qqpay
+  clientIp               String? // For rate limit: max PENDING orders per IP
+  fingerprintHash        String? // 浏览器指纹，用于免费商品多因素领取限制
+  exitDiscountMeta       String?            @db.Text // Exit intent 折扣信号 JSON，订单 COMPLETED 后转存到 ExitDiscountUsage
   /// AUTO_FETCH：用户已使用的换号次数
-  switchAccountCount      Int         @default(0)
-  paymentChannelId        String?
-  paymentChannel          PaymentChannel? @relation(fields: [paymentChannelId], references: [id])
-  product                 Product     @relation(fields: [productId], references: [id])
-  distributor             User?       @relation(fields: [distributorId], references: [id])
-  cards                   Card[]
-  commissions             Commission[]
-  exitDiscountUsage       ExitDiscountUsage?
-  crossSellUsageAsSource  CrossSellUsage[] @relation("CrossSellSource")
-  crossSellUsageAsTarget  CrossSellUsage?  @relation("CrossSellTarget")
+  switchAccountCount     Int                @default(0)
+  paymentChannelId       String?
+  variantId              String?
+  /// Snapshot of variant.name at order creation time. NULL for non-MANUAL orders.
+  variantNameSnapshot    String?            @db.VarChar(200)
+  /// Number of buyer-triggered fulfillment reminders ("催发货"). Rate-limited by
+  /// SiteSetting.dunCooldownMinutes; only allowed after order age > SiteSetting.dunMinAgeMinutes.
+  /// MANUAL orders only.
+  dunCount               Int                @default(0)
+  /// Timestamp of the most recent dun event; null until first dun. Used for cooldown calculation.
+  lastDunAt              DateTime?
+  paymentChannel         PaymentChannel?    @relation(fields: [paymentChannelId], references: [id])
+  product                Product            @relation(fields: [productId], references: [id])
+  distributor            User?              @relation(fields: [distributorId], references: [id])
+  variant                ProductVariant?    @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  cards                  Card[]
+  commissions            Commission[]
+  exitDiscountUsage      ExitDiscountUsage?
+  fulfillment            OrderFulfillment?
+  crossSellUsageAsSource CrossSellUsage[]   @relation("CrossSellSource")
+  crossSellUsageAsTarget CrossSellUsage?    @relation("CrossSellTarget")
 
   @@index([email])
+  @@index([email, createdAt])
   @@index([status, createdAt])
   @@index([clientIp, status])
   @@index([fingerprintHash])
   @@index([distributorId])
   @@index([paymentChannelId])
+  @@index([variantId])
+}
+
+model OrderFulfillment {
+  id          String   @id @default(cuid())
+  orderId     String   @unique
+  content     String   @db.Text
+  fulfilledBy String
+  fulfilledAt DateTime @default(now())
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  operator    User     @relation(fields: [fulfilledBy], references: [id])
+
+  @@index([fulfilledBy])
+}
+
+model NotificationLog {
+  id        String   @id @default(cuid())
+  /// Notification channel identifier. Allowed values: "wecom" (extensible later; not enforced as enum to avoid migration churn).
+  channel   String   @db.VarChar(32)
+  /// Event name. Allowed values: "order.awaiting_fulfillment", "order.dun" (extensible).
+  event     String   @db.VarChar(64)
+  payload   String   @db.Text
+  /// Send result. Allowed values: "sent", "failed".
+  status    String   @db.VarChar(16)
+  error     String?  @db.Text
+  /// Soft reference to Order.id (no FK on purpose; log entries must survive Order deletion for audit).
+  orderId   String?
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
+  @@index([createdAt])
 }
 
 model RestockSubscription {
-  id         String                  @id @default(cuid())
+  id         String                    @id @default(cuid())
   productId  String
   ip         String
   email      String
   status     RestockSubscriptionStatus @default(PENDING)
   notifiedAt DateTime?
-  createdAt  DateTime                @default(now())
-  updatedAt  DateTime                @updatedAt
-  product    Product                 @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt  DateTime                  @default(now())
+  updatedAt  DateTime                  @updatedAt
+  product    Product                   @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@unique([productId, ip])
   @@index([productId, status])
@@ -294,19 +373,19 @@ enum CommissionStatus {
 }
 
 model Commission {
-  id                  String          @id @default(cuid())
+  id                  String           @id @default(cuid())
   orderId             String
   distributorId       String
-  amount              Decimal         @db.Decimal(10, 2)
+  amount              Decimal          @db.Decimal(10, 2)
   status              CommissionStatus @default(PENDING)
   /// 1=一级佣金（直接推广所得），2=二级佣金（下线推广触发）
-  level               Int             @default(1)
+  level               Int              @default(1)
   /// level=2 时记录触发该佣金的下线分销员 ID，便于追溯
   sourceDistributorId String?
-  createdAt           DateTime        @default(now())
-  updatedAt           DateTime        @updatedAt
-  order               Order           @relation(fields: [orderId], references: [id])
-  distributor         User            @relation(fields: [distributorId], references: [id])
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  order               Order            @relation(fields: [orderId], references: [id])
+  distributor         User             @relation(fields: [distributorId], references: [id])
 
   @@index([distributorId])
   @@index([distributorId, level])
@@ -315,13 +394,13 @@ model Commission {
 }
 
 model CommissionTier {
-  id             String   @id @default(cuid())
-  minAmount      Decimal  @db.Decimal(12, 2) // 当周累计销售额下限
-  maxAmount      Decimal  @db.Decimal(12, 2) // 当周累计销售额上限
-  ratePercent    Decimal  @db.Decimal(5, 2) // 该档阶梯佣金比例，如 5 表示 5%
-  sortOrder      Int      @default(0)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id          String   @id @default(cuid())
+  minAmount   Decimal  @db.Decimal(12, 2) // 当周累计销售额下限
+  maxAmount   Decimal  @db.Decimal(12, 2) // 当周累计销售额上限
+  ratePercent Decimal  @db.Decimal(5, 2) // 该档阶梯佣金比例，如 5 表示 5%
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@index([sortOrder])
 }
@@ -333,18 +412,18 @@ enum WithdrawalStatus {
 }
 
 model Withdrawal {
-  id                String           @id @default(cuid())
-  distributorId     String
-  amount            Decimal          @db.Decimal(10, 2)
-  status            WithdrawalStatus @default(PENDING)
-  receiptImageUrl   String?          // 收款码图片 URL，申请提现时上传
-  note              String?          @db.Text
-  processedAt       DateTime?
-  feePercent        Decimal?         @db.Decimal(5, 2)  // 手续费比例（创建时固化），如 2.00 表示 2%
-  feeAmount         Decimal?         @db.Decimal(10, 2) // 手续费金额（创建时固化）
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
-  distributor       User             @relation(fields: [distributorId], references: [id])
+  id              String           @id @default(cuid())
+  distributorId   String
+  amount          Decimal          @db.Decimal(10, 2)
+  status          WithdrawalStatus @default(PENDING)
+  receiptImageUrl String? // 收款码图片 URL，申请提现时上传
+  note            String?          @db.Text
+  processedAt     DateTime?
+  feePercent      Decimal?         @db.Decimal(5, 2) // 手续费比例（创建时固化），如 2.00 表示 2%
+  feeAmount       Decimal?         @db.Decimal(10, 2) // 手续费金额（创建时固化）
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  distributor     User             @relation(fields: [distributorId], references: [id])
 
   @@index([distributorId])
   @@index([status])
@@ -357,8 +436,8 @@ model PaymentChannel {
   key         String
   submitUrl   String
   siteName    String
-  type        String              // "alipay" | "wxpay" | "qqpay"
-  annualLimit Decimal             @db.Decimal(10, 2) @default(65000)
+  type        String // "alipay" | "wxpay" | "qqpay"
+  annualLimit Decimal             @default(65000) @db.Decimal(10, 2)
   sortOrder   Int                 @default(0)
   isActive    Boolean             @default(true)
   createdAt   DateTime            @default(now())
@@ -387,7 +466,7 @@ model DistributorInvitation {
   id         String    @id @default(cuid())
   email      String?
   token      String    @unique
-  inviterId  String    // 邀请人 ID（可以是 ADMIN 或 DISTRIBUTOR）
+  inviterId  String // 邀请人 ID（可以是 ADMIN 或 DISTRIBUTOR）
   expiresAt  DateTime
   acceptedAt DateTime? // first use timestamp (audit)
   maxUses    Int       @default(1) // max registrations allowed per link
@@ -399,13 +478,13 @@ model DistributorInvitation {
 }
 
 model InvitationMilestone {
-  id              String  @id @default(cuid())
-  thresholdAmount Decimal @db.Decimal(12, 2)
+  id              String                     @id @default(cuid())
+  thresholdAmount Decimal                    @db.Decimal(12, 2)
   thresholdCount  Int
-  bonusAmount     Decimal  @db.Decimal(10, 2)
-  sortOrder       Int      @default(0)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  bonusAmount     Decimal                    @db.Decimal(10, 2)
+  sortOrder       Int                        @default(0)
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
   bonuses         InvitationMilestoneBonus[]
 
   @@index([sortOrder])
@@ -435,9 +514,9 @@ enum AnnouncementStatus {
 }
 
 enum AnnouncementAudience {
-  CUSTOMER      // 客户端（首页店铺）
-  DISTRIBUTOR   // 分销中心
-  ALL           // 两端都展示
+  CUSTOMER // 客户端（首页店铺）
+  DISTRIBUTOR // 分销中心
+  ALL // 两端都展示
 }
 
 model Announcement {
@@ -480,7 +559,7 @@ model DistributorGuide {
   status      AnnouncementStatus @default(DRAFT)
   publishedAt DateTime?
   createdAt   DateTime           @default(now())
-  updatedAt   DateTime          @updatedAt
+  updatedAt   DateTime           @updatedAt
   tag         Tag?               @relation(fields: [tagId], references: [id])
 
   @@index([status, sortOrder])
@@ -491,8 +570,8 @@ model ExitDiscountUsage {
   id              String   @id @default(cuid())
   productId       String
   orderId         String   @unique
-  visitorId       String   // 持久 cookie __ed_vid
-  fingerprintHash String   // FingerprintJS visitorId hash
+  visitorId       String // 持久 cookie __ed_vid
+  fingerprintHash String // FingerprintJS visitorId hash
   ip              String
   usedAt          DateTime @default(now())
 
@@ -539,7 +618,7 @@ model EmailTemplate {
   title          String
   description    String?
   defaultSubject String
-  unlayerDesign  Json            // Unlayer editor JSON (for re-editing); {} = preset (HTML-only)
+  unlayerDesign  Json // Unlayer editor JSON (for re-editing); {} = preset (HTML-only)
   html           String          @db.Text
   isPreset       Boolean         @default(false) // true = seeded from transactional template
   createdAt      DateTime        @default(now())
@@ -589,7 +668,7 @@ model ProductCrossSell {
 model CrossSellSetting {
   id              String   @id @default("singleton")
   enabled         Boolean  @default(true)
-  discountPercent Decimal  @db.Decimal(5, 2) @default(10)
+  discountPercent Decimal  @default(10) @db.Decimal(5, 2)
   ttlMinutes      Int      @default(30)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -610,6 +689,16 @@ model SiteSetting {
   businessLicenseNo     String?
   contactEmail          String?
   escalateWebhookUrl    String?
+  /// JSON array of allowed weekdays in JS convention (0=Sun, 6=Sat), e.g. "[0,1,2,3,4,5,6]" for every day,
+  /// "[1,2,3,4,5]" for weekdays only. Parsed by lib/site-settings.ts; malformed JSON falls back to all-days.
+  businessHoursWeekdays String?
+  /// WeCom group-bot webhook URL (full qyapi URL with key). Empty/NULL disables push.
+  /// Env fallback: WECOM_WEBHOOK_URL.
+  wecomWebhookUrl       String?
+  /// Minimum minutes between two consecutive buyer dun events on the same order. Env fallback default: 30.
+  dunCooldownMinutes    Int?
+  /// Buyer can only trigger dun after the order has existed for at least this many minutes. Env fallback default: 5.
+  dunMinAgeMinutes      Int?
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 }
@@ -634,36 +723,38 @@ model CrossSellUsage {
 // ─── Customer Service Agent ──────────────────────────────────────────────────
 
 model AgentSession {
-  id                      String         @id          // 客户端 ULID
-  fingerprintHash         String                      // SHA256(IP + UA).slice(0, 32)
-  startedAt               DateTime       @default(now())
-  endedAt                 DateTime?
-  tokenBudget             Int            @default(2000)
-  tokensUsed              Int            @default(0)
-  escalated               Boolean        @default(false)
-  expiresAt               DateTime
-  messages                AgentMessage[]
+  id              String         @id // 客户端 ULID
+  fingerprintHash String // SHA256(IP + UA).slice(0, 32)
+  startedAt       DateTime       @default(now())
+  endedAt         DateTime?
+  tokenBudget     Int            @default(2000)
+  tokensUsed      Int            @default(0)
+  escalated       Boolean        @default(false)
+  expiresAt       DateTime
+  messages        AgentMessage[]
   // One session can produce multiple leads over its 90-day lifetime
   // (each escalate_to_human creates a fresh row so operations can
   // track each distinct consultation separately, instead of upsert
   // wiping the previous one).
-  leads                   AgentLead[]
+  leads           AgentLead[]
+
   @@index([expiresAt])
 }
 
 model AgentMessage {
-  id           String          @id @default(cuid())
+  id           String           @id @default(cuid())
   sessionId    String
-  session      AgentSession    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  session      AgentSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   role         MessageRole
   parts        Json
-  contentText  String          @db.Text
+  contentText  String           @db.Text
   toolName     String?
   citations    Json?
   feedback     MessageFeedback?
-  inputTokens  Int             @default(0)
-  outputTokens Int             @default(0)
-  createdAt    DateTime        @default(now())
+  inputTokens  Int              @default(0)
+  outputTokens Int              @default(0)
+  createdAt    DateTime         @default(now())
+
   @@index([sessionId, createdAt])
   @@index([feedback])
 }
@@ -699,6 +790,7 @@ model AgentLead {
   conversationSnapshot Json
   createdAt            DateTime     @default(now())
   updatedAt            DateTime     @updatedAt
+
   @@index([status, createdAt])
   @@index([sessionId, createdAt])
 }
@@ -729,6 +821,7 @@ model AgentKnowledge {
   updatedAt   DateTime        @updatedAt
   publishedAt DateTime?
   embedding   Float[]         @default([])
+
   @@index([status])
   @@index([tags], type: Gin)
 }
@@ -738,4 +831,3 @@ enum KnowledgeStatus {
   PUBLISHED
   ARCHIVED
 }
-

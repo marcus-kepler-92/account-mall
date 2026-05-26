@@ -148,26 +148,34 @@ describe("Security: AuthZ / IDOR (admin and order access)", () => {
         expect(data.error).toMatch(/not found|password incorrect|订单不存在|密码/)
     })
 
-    it("lookup-by-email returns same fuzzy message for no orders vs wrong password (no email enumeration)", async () => {
+    it("lookup-by-email returns 200 + identical empty-list shape for non-existent vs registered-but-empty emails (no enumeration)", async () => {
+        // Verify-on-access redesign: lookup-by-email returns metadata only, no
+        // password, no scrypt. Anti-enumeration is now achieved by returning
+        // the same 200 + empty-orders shape regardless of whether the email
+        // exists in the system. Sensitive content stays behind the per-order
+        // password (lookup endpoint).
+        prismaMock.order.count.mockResolvedValue(0)
         prismaMock.order.findMany.mockResolvedValue([])
-        const resEmpty = await POSTLookupByEmail(
-            createJsonRequest({ email: "nonexistent@test.com", password: "secret123" }),
-        )
-        const dataEmpty = await resEmpty.json()
-        expect(resEmpty.status).toBe(400)
-        expect(dataEmpty.error).toMatch(/not found|password incorrect|Order not found/)
 
-        prismaMock.order.findMany.mockResolvedValue([
-            { id: "o1", orderNo: "O1", passwordHash: "h", status: "PENDING", product: { name: "P" }, cards: [], createdAt: new Date(), quantity: 1, amount: new Prisma.Decimal("99") },
-        ] as any)
-        verifyPassword.mockResolvedValue(false)
-        const resWrong = await POSTLookupByEmail(
-            createJsonRequest({ email: "real@test.com", password: "wrong666" }),
+        const resA = await POSTLookupByEmail(
+            createJsonRequest({ email: "nonexistent@test.com" }),
         )
-        const dataWrong = await resWrong.json()
-        expect(resWrong.status).toBe(400)
-        expect(dataWrong.error).toMatch(/not found|password incorrect|Order not found/)
-        expect(dataEmpty.error).toBe(dataWrong.error)
+        const dataA = await resA.json()
+        expect(resA.status).toBe(200)
+        expect(dataA.orders).toEqual([])
+        expect(dataA.total).toBe(0)
+
+        prismaMock.order.count.mockResolvedValue(0)
+        prismaMock.order.findMany.mockResolvedValue([])
+
+        const resB = await POSTLookupByEmail(
+            createJsonRequest({ email: "registered-no-orders@test.com" }),
+        )
+        const dataB = await resB.json()
+        expect(resB.status).toBe(200)
+        // Same shape — attacker can't distinguish.
+        expect(Object.keys(dataA).sort()).toEqual(Object.keys(dataB).sort())
+        expect(dataA).toEqual(dataB)
     })
 })
 

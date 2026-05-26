@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useProductPriceSyncStore } from "@/lib/stores/product-price-sync"
 import { useTurnstileStore } from "@/lib/stores/turnstile"
+import type { ManualDisplay } from "@/lib/manual-display"
 
 const ORDER_FORM_LOADING_EVENT = "product-order-loading"
 
@@ -16,6 +17,13 @@ type ProductBottomBarProps = {
     formId?: string
     isFree?: boolean
     requireTurnstile?: boolean
+    // MANUAL products use per-variant pricing and have their own dun-发货 flow
+    // on the order page, so the catalog price (¥0.00) and the 催货 CTA aren't
+    // meaningful here. Bottom bar swaps to a min-price label + a 联系客服 CTA
+    // when the variant list is fully out of stock. `manual` is the derived
+    // display payload from `computeManualDisplay` — undefined for NORMAL /
+    // AUTO_FETCH products.
+    manual?: ManualDisplay
 }
 
 export function ProductBottomBar({
@@ -25,7 +33,10 @@ export function ProductBottomBar({
     formId,
     isFree,
     requireTurnstile = false,
+    manual,
 }: ProductBottomBarProps) {
+    const isManual = manual?.isManual ?? false
+    const manualPriceLabel = manual?.priceLabel ?? null
     const [isSubmitting, setIsSubmitting] = useState(false)
     const d = useProductPriceSyncStore((s) => s.display)
     const turnstileStatus = useTurnstileStore((s) => s.status)
@@ -57,6 +68,14 @@ export function ProductBottomBar({
         if (isSubmitting) return
 
         if (!inStock) {
+            // MANUAL has no restock-subscription path; the sold-out CTA reads
+            // 联系客服, so trigger the global customer-service FAB instead of
+            // scrolling — the order section doesn't render a buy form in this
+            // state, so scrolling is misleading.
+            if (isManual) {
+                document.dispatchEvent(new CustomEvent("open-customer-service"))
+                return
+            }
             document.dispatchEvent(new CustomEvent("open-restock-dialog"))
             return
         }
@@ -69,7 +88,18 @@ export function ProductBottomBar({
     const showSubmitState = inStock && isSubmitting
 
     const displayFree = d ? d.isFreeShared : isFree
-    const displayPrice = d && !d.isFreeShared ? d.totalPrice : price.toFixed(2)
+    // MANUAL: prefer live variant price from the sync store (driven by the
+    // variant selector); fall back to the helper's preformatted label if the
+    // user hasn't picked a variant yet, otherwise dash. Strip the "¥" prefix
+    // from the helper label because the JSX adds it separately.
+    const manualFallback = manualPriceLabel
+        ? manualPriceLabel.replace(/^¥/, "")
+        : "—"
+    const displayPrice = d && !d.isFreeShared
+        ? d.totalPrice
+        : isManual
+          ? manualFallback
+          : price.toFixed(2)
     const hasDiscount = Boolean(d?.discountPercent != null && d.discountPercent > 0)
 
     return (
@@ -87,7 +117,8 @@ export function ProductBottomBar({
                         <span
                             className={cn(
                                 "text-lg font-bold tabular-nums",
-                                !inStock && "text-muted-foreground line-through"
+                                !inStock && !isManual && "text-muted-foreground line-through",
+                                !inStock && isManual && "text-muted-foreground"
                             )}
                         >
                             {displayFree ? "免费" : `¥${displayPrice}`}
@@ -97,9 +128,14 @@ export function ProductBottomBar({
                                 已享 {d.discountPercent}% 优惠
                             </span>
                         )}
-                        {!inStock && (
+                        {!inStock && !isManual && (
                             <span className="mt-0.5 text-[11px] text-muted-foreground">
                                 已售罄，催货告诉我们你要
+                            </span>
+                        )}
+                        {!inStock && isManual && (
+                            <span className="mt-0.5 text-[11px] text-muted-foreground">
+                                暂无库存，可联系客服
                             </span>
                         )}
                     </div>
@@ -122,7 +158,9 @@ export function ProductBottomBar({
                             ? "准备中…"
                             : inStock
                               ? (isFree ? "免费领取" : "立即购买")
-                              : "催货"}
+                              : isManual
+                                ? "联系客服"
+                                : "催货"}
                 </Button>
             </div>
         </div>

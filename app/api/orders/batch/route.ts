@@ -54,6 +54,9 @@ export async function POST(request: NextRequest) {
             continue;
         }
 
+        // CLOSE is intentionally restricted to PENDING orders only (spec non-goal:
+        // no batch CLOSE on AWAITING_FULFILLMENT/PROCESSING — variant stock rollback
+        // is handled per-order, not in batch).
         if (action === "CLOSE") {
             if (status === "PENDING") {
                 idsToProcess.push(id);
@@ -71,6 +74,10 @@ export async function POST(request: NextRequest) {
 
     if (idsToProcess.length > 0) {
         if (action === "CLOSE") {
+            // Direct status write bypasses assertTransition(): the loop above
+            // filtered idsToProcess to status="PENDING" only, and PENDING→CLOSED
+            // is legal for ALL product types per lib/order-state-machine.ts.
+            // The pre-filter is the source-of-truth guard here.
             const result = await prisma.order.updateMany({
                 where: { id: { in: idsToProcess } },
                 data: { status: "CLOSED" },

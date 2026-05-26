@@ -29,6 +29,7 @@ import { useProductPriceSyncStore } from "@/lib/stores/product-price-sync"
 import { useTurnstileStore } from "@/lib/stores/turnstile"
 import { ProductOrderQuantityPicker } from "./product-order-quantity-picker"
 import { ProductOrderTurnstile } from "./product-order-turnstile"
+import { ProductVariantSelector, type ProductVariantOption } from "./product-variant-selector"
 import { useFingerprint } from "@/hooks/use-fingerprint"
 import { SiAlipay, SiWechat, SiQq } from "react-icons/si"
 import { trackEvent } from "@/lib/analytics"
@@ -77,7 +78,7 @@ type ProductOrderFormProps = {
     price: number
     inStock: boolean
     formId?: string
-    productType?: "NORMAL" | "AUTO_FETCH"
+    productType?: "NORMAL" | "AUTO_FETCH" | "MANUAL"
     couponEnabled?: boolean
     requireTurnstile: boolean
     prefilledEmail?: string
@@ -86,6 +87,18 @@ type ProductOrderFormProps = {
     onExitDiscountConsumed?: () => void
     cs?: string | null
     crossSellDiscountPercent?: number | null
+    /** MANUAL only: variant options rendered as a selector above the form. */
+    variants?: ProductVariantOption[]
+    /** MANUAL only: currently selected variant id (controlled by parent). */
+    selectedVariantId?: string | null
+    /** MANUAL only: notified when user picks a variant. */
+    onVariantChange?: (id: string) => void
+    /**
+     * MANUAL only: whether the product tracks per-variant stock. When false
+     * (default), the selector ignores stockQuantity (no sold-out dimming) and
+     * orders skip the stock-check at submit time.
+     */
+    inventoryTracked?: boolean
 }
 
 export function ProductOrderForm({
@@ -104,6 +117,10 @@ export function ProductOrderForm({
     onExitDiscountConsumed,
     cs = null,
     crossSellDiscountPercent = null,
+    variants,
+    selectedVariantId = null,
+    onVariantChange,
+    inventoryTracked = false,
 }: ProductOrderFormProps) {
     const [showOrderPassword, setShowOrderPassword] = useState(false)
     const [discountCode, setDiscountCode] = useState("")
@@ -132,7 +149,10 @@ export function ProductOrderForm({
     const router = useRouter()
     const turnstileLoading = requireTurnstile && turnstileStatus !== "ready" && turnstileStatus !== "unsupported"
     const isAutoFetch = productType === "AUTO_FETCH"
+    const isManual = productType === "MANUAL"
     const isFree = isAutoFetch && price === 0
+    // MANUAL gating: require a variant selection before allowing submission.
+    const manualVariantMissing = isManual && !selectedVariantId
     const fingerprintHash = useFingerprint()
     const submittingRef = useRef(false)
 
@@ -178,10 +198,20 @@ export function ProductOrderForm({
             ? crossSellDiscountPercent
             : null
 
+    // MANUAL prices on the variant; product.price is always 0. Resolve the
+    // selected variant's price for the total / sticky bar; fall back to the
+    // product.price when nothing is selected yet (which gates submit anyway).
+    const effectiveUnitPrice = isManual
+        ? (() => {
+            const v = variants?.find((x) => x.id === selectedVariantId)
+            return v ? Number(v.price) : 0
+        })()
+        : price
+
     const totalPrice = isFree
         ? "0.00"
         : (() => {
-            let amt = price * effectiveQuantity
+            let amt = effectiveUnitPrice * effectiveQuantity
             const promo = promoValidation?.valid ? promoValidation.discountPercent : null
             if (promo != null) amt = amt * (1 - promo / 100)
             if (activeExitDiscount != null) amt = amt * (1 - activeExitDiscount / 100)
@@ -204,6 +234,10 @@ export function ProductOrderForm({
 
     const onSubmit = async (data: OrderFormSchema) => {
         if (!inStock) return
+        if (manualVariantMissing) {
+            toast.error("请选择商品规格")
+            return
+        }
         if (requireTurnstile && !turnstileToken && turnstileStatus !== "unsupported") {
             toast.error("安全验证尚未完成，请稍候再试")
             return
@@ -221,6 +255,9 @@ export function ProductOrderForm({
                 paymentMethod: data.paymentMethod,
                 fingerprintHash: data.fingerprintHash,
                 ...(turnstileToken && { turnstileToken }),
+                // variantId is sent only for MANUAL — API rejects it for other types
+                // (extra fields ignored by Zod, but we keep payloads minimal).
+                ...(isManual && selectedVariantId ? { variantId: selectedVariantId } : {}),
             }
             if (activeCrossSellDiscount != null && cs) {
                 payload.cs = cs
@@ -307,9 +344,27 @@ export function ProductOrderForm({
                     <p className="text-xs text-muted-foreground">
                         {isFree
                             ? "填写邮箱与查询密码用于记录，领取后请复制保存账号信息。"
-                            : "支持邮箱接收卡密，请妥善保管查询密码以便后续查询。"}
+                            : isManual
+                              ? "人工发货商品，请选择规格后下单，付款后客服将在工作时间内发货。"
+                              : "支持邮箱接收卡密，请妥善保管查询密码以便后续查询。"}
                     </p>
                     </div>
+
+                    {isManual && variants && variants.length > 0 && (
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">选择规格</label>
+                            <ProductVariantSelector
+                                variants={variants}
+                                value={selectedVariantId}
+                                onChange={(id) => onVariantChange?.(id)}
+                                disabled={!inStock}
+                                trackInventory={inventoryTracked}
+                            />
+                            {manualVariantMissing && (
+                                <p className="text-xs text-muted-foreground">请选择一个规格后继续下单</p>
+                            )}
+                        </div>
+                    )}
 
                     <FormField
                         control={form.control}
@@ -320,7 +375,13 @@ export function ProductOrderForm({
                                 <FormControl>
                         <Input
                                     type="email"
-                                    placeholder={isFree ? "用于订单记录与查询" : "用于接收卡密"}
+                                    placeholder={
+                                        isFree
+                                            ? "用于订单记录与查询"
+                                            : isManual
+                                                ? "用于订单查询"
+                                                : "用于接收卡密"
+                                    }
                                         disabled={!inStock}
                                         {...field}
                                     />
@@ -452,6 +513,7 @@ export function ProductOrderForm({
                                 !inStock ||
                                 !fingerprintHash ||
                                 form.formState.isSubmitting ||
+                                manualVariantMissing ||
                                 (requireTurnstile && turnstileStatus !== "ready" && turnstileStatus !== "unsupported")
                             }
                             className="hidden lg:flex gap-2"
@@ -465,11 +527,13 @@ export function ProductOrderForm({
                                   ? "请先完成安全验证 ↑"
                                   : turnstileLoading
                                     ? "准备中…"
-                                    : isFree
-                                      ? "免费领取"
-                                      : inStock
-                                        ? "立即购买"
-                                        : "售罄"}
+                                    : manualVariantMissing
+                                      ? "请选择规格"
+                                      : isFree
+                                        ? "免费领取"
+                                        : inStock
+                                          ? "立即购买"
+                                          : "售罄"}
                         </Button>
                     </div>
                     <p className="text-center text-xs text-muted-foreground">

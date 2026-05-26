@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useInvalidateAdminNotifications } from "@/app/admin/hooks/use-admin-notifications";
 import { toast } from "sonner";
 import {
     useReactTable,
@@ -43,6 +44,8 @@ interface OrdersDataTableProps {
     total: number;
     statusCounts: {
         PENDING: number;
+        AWAITING_FULFILLMENT: number;
+        PROCESSING: number;
         COMPLETED: number;
         CLOSED: number;
     };
@@ -53,12 +56,15 @@ interface OrdersDataTableProps {
 
 const statusOptions = [
     { label: "待完成", value: "PENDING" },
+    { label: "待发货", value: "AWAITING_FULFILLMENT" },
+    { label: "发货中", value: "PROCESSING" },
     { label: "已完成", value: "COMPLETED" },
     { label: "已关闭", value: "CLOSED" },
 ];
 
 export function OrdersDataTable({ data, total, statusCounts, distributors, canReassignDistributor, isSuperAdmin = false }: OrdersDataTableProps) {
     const router = useRouter();
+    const invalidateNotifications = useInvalidateAdminNotifications();
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
     const [batchLoading, setBatchLoading] = useState(false);
@@ -132,6 +138,7 @@ export function OrdersDataTable({ data, total, statusCounts, distributors, canRe
             setRowSelection({});
             setBatchAction(null);
             router.refresh();
+            invalidateNotifications();
         } catch {
             toast.error("操作失败");
         } finally {
@@ -153,6 +160,7 @@ export function OrdersDataTable({ data, total, statusCounts, distributors, canRe
             } else {
                 toast.success(`已关闭 ${result.closed} 笔过期订单`);
                 router.refresh();
+                invalidateNotifications();
             }
         } catch {
             toast.error("操作失败");

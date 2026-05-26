@@ -3,14 +3,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getAdminSession } from "@/lib/auth-guard"
 import { updateOrderStatusSchema } from "@/lib/validations/order"
+import { canTransition } from "@/lib/order-state-machine"
 import { unauthorized, notFound, invalidJsonBody, validationError, conflict, internalServerError } from "@/lib/api-response"
-
-/** Only allow: PENDING → COMPLETED, PENDING → CLOSED. COMPLETED → CLOSED is forbidden. */
-function isValidStatusTransition(from: string, to: string): boolean {
-    if (from === to) return true
-    if (from === "PENDING" && (to === "COMPLETED" || to === "CLOSED")) return true
-    return false
-}
 
 function mapOrderToResponse(order: {
     id: string
@@ -117,6 +111,7 @@ export async function PATCH(
     const existing = await prisma.order.findUnique({
         where: { id: orderId },
         include: {
+            product: { select: { id: true, productType: true, name: true, price: true, inventoryTracked: true } },
             cards: { select: { id: true, status: true } },
         },
     })
@@ -124,9 +119,7 @@ export async function PATCH(
         return notFound("Order not found")
     }
     const currentStatus = existing.status
-    if (!isValidStatusTransition(currentStatus, nextStatus)) {
-        return conflict("Invalid status transition")
-    }
+    const productType = existing.product?.productType ?? "NORMAL"
     if (currentStatus === nextStatus) {
         const unchanged = await prisma.order.findUnique({
             where: { id: orderId },
@@ -137,6 +130,9 @@ export async function PATCH(
         })
         if (!unchanged) return notFound("Order not found")
         return NextResponse.json(mapOrderToResponse(unchanged))
+    }
+    if (!canTransition(currentStatus, nextStatus, productType)) {
+        return conflict("Invalid status transition")
     }
 
     if (currentStatus === "PENDING" && nextStatus === "COMPLETED") {
@@ -155,6 +151,20 @@ export async function PATCH(
                     await tx.card.updateMany({
                         where: { orderId: existing.id, status: "RESERVED" },
                         data: { status: "UNSOLD", orderId: null },
+                    })
+                }
+                // Restock only when the product has inventoryTracked=true.
+                // Untracked MANUAL products never decremented stock at payment,
+                // so there's nothing to restore on close.
+                if (
+                    productType === "MANUAL" &&
+                    existing.product?.inventoryTracked === true &&
+                    (currentStatus === "AWAITING_FULFILLMENT" || currentStatus === "PROCESSING") &&
+                    existing.variantId
+                ) {
+                    await tx.productVariant.update({
+                        where: { id: existing.variantId },
+                        data: { stockQuantity: { increment: 1 } },
                     })
                 }
             })
@@ -222,6 +232,7 @@ export async function DELETE(
             const existing = await tx.order.findUnique({
                 where: { id: orderId },
                 include: {
+                    product: { select: { productType: true, inventoryTracked: true } },
                     cards: {
                         select: {
                             id: true,
@@ -258,6 +269,22 @@ export async function DELETE(
                         status: "UNSOLD",
                         orderId: null,
                     },
+                })
+            }
+
+            // MANUAL variant restock — mirror PATCH (CLOSED transition) logic so
+            // admin soft-close from AWAITING_FULFILLMENT/PROCESSING doesn't leak stock.
+            // Only restock when the product is configured to track inventory —
+            // untracked MANUAL never decremented in the first place.
+            if (
+                existing.product?.productType === "MANUAL" &&
+                existing.product?.inventoryTracked === true &&
+                (existing.status === "AWAITING_FULFILLMENT" || existing.status === "PROCESSING") &&
+                existing.variantId
+            ) {
+                await tx.productVariant.update({
+                    where: { id: existing.variantId },
+                    data: { stockQuantity: { increment: 1 } },
                 })
             }
         })

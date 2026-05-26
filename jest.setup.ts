@@ -30,6 +30,10 @@ jest.mock("@/lib/config", () => {
         wechatQrUrl: "https://example.com/qr.png",
         wechatId: "test_wechat_id",
         escalateWebhookUrl: undefined,
+        wecomWebhookUrl: undefined,
+        dunCooldownMinutes: 30,
+        dunMinAgeMinutes: 5,
+        businessHoursWeekdays: undefined,
         upstashRedisRestUrl: "https://test.upstash.io",
         upstashRedisRestToken: "test-token",
         deepseekApiKey: "sk-test-deepseek-key",
@@ -53,6 +57,10 @@ jest.mock("@/lib/site-settings", () => {
         businessLicenseNo: "",
         contactEmail: "",
         escalateWebhookUrl: undefined,
+        wecomWebhookUrl: undefined,
+        dunCooldownMinutes: 30,
+        dunMinAgeMinutes: 5,
+        businessHoursWeekdays: [0, 1, 2, 3, 4, 5, 6],
     }
     return {
         getSiteSettings: jest.fn().mockResolvedValue(settings),

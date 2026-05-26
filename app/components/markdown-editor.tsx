@@ -2,12 +2,34 @@
 
 import "@uiw/react-md-editor/markdown-editor.css"
 import dynamic from "next/dynamic"
-import { useTheme } from "next-themes"
-import { useRef, useMemo, useState } from "react"
+import { useRef, useMemo, useState, useSyncExternalStore } from "react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { getCommands, type ICommand } from "@uiw/react-md-editor/commands"
 import { Skeleton } from "@/components/ui/skeleton"
+
+// next-themes writes the resolved theme onto <html class="dark"> after mount.
+// Read it via useSyncExternalStore so server snapshot ("light") is stable and
+// the client snapshot is taken from the DOM — React then knows the two can
+// differ and skips the hydration mismatch warning.
+function subscribeColorMode(callback: () => void) {
+    if (typeof window === "undefined") return () => {}
+    const observer = new MutationObserver(callback)
+    observer.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ["class"],
+    })
+    return () => observer.disconnect()
+}
+
+function getColorMode(): "light" | "dark" {
+    if (typeof document === "undefined") return "light"
+    return document.documentElement.classList.contains("dark") ? "dark" : "light"
+}
+
+function getServerColorMode(): "light" | "dark" {
+    return "light"
+}
 
 // `ssr: false` keeps the editor client-only (it touches `window`/`document`),
 // but without `loading` the wrapper height collapses to 0 until the chunk
@@ -66,8 +88,11 @@ export function MarkdownEditor({
     height = 320,
     imageUpload,
 }: MarkdownEditorProps) {
-    const { resolvedTheme } = useTheme()
-    const colorMode = resolvedTheme === "dark" ? "dark" : "light"
+    const colorMode = useSyncExternalStore(
+        subscribeColorMode,
+        getColorMode,
+        getServerColorMode,
+    )
     // MDEditor is SSR-disabled, so window is always available at this point
     const [defaultPreview] = useState<"edit" | "live">(() =>
         typeof window !== "undefined" && window.innerWidth >= 640 ? "live" : "edit"

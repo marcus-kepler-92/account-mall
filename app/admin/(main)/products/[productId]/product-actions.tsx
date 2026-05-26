@@ -45,6 +45,9 @@ export function DeactivateProductButton({
                 toast.success(isActive ? "商品已下架" : "商品已上架")
                 router.push("/admin/products")
                 router.refresh()
+            } else {
+                const data = await res.json().catch(() => ({}))
+                toast.error(data?.error ?? "操作失败")
             }
         } catch {
             toast.error("操作失败")

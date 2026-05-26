@@ -94,6 +94,12 @@ export async function getCrossSellRecommendations(
     const withStock = await Promise.all(
         deduped.map(async (product) => {
             if (product.status !== ProductStatus.ACTIVE) return null
+            // MANUAL products are excluded from cross-sell — they have no card
+            // inventory and require manual fulfillment, so they don't fit the
+            // post-purchase one-click upsell model (would also make the
+            // CrossSellUsage one-time-use semantics ambiguous if the buyer
+            // never gets fulfilled).
+            if (product.productType === "MANUAL") return null
             if (product.productType === "AUTO_FETCH") return product
             const unsoldCount = await prisma.card.count({
                 where: { productId: product.id, status: CardStatus.UNSOLD },

@@ -40,6 +40,7 @@ describe("Product model", () => {
     purchaseLimitEnabled: false,
     purchaseLimitQuantity: 1,
     excludeFromAttribution: false,
+    inventoryTracked: false,
     createdAt: new Date("2026-01-01"),
     updatedAt: new Date("2026-01-01"),
   };
@@ -345,6 +346,10 @@ describe("Order model", () => {
     costSnapshot: null,
     costTotalSnapshot: null,
     paymentChannelId: null,
+    variantId: null,
+    variantNameSnapshot: null,
+    dunCount: 0,
+    lastDunAt: null,
     createdAt: new Date("2026-01-01"),
     updatedAt: new Date("2026-01-01"),
   };
@@ -490,6 +495,7 @@ describe("Enum default values", () => {
       purchaseLimitEnabled: false,
       purchaseLimitQuantity: 1,
       excludeFromAttribution: false,
+      inventoryTracked: false,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -546,6 +552,10 @@ describe("Enum default values", () => {
       costSnapshot: null,
       costTotalSnapshot: null,
       paymentChannelId: null,
+      variantId: null,
+      variantNameSnapshot: null,
+      dunCount: 0,
+      lastDunAt: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };

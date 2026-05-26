@@ -14,11 +14,67 @@ import { Loader2, ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import { ProductFormBasicFields } from "./product-form-basic-fields"
 import { ProductFormPricingFields } from "./product-form-pricing-fields"
+import { ProductFormContentCards } from "./product-form-content-cards"
 import { ProductFormTagSelect } from "./product-form-tag-select"
 import { ProductFormCardTemplateSelect } from "./product-form-card-template-select"
 import { ProductFormSettings } from "./product-form-settings"
 import { ProductFormRiskWarningFields } from "./product-form-risk-warning-fields"
 import { ProductFormPurchaseLimitFields } from "./product-form-purchase-limit-fields"
+import { ProductFormVariantsField } from "./product-form-variants-field"
+import { SkuListEditor } from "@/app/admin/(main)/products/[productId]/variants/sku-list-editor"
+import type { FieldErrors } from "react-hook-form"
+
+// Field labels surfaced in the validation toast. Keep keys in sync with
+// productFormSchema field names — unknown keys fall through to the raw path.
+const PRODUCT_FORM_FIELD_LABELS: Record<string, string> = {
+    name: "商品名称",
+    slug: "URL 别名",
+    description: "商品描述",
+    summary: "商品简介",
+    image: "商品图片",
+    price: "价格",
+    costPerUnit: "成本",
+    maxQuantity: "单笔最大数量",
+    productType: "商品类型",
+    sourceUrl: "来源 URL",
+    voidloginsCode: "VoidLogins 分享代码",
+    voidloginsPassword: "VoidLogins 密码",
+    validityHours: "有效时长",
+    accountSwitchLimit: "切换账号次数",
+    tagIds: "标签",
+    cardTemplateIds: "卡密模板",
+    riskWarningTitle: "风险提示标题",
+    riskWarningContent: "风险提示内容",
+    riskWarningCountdown: "风险提示倒计时",
+    riskWarningConfirmText: "风险提示确认文案",
+    purchaseLimitQuantity: "限购数量",
+    variants: "SKU 列表",
+}
+
+// react-hook-form invalid handler: toast a short summary and scroll the first
+// errored field into view + focus it. Looks up by `name=`, then `data-field=`
+// (so non-input anchors like the SKU section can opt-in via a marker div).
+function focusFirstError<T extends Record<string, unknown>>(errors: FieldErrors<T>) {
+    const keys = Object.keys(errors)
+    if (keys.length === 0) return
+    const firstKey = keys[0]
+    const label = PRODUCT_FORM_FIELD_LABELS[firstKey] ?? firstKey
+    const firstError = errors[firstKey as keyof FieldErrors<T>]
+    const msg =
+        firstError && typeof firstError === "object" && "message" in firstError && firstError.message
+            ? String(firstError.message)
+            : "请检查表单内容"
+    const otherCount = keys.length - 1
+    toast.error(otherCount > 0 ? `${label}：${msg}（还有 ${otherCount} 项需修复）` : `${label}：${msg}`)
+    const el =
+        document.querySelector<HTMLElement>(`[name="${firstKey}"]`) ??
+        document.querySelector<HTMLElement>(`[data-field="${firstKey}"]`)
+    if (!el) return
+    el.scrollIntoView({ behavior: "smooth", block: "center" })
+    // Defer focus to after the smooth scroll starts so the browser doesn't
+    // snap back to the top.
+    window.setTimeout(() => el.focus({ preventScroll: true }), 50)
+}
 
 type Tag = { id: string; name: string; slug: string }
 
@@ -33,7 +89,7 @@ type ProductData = {
     costPerUnit?: number | null
     maxQuantity: number
     status: string
-    productType?: "NORMAL" | "AUTO_FETCH"
+    productType?: "NORMAL" | "AUTO_FETCH" | "MANUAL"
     sourceUrl?: string | null
     validityHours?: number | null
     allowAccountSwitch?: boolean
@@ -47,6 +103,8 @@ type ProductData = {
     purchaseLimitEnabled?: boolean
     purchaseLimitQuantity?: number
     excludeFromAttribution?: boolean
+    inventoryTracked?: boolean
+    emailOnFulfill?: boolean
     tags: Tag[]
     cardTemplates: { id: string; name: string; template: string }[]
 }
@@ -100,6 +158,17 @@ export function ProductForm({
             purchaseLimitEnabled: product?.purchaseLimitEnabled ?? false,
             purchaseLimitQuantity: product?.purchaseLimitQuantity != null ? String(product.purchaseLimitQuantity) : "1",
             excludeFromAttribution: product?.excludeFromAttribution ?? false,
+            inventoryTracked: product?.inventoryTracked ?? false,
+            emailOnFulfill: product?.emailOnFulfill ?? false,
+            // MANUAL-only: SKUs are edited inline on the create form and
+            // submitted atomically with POST /api/products. The edit page uses
+            // a separate SkuListEditor instance in "edit" mode that talks to
+            // /api/admin/products/[id]/variants directly.
+            variants: [],
+            // Hidden marker so the form schema's MANUAL+variants superRefine
+            // knows to skip the "≥1 SKU" check on edit (where SKUs are owned
+            // by SkuListEditor autosave, not the form's variants[]).
+            _isEditing: isEditing,
         },
     })
 
@@ -107,6 +176,7 @@ export function ProductForm({
     const name = watch("name")
     const productType = watch("productType") ?? "NORMAL"
     const isAutoFetch = productType === "AUTO_FETCH"
+    const isManual = productType === "MANUAL"
 
     useEffect(() => {
         if (!slugManuallyEdited && !isEditing) {
@@ -127,19 +197,34 @@ export function ProductForm({
             }
         }
 
+        // MANUAL products derive price from SKU variants and don't use
+        // source URL / validity / account switch settings.
         const body = {
             name: data.name.trim(),
             slug: data.slug.trim(),
             description: data.description?.trim() || undefined,
             summary: data.summary?.trim() || null,
             image: data.image || null,
-            price: data.price === "" ? (isAutoFetch ? 0 : undefined) : parseFloat(data.price),
+            price:
+                isManual
+                    ? 0
+                    : data.price === ""
+                        ? (isAutoFetch ? 0 : undefined)
+                        : parseFloat(data.price),
             costPerUnit: data.costPerUnit ?? null,
-            maxQuantity: isAutoFetch ? 1 : (data.maxQuantity === "" ? 10 : parseInt(data.maxQuantity, 10)),
+            maxQuantity: isAutoFetch
+                ? 1
+                : isManual
+                    ? 1
+                    : (data.maxQuantity === "" ? 10 : parseInt(data.maxQuantity, 10)),
             status: data.isActive ? "ACTIVE" : "INACTIVE",
             productType: data.productType ?? "NORMAL",
-            sourceUrl: finalSourceUrl,
-            validityHours: data.validityHours && data.validityHours !== "" ? parseInt(data.validityHours, 10) : null,
+            sourceUrl: isManual ? null : finalSourceUrl,
+            validityHours: isManual
+                ? null
+                : data.validityHours && data.validityHours !== ""
+                    ? parseInt(data.validityHours, 10)
+                    : null,
             ...(isAutoFetch && {
                 allowAccountSwitch: data.allowAccountSwitch ?? true,
                 accountSwitchLimit: data.accountSwitchLimit && data.accountSwitchLimit !== "" ? parseInt(data.accountSwitchLimit, 10) : 1,
@@ -157,6 +242,38 @@ export function ProductForm({
                 ? parseInt(data.purchaseLimitQuantity, 10)
                 : 1,
             excludeFromAttribution: data.excludeFromAttribution ?? false,
+            // MANUAL-only toggle; backend ignores for non-MANUAL types but we
+            // ship it unconditionally so the column stays consistent across
+            // type swaps.
+            inventoryTracked: data.inventoryTracked ?? false,
+            // Per-product order-completion email toggle. Default off — the
+            // global env still gates whether any email is sent at all.
+            emailOnFulfill: data.emailOnFulfill ?? false,
+            // Atomic create: ship the MANUAL SKUs alongside the product so the
+            // server can wrap both writes in one transaction. Editing variants
+            // (edit page) uses dedicated variant endpoints — this field is
+            // only meaningful on create.
+            ...(!isEditing && isManual && {
+                variants: (data.variants ?? [])
+                    .filter((r) => r.name?.trim() && r.price !== "")
+                    .map((r) => ({
+                        name: r.name.trim(),
+                        price: parseFloat(r.price),
+                        unitCost:
+                            r.unitCost && r.unitCost !== ""
+                                ? parseFloat(r.unitCost)
+                                : null,
+                        stockQuantity:
+                            r.stockQuantity === ""
+                                ? 0
+                                : parseInt(r.stockQuantity, 10),
+                        sortOrder:
+                            r.sortOrder === ""
+                                ? 0
+                                : parseInt(r.sortOrder, 10),
+                        isActive: r.isActive,
+                    })),
+            }),
         }
 
         try {
@@ -200,14 +317,28 @@ export function ProductForm({
             </div>
 
             <Form {...form}>
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+                <form
+                    onSubmit={handleSubmit(onSubmit, focusFirstError)}
+                    className="space-y-6"
+                >
                     <div className="grid gap-6 lg:grid-cols-3">
                         <div className="min-w-0 lg:col-span-2 space-y-6">
                             <ProductFormBasicFields
                                 isEditing={isEditing}
                                 onSlugManualEdit={() => setSlugManuallyEdited(true)}
                             />
-                            <ProductFormPricingFields isAutoFetch={isAutoFetch} sourceUrlOptions={sourceUrlOptions} />
+                            <ProductFormPricingFields isAutoFetch={isAutoFetch} isManual={isManual} sourceUrlOptions={sourceUrlOptions} />
+                            {isManual && (
+                                isEditing && product
+                                    ? <SkuListEditor
+                                        mode="edit"
+                                        productId={product.id}
+                                        value={[]}
+                                        trackInventory={form.watch("inventoryTracked") ?? false}
+                                      />
+                                    : <ProductFormVariantsField />
+                            )}
+                            <ProductFormContentCards />
                             <ProductFormRiskWarningFields />
                             <ProductFormPurchaseLimitFields />
                         </div>

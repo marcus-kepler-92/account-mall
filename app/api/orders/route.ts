@@ -42,6 +42,7 @@ type ProductForAutoFetch = {
     sourceUrl: string | null
     productType: string | null
     validityHours: number | null
+    inventoryTracked?: boolean
 }
 
 /**
@@ -552,6 +553,7 @@ export async function POST(request: NextRequest) {
             fingerprintHash,
             clientIp,
             limitQuantity: product.purchaseLimitQuantity,
+            productType: (product as unknown as { productType?: string }).productType,
         })
         if (limitResult.blocked) {
             return NextResponse.json(
@@ -563,8 +565,40 @@ export async function POST(request: NextRequest) {
 
     const productWithType = product as unknown as ProductForAutoFetch
     const isAutoFetch = productWithType.productType === "AUTO_FETCH"
+    const isManual = productWithType.productType === "MANUAL"
+
+    // MANUAL: validate variant ownership / activeness / stock, then proceed with a
+    // dedicated create path. MANUAL orders are single-variant, single-unit; we
+    // never touch the cards reservation logic.
+    type ManualVariantSlice = { id: string; productId: string; name: string; price: unknown; isActive: boolean; stockQuantity: number }
+    let manualVariant: ManualVariantSlice | null = null
+    if (isManual) {
+        if (!parsed.data.variantId) {
+            return validationError({ variantId: ["MANUAL 商品必须选择规格"] })
+        }
+        const variant = await prisma.productVariant.findUnique({
+            where: { id: parsed.data.variantId },
+        })
+        if (!variant || variant.productId !== productWithType.id) {
+            return validationError({ variantId: ["规格不存在"] })
+        }
+        if (!variant.isActive) {
+            return validationError({ variantId: ["该规格已停售"] })
+        }
+        // Stock-quantity check is gated by the product-level inventoryTracked
+        // flag. Untracked MANUAL products are intentionally unbounded (代购 /
+        // 定制 / 按需类商品 — 卖家手动控制是否接单)；sold-out display is
+        // driven exclusively by variant.isActive.
+        if (productWithType.inventoryTracked && variant.stockQuantity < 1) {
+            return validationError({ variantId: ["该规格已售罄"] })
+        }
+        manualVariant = variant
+    }
+
     const maxQty = isAutoFetch ? config.autoFetchMaxQuantityPerOrder : product.maxQuantity
-    if (quantity < 1 || quantity > maxQty) {
+    // MANUAL: single-unit purchase; ignore user-supplied quantity. Schema-level
+    // quantity validation (min 1) stays in place for NORMAL / AUTO_FETCH.
+    if (!isManual && (quantity < 1 || quantity > maxQty)) {
         return badRequest(`Quantity must be between 1 and ${maxQty}`)
     }
 
@@ -644,6 +678,88 @@ export async function POST(request: NextRequest) {
             promoCode: lookupCode,
             fingerprintHash,
             paymentMethod,
+        })
+    }
+
+    // ─── MANUAL：单 SKU、单数量、人工发卡。不预占卡，不叠加 cross-sell / exit-discount。 ──
+    // Stock is decremented at payment success (Task 8); closed orders restore stock (Task 9).
+    if (isManual && manualVariant) {
+        const variantPrice = Number(manualVariant.price)
+        // Distributor discount still applies; exit-discount and cross-sell are intentionally skipped
+        // for the MANUAL channel (different fulfillment path; covered explicitly in Task 15).
+        const originalAmount = variantPrice
+        let amount = originalAmount
+        let discountPercentApplied: number | null = null
+        if (distributorDiscountPercent != null) {
+            amount = amount * (1 - distributorDiscountPercent / 100)
+        }
+        if (amount < originalAmount) {
+            discountPercentApplied = Math.round((1 - amount / originalAmount) * 10000) / 100
+        }
+        const amountRounded = Math.round(amount * 100) / 100
+        if (amountRounded <= 0 || amountRounded > 999_999.99) {
+            return badRequest("Invalid order amount")
+        }
+
+        const passwordHash = await hashPassword(orderPassword)
+        const channel = await selectPaymentChannel(paymentMethod)
+        const orderNo = generateOrderNo()
+
+        let manualOrder
+        try {
+            manualOrder = await prisma.order.create({
+                data: {
+                    orderNo,
+                    productId,
+                    productNameSnapshot: product.name,
+                    variantId: manualVariant.id,
+                    variantNameSnapshot: manualVariant.name,
+                    unitPriceSnapshot: variantPrice,
+                    email: email.trim().toLowerCase(),
+                    passwordHash,
+                    quantity: 1,
+                    amount: amountRounded,
+                    ...(discountPercentApplied != null && { discountPercentApplied }),
+                    status: "PENDING",
+                    paymentMethod,
+                    ...(clientIp !== "unknown" && { clientIp }),
+                    ...(distributorId && { distributorId }),
+                    ...(lookupCode && { promoCode: lookupCode }),
+                    ...(fingerprintHash && { fingerprintHash }),
+                    ...(channel && { paymentChannelId: channel.id }),
+                },
+            })
+        } catch (err) {
+            console.error("[MANUAL] 创建订单失败:", err)
+            return internalServerError("Failed to create order")
+        }
+
+        // Development shortcut mirrors NORMAL/AUTO_FETCH for E2E parity
+        if (config.nodeEnv === "development") {
+            const devResult = await completePendingOrder(manualOrder.orderNo)
+            if (devResult.done) {
+                const successToken = createOrderSuccessToken(manualOrder.orderNo)
+                return NextResponse.json({
+                    orderNo: manualOrder.orderNo,
+                    amount: amountRounded,
+                    paymentUrl: null,
+                    ...(successToken && { successToken }),
+                })
+            }
+        }
+
+        const paymentUrl = getPaymentUrlForOrder({
+            orderNo: manualOrder.orderNo,
+            totalAmount: amountRounded.toFixed(2),
+            subject: `${product.name} - ${manualVariant.name}`,
+            paymentMethod,
+            channel,
+        })
+
+        return NextResponse.json({
+            orderNo: manualOrder.orderNo,
+            amount: amountRounded,
+            paymentUrl: paymentUrl ?? null,
         })
     }
 

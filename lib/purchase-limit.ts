@@ -6,8 +6,17 @@ export async function checkPurchaseLimit(params: {
   fingerprintHash: string | null
   clientIp: string
   limitQuantity: number
+  productType?: string
 }): Promise<{ blocked: boolean; orderNo?: string; message: string }> {
-  const { productId, email, fingerprintHash, clientIp, limitQuantity } = params
+  const { productId, email, fingerprintHash, clientIp, limitQuantity, productType } = params
+
+  // MANUAL products are exempt from purchase-limit: each SKU/variant is
+  // priced independently and stocked by hand, so the per-email limit driven
+  // by card-based products doesn't apply. Spec non-goal.
+  if (productType === "MANUAL") {
+    return { blocked: false, message: "" }
+  }
+
   const emailLower = email.trim().toLowerCase()
 
   const emailSignal = { email: emailLower }

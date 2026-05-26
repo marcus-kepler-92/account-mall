@@ -37,6 +37,10 @@ describe("AdminProductsPage — sales query", () => {
         prismaMock.card.groupBy.mockResolvedValue([])
         prismaMock.order.groupBy.mockResolvedValue([])
         prismaMock.restockSubscription.groupBy.mockResolvedValue([])
+        // MANUAL ⚠缺 SKU badge feature (Fix D) added a productVariant.groupBy
+        // call in this page's Promise.all. Default to empty so tests focused
+        // on other concerns aren't affected.
+        prismaMock.productVariant.groupBy.mockResolvedValue([])
     })
 
     it("queries completed orders with quantity sum", async () => {

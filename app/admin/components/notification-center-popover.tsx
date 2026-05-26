@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import type { ReactNode } from "react"
-import { Bell, GripVertical } from "lucide-react"
+import { Bell, X } from "lucide-react"
 import {
   Popover,
   PopoverContent,
@@ -11,13 +11,13 @@ import {
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { NotificationBadge } from "./notification-badge"
-import { SwipeToDismiss } from "./swipe-to-dismiss"
 import {
   useAdminNotifications,
   useDismissAdminNotifications,
 } from "@/app/admin/hooks/use-admin-notifications"
 import { SOURCES, type SourceKey, type SourceResult } from "@/lib/admin-notifications"
 import { formatCurrency } from "@/lib/utils"
+import { cn } from "@/lib/utils"
 
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime()
@@ -46,12 +46,26 @@ function Row({
   children: ReactNode
 }) {
   return (
-    <SwipeToDismiss onDismiss={() => onDismiss({ sourceKey, itemId, fingerprint })}>
-      <div className="flex items-center gap-2 py-1.5 text-sm">
-        <div className="min-w-0 flex-1">{children}</div>
-        <GripVertical className="size-3.5 shrink-0 text-muted-foreground/50" aria-hidden />
-      </div>
-    </SwipeToDismiss>
+    <div className="group/notif-row -mx-2 flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-muted/50">
+      <div className="min-w-0 flex-1">{children}</div>
+      <Button
+        variant="ghost"
+        size="icon"
+        className={cn(
+          "size-6 shrink-0 text-muted-foreground hover:text-foreground",
+          "opacity-0 transition-opacity group-hover/notif-row:opacity-100 focus-visible:opacity-100",
+        )}
+        aria-label="标记已读"
+        onClick={(e) => {
+          // Prevent any wrapping link from navigating when the user clicks the X.
+          e.preventDefault()
+          e.stopPropagation()
+          onDismiss({ sourceKey, itemId, fingerprint })
+        }}
+      >
+        <X className="size-3.5" />
+      </Button>
+    </div>
   )
 }
 
@@ -112,6 +126,48 @@ function renderItems(source: SourceResult, onDismiss: DismissFn): ReactNode {
           </Row>
         )
       })
+    case "manualPendingOrders":
+      return source.items.slice(0, POPOVER_ITEM_LIMIT).map((it) => {
+        const waitMin = Math.max(
+          0,
+          Math.floor((Date.now() - new Date(it.createdAt).getTime()) / 60_000),
+        )
+        const waitLabel =
+          waitMin < 60
+            ? `${waitMin} 分钟`
+            : waitMin < 60 * 24
+              ? `${Math.floor(waitMin / 60)} 小时`
+              : `${Math.floor(waitMin / (60 * 24))} 天`
+        const display = it.variantName ?? it.productName
+        return (
+          <Row
+            key={it.id}
+            sourceKey={source.key}
+            itemId={it.id}
+            fingerprint={it.fingerprint}
+            onDismiss={onDismiss}
+          >
+            <Link
+              href={`/admin/orders/${it.id}`}
+              className="block hover:underline"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate">
+                  {display} · {formatCurrency(it.amount)}
+                </span>
+                <span className="text-muted-foreground tabular-nums shrink-0">
+                  已等 {waitLabel}
+                </span>
+              </div>
+              {it.dunCount > 0 && (
+                <div className="mt-0.5 text-xs font-medium text-destructive">
+                  已催 {it.dunCount} 次
+                </div>
+              )}
+            </Link>
+          </Row>
+        )
+      })
   }
 }
 
@@ -136,7 +192,12 @@ export function NotificationCenterPopover() {
       <PopoverContent align="end" className="w-[380px] p-0">
         <div className="border-b px-4 py-3">
           <div className="flex items-center justify-between">
-            <div className="font-medium">通知中心</div>
+            <Link
+              href="/admin/notifications"
+              className="font-medium hover:underline"
+            >
+              通知中心
+            </Link>
             {totalCount > 0 && (
               <span className="text-xs text-muted-foreground tabular-nums">
                 {totalCount} 项待办
@@ -145,7 +206,7 @@ export function NotificationCenterPopover() {
           </div>
           {totalCount > 0 && (
             <p className="mt-1 text-xs text-muted-foreground">
-              左右滑动单条标记已读；拖走侧边栏菜单上的红点可整组标记
+              悬停点 × 标记单条已读；点击标题进入「通知中心」管理已读历史
             </p>
           )}
         </div>
