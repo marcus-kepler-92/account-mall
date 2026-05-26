@@ -14,9 +14,8 @@ import {
     getCrossSellSetting,
     getCrossSellRecommendations,
     getEligibleTargetIds,
-    resolveCrossSellDiscount,
-    resolveCrossSellDiscountsForProducts,
-    getCsExpiryMs,
+    resolveCrossSellDiscounts,
+    createCrossSellSession,
 } from "@/lib/cross-sell"
 import { generateCsToken } from "@/lib/cross-sell-token"
 
@@ -290,11 +289,14 @@ describe("getEligibleTargetIds (projection of getCrossSellRecommendations)", () 
     })
 })
 
-describe("resolveCrossSellDiscount (single-source per token)", () => {
+describe("resolveCrossSellDiscounts (single product via .get(id))", () => {
     const sourceOrderId = "src-order-1"
     const sourceProductId = "src-prod"
     const targetProductId = "tgt-prod"
     const now = new Date()
+
+    const single = async (token: string | null | undefined, productId: string) =>
+        (await resolveCrossSellDiscounts(token, [productId])).get(productId) ?? null
 
     beforeEach(() => {
         prismaMock.crossSellSetting.findUnique.mockResolvedValue({
@@ -326,25 +328,22 @@ describe("resolveCrossSellDiscount (single-source per token)", () => {
         )
         prismaMock.product.findMany.mockResolvedValue([])
         prismaMock.card.count.mockResolvedValue(5)
-        prismaMock.crossSellUsage.findUnique.mockResolvedValue(null)
+        prismaMock.crossSellUsage.findMany.mockResolvedValue([])
     })
 
     it("returns null for missing token", async () => {
-        expect(await resolveCrossSellDiscount(null, targetProductId)).toBeNull()
-        expect(await resolveCrossSellDiscount(undefined, targetProductId)).toBeNull()
-        expect(await resolveCrossSellDiscount("", targetProductId)).toBeNull()
+        expect(await single(null, targetProductId)).toBeNull()
+        expect(await single(undefined, targetProductId)).toBeNull()
+        expect(await single("", targetProductId)).toBeNull()
     })
 
     it("returns null for invalid token", async () => {
-        expect(
-            await resolveCrossSellDiscount("garbage.token.value", targetProductId),
-        ).toBeNull()
+        expect(await single("garbage.token.value", targetProductId)).toBeNull()
     })
 
     it("returns discountPercent for valid token + eligible target + unconsumed", async () => {
         const token = generateCsToken(sourceOrderId, 60_000)!
-        const result = await resolveCrossSellDiscount(token, targetProductId)
-        expect(result).toBe(10)
+        expect(await single(token, targetProductId)).toBe(10)
     })
 
     it("returns null when source order not COMPLETED", async () => {
@@ -355,7 +354,7 @@ describe("resolveCrossSellDiscount (single-source per token)", () => {
             paidAt: now,
         } as any)
         const token = generateCsToken(sourceOrderId, 60_000)!
-        expect(await resolveCrossSellDiscount(token, targetProductId)).toBeNull()
+        expect(await single(token, targetProductId)).toBeNull()
     })
 
     it("returns null when cross-sell globally disabled", async () => {
@@ -368,22 +367,20 @@ describe("resolveCrossSellDiscount (single-source per token)", () => {
             updatedAt: now,
         } as any)
         const token = generateCsToken(sourceOrderId, 60_000)!
-        expect(await resolveCrossSellDiscount(token, targetProductId)).toBeNull()
+        expect(await single(token, targetProductId)).toBeNull()
     })
 
     it("returns null when product not in the source's eligible target set", async () => {
         const token = generateCsToken(sourceOrderId, 60_000)!
-        expect(
-            await resolveCrossSellDiscount(token, "unrelated-product-id"),
-        ).toBeNull()
+        expect(await single(token, "unrelated-product-id")).toBeNull()
     })
 
     it("returns null when CrossSellUsage already consumed (this source × target)", async () => {
-        prismaMock.crossSellUsage.findUnique.mockResolvedValue({
-            id: "usage-1",
-        } as any)
+        prismaMock.crossSellUsage.findMany.mockResolvedValue([
+            { targetProductId },
+        ] as any)
         const token = generateCsToken(sourceOrderId, 60_000)!
-        expect(await resolveCrossSellDiscount(token, targetProductId)).toBeNull()
+        expect(await single(token, targetProductId)).toBeNull()
     })
 
     it("returns null when paidAt + TTL has elapsed (data-layer TTL guard)", async () => {
@@ -396,11 +393,11 @@ describe("resolveCrossSellDiscount (single-source per token)", () => {
         } as any)
         // Token still valid (long ttlMs), but paidAt+TTL is past
         const token = generateCsToken(sourceOrderId, 60 * 60_000)!
-        expect(await resolveCrossSellDiscount(token, targetProductId)).toBeNull()
+        expect(await single(token, targetProductId)).toBeNull()
     })
 })
 
-describe("resolveCrossSellDiscountsForProducts (single-source per token)", () => {
+describe("resolveCrossSellDiscounts (bulk, single-source per token)", () => {
     const sourceOrderId = "src-order-1"
     const sourceProductId = "src-prod"
     const now = new Date()
@@ -447,19 +444,19 @@ describe("resolveCrossSellDiscountsForProducts (single-source per token)", () =>
     })
 
     it("returns empty map for missing token", async () => {
-        const m = await resolveCrossSellDiscountsForProducts(null, ["p-a"])
+        const m = await resolveCrossSellDiscounts(null, ["p-a"])
         expect(m.size).toBe(0)
     })
 
     it("returns empty map for empty productIds", async () => {
         const token = generateCsToken(sourceOrderId, 60_000)!
-        const m = await resolveCrossSellDiscountsForProducts(token, [])
+        const m = await resolveCrossSellDiscounts(token, [])
         expect(m.size).toBe(0)
     })
 
     it("marks eligible products with discountPercent, skips others", async () => {
         const token = generateCsToken(sourceOrderId, 60_000)!
-        const m = await resolveCrossSellDiscountsForProducts(token, [
+        const m = await resolveCrossSellDiscounts(token, [
             "p-a",
             "p-b",
             "p-unrelated",
@@ -474,7 +471,7 @@ describe("resolveCrossSellDiscountsForProducts (single-source per token)", () =>
             { targetProductId: "p-a" },
         ] as any)
         const token = generateCsToken(sourceOrderId, 60_000)!
-        const m = await resolveCrossSellDiscountsForProducts(token, ["p-a", "p-b"])
+        const m = await resolveCrossSellDiscounts(token, ["p-a", "p-b"])
         expect(m.has("p-a")).toBe(false)
         expect(m.get("p-b")).toBe(10)
     })
@@ -483,7 +480,7 @@ describe("resolveCrossSellDiscountsForProducts (single-source per token)", () =>
         const findManySpy = prismaMock.crossSellUsage.findMany as jest.Mock
         findManySpy.mockResolvedValue([])
         const token = generateCsToken(sourceOrderId, 60_000)!
-        await resolveCrossSellDiscountsForProducts(token, ["p-a"])
+        await resolveCrossSellDiscounts(token, ["p-a"])
 
         const callArgs = findManySpy.mock.calls[0][0]
         // Scalar, not `{ in: [...] }` — single-source semantics.
@@ -491,18 +488,25 @@ describe("resolveCrossSellDiscountsForProducts (single-source per token)", () =>
     })
 })
 
-describe("getCsExpiryMs", () => {
-    it("returns paidAt + ttlMinutes when paidAt present", () => {
-        const paidAt = new Date("2026-01-01T00:00:00Z")
-        const result = getCsExpiryMs(paidAt, 30)
-        expect(result).toBe(paidAt.getTime() + 30 * 60_000)
+describe("createCrossSellSession", () => {
+    it("returns signed token + expiry anchored to paidAt", () => {
+        const paidAt = new Date(Date.now() - 60_000) // 1 min ago
+        const session = createCrossSellSession("order-1", paidAt, 30)
+        expect(session.csToken).not.toBeNull()
+        expect(session.expiresAt).toBe(paidAt.getTime() + 30 * 60_000)
+        expect(session.initialRemainingMs).toBeGreaterThan(0)
+        expect(session.initialRemainingMs).toBeLessThanOrEqual(30 * 60_000)
     })
 
-    it("falls back to now + ttlMinutes when paidAt null", () => {
-        const before = Date.now()
-        const result = getCsExpiryMs(null, 5)
-        const after = Date.now()
-        expect(result).toBeGreaterThanOrEqual(before + 5 * 60_000)
-        expect(result).toBeLessThanOrEqual(after + 5 * 60_000)
+    it("returns null token when paidAt missing", () => {
+        const session = createCrossSellSession("order-1", null, 30)
+        expect(session.csToken).toBeNull()
+    })
+
+    it("returns null token when paidAt + TTL already elapsed", () => {
+        const longAgo = new Date(Date.now() - 60 * 60_000) // 1h ago
+        const session = createCrossSellSession("order-1", longAgo, 5)
+        expect(session.csToken).toBeNull()
+        expect(session.initialRemainingMs).toBe(0)
     })
 })

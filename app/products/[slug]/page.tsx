@@ -18,7 +18,7 @@ import { ProductBottomBar } from "../../components/product-bottom-bar";
 import { descriptionToPlainText } from "@/lib/description";
 import { MarkdownViewClient } from "@/app/components/markdown-view-client";
 import { RiskWarningDialog } from "./risk-warning-dialog";
-import { resolveCrossSellDiscount } from "@/lib/cross-sell";
+import { resolveCrossSellDiscounts } from "@/lib/cross-sell";
 
 const PRODUCT_CACHE_TTL_SECONDS = 300;
 const STOCK_CACHE_TTL_SECONDS = 30;
@@ -116,7 +116,7 @@ export default async function ProductDetailPage({
   // backend re-verifies before applying the discount.
   const csToken: string | null = resolvedParams.cs ?? null
   const crossSellDiscountPercent = csToken
-    ? await resolveCrossSellDiscount(csToken, product.id)
+    ? (await resolveCrossSellDiscounts(csToken, [product.id])).get(product.id) ?? null
     : null
 
   const productWithImage = product as typeof product & { image: string | null };

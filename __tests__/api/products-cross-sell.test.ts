@@ -26,7 +26,7 @@ jest.mock("@/lib/revalidate-storefront", () => ({
 }))
 jest.mock("@/lib/cross-sell", () => ({
     __esModule: true,
-    resolveCrossSellDiscountsForProducts: jest.fn(),
+    resolveCrossSellDiscounts: jest.fn(),
 }))
 jest.mock("@/lib/config", () => ({
     config: { autoFetchMaxQuantityPerOrder: 5 },
@@ -53,12 +53,12 @@ const baseProduct = {
 }
 
 describe("GET /api/products — cross-sell discount integration", () => {
-    const resolveCrossSellDiscountsForProducts = require("@/lib/cross-sell")
-        .resolveCrossSellDiscountsForProducts as jest.Mock
+    const resolveCrossSellDiscounts = require("@/lib/cross-sell")
+        .resolveCrossSellDiscounts as jest.Mock
 
     beforeEach(() => {
         jest.clearAllMocks()
-        resolveCrossSellDiscountsForProducts.mockResolvedValue(new Map())
+        resolveCrossSellDiscounts.mockResolvedValue(new Map())
         prismaMock.product.findMany.mockResolvedValue([
             baseProduct,
             { ...baseProduct, id: "prod_b", slug: "product-b", name: "Product B" },
@@ -73,23 +73,23 @@ describe("GET /api/products — cross-sell discount integration", () => {
     it("does NOT call resolver when no cs param is present", async () => {
         const res = await GET(buildRequest("http://localhost/api/products"))
         const body = await res.json()
-        expect(resolveCrossSellDiscountsForProducts).not.toHaveBeenCalled()
+        expect(resolveCrossSellDiscounts).not.toHaveBeenCalled()
         for (const p of body.data) {
             expect(p.discountPercent).toBeUndefined()
         }
     })
 
     it("calls resolver with cs token and product IDs", async () => {
-        resolveCrossSellDiscountsForProducts.mockResolvedValueOnce(new Map())
+        resolveCrossSellDiscounts.mockResolvedValueOnce(new Map())
         await GET(buildRequest("http://localhost/api/products?cs=valid.cs.token"))
-        expect(resolveCrossSellDiscountsForProducts).toHaveBeenCalledWith(
+        expect(resolveCrossSellDiscounts).toHaveBeenCalledWith(
             "valid.cs.token",
             ["prod_a", "prod_b"],
         )
     })
 
     it("attaches discountPercent only to products returned by resolver", async () => {
-        resolveCrossSellDiscountsForProducts.mockResolvedValueOnce(
+        resolveCrossSellDiscounts.mockResolvedValueOnce(
             new Map([["prod_a", 10]]),
         )
         const res = await GET(buildRequest("http://localhost/api/products?cs=valid.cs.token"))
@@ -101,7 +101,7 @@ describe("GET /api/products — cross-sell discount integration", () => {
     })
 
     it("emits no discountPercent fields when resolver returns empty map (invalid/expired cs)", async () => {
-        resolveCrossSellDiscountsForProducts.mockResolvedValueOnce(new Map())
+        resolveCrossSellDiscounts.mockResolvedValueOnce(new Map())
         const res = await GET(buildRequest("http://localhost/api/products?cs=expired.cs.token"))
         const body = await res.json()
         for (const p of body.data) {
@@ -115,6 +115,6 @@ describe("GET /api/products — cross-sell discount integration", () => {
 
         await GET(buildRequest("http://localhost/api/products?admin=true&cs=valid.cs.token"))
 
-        expect(resolveCrossSellDiscountsForProducts).not.toHaveBeenCalled()
+        expect(resolveCrossSellDiscounts).not.toHaveBeenCalled()
     })
 })

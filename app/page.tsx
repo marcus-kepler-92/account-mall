@@ -13,7 +13,7 @@ import {
   DEFAULT_SEO_SUBTITLE,
 } from "@/lib/seo-keywords"
 import type { ProductCardData } from "@/app/components/product-card"
-import { resolveCrossSellDiscountsForProducts } from "@/lib/cross-sell"
+import { resolveCrossSellDiscounts } from "@/lib/cross-sell"
 
 const PAGE_SIZE = 18
 const ANNOUNCEMENTS_LIMIT = 20
@@ -176,7 +176,7 @@ export default async function HomePage({
         // Resolve per-product cross-sell discount for the user's current cs
         // session. Empty map for anonymous browsing / expired tokens —
         // products simply render at original price.
-        resolveCrossSellDiscountsForProducts(csParam, productIds),
+        resolveCrossSellDiscounts(csParam, productIds),
     ])
 
     const productsWithStock: ProductCardData[] = products.map(product => {

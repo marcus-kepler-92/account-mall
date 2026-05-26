@@ -5,7 +5,7 @@ import { createProductSchema } from "@/lib/validations/product";
 import { config } from "@/lib/config";
 import { unauthorized, invalidJsonBody, validationError, conflict } from "@/lib/api-response";
 import { revalidateProducts } from "@/lib/revalidate-storefront";
-import { resolveCrossSellDiscountsForProducts } from "@/lib/cross-sell";
+import { resolveCrossSellDiscounts } from "@/lib/cross-sell";
 
 /**
  * GET /api/products
@@ -113,7 +113,7 @@ export async function GET(request: NextRequest) {
     // catalog data, not customer-personalized pricing.
     const csToken = isAdmin ? null : searchParams.get("cs");
     const discountMap = csToken
-        ? await resolveCrossSellDiscountsForProducts(csToken, productIds)
+        ? await resolveCrossSellDiscounts(csToken, productIds)
         : new Map<string, number>();
 
     const productsWithStock = products.map((product) => {

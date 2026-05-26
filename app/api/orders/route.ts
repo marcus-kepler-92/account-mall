@@ -16,7 +16,7 @@ import { verifyTurnstileToken } from "@/lib/turnstile"
 import { isStorefrontTurnstileEnforced } from "@/lib/turnstile-policy"
 import { verifyExitDiscountToken, type ExitDiscountPayload } from "@/lib/exit-discount"
 import { verifyCsToken } from "@/lib/cross-sell-token"
-import { resolveCrossSellDiscount } from "@/lib/cross-sell"
+import { resolveCrossSellDiscounts } from "@/lib/cross-sell"
 import { scrapeMultipleUrls } from "@/lib/scrape-shared-accounts"
 import { sharedAccountToCardPayload, toCardContentJson, MANUAL_BLACKLIST_REASON } from "@/lib/auto-fetch-card"
 import { createOrderSuccessToken } from "@/lib/order-success-token"
@@ -594,8 +594,8 @@ export async function POST(request: NextRequest) {
         }
     }
 
-    // Cross-sell discount: token now carries only sourceOrderId; eligibility and
-    // discount percent are resolved via resolveCrossSellDiscount (HMAC + source
+    // Cross-sell discount: token carries only sourceOrderId; eligibility and
+    // discount percent are resolved via resolveCrossSellDiscounts (HMAC + source
     // order COMPLETED + setting enabled + TTL from paidAt + eligible target +
     // CrossSellUsage unique). On top of that, the buyer email must match the
     // source order's email — defense against shared tokens (URL token leak
@@ -611,7 +611,7 @@ export async function POST(request: NextRequest) {
                 select: { email: true },
             })
             if (sourceOrder?.email === email.trim().toLowerCase()) {
-                const discountPercent = await resolveCrossSellDiscount(cs, productId)
+                const discountPercent = (await resolveCrossSellDiscounts(cs, [productId])).get(productId) ?? null
                 if (discountPercent != null) {
                     crossSellDiscountPercent = discountPercent
                     crossSellPayload = {

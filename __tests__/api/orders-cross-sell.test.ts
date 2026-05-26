@@ -3,11 +3,11 @@
  * under the cs-token (sourceOrderId-bound) model.
  *
  * Covers:
- *  - Happy path: valid cs token + email match + resolveCrossSellDiscount → discount applied
+ *  - Happy path: valid cs token + email match + resolveCrossSellDiscounts → discount applied
  *  - Forged / tampered token → full price
  *  - Wrong email (source order belongs to different buyer) → full price
  *  - Source order not found → full price
- *  - resolveCrossSellDiscount returns null (any reason) → full price
+ *  - resolveCrossSellDiscounts returns empty map (any reason) → full price
  *  - Email comparison is case-insensitive
  *  - Stacking: cross-sell + promoCode / exit discount → only cross-sell applied
  *  - CrossSellUsage written on happy path
@@ -55,7 +55,7 @@ jest.mock("@/lib/cross-sell-token", () => ({
 
 jest.mock("@/lib/cross-sell", () => ({
     __esModule: true,
-    resolveCrossSellDiscount: jest.fn(),
+    resolveCrossSellDiscounts: jest.fn(),
 }))
 
 jest.mock("@/lib/exit-discount", () => ({
@@ -172,7 +172,7 @@ const baseBody = {
 
 describe("POST /api/orders — cross-sell discount (cs token model)", () => {
     const verifyCsToken = require("@/lib/cross-sell-token").verifyCsToken as jest.Mock
-    const resolveCrossSellDiscount = require("@/lib/cross-sell").resolveCrossSellDiscount as jest.Mock
+    const resolveCrossSellDiscounts = require("@/lib/cross-sell").resolveCrossSellDiscounts as jest.Mock
     const verifyExitDiscountToken = require("@/lib/exit-discount").verifyExitDiscountToken as jest.Mock
 
     beforeEach(() => {
@@ -182,7 +182,7 @@ describe("POST /api/orders — cross-sell discount (cs token model)", () => {
         ;(prismaMock.$transaction as jest.Mock).mockReset()
         ;(prismaMock.paymentChannel.findMany as jest.Mock).mockResolvedValue([])
         verifyCsToken.mockReturnValue({ valid: false })
-        resolveCrossSellDiscount.mockResolvedValue(null)
+        resolveCrossSellDiscounts.mockResolvedValue(new Map())
         verifyExitDiscountToken.mockReturnValue({ valid: false })
     })
 
@@ -191,7 +191,7 @@ describe("POST /api/orders — cross-sell discount (cs token model)", () => {
     it("applies discount when cs token valid + source email matches + resolve returns percent", async () => {
         verifyCsToken.mockReturnValueOnce({ valid: true, payload: validCsPayload })
         prismaMock.order.findUnique.mockResolvedValueOnce(sourceOrderRow as any)
-        resolveCrossSellDiscount.mockResolvedValueOnce(10)
+        resolveCrossSellDiscounts.mockResolvedValueOnce(new Map([["prod_1", 10]]))
         prismaMock.product.findUnique.mockResolvedValueOnce(product as any)
         prismaMock.card.count.mockResolvedValueOnce(5)
         const tx = mockTx()
@@ -207,7 +207,7 @@ describe("POST /api/orders — cross-sell discount (cs token model)", () => {
     it("writes CrossSellUsage in transaction when discount applied", async () => {
         verifyCsToken.mockReturnValueOnce({ valid: true, payload: validCsPayload })
         prismaMock.order.findUnique.mockResolvedValueOnce(sourceOrderRow as any)
-        resolveCrossSellDiscount.mockResolvedValueOnce(10)
+        resolveCrossSellDiscounts.mockResolvedValueOnce(new Map([["prod_1", 10]]))
         prismaMock.product.findUnique.mockResolvedValueOnce(product as any)
         prismaMock.card.count.mockResolvedValueOnce(5)
         const tx = mockTx()
@@ -238,7 +238,7 @@ describe("POST /api/orders — cross-sell discount (cs token model)", () => {
         expect(data.discountPercentApplied).toBeUndefined()
         expect(tx.crossSellUsage.create).not.toHaveBeenCalled()
         // Resolver should not have been called when token verification fails
-        expect(resolveCrossSellDiscount).not.toHaveBeenCalled()
+        expect(resolveCrossSellDiscounts).not.toHaveBeenCalled()
     })
 
     // ─── Email binding (prevents link sharing) ────────────────────────────────
@@ -255,7 +255,7 @@ describe("POST /api/orders — cross-sell discount (cs token model)", () => {
         const { data } = (tx.order.create as jest.Mock).mock.calls[0][0]
         expect(data.amount).toBe(100)
         expect(tx.crossSellUsage.create).not.toHaveBeenCalled()
-        expect(resolveCrossSellDiscount).not.toHaveBeenCalled()
+        expect(resolveCrossSellDiscounts).not.toHaveBeenCalled()
     })
 
     it("falls back to full price when source order not found", async () => {
@@ -275,7 +275,7 @@ describe("POST /api/orders — cross-sell discount (cs token model)", () => {
     it("email comparison is case-insensitive (USER@EXAMPLE.COM matches user@example.com)", async () => {
         verifyCsToken.mockReturnValueOnce({ valid: true, payload: validCsPayload })
         prismaMock.order.findUnique.mockResolvedValueOnce(sourceOrderRow as any)
-        resolveCrossSellDiscount.mockResolvedValueOnce(10)
+        resolveCrossSellDiscounts.mockResolvedValueOnce(new Map([["prod_1", 10]]))
         prismaMock.product.findUnique.mockResolvedValueOnce(product as any)
         prismaMock.card.count.mockResolvedValueOnce(5)
         const tx = mockTx()
@@ -288,13 +288,13 @@ describe("POST /api/orders — cross-sell discount (cs token model)", () => {
 
     // ─── Resolver returns null (any reason) ───────────────────────────────────
 
-    it("falls back to full price when resolveCrossSellDiscount returns null", async () => {
+    it("falls back to full price when resolveCrossSellDiscounts returns empty map", async () => {
         // Resolver returning null could be: TTL expired, source not COMPLETED,
         // disabled setting, not in eligible targets, already used. The route
         // doesn't need to distinguish — it treats null uniformly as "no discount".
         verifyCsToken.mockReturnValueOnce({ valid: true, payload: validCsPayload })
         prismaMock.order.findUnique.mockResolvedValueOnce(sourceOrderRow as any)
-        resolveCrossSellDiscount.mockResolvedValueOnce(null)
+        resolveCrossSellDiscounts.mockResolvedValueOnce(new Map())
         prismaMock.product.findUnique.mockResolvedValueOnce(product as any)
         prismaMock.card.count.mockResolvedValueOnce(5)
         const tx = mockTx({ ...baseOrder, amount: new Prisma.Decimal("100") })
@@ -311,7 +311,7 @@ describe("POST /api/orders — cross-sell discount (cs token model)", () => {
     it("cross-sell + promoCode: only cross-sell discount applied", async () => {
         verifyCsToken.mockReturnValueOnce({ valid: true, payload: validCsPayload })
         prismaMock.order.findUnique.mockResolvedValueOnce(sourceOrderRow as any)
-        resolveCrossSellDiscount.mockResolvedValueOnce(10)
+        resolveCrossSellDiscounts.mockResolvedValueOnce(new Map([["prod_1", 10]]))
         prismaMock.user.findFirst.mockResolvedValueOnce({
             id: "dist_1",
             discountCodeEnabled: true,
@@ -331,7 +331,7 @@ describe("POST /api/orders — cross-sell discount (cs token model)", () => {
     it("cross-sell + exitDiscountToken: only cross-sell applied, exit usage NOT written", async () => {
         verifyCsToken.mockReturnValueOnce({ valid: true, payload: validCsPayload })
         prismaMock.order.findUnique.mockResolvedValueOnce(sourceOrderRow as any)
-        resolveCrossSellDiscount.mockResolvedValueOnce(10)
+        resolveCrossSellDiscounts.mockResolvedValueOnce(new Map([["prod_1", 10]]))
         verifyExitDiscountToken.mockReturnValueOnce({
             valid: true,
             payload: {
@@ -358,7 +358,7 @@ describe("POST /api/orders — cross-sell discount (cs token model)", () => {
     it("cross-sell + promoCode + exitDiscount: only cross-sell applied", async () => {
         verifyCsToken.mockReturnValueOnce({ valid: true, payload: validCsPayload })
         prismaMock.order.findUnique.mockResolvedValueOnce(sourceOrderRow as any)
-        resolveCrossSellDiscount.mockResolvedValueOnce(10)
+        resolveCrossSellDiscounts.mockResolvedValueOnce(new Map([["prod_1", 10]]))
         prismaMock.user.findFirst.mockResolvedValueOnce({
             id: "dist_1",
             discountCodeEnabled: true,

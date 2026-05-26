@@ -1,7 +1,7 @@
 /**
  * Unit tests for cs token: generate / verify, expiry, tampering.
  * Token carries only sourceOrderId + exp; eligible targets and discount %
- * are resolved separately by resolveCrossSellDiscount.
+ * are resolved separately by resolveCrossSellDiscounts.
  */
 
 import { generateCsToken, verifyCsToken } from "@/lib/cross-sell-token"

@@ -20,10 +20,8 @@ import { OrderAutoFetchSection } from "@/app/components/order-detail/auto-fetch-
 import {
   getCrossSellSetting,
   getCrossSellRecommendations,
-  getCsExpiryMs,
-  getCsRemainingMs,
-  resolveCrossSellDiscountsForProducts,
-  signCsTokenForOrder,
+  resolveCrossSellDiscounts,
+  createCrossSellSession,
 } from "@/lib/cross-sell";
 import { appendCsParam } from "@/lib/cs-params";
 import { CrossSellSection } from "./cross-sell-section";
@@ -152,22 +150,17 @@ export default async function OrderSuccessPage({
     : [];
 
   const ttlMs = crossSellSetting.ttlMinutes * 60_000;
-  const csExpiresAt = getCsExpiryMs(order.paidAt, crossSellSetting.ttlMinutes);
-  const csInitialRemainingMs = getCsRemainingMs(csExpiresAt);
-
-  // Sign a fresh cs token anchored to paidAt + TTL. Returns null past the
-  // window so the recommendation links degrade to plain (no-discount) URLs.
-  const csToken = crossSellSetting.enabled
-    ? signCsTokenForOrder(order.id, order.paidAt, crossSellSetting.ttlMinutes)
-    : null;
+  const { csToken, expiresAt: csExpiresAt, initialRemainingMs: csInitialRemainingMs } =
+    crossSellSetting.enabled
+      ? createCrossSellSession(order.id, order.paidAt, crossSellSetting.ttlMinutes)
+      : { csToken: null, expiresAt: 0, initialRemainingMs: 0 };
 
   // Per-item discount via the same resolver the product detail page uses.
   // Without this, the recommendation card would advertise a discounted price
   // (just by multiplying setting.discountPercent) while the detail page —
   // which honors CrossSellUsage / eligibility / TTL — would show the original.
-  // The visual lie ("¥37.80 here, ¥42 there") is exactly the bug we're fixing.
   const recDiscountMap = csToken
-    ? await resolveCrossSellDiscountsForProducts(
+    ? await resolveCrossSellDiscounts(
         csToken,
         crossSellRecommendations.map((p) => p.id),
       )
@@ -206,7 +199,7 @@ export default async function OrderSuccessPage({
         amount={Number(order.amount)}
         isFree={Number(order.amount) === 0}
       />
-      <SiteHeader cs={csToken ?? incomingCs} />
+      <SiteHeader cs={csToken} />
       <main className="flex-1 py-8">
         <div className="mx-auto max-w-2xl space-y-4 px-4 pb-8">
           <div className="text-center">
