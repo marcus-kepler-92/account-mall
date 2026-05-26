@@ -15,6 +15,7 @@ import {
     Layers,
     Wallet,
     BookOpen,
+    BellRing,
     FolderOpen,
     FlaskConical,
     Mail,
@@ -55,6 +56,7 @@ import { sourceFor } from "@/lib/admin-notifications"
 const allNavItems = [
     // 总览
     { title: "仪表盘", href: "/admin/dashboard", icon: LayoutDashboard },
+    { title: "通知中心", href: "/admin/notifications", icon: BellRing },
     // 商品
     { title: "商品管理", href: "/admin/products", icon: Package },
     { title: "卡密管理", href: "/admin/cards", icon: CreditCard },

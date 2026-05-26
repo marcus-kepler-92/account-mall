@@ -4,6 +4,7 @@ export const ADMIN_ROLE_CONFIG = {
   SYSTEM_OPS: {
     label: "系统运维管理员",
     allowedMenus: [
+      "/admin/notifications",
       "/admin/products",
       "/admin/orders",
       "/admin/fulfillment",

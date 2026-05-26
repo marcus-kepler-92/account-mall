@@ -3,10 +3,12 @@
 import { useMemo } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import type { SourceKey, SourceResult } from "@/lib/admin-notifications"
+import type { DismissedItem } from "@/app/api/admin/notifications/dismissed/route"
 
 type Response = { sources: SourceResult[] }
 
 const QUERY_KEY = ["admin", "notifications"] as const
+const DISMISSED_QUERY_KEY = ["admin", "notifications", "dismissed"] as const
 
 export function useAdminNotifications() {
   const { data, isLoading } = useQuery<Response>({
@@ -89,6 +91,92 @@ export function useDismissAdminNotifications() {
       if (ctx?.previous) queryClient.setQueryData(QUERY_KEY, ctx.previous)
     },
     onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY })
+      queryClient.invalidateQueries({ queryKey: DISMISSED_QUERY_KEY })
+    },
+  })
+}
+
+/**
+ * Returns a callback that invalidates both notification caches (unread +
+ * dismissed). Call from any admin mutation that mutates the underlying
+ * entity of a notification (e.g. fulfill an order, approve a withdrawal,
+ * close a lead, restock cards) so the sidebar red dots / bell badge
+ * update immediately, not on the next 30s window-focus refetch.
+ */
+export function useInvalidateAdminNotifications() {
+  const queryClient = useQueryClient()
+  return () => {
+    queryClient.invalidateQueries({ queryKey: QUERY_KEY })
+    queryClient.invalidateQueries({ queryKey: DISMISSED_QUERY_KEY })
+  }
+}
+
+export function useDismissedNotifications() {
+  const { data, isLoading } = useQuery<{ items: DismissedItem[] }>({
+    queryKey: DISMISSED_QUERY_KEY,
+    queryFn: async () => {
+      const r = await fetch("/api/admin/notifications/dismissed")
+      if (!r.ok) throw new Error(`dismissed fetch failed: ${r.status}`)
+      return r.json()
+    },
+    staleTime: 30_000,
+    refetchOnMount: "always",
+  })
+  const items = useMemo(() => data?.items ?? [], [data?.items])
+  return { items, isLoading }
+}
+
+export type RestoreItem = { sourceKey: SourceKey; itemId: string }
+
+/**
+ * Restore previously-dismissed notifications. Optimistically drops the
+ * row from the dismissed cache and invalidates the unread cache so it
+ * surfaces on the next poll.
+ */
+export function useRestoreNotifications() {
+  const queryClient = useQueryClient()
+
+  return useMutation<
+    { ok: true; restored: number },
+    Error,
+    RestoreItem[],
+    { previous: { items: DismissedItem[] } | undefined }
+  >({
+    mutationFn: async (items) => {
+      if (items.length === 0) return { ok: true, restored: 0 }
+      const r = await fetch("/api/admin/notifications/restore", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items }),
+      })
+      if (!r.ok) throw new Error(`restore failed: ${r.status}`)
+      return r.json() as Promise<{ ok: true; restored: number }>
+    },
+    onMutate: async (items) => {
+      await queryClient.cancelQueries({ queryKey: DISMISSED_QUERY_KEY })
+      const previous = queryClient.getQueryData<{ items: DismissedItem[] }>(
+        DISMISSED_QUERY_KEY,
+      )
+      const droppedKeys = new Set(items.map((it) => `${it.sourceKey}::${it.itemId}`))
+      queryClient.setQueryData<{ items: DismissedItem[] } | undefined>(
+        DISMISSED_QUERY_KEY,
+        (prev) =>
+          prev
+            ? {
+                items: prev.items.filter(
+                  (it) => !droppedKeys.has(`${it.sourceKey}::${it.itemId}`),
+                ),
+              }
+            : prev,
+      )
+      return { previous }
+    },
+    onError: (_err, _items, ctx) => {
+      if (ctx?.previous) queryClient.setQueryData(DISMISSED_QUERY_KEY, ctx.previous)
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: DISMISSED_QUERY_KEY })
       queryClient.invalidateQueries({ queryKey: QUERY_KEY })
     },
   })
