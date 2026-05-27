@@ -41,6 +41,10 @@ function isIdSegment(seg: string) {
     return seg.length >= 20 && /^[a-z0-9]+$/i.test(seg)
 }
 
+// Segments that act as grouping labels only — no page.tsx exists at that path,
+// so the breadcrumb should render text without a clickable link.
+const groupOnlySegments = new Set(["agent", "campaigns"])
+
 function getBreadcrumbItems(pathname: string) {
     const segments = pathname.split("/").filter(Boolean)
     const items: { label: string; href?: string }[] = []
@@ -125,7 +129,8 @@ function getBreadcrumbItems(pathname: string) {
         }
 
         const isLast = i === segments.length - 1
-        items.push(isLast ? { label } : { label, href })
+        const isGroupOnly = groupOnlySegments.has(seg)
+        items.push(isLast || isGroupOnly ? { label } : { label, href })
     }
 
     return items
