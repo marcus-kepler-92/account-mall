@@ -1,11 +1,13 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { toast } from "sonner"
-import { Copy, UserCheck, UserX, Percent, Trash2, Loader2 } from "lucide-react"
+import { Copy, UserCheck, UserX, Percent, Trash2, Loader2, ChevronRight, MoreHorizontal } from "lucide-react"
 import {
     Sheet,
     SheetContent,
+    SheetFooter,
     SheetHeader,
     SheetTitle,
 } from "@/components/ui/sheet"
@@ -21,7 +23,13 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Separator } from "@/components/ui/separator"
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { EditDiscountDialog } from "./edit-discount-dialog"
 import type { DistributorRow } from "./distributors-columns"
 import type { TierSummaryItem } from "@/lib/distributor-tier-summary"
@@ -32,7 +40,11 @@ interface DistributorDetailSheetProps {
     onOpenChange: (open: boolean) => void
     onSuccess: () => void
     tiers: TierSummaryItem[]
+    onSelectDistributor?: (id: string) => void
+    selectLoading?: boolean
 }
+
+const INVITEE_PREVIEW_LIMIT = 3
 
 function getCurrentTier(weeklySalesTotal: number, tiers: TierSummaryItem[]): { tier: TierSummaryItem; index: number } | null {
     for (let i = 0; i < tiers.length; i++) {
@@ -50,6 +62,8 @@ export function DistributorDetailSheet({
     onOpenChange,
     onSuccess,
     tiers,
+    onSelectDistributor,
+    selectLoading,
 }: DistributorDetailSheetProps) {
     const [toggleLoading, setToggleLoading] = useState(false)
     const [deleteOpen, setDeleteOpen] = useState(false)
@@ -116,70 +130,46 @@ export function DistributorDetailSheet({
     return (
         <>
             <Sheet open={open} onOpenChange={onOpenChange}>
-                <SheetContent className="flex flex-col w-full sm:max-w-md">
-                    <SheetHeader className="border-b pb-4 shrink-0">
+                <SheetContent className="flex flex-col w-full sm:max-w-md p-0">
+                    {selectLoading && (
+                        <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/60 backdrop-blur-sm">
+                            <Loader2 className="size-6 animate-spin text-muted-foreground" />
+                        </div>
+                    )}
+                    <SheetHeader className="border-b shrink-0 gap-2">
                         <SheetTitle className="flex items-center gap-2 flex-wrap">
                             {row.name}
                             <Badge variant={disabled ? "destructive" : "default"} className="text-xs">
                                 {disabled ? "已停用" : "启用"}
                             </Badge>
                         </SheetTitle>
-                        <p className="text-sm text-muted-foreground">{row.email ?? row.username ?? "—"}</p>
-                        {row.distributorCode && (
-                            <div className="flex items-center gap-2">
-                                <code className="text-xs font-mono">{row.distributorCode}</code>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 px-2 text-xs"
-                                    onClick={handleCopyCode}
-                                >
-                                    <Copy className="size-3 mr-1" />复制
-                                </Button>
-                            </div>
-                        )}
-                    </SheetHeader>
-
-                    <div className="flex-1 overflow-y-auto p-4 space-y-6">
-                        {/* Actions */}
-                        <div className="flex flex-wrap gap-2">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={handleToggle}
-                                disabled={toggleLoading}
-                            >
-                                {toggleLoading
-                                    ? <Loader2 className="size-4 animate-spin" />
-                                    : disabled
-                                        ? <UserCheck className="size-4" />
-                                        : <UserX className="size-4" />
-                                }
-                                {disabled ? "启用" : "停用"}
-                            </Button>
-                            <Button variant="outline" size="sm" onClick={() => setDiscountOpen(true)}>
-                                <Percent className="size-4" />优惠码设置
-                            </Button>
-                            {disabled && (
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground"
-                                    onClick={() => setDeleteOpen(true)}
-                                >
-                                    <Trash2 className="size-4" />删除
-                                </Button>
+                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground flex-wrap">
+                            <span className="truncate">{row.email ?? row.username ?? "—"}</span>
+                            {row.distributorCode && (
+                                <>
+                                    <span aria-hidden>·</span>
+                                    <code className="text-xs font-mono">{row.distributorCode}</code>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="size-6"
+                                        onClick={handleCopyCode}
+                                        title="复制推荐码"
+                                    >
+                                        <Copy className="size-3" />
+                                    </Button>
+                                </>
                             )}
                         </div>
+                    </SheetHeader>
 
-                        <Separator />
-
+                    <div className="flex-1 overflow-y-auto px-4 py-5 space-y-7">
                         {/* 阶梯 */}
                         {tiers.length > 0 && (() => {
                             const result = getCurrentTier(row.weeklySalesTotal, tiers)
                             const nextTier = result ? tiers[result.index + 1] : null
                             return (
-                                <div>
+                                <section>
                                     <h4 className="text-sm font-medium mb-3">本周阶梯</h4>
                                     <div className="space-y-2 text-sm">
                                         <div className="flex justify-between">
@@ -195,165 +185,239 @@ export function DistributorDetailSheet({
                                             <span className="tabular-nums">¥{row.weeklySalesTotal.toFixed(2)}</span>
                                         </div>
                                         {nextTier && (
-                                            <div className="flex justify-between">
-                                                <span className="text-muted-foreground">距下一档</span>
-                                                <span className="tabular-nums text-muted-foreground">
+                                            <div className="flex justify-between text-xs text-muted-foreground">
+                                                <span>距下一档</span>
+                                                <span className="tabular-nums">
                                                     ¥{(nextTier.minAmount - row.weeklySalesTotal).toFixed(2)}
                                                 </span>
                                             </div>
                                         )}
                                     </div>
-                                </div>
+                                </section>
                             )
                         })()}
 
-                        <Separator />
-
                         {/* 业绩 */}
-                        <div>
+                        <section>
                             <h4 className="text-sm font-medium mb-3">业绩</h4>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <p className="text-xs text-muted-foreground">累计销售额</p>
-                                    <p className="text-lg font-bold tabular-nums">¥{row.salesTotal.toFixed(2)}</p>
+                            <div className="space-y-2 text-sm">
+                                <div className="flex justify-between">
+                                    <span className="text-muted-foreground">累计销售额</span>
+                                    <span className="font-medium tabular-nums">¥{row.salesTotal.toFixed(2)}</span>
                                 </div>
-                                <div>
-                                    <p className="text-xs text-muted-foreground">成交订单</p>
-                                    <p className="text-lg font-bold">{row.completedOrderCount} 单</p>
+                                <div className="flex justify-between">
+                                    <span className="text-muted-foreground">成交订单</span>
+                                    <span className="tabular-nums">{row.completedOrderCount} 单</span>
                                 </div>
                             </div>
-                        </div>
-
-                        <Separator />
+                        </section>
 
                         {/* 佣金 */}
-                        <div>
+                        <section>
                             <h4 className="text-sm font-medium mb-3">佣金</h4>
                             <div className="space-y-2 text-sm">
                                 <div className="flex justify-between">
                                     <span className="text-muted-foreground">累计佣金</span>
                                     <span className="font-medium tabular-nums">¥{row.totalCommission.toFixed(2)}</span>
                                 </div>
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">一级佣金</span>
+                                <div className="flex justify-between text-xs text-muted-foreground">
+                                    <span>一级佣金</span>
                                     <span className="tabular-nums">¥{row.level1CommissionTotal.toFixed(2)}</span>
                                 </div>
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">二级佣金</span>
+                                <div className="flex justify-between text-xs text-muted-foreground">
+                                    <span>二级佣金</span>
                                     <span className="tabular-nums">¥{row.level2CommissionTotal.toFixed(2)}</span>
                                 </div>
                             </div>
-                        </div>
-
-                        <Separator />
+                        </section>
 
                         {/* 余额 */}
-                        <div>
+                        <section>
                             <h4 className="text-sm font-medium mb-3">余额</h4>
                             <div className="space-y-2 text-sm">
                                 <div className="flex justify-between">
                                     <span className="text-muted-foreground">可提现余额</span>
                                     <span className="font-medium tabular-nums">¥{row.withdrawableBalance.toFixed(2)}</span>
                                 </div>
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">已结算（一级）</span>
+                                <div className="flex justify-between text-xs text-muted-foreground">
+                                    <span>已结算（一级）</span>
                                     <span className="tabular-nums">¥{row.level1Settled.toFixed(2)}</span>
                                 </div>
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">已结算（二级）</span>
+                                <div className="flex justify-between text-xs text-muted-foreground">
+                                    <span>已结算（二级）</span>
                                     <span className="tabular-nums">¥{row.level2Settled.toFixed(2)}</span>
                                 </div>
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">已打款</span>
+                                <div className="flex justify-between text-xs text-muted-foreground">
+                                    <span>已打款</span>
                                     <span className="tabular-nums">¥{row.paidTotal.toFixed(2)}</span>
                                 </div>
                                 {row.pendingTotal > 0 && (
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">提现中</span>
+                                    <div className="flex justify-between text-xs text-muted-foreground">
+                                        <span>提现中</span>
                                         <span className="tabular-nums">¥{row.pendingTotal.toFixed(2)}</span>
                                     </div>
                                 )}
                             </div>
-                        </div>
+                        </section>
 
-                        <Separator />
-
-                        {/* 团队 */}
-                        <div>
-                            <h4 className="text-sm font-medium mb-3">团队</h4>
+                        {/* 团队与里程碑 */}
+                        <section>
+                            <h4 className="text-sm font-medium mb-3">团队与里程碑</h4>
                             <div className="space-y-2 text-sm">
-                                <div className="flex justify-between">
+                                <div className="flex justify-between items-center">
                                     <span className="text-muted-foreground">上线</span>
-                                    <span>
-                                        {row.inviter
-                                            ? `${row.inviter.name}${row.inviter.distributorCode ? ` (${row.inviter.distributorCode})` : ""}`
-                                            : "—"}
-                                    </span>
+                                    {row.inviter ? (
+                                        onSelectDistributor ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => onSelectDistributor(row.inviter!.id)}
+                                                disabled={selectLoading}
+                                                className="inline-flex items-center gap-1 hover:underline disabled:opacity-50"
+                                            >
+                                                {row.inviter.name}
+                                                {row.inviter.distributorCode && (
+                                                    <code className="text-xs font-mono text-muted-foreground">
+                                                        ({row.inviter.distributorCode})
+                                                    </code>
+                                                )}
+                                                <ChevronRight className="size-3 text-muted-foreground" />
+                                            </button>
+                                        ) : (
+                                            <span>
+                                                {row.inviter.name}
+                                                {row.inviter.distributorCode ? ` (${row.inviter.distributorCode})` : ""}
+                                            </span>
+                                        )
+                                    ) : (
+                                        <span>—</span>
+                                    )}
                                 </div>
                                 <div className="flex justify-between">
                                     <span className="text-muted-foreground">下线人数</span>
                                     <span>{row.inviteeCount} 人</span>
                                 </div>
                                 {row.invitees.length > 0 && (
-                                    <div className="pt-1 space-y-1">
-                                        {row.invitees.map((inv) => (
-                                            <div key={inv.id} className="flex justify-between text-xs text-muted-foreground">
-                                                <span>{inv.name}</span>
-                                                {inv.distributorCode && (
-                                                    <code className="font-mono">{inv.distributorCode}</code>
-                                                )}
-                                            </div>
-                                        ))}
+                                    <div className="pl-3 space-y-1 border-l">
+                                        {row.invitees.slice(0, INVITEE_PREVIEW_LIMIT).map((inv) => {
+                                            const content = (
+                                                <>
+                                                    <span className="truncate">{inv.name}</span>
+                                                    <span className="flex items-center gap-1 shrink-0">
+                                                        {inv.distributorCode && (
+                                                            <code className="font-mono">{inv.distributorCode}</code>
+                                                        )}
+                                                        {onSelectDistributor && (
+                                                            <ChevronRight className="size-3" />
+                                                        )}
+                                                    </span>
+                                                </>
+                                            )
+                                            return onSelectDistributor ? (
+                                                <button
+                                                    key={inv.id}
+                                                    type="button"
+                                                    onClick={() => onSelectDistributor(inv.id)}
+                                                    disabled={selectLoading}
+                                                    className="flex w-full justify-between items-center text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+                                                >
+                                                    {content}
+                                                </button>
+                                            ) : (
+                                                <div key={inv.id} className="flex justify-between text-xs text-muted-foreground">
+                                                    {content}
+                                                </div>
+                                            )
+                                        })}
+                                        {row.invitees.length > INVITEE_PREVIEW_LIMIT && (
+                                            <Link
+                                                href={`/admin/distributors?inviterId=${row.id}`}
+                                                className="block text-xs text-primary hover:underline pt-1"
+                                                onClick={() => onOpenChange(false)}
+                                            >
+                                                查看全部 {row.inviteeCount} 个下线 →
+                                            </Link>
+                                        )}
                                     </div>
                                 )}
-                            </div>
-                        </div>
-
-                        {row.milestoneSummary && (
-                            <>
-                                <Separator />
-                                <div>
-                                    <h4 className="text-sm font-medium mb-3">邀请里程碑</h4>
-                                    <div className="space-y-2 text-sm">
+                                {row.milestoneSummary && (
+                                    <div className="pt-2 mt-1 border-t space-y-2">
                                         <div className="flex justify-between">
-                                            <span className="text-muted-foreground">已触发</span>
+                                            <span className="text-muted-foreground">里程碑已触发</span>
                                             <span>{row.milestoneSummary.triggeredCount} 个</span>
                                         </div>
                                         {row.milestoneSummary.nextMilestone ? (
                                             <>
-                                                <div className="flex justify-between">
-                                                    <span className="text-muted-foreground">下一档目标</span>
+                                                <div className="flex justify-between text-xs text-muted-foreground">
+                                                    <span>下一档目标</span>
                                                     <span>
                                                         {row.milestoneSummary.nextMilestone.thresholdCount} 人各满 ¥{row.milestoneSummary.nextMilestone.thresholdAmount.toFixed(0)}
                                                     </span>
                                                 </div>
-                                                <div className="flex justify-between">
-                                                    <span className="text-muted-foreground">达标奖励</span>
-                                                    <span className="font-medium tabular-nums">¥{row.milestoneSummary.nextMilestone.bonusAmount.toFixed(0)}</span>
+                                                <div className="flex justify-between text-xs text-muted-foreground">
+                                                    <span>达标奖励</span>
+                                                    <span className="tabular-nums">¥{row.milestoneSummary.nextMilestone.bonusAmount.toFixed(0)}</span>
                                                 </div>
                                             </>
                                         ) : (
                                             <p className="text-xs text-muted-foreground">已完成所有里程碑</p>
                                         )}
                                     </div>
-                                </div>
-                            </>
-                        )}
-
-                        <Separator />
-
-                        {/* 优惠码 */}
-                        <div>
-                            <h4 className="text-sm font-medium mb-3">优惠码</h4>
-                            <p className="text-sm">
-                                {row.discountCodeEnabled
-                                    ? row.discountPercent != null
-                                        ? `已启用 · ${row.discountPercent}% 折扣`
-                                        : "已启用"
-                                    : "未开启"}
-                            </p>
-                        </div>
+                                )}
+                            </div>
+                        </section>
                     </div>
+
+                    <SheetFooter className="border-t flex-row items-center gap-2">
+                        <Button
+                            variant={disabled ? "default" : "outline"}
+                            size="sm"
+                            onClick={handleToggle}
+                            disabled={toggleLoading}
+                            className="flex-1"
+                        >
+                            {toggleLoading
+                                ? <Loader2 className="size-4 animate-spin" />
+                                : disabled
+                                    ? <UserCheck className="size-4" />
+                                    : <UserX className="size-4" />
+                            }
+                            {disabled ? "启用" : "停用"}
+                        </Button>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" size="icon" className="size-9 shrink-0" aria-label="更多操作">
+                                    <MoreHorizontal className="size-4" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-56">
+                                <DropdownMenuItem onSelect={() => setDiscountOpen(true)} className="flex-col items-start gap-0.5">
+                                    <div className="flex items-center gap-2">
+                                        <Percent className="size-4" />
+                                        优惠码设置
+                                    </div>
+                                    <span className="text-xs text-muted-foreground pl-6">
+                                        {row.discountCodeEnabled
+                                            ? row.discountPercent != null
+                                                ? `${row.discountPercent}% · 已启用`
+                                                : "已启用"
+                                            : "未开启"}
+                                    </span>
+                                </DropdownMenuItem>
+                                {disabled && (
+                                    <>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem
+                                            onSelect={() => setDeleteOpen(true)}
+                                            variant="destructive"
+                                        >
+                                            <Trash2 className="size-4" />
+                                            删除
+                                        </DropdownMenuItem>
+                                    </>
+                                )}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </SheetFooter>
                 </SheetContent>
             </Sheet>
 

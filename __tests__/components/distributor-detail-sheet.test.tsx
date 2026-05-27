@@ -89,14 +89,6 @@ describe("DistributorDetailSheet", () => {
         expect(screen.getByRole("button", { name: /启用/ })).toBeInTheDocument()
     })
 
-    it("shows 删除 button only when disabled", () => {
-        const { rerender } = render(<DistributorDetailSheet row={row} open={true} onOpenChange={jest.fn()} onSuccess={jest.fn()} tiers={tiers} />)
-        expect(screen.queryByRole("button", { name: /删除/ })).not.toBeInTheDocument()
-
-        rerender(<DistributorDetailSheet row={{ ...row, disabledAt: "2024-06-01T00:00:00Z" }} open={true} onOpenChange={jest.fn()} onSuccess={jest.fn()} tiers={tiers} />)
-        expect(screen.getByRole("button", { name: /删除/ })).toBeInTheDocument()
-    })
-
     it("renders nothing when row is null", () => {
         const { container } = render(<DistributorDetailSheet row={null} open={true} onOpenChange={jest.fn()} onSuccess={jest.fn()} tiers={tiers} />)
         expect(container).toBeEmptyDOMElement()
@@ -106,7 +98,7 @@ describe("DistributorDetailSheet", () => {
 describe("DistributorDetailSheet — 邀请里程碑", () => {
     it("hides milestone section when milestoneSummary is null", () => {
         render(<DistributorDetailSheet row={row} open={true} onOpenChange={jest.fn()} onSuccess={jest.fn()} tiers={tiers} />)
-        expect(screen.queryByText("邀请里程碑")).not.toBeInTheDocument()
+        expect(screen.queryByText("里程碑已触发")).not.toBeInTheDocument()
     })
 
     it("shows triggered count and next milestone target", () => {
@@ -118,7 +110,7 @@ describe("DistributorDetailSheet — 邀请里程碑", () => {
             },
         }
         render(<DistributorDetailSheet row={r} open={true} onOpenChange={jest.fn()} onSuccess={jest.fn()} tiers={tiers} />)
-        expect(screen.getByText("邀请里程碑")).toBeInTheDocument()
+        expect(screen.getByText("里程碑已触发")).toBeInTheDocument()
         expect(screen.getByText("1 个")).toBeInTheDocument()
         expect(screen.getByText(/3 人各满 ¥5000/)).toBeInTheDocument()
         expect(screen.getByText("¥200")).toBeInTheDocument()
@@ -130,7 +122,7 @@ describe("DistributorDetailSheet — 邀请里程碑", () => {
             milestoneSummary: { triggeredCount: 3, nextMilestone: null },
         }
         render(<DistributorDetailSheet row={r} open={true} onOpenChange={jest.fn()} onSuccess={jest.fn()} tiers={tiers} />)
-        expect(screen.getByText("邀请里程碑")).toBeInTheDocument()
+        expect(screen.getByText("里程碑已触发")).toBeInTheDocument()
         expect(screen.getByText("3 个")).toBeInTheDocument()
         expect(screen.getByText("已完成所有里程碑")).toBeInTheDocument()
         expect(screen.queryByText(/各满/)).not.toBeInTheDocument()

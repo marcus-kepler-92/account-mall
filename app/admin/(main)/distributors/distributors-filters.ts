@@ -5,6 +5,7 @@ export type DistributorFiltersState = {
     pageSize: number
     search: string
     statusList: DistributorStatusValue[]
+    inviterId: string
 }
 
 export type DistributorFiltersInput = {
@@ -12,6 +13,7 @@ export type DistributorFiltersInput = {
     pageSize?: string | null
     search?: string | null
     status?: string | null
+    inviterId?: string | null
 }
 
 export const DEFAULT_DISTRIBUTOR_FILTERS: DistributorFiltersState = {
@@ -19,6 +21,7 @@ export const DEFAULT_DISTRIBUTOR_FILTERS: DistributorFiltersState = {
     pageSize: 20,
     search: "",
     statusList: [],
+    inviterId: "",
 }
 
 export function parseDistributorFilters(input: DistributorFiltersInput): DistributorFiltersState {
@@ -37,6 +40,7 @@ export function parseDistributorFilters(input: DistributorFiltersInput): Distrib
         pageSize,
         search: (input.search ?? "").trim(),
         statusList,
+        inviterId: (input.inviterId ?? "").trim(),
     }
 }
 
@@ -46,6 +50,7 @@ export function buildDistributorFiltersQuery(filters: DistributorFiltersState): 
     if (filters.pageSize !== DEFAULT_DISTRIBUTOR_FILTERS.pageSize) params.set("pageSize", String(filters.pageSize))
     if (filters.search) params.set("search", filters.search)
     if (filters.statusList.length > 0) params.set("status", filters.statusList.join(","))
+    if (filters.inviterId) params.set("inviterId", filters.inviterId)
     const query = params.toString()
     return query ? `?${query}` : ""
 }

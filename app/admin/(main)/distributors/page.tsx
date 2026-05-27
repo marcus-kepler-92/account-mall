@@ -18,6 +18,7 @@ type SearchParams = Promise<{
     status?: string
     sort?: string
     sortDir?: string
+    inviterId?: string
 }>
 
 export default async function AdminDistributorsPage({
@@ -45,6 +46,9 @@ export default async function AdminDistributorsPage({
         if (filters.statusList[0] === "enabled") where.disabledAt = null
         if (filters.statusList[0] === "disabled") where.disabledAt = { not: null }
     }
+    if (filters.inviterId) {
+        where.inviterId = filters.inviterId
+    }
     if (search) {
         const term = search.trim().toLowerCase()
         where.OR = [
@@ -53,6 +57,14 @@ export default async function AdminDistributorsPage({
             { username: { contains: term, mode: "insensitive" } },
             { distributorCode: { contains: term, mode: "insensitive" } },
         ]
+    }
+
+    let inviter: { id: string; name: string; distributorCode: string | null } | null = null
+    if (filters.inviterId) {
+        inviter = await prisma.user.findUnique({
+            where: { id: filters.inviterId },
+            select: { id: true, name: true, distributorCode: true },
+        })
     }
 
     const distributorSelect = {
@@ -84,6 +96,9 @@ export default async function AdminDistributorsPage({
         if (filters.statusList.length === 1) {
             if (filters.statusList[0] === "enabled") rawWhere.push(Prisma.sql`u."disabledAt" IS NULL`)
             else rawWhere.push(Prisma.sql`u."disabledAt" IS NOT NULL`)
+        }
+        if (filters.inviterId) {
+            rawWhere.push(Prisma.sql`u."inviterId" = ${filters.inviterId}`)
         }
         if (search) {
             const term = `%${search.trim().toLowerCase()}%`
@@ -153,7 +168,13 @@ export default async function AdminDistributorsPage({
     return (
         <div className="space-y-6">
             <PageHeader title="分销员管理" description="查看分销员列表、启用/停用、订单与佣金汇总" />
-            <DistributorsDataTable data={data} total={total} statusCounts={statusCounts} tiers={tiers} />
+            <DistributorsDataTable
+                data={data}
+                total={total}
+                statusCounts={statusCounts}
+                tiers={tiers}
+                inviterFilter={inviter}
+            />
         </div>
     )
 }
