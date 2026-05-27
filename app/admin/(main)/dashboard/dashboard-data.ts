@@ -208,6 +208,10 @@ export type GlobalKPIMetrics = Omit<GlobalKPI, "lowStockCount">
 /**
  * Today revenue / profit / orders / cost warning. Does not query inventory —
  * combine with `countInventoryAttentionProducts(await getInventoryByProduct())` for full `GlobalKPI`.
+ *
+ * Milestone bonuses are excluded from todayProfit: they reward cumulative invitee
+ * spending earned over weeks/months, so attributing the full bonus to the trigger day
+ * distorts that day's operational profit. They remain visible in the milestone tab.
  */
 export async function getGlobalKPI(): Promise<GlobalKPIMetrics> {
   const now = new Date()
@@ -215,7 +219,7 @@ export async function getGlobalKPI(): Promise<GlobalKPIMetrics> {
   const tomorrowStart = new Date(todayStart)
   tomorrowStart.setDate(tomorrowStart.getDate() + 1)
 
-  const [orders, commissions, milestoneBonus] = await Promise.all([
+  const [orders, commissions] = await Promise.all([
     prisma.order.findMany({
       where: { status: "COMPLETED", paidAt: { gte: todayStart, lt: tomorrowStart } },
       select: { amount: true, quantity: true, costSnapshot: true, costTotalSnapshot: true },
@@ -227,10 +231,6 @@ export async function getGlobalKPI(): Promise<GlobalKPIMetrics> {
       },
       _sum: { amount: true },
     }),
-    prisma.invitationMilestoneBonus.aggregate({
-      where: { createdAt: { gte: todayStart, lt: tomorrowStart } },
-      _sum: { amount: true },
-    }),
   ])
 
   const todayRevenue = orders.reduce((s, o) => s + Number(o.amount), 0)
@@ -238,11 +238,10 @@ export async function getGlobalKPI(): Promise<GlobalKPIMetrics> {
   const todayCost = costResolutions.reduce((s, r) => s + r.cost, 0)
   const hasMissingCost = costResolutions.some((r) => !r.hasCost)
   const todayCommission = Number(commissions._sum.amount ?? 0)
-  const todayMilestoneBonus = Number(milestoneBonus._sum.amount ?? 0)
 
   return {
     todayRevenue,
-    todayProfit: todayRevenue - todayCost - todayCommission - todayMilestoneBonus,
+    todayProfit: todayRevenue - todayCost - todayCommission,
     todayOrders: orders.length,
     hasMissingCost,
   }

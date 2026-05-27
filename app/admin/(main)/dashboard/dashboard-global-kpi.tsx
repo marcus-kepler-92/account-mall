@@ -14,10 +14,16 @@ export function DashboardGlobalKPI({ kpi }: { kpi: GlobalKPI }) {
       <Card>
         <CardContent>
           <p className="flex items-center gap-1 text-xs text-muted-foreground">
-            今日净利润
+            今日运营利润
             {kpi.hasMissingCost && (
               <span title="部分商品未设成本，利润偏高" className="cursor-help">⚠</span>
             )}
+            <span
+              className="cursor-help text-muted-foreground/70"
+              title="营收 − 成本 − 佣金。里程碑奖金为跨期费用，不计入日维度运营利润；查看完整净利润请到利润看板选择更长时间窗口。"
+            >
+              ⓘ
+            </span>
           </p>
           <p
             className={`mt-1 text-xl font-bold ${

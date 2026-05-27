@@ -12,6 +12,7 @@ import {
   getRestockPending,
   getRecentOrders,
   getDashboardData,
+  getGlobalKPI,
   countInventoryAttentionProducts,
 } from "@/app/admin/(main)/dashboard/dashboard-data"
 import type { InventoryRow } from "@/app/admin/(main)/dashboard/types"
@@ -196,6 +197,31 @@ describe("dashboard-data", () => {
           select: expect.objectContaining({ product: { select: { id: true, name: true } } }),
         }),
       )
+    })
+  })
+
+  describe("getGlobalKPI", () => {
+    it("excludes milestone bonuses from todayProfit (cumulative reward, not daily op cost)", async () => {
+      prismaMock.order.findMany.mockResolvedValueOnce([
+        { amount: 200, quantity: 1, costSnapshot: null, costTotalSnapshot: "30" } as any,
+      ])
+      prismaMock.commission.aggregate.mockResolvedValueOnce({ _sum: { amount: "10" } } as any)
+
+      const result = await getGlobalKPI()
+
+      // todayProfit = 200 - 30 - 10 = 160; milestone bonus is NOT deducted even if one triggered today
+      expect(result.todayRevenue).toBe(200)
+      expect(result.todayProfit).toBeCloseTo(160, 2)
+      expect(result.todayOrders).toBe(1)
+    })
+
+    it("does not query invitationMilestoneBonus (decoupled from daily KPI)", async () => {
+      prismaMock.order.findMany.mockResolvedValueOnce([])
+      prismaMock.commission.aggregate.mockResolvedValueOnce({ _sum: { amount: 0 } } as any)
+
+      await getGlobalKPI()
+
+      expect(prismaMock.invitationMilestoneBonus.aggregate).not.toHaveBeenCalled()
     })
   })
 

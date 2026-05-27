@@ -19,6 +19,7 @@ const defaultProps = {
   from: "2026-05-17",
   to: "2026-05-17",
   onChange: jest.fn(),
+  onModeChange: jest.fn(),
 }
 
 describe("DashboardDateRangePresets", () => {
@@ -72,6 +73,21 @@ describe("DashboardDateRangePresets", () => {
     render(<DashboardDateRangePresets {...defaultProps} />)
     fireEvent.click(screen.getByRole("button", { name: /今日/ }))
     fireEvent.click(screen.getByText("自定义"))
+    expect(defaultProps.onChange).not.toHaveBeenCalled()
+  })
+
+  it("fires onModeChange with picked preset key", () => {
+    render(<DashboardDateRangePresets {...defaultProps} />)
+    fireEvent.click(screen.getByRole("button", { name: /今日/ }))
+    fireEvent.click(screen.getByText("本月"))
+    expect(defaultProps.onModeChange).toHaveBeenCalledWith("month")
+  })
+
+  it("fires onModeChange when switching to custom even though onChange is not called", () => {
+    render(<DashboardDateRangePresets {...defaultProps} />)
+    fireEvent.click(screen.getByRole("button", { name: /今日/ }))
+    fireEvent.click(screen.getByText("自定义"))
+    expect(defaultProps.onModeChange).toHaveBeenCalledWith("custom")
     expect(defaultProps.onChange).not.toHaveBeenCalled()
   })
 })

@@ -52,6 +52,7 @@ export type SalesReportResponse = {
         revenue: number
         cost: number
         milestoneBonus: number
+        /** Operational profit: revenue - cost - commission. Does NOT include milestone bonus. */
         profit: number
         hasMissingCost: boolean
     }
@@ -136,22 +137,20 @@ export async function GET(request: Request): Promise<NextResponse> {
     )
     const dayList = enumerateDays(from, to)
 
+    // `profit` is operational only (revenue - cost - commission). Milestone bonuses
+    // reward cumulative invitee spending over weeks/months — surfaced via
+    // `milestoneBonus` (period sum) and never mixed into per-day or period profit.
     if (orders.length === 0) {
-        const emptySeries: SalesReportSeriesPoint[] = dayList.map((date) => {
-            const dayBonus = milestoneBonusRows
-                .filter((r) => hktDateKey(r.createdAt) === date)
-                .reduce((s, r) => s + Number(r.amount), 0)
-            return {
-                date,
-                revenue: 0,
-                cost: 0,
-                profit: -dayBonus,
-                quantity: 0,
-                orderCount: 0,
-            }
-        })
+        const emptySeries: SalesReportSeriesPoint[] = dayList.map((date) => ({
+            date,
+            revenue: 0,
+            cost: 0,
+            profit: 0,
+            quantity: 0,
+            orderCount: 0,
+        }))
         return NextResponse.json<SalesReportResponse>({
-            summary: { orderCount: 0, totalQuantity: 0, revenue: 0, cost: 0, milestoneBonus, profit: -milestoneBonus, hasMissingCost: false },
+            summary: { orderCount: 0, totalQuantity: 0, revenue: 0, cost: 0, milestoneBonus, profit: 0, hasMissingCost: false },
             products: [],
             series: emptySeries,
         })
@@ -180,7 +179,6 @@ export async function GET(request: Request): Promise<NextResponse> {
         revenue: number
         cost: number
         commission: number
-        milestoneBonus: number
         quantity: number
         orderCount: number
     }
@@ -188,7 +186,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     const ensureDay = (key: string): DayBucket => {
         let b = dayMap.get(key)
         if (!b) {
-            b = { revenue: 0, cost: 0, commission: 0, milestoneBonus: 0, quantity: 0, orderCount: 0 }
+            b = { revenue: 0, cost: 0, commission: 0, quantity: 0, orderCount: 0 }
             dayMap.set(key, b)
         }
         return b
@@ -229,11 +227,6 @@ export async function GET(request: Request): Promise<NextResponse> {
         }
     }
 
-    for (const bonus of milestoneBonusRows) {
-        const day = ensureDay(hktDateKey(bonus.createdAt))
-        day.milestoneBonus += Number(bonus.amount)
-    }
-
     const products: SalesReportProduct[] = Array.from(productMap.entries())
         .map(([productId, data]) => {
             const profit = data.revenue - data.commission - data.cost
@@ -266,7 +259,7 @@ export async function GET(request: Request): Promise<NextResponse> {
             date,
             revenue: b.revenue,
             cost: b.cost,
-            profit: b.revenue - b.cost - b.commission - b.milestoneBonus,
+            profit: b.revenue - b.cost - b.commission,
             quantity: b.quantity,
             orderCount: b.orderCount,
         }
@@ -279,7 +272,7 @@ export async function GET(request: Request): Promise<NextResponse> {
             revenue: totalRevenue,
             cost: totalCost,
             milestoneBonus,
-            profit: totalRevenue - totalCommission - totalCost - milestoneBonus,
+            profit: totalRevenue - totalCommission - totalCost,
             hasMissingCost,
         },
         products,

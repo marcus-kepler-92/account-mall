@@ -18,14 +18,25 @@ import { formatCurrency } from "@/lib/utils"
 import type { SalesReportResponse } from "@/app/api/admin/sales-report/route"
 import type { DistributorReportResponse } from "@/app/api/admin/distributor-report/route"
 import { todayHKT } from "./dashboard-hkt"
-import { DashboardDateRangePresets } from "./dashboard-date-range-presets"
-import { DashboardProfitTrendChart } from "./dashboard-charts"
-import { DashboardProfitCompositionBar } from "./dashboard-profit-composition-bar"
+import {
+  DashboardDateRangePresets,
+  type DashboardDateRangeMode,
+} from "./dashboard-date-range-presets"
+import { DashboardProfitTrendChart, DashboardProfitWaterfall } from "./dashboard-charts"
+
+// Short windows (today/yesterday/this-week) are operational views — milestone bonuses
+// would dominate the headline. Longer windows (this-month/custom) are accounting views
+// where the full net profit (including milestone payouts) is the right summary.
+function resolveReportMode(mode: DashboardDateRangeMode): "operating" | "net" {
+  return mode === "month" || mode === "custom" ? "net" : "operating"
+}
 
 export function DashboardProfitTab() {
   const today = todayHKT()
   const [from, setFrom] = useState(today)
   const [to, setTo] = useState(today)
+  const [pickerMode, setPickerMode] = useState<DashboardDateRangeMode>("today")
+  const reportMode = resolveReportMode(pickerMode)
 
   const { data, isLoading } = useQuery<SalesReportResponse>({
     queryKey: ["sales-report", from, to],
@@ -47,8 +58,9 @@ export function DashboardProfitTab() {
   const leaderboard = distData?.leaderboard ?? []
   const hasMissing = s?.hasMissingCost ?? false
 
-  // commission = revenue - cost - milestoneBonus - profit
-  const commission = s ? s.revenue - s.profit - s.cost - s.milestoneBonus : 0
+  // profit is operational (revenue - cost - commission), excluding milestone bonus.
+  // Milestone bonus is surfaced separately in the composition bar.
+  const commission = s ? s.revenue - s.profit - s.cost : 0
 
   return (
     <div className="space-y-6">
@@ -59,19 +71,18 @@ export function DashboardProfitTab() {
           setFrom(f)
           setTo(t)
         }}
+        onModeChange={setPickerMode}
       />
 
-      {/* Headline + composition — the single place that tells "revenue → net profit". */}
+      {/* Waterfall — revenue decomposes step-by-step into final profit, so the
+          chart itself carries the full narrative (no separate text headline needed). */}
       <Card>
         <CardContent>
           {isLoading ? (
-            <div className="space-y-4">
-              <Skeleton className="h-10 w-72" />
-              <Skeleton className="h-7 w-full" />
-              <Skeleton className="h-16 w-full" />
-            </div>
+            <Skeleton className="h-[320px] w-full" />
           ) : s ? (
-            <DashboardProfitCompositionBar
+            <DashboardProfitWaterfall
+              mode={reportMode}
               revenue={s.revenue}
               cost={s.cost}
               commission={commission}

@@ -131,7 +131,23 @@ describe("GET /api/admin/sales-report", () => {
     expect(p2.profit).toBeCloseTo(38, 2)
   })
 
-  it("deducts milestone bonuses from summary profit", async () => {
+  it("keeps profit at 0 when no orders, even if milestone fired in range", async () => {
+    ;(getAdminSession as jest.Mock).mockResolvedValue(mockSession)
+    prismaMock.order.findMany.mockResolvedValue([])
+    prismaMock.invitationMilestoneBonus.findMany.mockResolvedValue([
+      { amount: "500.00" as any, createdAt: PAID_AT },
+    ] as any)
+
+    const res = await GET(makeRequest({ from: "2025-03-17", to: "2025-03-17" }))
+    const body = await res.json()
+
+    expect(body.summary.revenue).toBe(0)
+    expect(body.summary.milestoneBonus).toBeCloseTo(500, 2)
+    expect(body.summary.profit).toBe(0)
+    expect(body.series[0].profit).toBe(0)
+  })
+
+  it("surfaces milestone bonus separately in summary, without deducting from profit", async () => {
     ;(getAdminSession as jest.Mock).mockResolvedValue(mockSession)
     prismaMock.order.findMany.mockResolvedValue([
       { id: "o1", productId: "p1", productNameSnapshot: "商品A", quantity: 1, amount: "200.00" as any, costSnapshot: null, costTotalSnapshot: null, product: { name: "商品A" } },
@@ -148,8 +164,9 @@ describe("GET /api/admin/sales-report", () => {
 
     expect(body.summary.revenue).toBeCloseTo(200, 2)
     expect(body.summary.milestoneBonus).toBeCloseTo(30, 2)
-    // profit = 200 - 10 (commission) - 30 (bonus) = 160
-    expect(body.summary.profit).toBeCloseTo(160, 2)
+    // Operational profit = 200 - 10 (commission); milestone bonus is reported separately
+    // because it rewards cumulative invitee spending, not period operations.
+    expect(body.summary.profit).toBeCloseTo(190, 2)
   })
 
   it("includes PENDING and WITHDRAWN commissions in profit deduction", async () => {
@@ -326,7 +343,7 @@ describe("GET /api/admin/sales-report", () => {
     expect(body.series[2].profit).toBeCloseTo(140, 2) // 200 - 60
   })
 
-  it("includes milestone bonuses in series profit on their own day", async () => {
+  it("excludes milestone bonuses from both daily series and summary profit", async () => {
     ;(getAdminSession as jest.Mock).mockResolvedValue(mockSession)
     prismaMock.order.findMany.mockResolvedValue([
       {
@@ -349,10 +366,14 @@ describe("GET /api/admin/sales-report", () => {
     const res = await GET(makeRequest({ from: "2025-03-17", to: "2025-03-18" }))
     const body = await res.json()
 
+    // Milestone bonuses are cumulative incentives — never blended into operational
+    // profit (any window). They're reported via summary.milestoneBonus only.
     expect(body.series).toHaveLength(2)
     expect(body.series[0].profit).toBeCloseTo(80, 2) // 100 - 20
-    // bonus 25 falls on 3/18, but no revenue/cost that day → profit = -25
     expect(body.series[1]).toMatchObject({ date: "2025-03-18", revenue: 0, cost: 0, quantity: 0, orderCount: 0 })
-    expect(body.series[1].profit).toBeCloseTo(-25, 2)
+    expect(body.series[1].profit).toBeCloseTo(0, 2)
+    // Summary surfaces the bonus separately, does NOT deduct from profit
+    expect(body.summary.milestoneBonus).toBeCloseTo(25, 2)
+    expect(body.summary.profit).toBeCloseTo(80, 2) // 100 - 20 (no milestone deduction)
   })
 })

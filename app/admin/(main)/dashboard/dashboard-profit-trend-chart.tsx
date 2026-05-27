@@ -14,7 +14,11 @@ function shortDate(d: string): string {
     return `${Number(m)}/${Number(day)}`
 }
 
-export function DashboardProfitTrendChart({ data }: { data: SalesReportSeriesPoint[] }) {
+export function DashboardProfitTrendChart({
+    data,
+}: {
+    data: SalesReportSeriesPoint[]
+}) {
     const [mounted, setMounted] = useState(false)
     const { resolvedTheme } = useTheme()
     const colors = useEChartsTheme()
@@ -31,11 +35,18 @@ export function DashboardProfitTrendChart({ data }: { data: SalesReportSeriesPoi
         )
     }
 
+    if (data.length === 1) {
+        // Single-day window: a "trend" needs at least two points; rendering one dot is noise.
+        return (
+            <div className="flex h-[280px] items-center justify-center text-sm text-muted-foreground">
+                选择更长时间窗口（本周 / 本月 / 自定义）查看趋势
+            </div>
+        )
+    }
+
     const tooltipStyle = getEChartsTooltip(colors)
     const axisColor = colors.mutedForeground || colors.foreground || "#666"
-    // Match the page palette: amber for cost, green for profit (mirrors text-amber-600 / text-green-600 elsewhere).
     const revenueColor = "#3b82f6" // blue-500
-    const costColor = "#f59e0b" // amber-500
     const profitColor = "#10b981" // emerald-500
 
     const xLabels = data.map((d) => shortDate(d.date))
@@ -44,7 +55,7 @@ export function DashboardProfitTrendChart({ data }: { data: SalesReportSeriesPoi
         backgroundColor: "transparent",
         textStyle: { color: colors.foreground, fontFamily: "inherit" },
         legend: {
-            data: ["营收", "成本", "利润"],
+            data: ["营收", "运营利润"],
             textStyle: { color: colors.foreground },
             top: 0,
             right: 0,
@@ -66,12 +77,12 @@ export function DashboardProfitTrendChart({ data }: { data: SalesReportSeriesPoi
                 const idx = (params[0] as { dataIndex: number }).dataIndex
                 const point = data[idx]
                 if (!point) return ""
+                const marginPct = point.revenue > 0 ? (point.profit / point.revenue) * 100 : 0
                 return [
                     `<div style="font-weight:600;margin-bottom:4px">${point.date}</div>`,
-                    `<div>营收：<span style="color:${revenueColor}">${formatCurrency(point.revenue)}</span></div>`,
-                    `<div>成本：<span style="color:${costColor}">${formatCurrency(point.cost)}</span></div>`,
-                    `<div>利润：<span style="color:${profitColor}">${formatCurrency(point.profit)}</span></div>`,
-                    `<div style="margin-top:4px;color:${axisColor}">销量 ${point.quantity}　订单 ${point.orderCount}</div>`,
+                    `<div>营收：<span style="color:${revenueColor};font-weight:600">${formatCurrency(point.revenue)}</span></div>`,
+                    `<div>运营利润：<span style="color:${profitColor};font-weight:600">${formatCurrency(point.profit)}</span> <span style="color:${axisColor}">(${marginPct.toFixed(1)}%)</span></div>`,
+                    `<div style="margin-top:4px;color:${axisColor}">订单 ${point.orderCount}</div>`,
                 ].join("")
             },
         },
@@ -98,21 +109,8 @@ export function DashboardProfitTrendChart({ data }: { data: SalesReportSeriesPoi
             },
         },
         series: [
-            // Cost on the bottom — usually the smallest values; thin so it doesn't dominate.
-            {
-                name: "成本",
-                type: "line",
-                smooth: true,
-                showSymbol: false,
-                symbol: "rect",
-                symbolSize: 8,
-                data: data.map((d) => d.cost),
-                lineStyle: { color: costColor, width: 1.5 },
-                itemStyle: { color: costColor },
-                emphasis: { focus: "none", scale: 1.2 },
-                z: 2,
-            },
-            // Revenue in the middle layer — the gross outline of business size.
+            // Revenue — top-line, light area fill so the gap between revenue and profit
+            // visually conveys "deductions zone" without needing a separate cost line.
             {
                 name: "营收",
                 type: "line",
@@ -123,12 +121,16 @@ export function DashboardProfitTrendChart({ data }: { data: SalesReportSeriesPoi
                 data: data.map((d) => d.revenue),
                 lineStyle: { color: revenueColor, width: 2 },
                 itemStyle: { color: revenueColor },
+                areaStyle: {
+                    color: revenueColor,
+                    opacity: 0.08,
+                },
                 emphasis: { focus: "none", scale: 1.2 },
-                z: 3,
+                z: 2,
             },
-            // Profit on top — the headline metric, slightly thicker and always visible above overlaps.
+            // Operating profit — the bottom-line.
             {
-                name: "利润",
+                name: "运营利润",
                 type: "line",
                 smooth: true,
                 showSymbol: false,
@@ -137,8 +139,12 @@ export function DashboardProfitTrendChart({ data }: { data: SalesReportSeriesPoi
                 data: data.map((d) => d.profit),
                 lineStyle: { color: profitColor, width: 2.5 },
                 itemStyle: { color: profitColor },
+                areaStyle: {
+                    color: profitColor,
+                    opacity: 0.15,
+                },
                 emphasis: { focus: "none", scale: 1.2 },
-                z: 4,
+                z: 3,
             },
         ],
     }

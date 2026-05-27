@@ -16,14 +16,19 @@ import {
   type DashboardDateRangePreset,
 } from "./dashboard-hkt"
 
+export type DashboardDateRangeMode = "today" | "yesterday" | "week" | "month" | "custom"
+
 type Props = {
   from: string
   to: string
   onChange: (from: string, to: string) => void
+  /** Notifies parent when the picked preset changes. Useful for views that need to
+   *  switch metrics based on conceptual window (operating vs. accounting). */
+  onModeChange?: (mode: DashboardDateRangeMode) => void
   className?: string
 }
 
-type OptionKey = "today" | "yesterday" | "week" | "month" | "custom"
+type OptionKey = DashboardDateRangeMode
 
 const OPTIONS: { key: OptionKey; label: string }[] = [
   { key: "today", label: "今日" },
@@ -52,6 +57,7 @@ export function DashboardDateRangePresets({
   from,
   to,
   onChange,
+  onModeChange,
   className,
 }: Props) {
   const [open, setOpen] = useState(false)
@@ -65,6 +71,7 @@ export function DashboardDateRangePresets({
 
   const handleSelect = (key: OptionKey) => {
     setMode(key)
+    onModeChange?.(key)
     if (key === "custom") return
     const preset = presets.find(
       (p) => p.label === OPTIONS.find((o) => o.key === key)?.label
