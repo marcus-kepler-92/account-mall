@@ -3,26 +3,13 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import type { LeadStatus } from "@prisma/client"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Loader2 } from "lucide-react"
 import { useInvalidateAdminNotifications } from "@/app/admin/hooks/use-admin-notifications"
-
-type LeadStatus =
-    | "PENDING_CONTACT"
-    | "NEW"
-    | "CONTACTED"
-    | "RESOLVED"
-    | "DROPPED"
-
-const NEXT: Record<LeadStatus, LeadStatus[]> = {
-    PENDING_CONTACT: ["CONTACTED", "DROPPED"],
-    NEW: ["CONTACTED"],
-    CONTACTED: ["RESOLVED", "DROPPED"],
-    RESOLVED: [],
-    DROPPED: [],
-}
+import { nextLeadStatuses } from "@/lib/agent-lead-state-machine"
 
 const LABEL: Record<LeadStatus, string> = {
     PENDING_CONTACT: "待补充",
@@ -60,7 +47,7 @@ export function LeadStatusForm({
     const [savingNotes, setSavingNotes] = useState(false)
     const [pendingStatus, setPendingStatus] = useState<LeadStatus | null>(null)
 
-    const allowedNext = NEXT[currentStatus]
+    const allowedNext = nextLeadStatuses(currentStatus)
 
     const patch = async (payload: { status?: LeadStatus; notes?: string }) => {
         const res = await fetch(`/api/admin/agent/leads/${leadId}`, {

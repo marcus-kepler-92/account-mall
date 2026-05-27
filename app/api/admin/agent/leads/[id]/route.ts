@@ -3,10 +3,15 @@ import { prisma } from "@/lib/prisma"
 import { getAdminSession } from "@/lib/auth-guard"
 import { leadPatchSchema } from "@/lib/validations/agent-lead"
 import {
+    assertTransition,
+    InvalidTransitionError,
+} from "@/lib/agent-lead-state-machine"
+import {
     unauthorized,
     notFound,
     invalidJsonBody,
     validationError,
+    conflict,
 } from "@/lib/api-response"
 
 export const runtime = "nodejs"
@@ -40,6 +45,18 @@ export async function PATCH(request: NextRequest, ctx: RouteContext) {
 
     const existing = await prisma.agentLead.findUnique({ where: { id } })
     if (!existing) return notFound("Lead not found")
+
+    // Guard the transition before writing. Notes-only PATCHes skip this gate.
+    // Self-loops (status === existing.status) are rejected by the state machine
+    // so the contactedAt/By stamp below can't re-fire on a repeat CONTACTED.
+    if (parsed.data.status) {
+        try {
+            assertTransition(existing.status, parsed.data.status)
+        } catch (err) {
+            if (err instanceof InvalidTransitionError) return conflict(err.message)
+            throw err
+        }
+    }
 
     // Prisma's update() ignores `undefined`, so spreading parsed.data only
     // writes the fields the client actually sent. Stamp contactedAt/By on
