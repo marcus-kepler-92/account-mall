@@ -8,7 +8,6 @@ import {
     Coins,
     Wallet,
     LogOut,
-    Store,
     BookOpen,
     Users,
     Megaphone,
@@ -31,6 +30,7 @@ import {
     SidebarRail,
 } from "@/components/ui/sidebar"
 import { useSiteName } from "@/app/components/site-name-provider"
+import { BrandMark } from "@/app/components/brand-mark"
 
 export const navItems = [
     { title: "总览", href: "/distributor", icon: LayoutDashboard },
@@ -65,9 +65,7 @@ export function DistributorSidebar() {
                     <SidebarMenuItem>
                         <SidebarMenuButton size="lg" asChild>
                             <Link href="/distributor">
-                                <div className="bg-primary text-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
-                                    <Store className="size-4" />
-                                </div>
+                                <BrandMark className="size-8 rounded-lg" />
                                 <div className="flex flex-col gap-0.5 leading-none">
                                     <span className="font-semibold">{siteName}</span>
                                     <span className="text-xs text-muted-foreground">分销中心</span>

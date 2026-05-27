@@ -1,9 +1,10 @@
 "use client"
 
 import Link from "next/link"
-import { Zap, Search, LayoutDashboard } from "lucide-react"
+import { Search, LayoutDashboard } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/app/components/theme-toggle"
+import { BrandMark } from "@/app/components/brand-mark"
 import { useSiteName } from "@/app/components/site-name-provider"
 import { appendCsParam } from "@/lib/cs-params"
 
@@ -26,9 +27,7 @@ export function SiteHeader({ cs }: SiteHeaderProps = {}) {
                     href={homeHref}
                     className="flex min-w-0 shrink items-center gap-2 focus-visible:outline focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md"
                 >
-                    <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary">
-                        <Zap className="size-4 text-primary-foreground" />
-                    </div>
+                    <BrandMark className="size-8 rounded-lg" />
                     <span className="truncate text-base font-bold tracking-tight sm:text-lg">
                         {siteName}
                     </span>

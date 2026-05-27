@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Zap } from "lucide-react"
+import { BrandMark } from "@/app/components/brand-mark"
 import { config } from "@/lib/config"
 import { getSiteSettings } from "@/lib/site-settings"
 
@@ -12,9 +12,7 @@ export async function SiteFooter() {
                 <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
                     <div className="flex flex-wrap items-center justify-center gap-4 sm:justify-start">
                         <div className="flex items-center gap-2">
-                            <div className="flex size-6 items-center justify-center rounded-md bg-primary">
-                                <Zap className="size-3 text-primary-foreground" />
-                            </div>
+                            <BrandMark className="size-6 rounded-md" />
                             <span className="text-sm font-medium">{config.siteName}</span>
                         </div>
                         <nav className="flex flex-wrap gap-4 text-sm text-muted-foreground">

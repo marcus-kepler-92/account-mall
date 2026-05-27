@@ -9,7 +9,6 @@ import {
     ShoppingCart,
     CreditCard,
     LogOut,
-    Store,
     Megaphone,
     Users,
     Layers,
@@ -48,6 +47,7 @@ import {
     SidebarRail,
 } from "@/components/ui/sidebar"
 import { useSiteName, useAdminPanelLabel } from "@/app/components/site-name-provider"
+import { BrandMark } from "@/app/components/brand-mark"
 import { DraggableSourceBadge } from "@/app/admin/components"
 import { useAdminNotifications } from "@/app/admin/hooks/use-admin-notifications"
 import type { DismissItem } from "@/app/admin/hooks/use-admin-notifications"
@@ -143,9 +143,7 @@ export function AdminSidebar({ allowedMenus, isSuperAdmin }: AdminSidebarProps) 
                     <SidebarMenuItem>
                         <SidebarMenuButton size="lg" asChild>
                             <Link href="/admin/dashboard">
-                                <div className="bg-primary text-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
-                                    <Store className="size-4" />
-                                </div>
+                                <BrandMark className="size-8 rounded-lg" />
                                 <div className="flex flex-col gap-0.5 leading-none">
                                     <span className="font-semibold">{siteName}</span>
                                     <span className="text-xs text-muted-foreground">{adminPanelLabel}</span>
