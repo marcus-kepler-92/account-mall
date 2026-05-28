@@ -47,7 +47,12 @@ function Row({
 }) {
   return (
     <div className="group/notif-row -mx-2 flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-muted/50">
-      <div className="min-w-0 flex-1">{children}</div>
+      <Link
+        href="/admin/notifications"
+        className="block min-w-0 flex-1 hover:underline"
+      >
+        {children}
+      </Link>
       <Button
         variant="ghost"
         size="icon"
@@ -57,7 +62,7 @@ function Row({
         )}
         aria-label="标记已读"
         onClick={(e) => {
-          // Prevent any wrapping link from navigating when the user clicks the X.
+          // Prevent the wrapping Link from navigating when the user clicks the X.
           e.preventDefault()
           e.stopPropagation()
           onDismiss({ sourceKey, itemId, fingerprint })
@@ -147,24 +152,19 @@ function renderItems(source: SourceResult, onDismiss: DismissFn): ReactNode {
             fingerprint={it.fingerprint}
             onDismiss={onDismiss}
           >
-            <Link
-              href={`/admin/orders/${it.id}`}
-              className="block hover:underline"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="truncate">
-                  {display} · {formatCurrency(it.amount)}
-                </span>
-                <span className="text-muted-foreground tabular-nums shrink-0">
-                  已等 {waitLabel}
-                </span>
+            <div className="flex items-center justify-between gap-2">
+              <span className="truncate">
+                {display} · {formatCurrency(it.amount)}
+              </span>
+              <span className="text-muted-foreground tabular-nums shrink-0">
+                已等 {waitLabel}
+              </span>
+            </div>
+            {it.dunCount > 0 && (
+              <div className="mt-0.5 text-xs font-medium text-destructive">
+                已催 {it.dunCount} 次
               </div>
-              {it.dunCount > 0 && (
-                <div className="mt-0.5 text-xs font-medium text-destructive">
-                  已催 {it.dunCount} 次
-                </div>
-              )}
-            </Link>
+            )}
           </Row>
         )
       })
@@ -206,7 +206,7 @@ export function NotificationCenterPopover() {
           </div>
           {totalCount > 0 && (
             <p className="mt-1 text-xs text-muted-foreground">
-              悬停点 × 标记单条已读；点击标题进入「通知中心」管理已读历史
+              点击通知或顶部标题进入「通知中心」；悬停点 × 标记单条已读
             </p>
           )}
         </div>
@@ -247,7 +247,7 @@ export function NotificationCenterPopover() {
                     {breakdownLine}
                     <div className="space-y-0.5">{renderItems(data, onDismiss)}</div>
                     <Link
-                      href={src.viewAllHref}
+                      href="/admin/notifications"
                       className="mt-2 inline-block text-xs text-primary hover:underline"
                     >
                       查看全部 →
