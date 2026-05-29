@@ -169,8 +169,10 @@ export function FloatingChat() {
         }
     }, [messages, status])
 
-    // Reset position when panel is closed
+    // Reset position when panel is closed — responds to the `open` prop,
+    // intentional set-state-in-effect.
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         if (!open) setPos(null)
     }, [open])
 

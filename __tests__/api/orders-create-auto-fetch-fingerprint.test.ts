@@ -152,7 +152,7 @@ function makeRequest(body: unknown): NextRequest {
 
 /** 成功创建订单所需的 transaction mock */
 function mockSuccessfulFreeTransaction() {
-  (prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: Function) => {
+  (prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: (tx: unknown) => unknown) => {
     const tx = {
       order: {
         create: jest.fn().mockResolvedValue({ id: "ord_1", orderNo: "uuid-1" }),
@@ -197,7 +197,7 @@ describe("POST /api/orders — AUTO_FETCH 多因素限领", () => {
       prismaMock.order.findFirst.mockResolvedValue(null);
 
       let capturedOrderData: Record<string, unknown> | undefined;
-      (prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: Function) => {
+      (prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: (tx: unknown) => unknown) => {
         const tx = {
           order: {
             create: jest
@@ -227,7 +227,7 @@ describe("POST /api/orders — AUTO_FETCH 多因素限领", () => {
       prismaMock.order.findFirst.mockResolvedValue(null);
 
       let capturedOrderData: Record<string, unknown> | undefined;
-      (prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: Function) => {
+      (prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: (tx: unknown) => unknown) => {
         const tx = {
           order: {
             create: jest
@@ -257,7 +257,7 @@ describe("POST /api/orders — AUTO_FETCH 多因素限领", () => {
       prismaMock.order.findFirst.mockResolvedValue(null);
 
       let capturedOrderData: Record<string, unknown> | undefined;
-      (prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: Function) => {
+      (prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: (tx: unknown) => unknown) => {
         const tx = {
           order: {
             create: jest

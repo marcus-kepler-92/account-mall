@@ -37,6 +37,9 @@ export function WithdrawalFormDialog({ open, onOpenChange, channelId, withdrawal
                     ? { amount: withdrawal.amount, note: withdrawal.note }
                     : { amount: 0, note: "" }
             )
+            // Clear transient error when the dialog (re)opens — responds to the
+            // `open` prop, intentional set-state-in-effect.
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setError(null)
         }
     }, [open, withdrawal, form])

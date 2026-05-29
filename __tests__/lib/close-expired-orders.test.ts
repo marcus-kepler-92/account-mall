@@ -45,7 +45,7 @@ describe("closeExpiredOrders", () => {
         const txCardUpdateMany = jest.fn().mockResolvedValue({ count: 1 })
         const txCardDeleteMany = jest.fn().mockResolvedValue({ count: 0 })
 
-        prismaMock.$transaction.mockImplementation((async (fn: Function) => {
+        prismaMock.$transaction.mockImplementation((async (fn: (tx: unknown) => unknown) => {
             const tx = {
                 order: { update: txOrderUpdate },
                 card: { updateMany: txCardUpdateMany, deleteMany: txCardDeleteMany },
@@ -77,7 +77,7 @@ describe("closeExpiredOrders", () => {
         const txCardUpdateMany = jest.fn().mockResolvedValue({ count: 0 })
         const txCardDeleteMany = jest.fn().mockResolvedValue({ count: 1 })
 
-        prismaMock.$transaction.mockImplementation((async (fn: Function) => {
+        prismaMock.$transaction.mockImplementation((async (fn: (tx: unknown) => unknown) => {
             const tx = {
                 order: { update: txOrderUpdate },
                 card: { updateMany: txCardUpdateMany, deleteMany: txCardDeleteMany },
@@ -102,7 +102,7 @@ describe("closeExpiredOrders", () => {
 
         const calls: { updateMany: jest.Mock; deleteMany: jest.Mock }[] = []
 
-        prismaMock.$transaction.mockImplementation((async (fn: Function) => {
+        prismaMock.$transaction.mockImplementation((async (fn: (tx: unknown) => unknown) => {
             const updateMany = jest.fn().mockResolvedValue({ count: 1 })
             const deleteMany = jest.fn().mockResolvedValue({ count: 1 })
             calls.push({ updateMany, deleteMany })
@@ -133,7 +133,7 @@ describe("closeExpiredOrders", () => {
         ] as any)
 
         let callCount = 0
-        prismaMock.$transaction.mockImplementation((async (fn: Function) => {
+        prismaMock.$transaction.mockImplementation((async (fn: (tx: unknown) => unknown) => {
             callCount++
             if (callCount === 1) throw new Error("DB error")
             const tx = {

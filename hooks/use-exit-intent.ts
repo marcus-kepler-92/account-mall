@@ -25,13 +25,21 @@ export function useExitIntent({
     onTrigger,
     disabled = false,
 }: UseExitIntentOptions) {
-    const mountedAtRef = useRef<number>(Date.now())
+    const mountedAtRef = useRef<number | null>(null)
     const triggeredRef = useRef<boolean>(false)
     const sentinelPushedRef = useRef<boolean>(false)
 
+    // Date.now() is impure and can't run during render — capture the mount
+    // timestamp in an effect instead.
+    useEffect(() => {
+        mountedAtRef.current = Date.now()
+    }, [])
+
     const checkAndTrigger = useCallback(() => {
         if (triggeredRef.current || disabled) return
-        if (Date.now() - mountedAtRef.current < minTimeMs) return
+        const mountedAt = mountedAtRef.current
+        if (mountedAt === null) return
+        if (Date.now() - mountedAt < minTimeMs) return
 
         try {
             if (sessionStorage.getItem(storageKey)) return

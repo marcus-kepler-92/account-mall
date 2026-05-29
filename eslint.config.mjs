@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
     "coverage/**",
+    // Python virtualenv vendored JS (automation/.venv) — third-party, not ours.
+    "**/.venv/**",
   ]),
   // Test files: allow require (jest.mock) and any for mocks
   {

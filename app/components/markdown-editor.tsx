@@ -105,7 +105,11 @@ export function MarkdownEditor({
         const defaultCommands = getCommands()
         const uploadCmd = createImageUploadCommand(
             imageUpload.pathPrefix,
+            // Stable ref objects handed to the command factory; .current is read
+            // only later inside event handlers, never during render.
+            // eslint-disable-next-line react-hooks/refs
             fileInputRef,
+            // eslint-disable-next-line react-hooks/refs
             apiRef
         )
         return defaultCommands.map((cmd) => (cmd.name === "image" ? uploadCmd : cmd))

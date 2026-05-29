@@ -323,7 +323,7 @@ describe("POST /api/orders — purchase limit check", () => {
         .mockResolvedValueOnce(0) // pending IP check
         .mockResolvedValueOnce(0) // purchase limit: no previous
       prismaMock.accountBlacklist.findMany.mockResolvedValue([])
-      prismaMock.$transaction.mockImplementation(async (fn: Function) => {
+      ;(prismaMock.$transaction as jest.Mock).mockImplementation(async (fn: (tx: unknown) => unknown) => {
         const tx = {
           order: { create: jest.fn().mockResolvedValue({ id: "o1", orderNo: "uuid-1" }) },
           card: { create: jest.fn().mockResolvedValue({ id: "c1" }) },

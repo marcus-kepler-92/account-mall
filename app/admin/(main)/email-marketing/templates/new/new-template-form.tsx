@@ -74,6 +74,9 @@ export function NewTemplateForm({
 
   return (
     <Form {...form}>
+      {/* onSubmit reads editorRef.current only on submit (an event handler), */}
+      {/* never during render -- safe ref access. */}
+      {/* eslint-disable-next-line react-hooks/refs */}
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">

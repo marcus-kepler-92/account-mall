@@ -61,6 +61,9 @@ export function GenerateLinkDialog({ open, onOpenChange, apiEndpoint }: Generate
 
     useEffect(() => {
         if (!open) {
+            // Clear dialog state when it closes — responds to the `open` prop,
+            // intentional set-state-in-effect.
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setState("config")
             form.reset()
             setLink(null)

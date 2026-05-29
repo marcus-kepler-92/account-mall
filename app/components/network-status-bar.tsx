@@ -1,22 +1,26 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useSyncExternalStore } from "react"
 import { WifiOff } from "lucide-react"
 
-export function NetworkStatusBar() {
-    const [online, setOnline] = useState(true)
+// Subscribe to the browser's online/offline events — the canonical
+// useSyncExternalStore use case (see react.dev). Server snapshot assumes online
+// so SSR markup renders nothing.
+function subscribe(callback: () => void) {
+    window.addEventListener("online", callback)
+    window.addEventListener("offline", callback)
+    return () => {
+        window.removeEventListener("online", callback)
+        window.removeEventListener("offline", callback)
+    }
+}
 
-    useEffect(() => {
-        const goOnline = () => setOnline(true)
-        const goOffline = () => setOnline(false)
-        window.addEventListener("online", goOnline)
-        window.addEventListener("offline", goOffline)
-        setOnline(navigator.onLine)
-        return () => {
-            window.removeEventListener("online", goOnline)
-            window.removeEventListener("offline", goOffline)
-        }
-    }, [])
+export function NetworkStatusBar() {
+    const online = useSyncExternalStore(
+        subscribe,
+        () => navigator.onLine,
+        () => true,
+    )
 
     if (online) return null
 

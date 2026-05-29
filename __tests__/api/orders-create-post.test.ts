@@ -1776,7 +1776,7 @@ describe("POST /api/orders (create order)", () => {
       data?: Record<string, unknown>;
     }) {
       return (prismaMock.$transaction as jest.Mock).mockImplementation(
-        async (fn: Function) => {
+        async (fn: (tx: unknown) => unknown) => {
           const tx = {
             order: {
               create: jest

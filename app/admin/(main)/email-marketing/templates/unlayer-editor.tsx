@@ -28,6 +28,9 @@ export function UnlayerEditor({ initialDesign, onReady, editorRef }: Props) {
   // Expose exportHtml via the forwarded ref
   useEffect(() => {
     if (editorRef && "current" in editorRef) {
+      // Imperative-handle pattern: populate the parent-provided ref on mount,
+      // mirroring useImperativeHandle. Intentional ref write.
+      // eslint-disable-next-line react-hooks/immutability
       (editorRef as React.MutableRefObject<UnlayerEditorHandle | null>).current = {
         exportHtml: () =>
           new Promise((resolve, reject) => {

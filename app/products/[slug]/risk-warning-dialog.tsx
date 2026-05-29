@@ -35,6 +35,9 @@ export function RiskWarningDialog({
 
   useEffect(() => {
     if (sessionStorage.getItem(storageKey)) return;
+    // sessionStorage can't be read during SSR/render, so the open decision must
+    // run on mount — intentional set-state-in-effect, not a derived-state bug.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSecondsLeft(initialSeconds);
     setOpen(true);
   }, [storageKey, initialSeconds]);

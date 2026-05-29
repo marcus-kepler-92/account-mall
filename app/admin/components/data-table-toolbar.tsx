@@ -39,7 +39,10 @@ export function DataTableToolbar<TData>({
     const initialSearch = searchParams.get(searchParamKey) || ""
     const [searchValue, setSearchValue] = useState(initialSearch)
 
+    // Sync the controlled input when the URL (source of truth) changes via
+    // back/forward or external navigation — intentional set-state-in-effect.
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setSearchValue(searchParams.get(searchParamKey) || "")
     }, [searchParams, searchParamKey])
 

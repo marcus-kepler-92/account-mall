@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useSyncExternalStore } from "react"
 import { useTheme } from "next-themes"
 import { Monitor, Moon, Sun } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -8,11 +8,14 @@ import { Button } from "@/components/ui/button"
 const THEMES = ["light", "dark", "system"] as const
 type Theme = (typeof THEMES)[number]
 
+// Hydration gate via useSyncExternalStore: server snapshot is false, client is
+// true, so `mounted` flips to true only after hydration — avoids the SSR theme
+// mismatch without a setState-in-effect.
+const subscribeNoop = () => () => {}
+
 export function ThemeToggle() {
     const { theme, setTheme } = useTheme()
-    const [mounted, setMounted] = useState(false)
-
-    useEffect(() => setMounted(true), [])
+    const mounted = useSyncExternalStore(subscribeNoop, () => true, () => false)
 
     function cycle() {
         const idx = THEMES.indexOf((theme ?? "system") as Theme)

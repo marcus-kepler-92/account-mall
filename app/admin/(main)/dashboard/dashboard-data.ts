@@ -42,7 +42,7 @@ export async function getDashboardTrend(days: number): Promise<DashboardTrendPoi
       _sum: { amount: true },
       _count: { id: true },
     }),
-    (prisma as any).commission.groupBy({
+    prisma.commission.groupBy({
       by: ["createdAt"],
       where: { createdAt: { gte: start }, status: { not: "CANCELLED" } },
       _sum: { amount: true },

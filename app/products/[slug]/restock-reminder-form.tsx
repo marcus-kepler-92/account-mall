@@ -49,7 +49,10 @@ export function RestockReminderForm({
         defaultValues: { email: defaultEmail ?? "" },
     })
 
+    // Open the dialog from a deep link (?restock=1) — reads the URL on mount,
+    // intentional set-state-in-effect.
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         if (searchParams.get("restock") === "1") setOpen(true)
     }, [searchParams])
 
