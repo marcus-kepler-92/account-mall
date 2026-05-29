@@ -5,6 +5,7 @@ import { AdminBreadcrumb } from "@/app/components/admin-breadcrumb"
 import { AdminTopbarActions } from "@/app/components/admin-topbar-actions"
 import { getAdminPermissions } from "@/lib/admin-permissions"
 import { VisibilityRefresh } from "@/app/components/visibility-refresh"
+import { NotificationTabIndicator } from "@/app/admin/components"
 
 export default async function AdminMainLayout({
     children,
@@ -22,6 +23,7 @@ export default async function AdminMainLayout({
     return (
         <SidebarProvider>
             <VisibilityRefresh />
+            <NotificationTabIndicator />
             <AdminSidebar allowedMenus={perms.allowedMenus} isSuperAdmin={perms.isSuperAdmin} />
             <SidebarInset>
                 <header className="sticky top-0 z-50 flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4">

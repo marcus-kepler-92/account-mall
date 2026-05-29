@@ -1,4 +1,5 @@
 import { withdrawalsSource } from "@/lib/admin-notifications/sources/withdrawals"
+import { SOURCE_ITEM_TAKE } from "@/lib/admin-notifications/constants"
 
 const findMany = jest.fn()
 const count = jest.fn()
@@ -13,7 +14,7 @@ beforeEach(() => {
 })
 
 describe("withdrawalsSource", () => {
-  it("counts PENDING withdrawals and returns up to 50 latest items with distributor names + fingerprint", async () => {
+  it("counts PENDING withdrawals and returns the latest items with distributor names + fingerprint", async () => {
     count.mockResolvedValue(7)
     findMany.mockResolvedValue([
       { id: "w1", amount: 200, createdAt: new Date("2026-05-21T10:00:00Z"), distributor: { name: "张三" } },
@@ -27,7 +28,7 @@ describe("withdrawalsSource", () => {
     expect(findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { status: "PENDING" },
-        take: 50,
+        take: SOURCE_ITEM_TAKE,
         orderBy: { createdAt: "desc" },
       }),
     )

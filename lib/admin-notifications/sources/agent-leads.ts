@@ -1,6 +1,7 @@
 import { UserSearch } from "lucide-react"
 import type { Prisma } from "@prisma/client"
 import type { NotificationSource, AgentLeadItem } from "@/lib/admin-notifications"
+import { SOURCE_ITEM_TAKE } from "@/lib/admin-notifications/constants"
 
 const URGENCY_RANK = { HIGH: 3, MED: 2, LOW: 1 } as const
 
@@ -17,11 +18,11 @@ export const agentLeadsSource: NotificationSource<"agentLeads"> = {
       prisma.agentLead.findMany({
         where,
         // Overfetch then sort by urgency in JS. Prisma's enum lexical sort
-        // would put MED/LOW before HIGH, so we sort here. 50 is a buffer
+        // would put MED/LOW before HIGH, so we sort here. The cap is a buffer
         // for HIGH-urgency leads scattered in recent activity plus headroom
         // for dismissal filtering — if lead volume exceeds this, switch to
         // raw SQL CASE.
-        take: 50,
+        take: SOURCE_ITEM_TAKE,
         orderBy: { createdAt: "desc" },
         select: { id: true, wechatId: true, status: true, urgency: true, createdAt: true },
       }),
@@ -41,7 +42,7 @@ export const agentLeadsSource: NotificationSource<"agentLeads"> = {
         if (byUrgency !== 0) return byUrgency
         return b.createdAt.localeCompare(a.createdAt)
       })
-      .slice(0, 50)
+      .slice(0, SOURCE_ITEM_TAKE)
 
     return { count, items }
   },

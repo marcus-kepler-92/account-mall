@@ -96,7 +96,7 @@ describe("inventoryAlertsSource", () => {
     })
 
     const result = await inventoryAlertsSource.fetch(prisma)
-    // Source returns up to 50; the route slices to 3 for the popover. We assert the head order here.
+    // Source returns up to the per-source cap; the route slices to 3 for the popover. We assert the head order here.
     expect(result.items.slice(0, 3).map((i) => i.id)).toEqual(["wait", "out2", "out1"])
   })
 

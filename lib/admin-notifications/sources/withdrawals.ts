@@ -1,5 +1,6 @@
 import { Wallet } from "lucide-react"
 import type { NotificationSource } from "@/lib/admin-notifications"
+import { SOURCE_ITEM_TAKE } from "@/lib/admin-notifications/constants"
 
 export const withdrawalsSource: NotificationSource<"withdrawals"> = {
   key: "withdrawals",
@@ -13,7 +14,7 @@ export const withdrawalsSource: NotificationSource<"withdrawals"> = {
       prisma.withdrawal.count({ where }),
       prisma.withdrawal.findMany({
         where,
-        take: 50,
+        take: SOURCE_ITEM_TAKE,
         orderBy: { createdAt: "desc" },
         select: {
           id: true,

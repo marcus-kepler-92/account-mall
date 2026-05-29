@@ -1,6 +1,7 @@
 import { PackageCheck } from "lucide-react"
 import { OrderStatus, ProductType, type Prisma } from "@prisma/client"
 import type { NotificationSource } from "@/lib/admin-notifications"
+import { SOURCE_ITEM_TAKE } from "@/lib/admin-notifications/constants"
 
 export const manualPendingOrdersSource: NotificationSource<"manualPendingOrders"> = {
   key: "manualPendingOrders",
@@ -20,7 +21,7 @@ export const manualPendingOrdersSource: NotificationSource<"manualPendingOrders"
       prisma.order.count({ where }),
       prisma.order.findMany({
         where,
-        take: 50,
+        take: SOURCE_ITEM_TAKE,
         // Surface dunned orders first (most-recently-dunned at the top), then
         // fall back to oldest-first so backlog naturally bubbles up.
         orderBy: [{ lastDunAt: { sort: "desc", nulls: "last" } }, { createdAt: "asc" }],

@@ -21,6 +21,12 @@ export function useAdminNotifications() {
     staleTime: 30_000,
     refetchOnWindowFocus: true,
     refetchOnMount: "always",
+    // Background polling so the browser-tab unread badge (NotificationTabIndicator)
+    // keeps climbing even while this tab is hidden. Unlike the in-page manual-status
+    // poll, we deliberately keep polling when unfocused — peripheral awareness from
+    // another tab is the whole point of the tab badge.
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: true,
   })
 
   // Memoize so consumers keyed off a stable reference don't recompute on unrelated renders.

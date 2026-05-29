@@ -1,5 +1,6 @@
 import { Package } from "lucide-react"
 import type { NotificationSource, InventoryAlertItem } from "@/lib/admin-notifications"
+import { SOURCE_ITEM_TAKE } from "@/lib/admin-notifications/constants"
 import { resolveInventorySubtype, type InventorySubtype } from "@/lib/inventory"
 
 const INVENTORY_PRODUCT_WHERE = {
@@ -78,7 +79,7 @@ export const inventoryAlertsSource: NotificationSource<"inventoryAlerts"> = {
     return {
       count: items.length,
       breakdown,
-      items: items.slice(0, 50),
+      items: items.slice(0, SOURCE_ITEM_TAKE),
     }
   },
 }
