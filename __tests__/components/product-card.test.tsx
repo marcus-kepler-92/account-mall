@@ -60,7 +60,11 @@ describe("ProductCard — MANUAL variant pricing", () => {
                 })}
             />,
         )
-        expect(screen.getAllByText(/¥29\.90 起/).length).toBeGreaterThan(0)
+        // "起" renders as a muted child <span> — a separate text node. Testing
+        // Library's getByText reads only direct text nodes, so the base price and
+        // suffix never share one node and must be asserted separately.
+        expect(screen.getAllByText("¥29.90").length).toBeGreaterThan(0)
+        expect(screen.getByText("起")).toBeInTheDocument()
         // Critical regression guard: must not fall through to ¥0.00.
         expect(screen.queryByText(/¥0\.00/)).toBeNull()
     })

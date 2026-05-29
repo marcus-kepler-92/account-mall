@@ -72,3 +72,14 @@ jest.mock("@/lib/site-settings", () => {
 jest.mock("better-auth/crypto", () => ({
     hashPassword: jest.fn().mockResolvedValue("hashed"),
 }))
+
+// next/cache is unusable in Jest: revalidateTag/revalidatePath throw "static
+// generation store missing" outside a Next.js request context, and unstable_cache
+// needs the same store. Stub them globally so route handlers that invalidate the
+// storefront cache (lib/revalidate-storefront) run cleanly. Tests that inspect
+// real cache keys (agent-persistence) override this with a file-level jest.mock.
+jest.mock("next/cache", () => ({
+    revalidateTag: jest.fn(),
+    revalidatePath: jest.fn(),
+    unstable_cache: (fn: unknown) => fn,
+}))

@@ -27,6 +27,9 @@ const baseProduct = {
     price: 100,
     sortOrder: 0,
     tags: [],
+    // page.tsx fetches products with `include: { variants }` and maps over
+    // p.variants — mirror that shape so the row mapper doesn't hit undefined.
+    variants: [],
     createdAt: new Date(),
     updatedAt: new Date(),
 }
