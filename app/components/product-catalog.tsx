@@ -49,7 +49,7 @@ export function ProductCatalog({ initialData }: { initialData?: InitialData }) {
     const router = useRouter()
     const searchParams = useSearchParams()
     const tagParam = searchParams.get("tag") ?? ""
-    const codeParam = searchParams.get("code") ?? ""
+    const promoCodeParam = searchParams.get("promoCode") ?? ""
     const csParam = searchParams.get("cs") ?? ""
     const selectedTagSlugs = parseTagFromUrl(searchParams.get("tag"))
 
@@ -59,9 +59,9 @@ export function ProductCatalog({ initialData }: { initialData?: InitialData }) {
     const [currentPage, setCurrentPage] = useState(1)
     const [showMobileFilters, setShowMobileFilters] = useState(false)
 
-    const tagsUrl = codeParam ? `/api/tags?code=${encodeURIComponent(codeParam)}` : "/api/tags"
+    const tagsUrl = promoCodeParam ? `/api/tags?promoCode=${encodeURIComponent(promoCodeParam)}` : "/api/tags"
     const { data: tags = [] } = useQuery<TagItem[]>({
-        queryKey: ["tags", codeParam],
+        queryKey: ["tags", promoCodeParam],
         queryFn: () => fetchJson(tagsUrl),
         initialData: initialData?.tags,
         staleTime: 5 * 60 * 1000,
@@ -70,7 +70,7 @@ export function ProductCatalog({ initialData }: { initialData?: InitialData }) {
     const productsParams = new URLSearchParams()
     if (search.trim()) productsParams.set("q", search.trim())
     if (tagParam) productsParams.set("tag", tagParam)
-    if (codeParam) productsParams.set("code", codeParam)
+    if (promoCodeParam) productsParams.set("promoCode", promoCodeParam)
     if (csParam) productsParams.set("cs", csParam)
     if (sort !== "default") productsParams.set("sort", sort)
     productsParams.set("page", String(currentPage))
@@ -83,7 +83,7 @@ export function ProductCatalog({ initialData }: { initialData?: InitialData }) {
         error: queryError,
         refetch: refetchProducts,
     } = useQuery<{ data: ProductCardData[]; meta: { totalPages: number } }>({
-        queryKey: ["products", search, tagParam, codeParam, csParam, sort, currentPage],
+        queryKey: ["products", search, tagParam, promoCodeParam, csParam, sort, currentPage],
         queryFn: () => fetchJson(`/api/products?${productsParams}`),
         initialData: initialData?.products,
         staleTime: 60 * 1000,
@@ -256,7 +256,7 @@ export function ProductCatalog({ initialData }: { initialData?: InitialData }) {
                     error={error}
                     currentPage={currentPage}
                     totalPages={totalPages}
-                    codeParam={codeParam}
+                    promoCodeParam={promoCodeParam}
                     csParam={csParam}
                     onPageChange={setCurrentPage}
                     onRetry={refetchProducts}

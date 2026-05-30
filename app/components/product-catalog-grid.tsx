@@ -10,7 +10,7 @@ type Props = {
     error: string | null
     currentPage: number
     totalPages: number
-    codeParam: string
+    promoCodeParam: string
     csParam: string
     onPageChange: (page: number) => void
     onRetry: () => void
@@ -22,7 +22,7 @@ export function ProductCatalogGrid({
     error,
     currentPage,
     totalPages,
-    codeParam,
+    promoCodeParam,
     csParam,
     onPageChange,
     onRetry,
@@ -72,7 +72,7 @@ export function ProductCatalogGrid({
                         key={product.id}
                         product={product}
                         gradientIndex={idx}
-                        code={codeParam || undefined}
+                        promoCode={promoCodeParam || undefined}
                         cs={csParam || undefined}
                         discountPercent={product.discountPercent}
                     />

@@ -42,7 +42,7 @@ type ProductCardProps = {
     product: ProductCardData
     gradientIndex?: number
     className?: string
-    code?: string
+    promoCode?: string
     cs?: string
     discountPercent?: number
     href?: string
@@ -52,7 +52,7 @@ type ProductCardProps = {
 /**
  * Product card with equal height in grid, cover maintains aspect ratio (1:1).
  */
-export function ProductCard({ product, gradientIndex = 0, className, code, cs, discountPercent, href, horizontal }: ProductCardProps) {
+export function ProductCard({ product, gradientIndex = 0, className, promoCode, cs, discountPercent, href, horizontal }: ProductCardProps) {
     const descriptionFallback = descriptionToPlainText(product.description, 80)
     const briefRaw = product.summary?.trim() || descriptionFallback
     const brief = briefRaw.slice(0, 80)
@@ -72,7 +72,7 @@ export function ProductCard({ product, gradientIndex = 0, className, code, cs, d
     const buildDetailHref = () => {
         const params = new URLSearchParams()
         if (canRestock) params.set("restock", "1")
-        if (code) params.set("code", code)
+        if (promoCode) params.set("promoCode", promoCode)
         if (cs) params.set("cs", cs)
         const query = params.toString()
         return `/products/${product.slug}${query ? `?${query}` : ""}`

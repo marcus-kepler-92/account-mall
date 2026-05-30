@@ -118,3 +118,43 @@ describe("ProductCard — MANUAL variant pricing", () => {
         expect(screen.queryByText(/起/)).toBeNull()
     })
 })
+
+describe("ProductCard — detail link param propagation", () => {
+    it("propagates promoCode into the detail href (affiliate attribution survives navigation)", () => {
+        render(
+            <ProductCard
+                product={baseProduct({ productType: "NORMAL", price: 99 })}
+                promoCode="DIST123"
+            />,
+        )
+        expect(screen.getAllByRole("link")[0].getAttribute("href")).toContain("promoCode=DIST123")
+    })
+
+    it("propagates cs token into the detail href (regression guard)", () => {
+        render(
+            <ProductCard
+                product={baseProduct({ productType: "NORMAL", price: 99 })}
+                cs="cs-token-abc"
+            />,
+        )
+        expect(screen.getAllByRole("link")[0].getAttribute("href")).toContain("cs=cs-token-abc")
+    })
+
+    it("carries both promoCode and cs together when both present", () => {
+        render(
+            <ProductCard
+                product={baseProduct({ productType: "NORMAL", price: 99 })}
+                promoCode="DIST123"
+                cs="cs-token-abc"
+            />,
+        )
+        const href = screen.getAllByRole("link")[0].getAttribute("href") ?? ""
+        expect(href).toContain("promoCode=DIST123")
+        expect(href).toContain("cs=cs-token-abc")
+    })
+
+    it("no promoCode / cs → clean detail href", () => {
+        render(<ProductCard product={baseProduct({ productType: "NORMAL", price: 99 })} />)
+        expect(screen.getAllByRole("link")[0].getAttribute("href")).toBe("/products/test-product")
+    })
+})
