@@ -421,7 +421,10 @@ export async function createOrderCommissions(
   tx: Prisma.TransactionClient,
   params: CreateOrderCommissionsParams,
 ): Promise<void> {
-  const { orderId, distributorId, orderEmail, orderAmount, paidAt } = params
+  const { orderId, distributorId, orderEmail, orderAmount, paidAt, commissionMode, commissionValue, quantity } = params
+  // NONE never reaches here in practice (such orders carry no distributorId),
+  // but guard defensively so a mis-wired caller can't mint commission.
+  if (commissionMode === "NONE") return
   const distributor = await tx.user.findUnique({
     where: { id: distributorId },
     select: { email: true, inviterId: true },
@@ -454,10 +457,20 @@ export async function createOrderCommissions(
   if (ratePercent == null && tiers.length > 0) ratePercent = toNumber(tiers[tiers.length - 1].ratePercent)
 
   const paidAmount = toNumber(orderAmount)
-  const totalCommission =
-    ratePercent != null && paidAmount > 0
-      ? Math.round((paidAmount * ratePercent) / 100 * 100) / 100
-      : 0
+  let totalCommission = 0
+  if (commissionMode === "FIXED_AMOUNT") {
+    // Fixed per-unit commission, independent of order amount / discounts.
+    totalCommission = Math.round(toNumber(commissionValue) * quantity * 100) / 100
+  } else if (commissionMode === "FIXED_PERCENT") {
+    // Fixed percent of the paid (post-discount) amount.
+    totalCommission = Math.round((paidAmount * toNumber(commissionValue)) / 100 * 100) / 100
+  } else {
+    // GLOBAL: weekly tier ladder selected above.
+    totalCommission =
+      ratePercent != null && paidAmount > 0
+        ? Math.round((paidAmount * ratePercent) / 100 * 100) / 100
+        : 0
+  }
   if (totalCommission <= 0) return
 
   const inviterId = distributor.inviterId ?? null
@@ -675,6 +688,10 @@ export async function reassignOrderDistributor(
     await repo.cancelOrderCommissions(orderId, tx as Parameters<typeof repo.cancelOrderCommissions>[1])
     await repo.updateOrderDistributor(orderId, distributorId, tx as Parameters<typeof repo.updateOrderDistributor>[2])
     if (distributorId !== null && order.paidAt) {
+      const product = await tx.product.findUnique({
+        where: { id: order.productId },
+        select: { commissionMode: true, commissionValue: true },
+      })
       await createOrderCommissions(tx, {
         orderId,
         distributorId,
@@ -682,6 +699,9 @@ export async function reassignOrderDistributor(
         orderAmount: order.amount,
         discountPercentApplied: order.discountPercentApplied,
         paidAt: order.paidAt,
+        commissionMode: product?.commissionMode ?? "GLOBAL",
+        commissionValue: product?.commissionValue ?? null,
+        quantity: order.quantity,
       })
       await checkAndIssueMilestoneBonuses(tx, distributorId)
     }

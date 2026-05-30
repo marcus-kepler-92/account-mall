@@ -37,7 +37,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ orderI
 
     const order = await prisma.order.findUnique({
         where: { id: orderId },
-        include: { product: { select: { productType: true } } },
+        include: { product: { select: { productType: true, commissionMode: true, commissionValue: true } } },
     })
     if (!order) return notFound("Order not found")
     if (!order.product) return internalServerError()
@@ -70,6 +70,9 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ orderI
                     orderAmount: order.amount,
                     discountPercentApplied: order.discountPercentApplied,
                     paidAt: order.paidAt ?? new Date(),
+                    commissionMode: order.product.commissionMode,
+                    commissionValue: order.product.commissionValue,
+                    quantity: order.quantity,
                 })
                 await checkAndIssueMilestoneBonuses(tx, order.distributorId)
             }

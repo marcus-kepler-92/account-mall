@@ -96,7 +96,7 @@ function makeManualProduct(overrides?: Partial<Record<string, unknown>>) {
         allowAccountSwitch: true,
         accountSwitchLimit: 1,
         couponEnabled: false,
-        excludeFromAttribution: false,
+        commissionMode: "GLOBAL",
         purchaseLimitEnabled: false,
         purchaseLimitQuantity: null,
         riskWarningEnabled: false,

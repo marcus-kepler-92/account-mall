@@ -235,7 +235,7 @@ export async function POST(request: NextRequest) {
         return validationError(parsed.error.flatten());
     }
 
-    const { name, slug, description, summary, image, price, maxQuantity, status, tagIds, productType, sourceUrl, validityHours, allowAccountSwitch, accountSwitchLimit, couponEnabled, riskWarningEnabled, riskWarningTitle, riskWarningContent, riskWarningCountdown, riskWarningConfirmText, purchaseLimitEnabled, purchaseLimitQuantity, excludeFromAttribution, emailOnFulfill, variants } =
+    const { name, slug, description, summary, image, price, maxQuantity, status, tagIds, productType, sourceUrl, validityHours, allowAccountSwitch, accountSwitchLimit, couponEnabled, riskWarningEnabled, riskWarningTitle, riskWarningContent, riskWarningCountdown, riskWarningConfirmText, purchaseLimitEnabled, purchaseLimitQuantity, commissionMode, commissionValue, emailOnFulfill, variants } =
         parsed.data;
 
     // MANUAL ↔ variants contract:
@@ -313,7 +313,8 @@ export async function POST(request: NextRequest) {
         couponEnabled: couponEnabled ?? false,
         purchaseLimitEnabled: purchaseLimitEnabled ?? false,
         purchaseLimitQuantity: purchaseLimitQuantity ?? 1,
-        excludeFromAttribution: excludeFromAttribution ?? false,
+        commissionMode: commissionMode ?? "GLOBAL",
+        commissionValue: (commissionMode === "FIXED_AMOUNT" || commissionMode === "FIXED_PERCENT") ? (commissionValue ?? null) : null,
         emailOnFulfill: emailOnFulfill ?? false,
         tags:
             tagIds && tagIds.length > 0

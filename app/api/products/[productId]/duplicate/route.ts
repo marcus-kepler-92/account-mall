@@ -60,6 +60,8 @@ export async function POST(
             riskWarningConfirmText: original.riskWarningConfirmText,
             purchaseLimitEnabled: original.purchaseLimitEnabled,
             purchaseLimitQuantity: original.purchaseLimitQuantity,
+            commissionMode: original.commissionMode,
+            commissionValue: original.commissionValue,
             tags: original.tags.length > 0
                 ? { connect: original.tags.map((t) => ({ id: t.id })) }
                 : undefined,

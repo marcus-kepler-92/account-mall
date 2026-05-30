@@ -46,7 +46,8 @@ export const createProductSchema = z.object({
     riskWarningConfirmText: z.string().max(50).nullish(),
     purchaseLimitEnabled: z.boolean().optional(),
     purchaseLimitQuantity: z.number().int().min(1).optional(),
-    excludeFromAttribution: z.boolean().optional(),
+    commissionMode: z.enum(["NONE", "GLOBAL", "FIXED_AMOUNT", "FIXED_PERCENT"]).optional(),
+    commissionValue: z.number().positive().nullable().optional(),
     /**
      * MANUAL-only: when true, ProductVariant.stockQuantity is enforced. Default
      * false — most MANUAL listings (代购 / 定制 / 按需) don't track stock and
@@ -68,7 +69,21 @@ export const createProductSchema = z.object({
 }).refine(
     (data) => data.productType !== "AUTO_FETCH" || (data.sourceUrl && data.sourceUrl !== ""),
     { message: "Auto-fetch product must have a source URL", path: ["sourceUrl"] }
-);
+).refine(
+    (data) => {
+        if (data.commissionMode === "FIXED_PERCENT") return data.commissionValue != null && data.commissionValue > 0 && data.commissionValue <= 100
+        if (data.commissionMode === "FIXED_AMOUNT") return data.commissionValue != null && data.commissionValue > 0
+        return true
+    },
+    { message: "固定百分比需 0<值≤100；固定金额需值>0", path: ["commissionValue"] }
+).transform((data) => {
+    // Positive-equality: only GLOBAL/NONE force value to null; undefined (partial
+    // update without commissionMode) is left untouched so PUT doesn't误清.
+    if (data.commissionMode === "GLOBAL" || data.commissionMode === "NONE") {
+        return { ...data, commissionValue: null }
+    }
+    return data
+});
 
 export const updateProductSchema = z.object({
     name: z.string().min(1, "Name is required").max(200).optional(),
@@ -111,11 +126,24 @@ export const updateProductSchema = z.object({
     riskWarningConfirmText: z.string().max(50).nullish(),
     purchaseLimitEnabled: z.boolean().optional(),
     purchaseLimitQuantity: z.number().int().min(1).optional(),
-    excludeFromAttribution: z.boolean().optional(),
+    commissionMode: z.enum(["NONE", "GLOBAL", "FIXED_AMOUNT", "FIXED_PERCENT"]).optional(),
+    commissionValue: z.number().positive().nullable().optional(),
     /** MANUAL-only inventory tracking toggle; see createProductSchema. */
     inventoryTracked: z.boolean().optional(),
     /** Per-product order-completion email toggle; see createProductSchema. */
     emailOnFulfill: z.boolean().optional(),
+}).refine(
+    (data) => {
+        if (data.commissionMode === "FIXED_PERCENT") return data.commissionValue != null && data.commissionValue > 0 && data.commissionValue <= 100
+        if (data.commissionMode === "FIXED_AMOUNT") return data.commissionValue != null && data.commissionValue > 0
+        return true
+    },
+    { message: "固定百分比需 0<值≤100；固定金额需值>0", path: ["commissionValue"] }
+).transform((data) => {
+    if (data.commissionMode === "GLOBAL" || data.commissionMode === "NONE") {
+        return { ...data, commissionValue: null }
+    }
+    return data
 });
 
 export const createTagSchema = z.object({
@@ -171,7 +199,8 @@ export const productFormSchema = z
         riskWarningConfirmText: z.string().max(50).optional(),
         purchaseLimitEnabled: z.boolean().optional(),
         purchaseLimitQuantity: z.string().optional(),
-        excludeFromAttribution: z.boolean().optional(),
+        commissionMode: z.enum(["NONE", "GLOBAL", "FIXED_AMOUNT", "FIXED_PERCENT"]).optional(),
+        commissionValue: z.string().optional(),
         /**
          * MANUAL-only toggle: when true the buyer-side and back-end enforce
          * variant.stockQuantity (decrement on payment, sold-out display, etc).
@@ -214,6 +243,15 @@ export const productFormSchema = z
         _isEditing: z.boolean().optional(),
     })
     .superRefine((data, ctx) => {
+        // Commission mode value (independent of productType)
+        if (data.commissionMode === "FIXED_PERCENT" || data.commissionMode === "FIXED_AMOUNT") {
+            const v = data.commissionValue ? parseFloat(data.commissionValue) : NaN
+            if (Number.isNaN(v) || v <= 0) {
+                ctx.addIssue({ code: "custom", message: "请填写佣金数值", path: ["commissionValue"] })
+            } else if (data.commissionMode === "FIXED_PERCENT" && v > 100) {
+                ctx.addIssue({ code: "custom", message: "百分比不能超过 100", path: ["commissionValue"] })
+            }
+        }
         if (data.productType === "AUTO_FETCH") {
             const fetchType = data.autoFetchType ?? "scrape"
             if (fetchType === "voidlogins") {

@@ -132,6 +132,13 @@ enum ProductType {
   MANUAL
 }
 
+enum CommissionMode {
+  NONE // not attributed to any distributor; no commission (replaces excludeFromAttribution=true)
+  GLOBAL // uses the global weekly CommissionTier ladder (default, prior behaviour)
+  FIXED_AMOUNT // fixed commission per unit: commissionValue × order.quantity
+  FIXED_PERCENT // fixed percent of paid amount: commissionValue% × order.amount
+}
+
 model Product {
   id                     String                @id @default(cuid())
   name                   String
@@ -163,8 +170,10 @@ model Product {
   riskWarningConfirmText String?               @db.VarChar(50)
   purchaseLimitEnabled   Boolean               @default(false)
   purchaseLimitQuantity  Int                   @default(1)
-  /// When true, orders for this product are never attributed to a distributor (no distributorId, no commission).
-  excludeFromAttribution Boolean               @default(false)
+  /// Per-product distribution settlement mode. GLOBAL (default) = weekly tier ladder; NONE = no attribution.
+  commissionMode         CommissionMode        @default(GLOBAL)
+  /// FIXED_AMOUNT: commission per unit (元); FIXED_PERCENT: percent of paid amount; null for GLOBAL/NONE.
+  commissionValue        Decimal?              @db.Decimal(10, 2)
   /// MANUAL-only: when true, ProductVariant.stockQuantity is enforced (decrement
   /// on payment, restock on close, sold-out display). When false (default),
   /// MANUAL stock is unbounded — the field exists but is never read by business

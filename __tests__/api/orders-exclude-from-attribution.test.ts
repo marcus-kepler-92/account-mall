@@ -1,7 +1,7 @@
 /**
- * Integration tests: excludeFromAttribution flag on POST /api/orders.
+ * Integration tests: commissionMode=NONE on POST /api/orders.
  *
- * When a product has excludeFromAttribution=true:
+ * When a product has commissionMode=NONE (supersedes the old excludeFromAttribution=true):
  * - Orders are never linked to a distributor (distributorId = null)
  * - Cookie-based affiliate attribution is suppressed
  * - Manual coupon code attribution is suppressed
@@ -105,7 +105,8 @@ function makeNormalProduct(overrides?: Record<string, unknown>) {
         riskWarningConfirmText: null,
         purchaseLimitEnabled: false,
         purchaseLimitQuantity: 1,
-        excludeFromAttribution: false,
+        commissionMode: "GLOBAL",
+        commissionValue: null,
         sortOrder: 0,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -137,7 +138,8 @@ function makeAutoFetchProduct(overrides?: Record<string, unknown>) {
         riskWarningConfirmText: null,
         purchaseLimitEnabled: false,
         purchaseLimitQuantity: 1,
-        excludeFromAttribution: false,
+        commissionMode: "GLOBAL",
+        commissionValue: null,
         sortOrder: 0,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -198,18 +200,18 @@ function mockNormalTx() {
     return tx
 }
 
-describe("POST /api/orders — excludeFromAttribution", () => {
+describe("POST /api/orders — commissionMode NONE", () => {
     beforeEach(() => {
         jest.clearAllMocks()
         ;(global as { __configMockExcludeAttr?: Record<string, unknown> }).__configMockExcludeAttr!.nodeEnv = "test"
         prismaMock.order.count.mockResolvedValue(0)
     })
 
-    describe("excludeFromAttribution = false（默认）：归因正常生效", () => {
+    describe("commissionMode = GLOBAL（默认）：归因正常生效", () => {
         it("cookie 归因写入 distributorId", async () => {
             prismaMock.user.findFirst.mockResolvedValueOnce(makeDistributor())
             prismaMock.product.findUnique.mockResolvedValueOnce(
-                makeNormalProduct({ excludeFromAttribution: false }),
+                makeNormalProduct({ commissionMode: "GLOBAL" }),
             )
             prismaMock.card.count.mockResolvedValueOnce(5)
             const tx = mockNormalTx()
@@ -224,7 +226,7 @@ describe("POST /api/orders — excludeFromAttribution", () => {
         it("优惠码归因写入 distributorId + 折扣生效", async () => {
             prismaMock.user.findFirst.mockResolvedValueOnce(makeDistributor())
             prismaMock.product.findUnique.mockResolvedValueOnce(
-                makeNormalProduct({ excludeFromAttribution: false }),
+                makeNormalProduct({ commissionMode: "GLOBAL" }),
             )
             prismaMock.card.count.mockResolvedValueOnce(5)
             const tx = mockNormalTx()
@@ -238,11 +240,11 @@ describe("POST /api/orders — excludeFromAttribution", () => {
         })
     })
 
-    describe("excludeFromAttribution = true：无论何种码，归因均被阻断", () => {
+    describe("commissionMode = NONE：无论何种码，归因均被阻断", () => {
         it("cookie 归因被阻断：distributorId 不写入订单", async () => {
             prismaMock.user.findFirst.mockResolvedValueOnce(makeDistributor())
             prismaMock.product.findUnique.mockResolvedValueOnce(
-                makeNormalProduct({ excludeFromAttribution: true }),
+                makeNormalProduct({ commissionMode: "NONE" }),
             )
             prismaMock.card.count.mockResolvedValueOnce(5)
             const tx = mockNormalTx()
@@ -257,7 +259,7 @@ describe("POST /api/orders — excludeFromAttribution", () => {
         it("优惠码归因被阻断：distributorId 不写入，但折扣仍然生效", async () => {
             prismaMock.user.findFirst.mockResolvedValueOnce(makeDistributor())
             prismaMock.product.findUnique.mockResolvedValueOnce(
-                makeNormalProduct({ excludeFromAttribution: true }),
+                makeNormalProduct({ commissionMode: "NONE" }),
             )
             prismaMock.card.count.mockResolvedValueOnce(5)
             const tx = mockNormalTx()
@@ -275,7 +277,7 @@ describe("POST /api/orders — excludeFromAttribution", () => {
         it("无码下单：本就无归因，正常创建订单", async () => {
             prismaMock.user.findFirst.mockResolvedValue(null)
             prismaMock.product.findUnique.mockResolvedValueOnce(
-                makeNormalProduct({ excludeFromAttribution: true }),
+                makeNormalProduct({ commissionMode: "NONE" }),
             )
             prismaMock.card.count.mockResolvedValueOnce(5)
             const tx = mockNormalTx()
@@ -290,7 +292,7 @@ describe("POST /api/orders — excludeFromAttribution", () => {
         it("无效优惠码仍返回 400（校验逻辑不受影响）", async () => {
             prismaMock.user.findFirst.mockResolvedValueOnce(null) // distributor not found
             prismaMock.product.findUnique.mockResolvedValueOnce(
-                makeNormalProduct({ excludeFromAttribution: true }),
+                makeNormalProduct({ commissionMode: "NONE" }),
             )
 
             const res = await POST(makeRequest({ ...BASE_BODY, promoCode: "INVALID" }))
@@ -301,7 +303,7 @@ describe("POST /api/orders — excludeFromAttribution", () => {
         })
     })
 
-    describe("AUTO_FETCH 商品 + excludeFromAttribution = true", () => {
+    describe("AUTO_FETCH 商品 + commissionMode NONE", () => {
         const SCRAPED = { account: "acc@apple.com", password: "Pass1!", region: "US", status: "valid" }
 
         function mockAutoFetchTx() {
@@ -320,7 +322,7 @@ describe("POST /api/orders — excludeFromAttribution", () => {
             prismaMock.user.findFirst.mockResolvedValueOnce(makeDistributor())
             prismaMock.order.count.mockResolvedValueOnce(0) // IP pending count check
             prismaMock.product.findUnique.mockResolvedValueOnce(
-                makeAutoFetchProduct({ excludeFromAttribution: true }),
+                makeAutoFetchProduct({ commissionMode: "NONE" }),
             )
             scrapeMultipleUrlsMock.mockResolvedValueOnce([SCRAPED])
             prismaMock.accountBlacklist.findMany.mockResolvedValueOnce([])

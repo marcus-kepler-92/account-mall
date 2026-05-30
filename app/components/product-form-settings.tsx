@@ -3,6 +3,8 @@
 import { useFormContext } from "react-hook-form"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { ProductFormSchema } from "@/lib/validations/product"
 
@@ -10,7 +12,8 @@ export function ProductFormSettings() {
     const { watch, setValue } = useFormContext<ProductFormSchema>()
     const isActive = watch("isActive") ?? false
     const couponEnabled = watch("couponEnabled") ?? false
-    const excludeFromAttribution = watch("excludeFromAttribution") ?? false
+    const commissionMode = watch("commissionMode") ?? "GLOBAL"
+    const commissionValue = watch("commissionValue") ?? ""
     const emailOnFulfill = watch("emailOnFulfill") ?? false
 
     return (
@@ -60,20 +63,49 @@ export function ProductFormSettings() {
                         onCheckedChange={(v) => setValue("emailOnFulfill", v)}
                     />
                 </div>
-                <div className="flex items-center justify-between">
+                <div className="space-y-2">
                     <div>
-                        <Label htmlFor="exclude-from-attribution">不参与分销归因</Label>
+                        <Label htmlFor="commission-mode">分销结算方式</Label>
                         <p className="text-xs text-muted-foreground">
-                            {excludeFromAttribution
-                                ? "该商品订单不归因到任何分销员，不产生佣金"
-                                : "正常按推广码 / 优惠码归因到分销员"}
+                            决定该商品如何给分销员算佣金
                         </p>
                     </div>
-                    <Switch
-                        id="exclude-from-attribution"
-                        checked={excludeFromAttribution}
-                        onCheckedChange={(v) => setValue("excludeFromAttribution", v)}
-                    />
+                    <Select
+                        value={commissionMode}
+                        onValueChange={(v) => {
+                            setValue("commissionMode", v as "NONE" | "GLOBAL" | "FIXED_AMOUNT" | "FIXED_PERCENT")
+                            // Clear value on any mode switch to avoid a stale number
+                            // carrying the wrong unit (e.g. 80% becoming ¥80/unit).
+                            setValue("commissionValue", "")
+                        }}
+                    >
+                        <SelectTrigger id="commission-mode">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="GLOBAL">全局阶梯佣金（默认）</SelectItem>
+                            <SelectItem value="FIXED_PERCENT">固定百分比</SelectItem>
+                            <SelectItem value="FIXED_AMOUNT">固定金额（每件）</SelectItem>
+                            <SelectItem value="NONE">不参与分销</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    {(commissionMode === "FIXED_PERCENT" || commissionMode === "FIXED_AMOUNT") && (
+                        <div>
+                            <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                placeholder={commissionMode === "FIXED_PERCENT" ? "佣金百分比，如 20" : "每件固定佣金（元），如 5"}
+                                value={commissionValue}
+                                onChange={(e) => setValue("commissionValue", e.target.value)}
+                            />
+                            <p className="text-xs text-muted-foreground mt-1">
+                                {commissionMode === "FIXED_PERCENT"
+                                    ? "按订单实付金额的百分比给佣金"
+                                    : "每件固定佣金；注意单件佣金超过售价会亏本"}
+                            </p>
+                        </div>
+                    )}
                 </div>
             </CardContent>
         </Card>

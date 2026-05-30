@@ -1,5 +1,5 @@
 // lib/domains/distributors/types.ts
-import type { Prisma } from "@prisma/client"
+import type { Prisma, CommissionMode } from "@prisma/client"
 
 // ── Prisma model aliases ──────────────────────────────────────────────────────
 export type Commission = Prisma.CommissionGetPayload<Record<string, never>>
@@ -88,6 +88,12 @@ export interface CreateOrderCommissionsParams {
   orderAmount: unknown
   discountPercentApplied: unknown
   paidAt: Date
+  /** Per-product settlement mode. NONE never reaches here (no distributorId). */
+  commissionMode: CommissionMode
+  /** FIXED_AMOUNT: per-unit amount; FIXED_PERCENT: percent; null for GLOBAL. */
+  commissionValue: unknown
+  /** Order quantity, used by FIXED_AMOUNT (per-unit × quantity). */
+  quantity: number
 }
 
 // ── Invite result ─────────────────────────────────────────────────────────────

@@ -48,6 +48,8 @@ export async function completePendingOrder(
           productType: true,
           validityHours: true,
           inventoryTracked: true,
+          commissionMode: true,
+          commissionValue: true,
         },
       },
       cards: { select: { id: true, status: true, unitCost: true } },
@@ -123,6 +125,9 @@ export async function completePendingOrder(
         orderAmount: order.amount,
         discountPercentApplied: order.discountPercentApplied,
         paidAt,
+        commissionMode: order.product?.commissionMode ?? "GLOBAL",
+        commissionValue: order.product?.commissionValue ?? null,
+        quantity: order.quantity,
       });
       await checkAndIssueMilestoneBonuses(tx, distributorId);
     }

@@ -542,7 +542,7 @@ export async function POST(request: NextRequest) {
         return badRequest("该商品不支持使用优惠码")
     }
 
-    if (product.excludeFromAttribution) {
+    if (product.commissionMode === "NONE") {
         distributorId = null
     }
 

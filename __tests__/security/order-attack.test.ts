@@ -302,7 +302,7 @@ describe("Security: Injection and malicious input", () => {
             couponEnabled: false,
             purchaseLimitEnabled: false,
             purchaseLimitQuantity: 1,
-            excludeFromAttribution: false,
+            commissionMode: "GLOBAL",
             createdAt: new Date(),
             updatedAt: new Date(),
         })
@@ -415,7 +415,7 @@ describe("Security: Mass assignment and privilege", () => {
             couponEnabled: false,
             purchaseLimitEnabled: false,
             purchaseLimitQuantity: 1,
-            excludeFromAttribution: false,
+            commissionMode: "GLOBAL",
             createdAt: new Date(),
             updatedAt: new Date(),
         })

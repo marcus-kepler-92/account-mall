@@ -59,6 +59,7 @@ export default async function AdminEditProductPage({ params }: PageProps) {
                     ...product,
                     price: Number(product.price),
                     costPerUnit: product.costPerUnit != null ? Number(product.costPerUnit) : null,
+                    commissionValue: product.commissionValue != null ? Number(product.commissionValue) : null,
                 }}
                 allTags={tags}
                 allCardTemplates={cardTemplates}

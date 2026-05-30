@@ -278,6 +278,9 @@ describe("createOrderCommissions — tier fallback", () => {
       orderAmount: 100 as any,
       discountPercentApplied: 0,
       paidAt: new Date(),
+      commissionMode: "GLOBAL",
+      commissionValue: null,
+      quantity: 1,
     })
 
     expect(prismaMock.commission.create).toHaveBeenCalledTimes(1)
@@ -285,6 +288,51 @@ describe("createOrderCommissions — tier fallback", () => {
     expect(prismaMock.commission.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ amount: 10 }) }),
     )
+  })
+})
+
+// ── createOrderCommissions — per-product modes ────────────────────────────────
+
+describe("createOrderCommissions — commission modes", () => {
+  const baseMocks = () => {
+    prismaMock.user.findUnique.mockResolvedValue({ email: "dist@example.com", inviterId: null } as any)
+    prismaMock.order.findMany.mockResolvedValue([] as any)
+    prismaMock.commissionTier.findMany.mockResolvedValue([] as any)
+    prismaMock.commission.create.mockResolvedValue({} as any)
+  }
+
+  it("FIXED_PERCENT: commission = value% of paid amount, independent of tiers", async () => {
+    baseMocks()
+    await createOrderCommissions(prismaMock as any, {
+      orderId: "o1", distributorId: "d1", orderEmail: "buyer@example.com",
+      orderAmount: 100 as any, discountPercentApplied: 0, paidAt: new Date(),
+      commissionMode: "FIXED_PERCENT", commissionValue: 20, quantity: 1,
+    })
+    expect(prismaMock.commission.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ amount: 20 }) }),
+    )
+  })
+
+  it("FIXED_AMOUNT: commission = value × quantity, independent of paid amount/discount", async () => {
+    baseMocks()
+    await createOrderCommissions(prismaMock as any, {
+      orderId: "o1", distributorId: "d1", orderEmail: "buyer@example.com",
+      orderAmount: 999 as any, discountPercentApplied: 50, paidAt: new Date(),
+      commissionMode: "FIXED_AMOUNT", commissionValue: 5, quantity: 3,
+    })
+    expect(prismaMock.commission.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ amount: 15 }) }),
+    )
+  })
+
+  it("NONE: creates no commission and returns early", async () => {
+    baseMocks()
+    await createOrderCommissions(prismaMock as any, {
+      orderId: "o1", distributorId: "d1", orderEmail: "buyer@example.com",
+      orderAmount: 100 as any, discountPercentApplied: 0, paidAt: new Date(),
+      commissionMode: "NONE", commissionValue: null, quantity: 1,
+    })
+    expect(prismaMock.commission.create).not.toHaveBeenCalled()
   })
 })
 

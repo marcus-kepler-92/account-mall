@@ -102,7 +102,8 @@ type ProductData = {
     riskWarningConfirmText?: string | null
     purchaseLimitEnabled?: boolean
     purchaseLimitQuantity?: number
-    excludeFromAttribution?: boolean
+    commissionMode?: "NONE" | "GLOBAL" | "FIXED_AMOUNT" | "FIXED_PERCENT"
+    commissionValue?: number | null
     inventoryTracked?: boolean
     emailOnFulfill?: boolean
     tags: Tag[]
@@ -157,7 +158,8 @@ export function ProductForm({
             riskWarningConfirmText: product?.riskWarningConfirmText ?? "",
             purchaseLimitEnabled: product?.purchaseLimitEnabled ?? false,
             purchaseLimitQuantity: product?.purchaseLimitQuantity != null ? String(product.purchaseLimitQuantity) : "1",
-            excludeFromAttribution: product?.excludeFromAttribution ?? false,
+            commissionMode: product?.commissionMode ?? "GLOBAL",
+            commissionValue: product?.commissionValue != null ? String(product.commissionValue) : "",
             inventoryTracked: product?.inventoryTracked ?? false,
             emailOnFulfill: product?.emailOnFulfill ?? false,
             // MANUAL-only: SKUs are edited inline on the create form and
@@ -241,7 +243,8 @@ export function ProductForm({
             purchaseLimitQuantity: data.purchaseLimitEnabled && data.purchaseLimitQuantity && data.purchaseLimitQuantity !== ""
                 ? parseInt(data.purchaseLimitQuantity, 10)
                 : 1,
-            excludeFromAttribution: data.excludeFromAttribution ?? false,
+            commissionMode: data.commissionMode ?? "GLOBAL",
+            commissionValue: (data.commissionMode === "FIXED_AMOUNT" || data.commissionMode === "FIXED_PERCENT") && data.commissionValue ? parseFloat(data.commissionValue) : null,
             // MANUAL-only toggle; backend ignores for non-MANUAL types but we
             // ship it unconditionally so the column stays consistent across
             // type swaps.
