@@ -334,6 +334,77 @@ describe("createOrderCommissions — commission modes", () => {
     })
     expect(prismaMock.commission.create).not.toHaveBeenCalled()
   })
+
+  it("FIXED_PERCENT with inviter: splits level1/level2 off the fixed total", async () => {
+    prismaMock.user.findUnique
+      .mockResolvedValueOnce({ email: "dist@example.com", inviterId: "inv1" } as any)
+      .mockResolvedValueOnce({ email: "inviter@example.com", role: "DISTRIBUTOR", disabledAt: null } as any)
+    prismaMock.order.findMany.mockResolvedValue([] as any)
+    prismaMock.commissionTier.findMany.mockResolvedValue([] as any)
+    prismaMock.commission.create.mockResolvedValue({} as any)
+
+    await createOrderCommissions(prismaMock as any, {
+      orderId: "o1", distributorId: "d1", orderEmail: "buyer@example.com",
+      orderAmount: 100 as any, discountPercentApplied: 0, paidAt: new Date(),
+      commissionMode: "FIXED_PERCENT", commissionValue: 20, quantity: 1,
+    })
+
+    // total = 100 × 20% = 20; level2 = 20 × 20% = 4; level1 = 16
+    const calls = prismaMock.commission.create.mock.calls
+    expect(calls.length).toBe(2)
+    const level1 = calls.find((c) => c[0].data.level === 1)?.[0].data
+    const level2 = calls.find((c) => c[0].data.level === 2)?.[0].data
+    expect(level1.amount).toBe(16)
+    expect(level1.distributorId).toBe("d1")
+    expect(level2.amount).toBe(4)
+    expect(level2.distributorId).toBe("inv1")
+    expect(level2.sourceDistributorId).toBe("d1")
+  })
+
+  it("FIXED_AMOUNT with inviter: splits level1/level2 off value × quantity", async () => {
+    prismaMock.user.findUnique
+      .mockResolvedValueOnce({ email: "dist@example.com", inviterId: "inv1" } as any)
+      .mockResolvedValueOnce({ email: "inviter@example.com", role: "DISTRIBUTOR", disabledAt: null } as any)
+    prismaMock.order.findMany.mockResolvedValue([] as any)
+    prismaMock.commissionTier.findMany.mockResolvedValue([] as any)
+    prismaMock.commission.create.mockResolvedValue({} as any)
+
+    await createOrderCommissions(prismaMock as any, {
+      orderId: "o1", distributorId: "d1", orderEmail: "buyer@example.com",
+      orderAmount: 999 as any, discountPercentApplied: 0, paidAt: new Date(),
+      commissionMode: "FIXED_AMOUNT", commissionValue: 10, quantity: 3,
+    })
+
+    // total = 10 × 3 = 30; level2 = 6; level1 = 24
+    const calls = prismaMock.commission.create.mock.calls
+    expect(calls.length).toBe(2)
+    const level1 = calls.find((c) => c[0].data.level === 1)?.[0].data
+    const level2 = calls.find((c) => c[0].data.level === 2)?.[0].data
+    expect(level1.amount).toBe(24)
+    expect(level2.amount).toBe(6)
+    expect(level2.distributorId).toBe("inv1")
+  })
+
+  it("GLOBAL: selects tier by weekTotal (normal match, not fallback) — regression guard", async () => {
+    prismaMock.user.findUnique.mockResolvedValue({ email: "dist@example.com", inviterId: null } as any)
+    prismaMock.order.findMany.mockResolvedValue([{ amount: 500 }] as any) // weekTotal = 500
+    prismaMock.commissionTier.findMany.mockResolvedValue([
+      { minAmount: 0, maxAmount: 800, ratePercent: 52, sortOrder: 1 },
+      { minAmount: 800, maxAmount: 2400, ratePercent: 59, sortOrder: 2 },
+    ] as any)
+    prismaMock.commission.create.mockResolvedValue({} as any)
+
+    await createOrderCommissions(prismaMock as any, {
+      orderId: "o1", distributorId: "d1", orderEmail: "buyer@example.com",
+      orderAmount: 100 as any, discountPercentApplied: 0, paidAt: new Date(),
+      commissionMode: "GLOBAL", commissionValue: null, quantity: 1,
+    })
+
+    // weekTotal 500 → tier [0,800] = 52%; 100 × 52% = 52
+    expect(prismaMock.commission.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ amount: 52 }) }),
+    )
+  })
 })
 
 // ── acceptInvite ──────────────────────────────────────────────────────────────

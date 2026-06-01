@@ -21,9 +21,10 @@ jest.mock("@/lib/domains/distributors", () => ({
 import { Prisma } from "@prisma/client"
 import { completePendingOrder } from "@/lib/complete-pending-order"
 import { prismaMock } from "../../__mocks__/prisma"
-import { checkAndIssueMilestoneBonuses } from "@/lib/domains/distributors"
+import { checkAndIssueMilestoneBonuses, createOrderCommissions } from "@/lib/domains/distributors"
 
 const checkMock = checkAndIssueMilestoneBonuses as jest.Mock
+const createMock = createOrderCommissions as jest.Mock
 
 function makePendingOrder(overrides: Record<string, unknown> = {}) {
     return {
@@ -100,5 +101,48 @@ describe("completePendingOrder — milestone integration", () => {
 
         // The tx argument passed to the mock must be the same object used in the transaction
         expect(checkMock.mock.calls[0][0]).toBe(capturedTx)
+    })
+
+    it("forwards product commissionMode/commissionValue + order quantity to createOrderCommissions (FIXED end-to-end)", async () => {
+        prismaMock.order.findFirst.mockResolvedValue(makePendingOrder({
+            distributorId: "dist_A",
+            quantity: 2,
+            product: {
+                name: "T",
+                productType: "NORMAL",
+                validityHours: null,
+                commissionMode: "FIXED_PERCENT",
+                commissionValue: new Prisma.Decimal("20"),
+            },
+        }))
+
+        await completePendingOrder("order-1")
+
+        // The completion path must read product.commissionMode/Value + order.quantity
+        // and pass them through — otherwise FIXED settlement silently falls back to GLOBAL.
+        expect(createMock).toHaveBeenCalledWith(
+            prismaMock,
+            expect.objectContaining({
+                distributorId: "dist_A",
+                commissionMode: "FIXED_PERCENT",
+                quantity: 2,
+            }),
+        )
+        expect(Number(createMock.mock.calls[0][1].commissionValue)).toBe(20)
+    })
+
+    it("falls back to GLOBAL when product has no commissionMode (defensive)", async () => {
+        prismaMock.order.findFirst.mockResolvedValue(makePendingOrder({
+            distributorId: "dist_A",
+            quantity: 1,
+            // product without commissionMode (legacy/edge) → caller defaults GLOBAL
+        }))
+
+        await completePendingOrder("order-1")
+
+        expect(createMock).toHaveBeenCalledWith(
+            prismaMock,
+            expect.objectContaining({ commissionMode: "GLOBAL" }),
+        )
     })
 })
