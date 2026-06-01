@@ -5,10 +5,13 @@ import { formatDateTime } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, CreditCard, ShoppingCart } from "lucide-react"
+import { ArrowLeft, CreditCard, ShoppingCart, TrendingUp } from "lucide-react"
 import { resolveAdminCard } from "@/lib/card-format"
+import { resolveOrderCost } from "@/lib/profit"
+import { cn } from "@/lib/utils"
 import { OrderCardsTable } from "@/app/admin/(main)/orders/[orderId]/order-cards-table"
 import { ManualFulfillmentPanel } from "@/app/admin/(main)/orders/[orderId]/manual-fulfillment-panel"
+import { OrderCostEditor } from "@/app/admin/(main)/orders/[orderId]/order-cost-editor"
 
 export const dynamic = "force-dynamic"
 
@@ -40,12 +43,39 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
             fulfillment: {
                 select: { content: true },
             },
+            commissions: {
+                where: { status: { not: "CANCELLED" } },
+                select: { amount: true, level: true },
+            },
         },
     })
 
     if (!order) {
         notFound()
     }
+
+    // Cost & profit ledger. Cost and commissions are only finalized on order
+    // completion, so profit is computable only for COMPLETED orders that have
+    // a recorded cost — otherwise we show "—" rather than a misleading number.
+    const revenue = Number(order.amount)
+    const { cost, hasCost } = resolveOrderCost(order)
+    const commissionL1 = order.commissions
+        .filter((c) => c.level === 1)
+        .reduce((s, c) => s + Number(c.amount), 0)
+    const commissionL2 = order.commissions
+        .filter((c) => c.level === 2)
+        .reduce((s, c) => s + Number(c.amount), 0)
+    const totalCommission = commissionL1 + commissionL2
+    const netProfit = revenue - cost - totalCommission
+    const canComputeProfit = order.status === "COMPLETED" && hasCost
+    const profitMargin =
+        canComputeProfit && revenue > 0 ? (netProfit / revenue) * 100 : null
+    const profitHint =
+        order.status !== "COMPLETED"
+            ? "成本与佣金在订单完成后结算"
+            : !hasCost
+              ? "未录入卡密成本，无法计算净利润"
+              : null
 
     const statusLabel =
         order.status === "PENDING"
@@ -172,6 +202,90 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
                             </div>
                         )}
                     </div>
+                </CardContent>
+            </Card>
+
+            {/* Cost & profit */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                        <TrendingUp className="size-4" />
+                        成本与利润
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="grid gap-x-4 gap-y-3 text-sm sm:grid-cols-2 sm:gap-y-4 md:grid-cols-4">
+                        <div className="flex items-center justify-between gap-4 sm:block">
+                            <p className="text-muted-foreground">营收</p>
+                            <p className="font-mono font-medium">
+                                ¥{revenue.toFixed(2)}
+                            </p>
+                        </div>
+                        <div className="flex items-center justify-between gap-4 sm:block">
+                            <p className="flex items-center gap-1 text-muted-foreground">
+                                成本
+                                <OrderCostEditor
+                                    orderId={order.id}
+                                    cost={hasCost ? cost : null}
+                                    editable={order.status === "COMPLETED"}
+                                />
+                            </p>
+                            <p className="font-mono font-medium">
+                                {hasCost ? (
+                                    `−¥${cost.toFixed(2)}`
+                                ) : (
+                                    <span className="font-normal text-muted-foreground">
+                                        未录入
+                                    </span>
+                                )}
+                            </p>
+                        </div>
+                        <div className="flex items-start justify-between gap-4 sm:block">
+                            <p className="text-muted-foreground">分销佣金</p>
+                            <div className="text-right sm:text-left">
+                                <p className="font-mono font-medium">
+                                    −¥{totalCommission.toFixed(2)}
+                                </p>
+                                {totalCommission > 0 && (
+                                    <p className="mt-0.5 text-xs text-muted-foreground">
+                                        直推 ¥{commissionL1.toFixed(2)}
+                                        {commissionL2 > 0 &&
+                                            ` · 下线 ¥${commissionL2.toFixed(2)}`}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                        <div className="flex items-center justify-between gap-4 border-t pt-3 sm:block sm:border-t-0 sm:pt-0">
+                            <p className="font-medium text-muted-foreground sm:font-normal">
+                                净利润
+                            </p>
+                            <p
+                                className={cn(
+                                    "font-mono font-semibold",
+                                    canComputeProfit &&
+                                        netProfit > 0 &&
+                                        "text-success",
+                                    canComputeProfit &&
+                                        netProfit < 0 &&
+                                        "text-destructive",
+                                )}
+                            >
+                                {canComputeProfit
+                                    ? `¥${netProfit.toFixed(2)}`
+                                    : "—"}
+                                {profitMargin != null && (
+                                    <span className="ml-2 text-xs font-normal text-muted-foreground">
+                                        利润率 {profitMargin.toFixed(1)}%
+                                    </span>
+                                )}
+                            </p>
+                        </div>
+                    </div>
+                    {profitHint && (
+                        <p className="text-muted-foreground mt-3 text-xs">
+                            {profitHint}
+                        </p>
+                    )}
                 </CardContent>
             </Card>
 

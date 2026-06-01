@@ -36,6 +36,15 @@ export const updateOrderStatusSchema = z.object({
     status: orderStatusSchema,
 })
 
+// PATCH /api/admin/orders/[orderId]/cost — admin edits an order's total cost
+// snapshot (costTotalSnapshot). Used to backfill/correct cost on COMPLETED orders
+// so profit reporting is accurate.
+export const editOrderCostSchema = z.object({
+    costTotal: z.number().min(0, "成本不能为负"),
+})
+
+export type EditOrderCostInput = z.infer<typeof editOrderCostSchema>
+
 export const createOrderSchema = z.object({
     productId: z.string().min(1),
     email: z.string().min(1).pipe(z.email()),
