@@ -12,6 +12,7 @@ import {
     Dialog,
     DialogClose,
     DialogContent,
+    DialogDescription,
     DialogFooter,
     DialogHeader,
     DialogTitle,
@@ -91,6 +92,9 @@ export function OrderCostEditor({ orderId, cost, editable }: Props) {
             <DialogContent className="sm:max-w-sm">
                 <DialogHeader>
                     <DialogTitle>编辑订单成本</DialogTitle>
+                    <DialogDescription>
+                        修改该订单消耗卡密的成本总额，用于利润核算。
+                    </DialogDescription>
                 </DialogHeader>
                 <Form {...form}>
                     <form
