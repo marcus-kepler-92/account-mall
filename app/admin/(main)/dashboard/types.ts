@@ -6,6 +6,7 @@ export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
   PROCESSING: "处理中",
   COMPLETED: "已完成",
   CLOSED: "已关闭",
+  REFUNDED: "已退款",
 }
 
 export const DASHBOARD_TREND_DAYS = [7, 30] as const

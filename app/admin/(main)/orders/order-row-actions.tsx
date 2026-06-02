@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { useInvalidateAdminNotifications } from "@/app/admin/hooks/use-admin-notifications"
-import { MoreHorizontal, Eye, Copy, XCircle, Trash2, Loader2 } from "lucide-react"
+import { MoreHorizontal, Eye, Copy, XCircle, Trash2, Loader2, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
     DropdownMenu,
@@ -31,8 +31,10 @@ export function OrderRowActions({ order }: { order: OrderRow }) {
     const invalidateNotifications = useInvalidateAdminNotifications()
     const [closeDialogOpen, setCloseDialogOpen] = useState(false)
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+    const [refundDialogOpen, setRefundDialogOpen] = useState(false)
     const [closing, setClosing] = useState(false)
     const [deleting, setDeleting] = useState(false)
+    const [refunding, setRefunding] = useState(false)
 
     const handleCopyOrderNo = async () => {
         try {
@@ -91,8 +93,34 @@ export function OrderRowActions({ order }: { order: OrderRow }) {
         }
     }
 
+    const handleRefund = async () => {
+        setRefunding(true)
+        try {
+            const res = await fetch(`/api/admin/orders/${order.id}/refund`, {
+                method: "POST",
+            })
+            if (res.ok) {
+                setRefundDialogOpen(false)
+                toast.success("退款成功")
+                router.refresh()
+                invalidateNotifications()
+            } else {
+                const data = await res.json().catch(() => ({}))
+                // Refund errors can carry critical, actionable detail (e.g. money already
+                // refunded at the provider but local state failed — admin must record the
+                // order number). Keep it on-screen longer so it isn't missed.
+                toast.error(data?.error ?? "退款失败", { duration: 10000 })
+            }
+        } catch {
+            toast.error("操作失败")
+        } finally {
+            setRefunding(false)
+        }
+    }
+
     const canClose = order.status === "PENDING"
     const canDelete = order.status === "CLOSED"
+    const canRefund = order.status === "COMPLETED"
 
     return (
         <>
@@ -125,6 +153,20 @@ export function OrderRowActions({ order }: { order: OrderRow }) {
                             >
                                 <XCircle className="size-4" />
                                 关闭订单
+                            </DropdownMenuItem>
+                        </>
+                    )}
+                    {canRefund && (
+                        <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                                onSelect={(e) => {
+                                    e.preventDefault()
+                                    setRefundDialogOpen(true)
+                                }}
+                            >
+                                <RotateCcw className="size-4" />
+                                退款
                             </DropdownMenuItem>
                         </>
                     )}
@@ -165,6 +207,30 @@ export function OrderRowActions({ order }: { order: OrderRow }) {
                         >
                             {closing && <Loader2 className="size-4 animate-spin" />}
                             确认关闭
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog open={refundDialogOpen} onOpenChange={setRefundDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>确认退款</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            将通过易支付对订单 {order.orderNo} 发起全额退款。成功后订单状态变为「已退款」，本单分销佣金将被撤销，相关里程碑奖金会重新核算。此操作无法撤销。
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={refunding}>取消</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={(e) => {
+                                e.preventDefault()
+                                handleRefund()
+                            }}
+                            disabled={refunding}
+                        >
+                            {refunding && <Loader2 className="size-4 animate-spin" />}
+                            确认退款
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

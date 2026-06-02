@@ -205,6 +205,14 @@ export function OrderDetailContent({ result: initialResult, getPassword }: Props
                 </div>
             )}
 
+            {/* 已退款 — 款项已原路退回；卡密内容保留可见 */}
+            {!result.isPending && result.status === "REFUNDED" && (
+                <div className="rounded-lg border border-muted bg-muted/50 p-3 text-sm text-muted-foreground">
+                    <p className="font-medium mb-0.5">订单已退款</p>
+                    <p className="text-xs">该订单已退款，款项将原路退回。如有疑问请联系客服。</p>
+                </div>
+            )}
+
             {/* MANUAL: 等待发货 / 卖家处理中 — 5-state timeline + ETA + dun button (Task 20) */}
             {!result.isPending && isManual && isProcessing && (
                 <div className="rounded-lg border border-border/60 bg-muted/40 p-4 text-sm space-y-3">

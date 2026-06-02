@@ -5,6 +5,7 @@ import {
     verifyYipayNotifySign,
     isYipayConfigured,
     getYipayPagePayUrl,
+    refundYipayOrder,
 } from "@/lib/yipay"
 import type { YipayChannelConfig } from "@/lib/yipay"
 
@@ -183,5 +184,70 @@ describe("verifyYipayNotifySign with explicit key", () => {
         const postData = { ...params, sign, sign_type: "MD5" }
         expect(verifyYipayNotifySign(postData, key)).toBe(true)
         expect(verifyYipayNotifySign(postData, "wrong_key")).toBe(false)
+    })
+})
+
+describe("refundYipayOrder", () => {
+    const realFetch = global.fetch
+
+    afterEach(() => {
+        global.fetch = realFetch
+    })
+
+    function mockFetch(body: unknown, ok = true, status = 200) {
+        global.fetch = jest.fn().mockResolvedValue({
+            ok,
+            status,
+            json: async () => body,
+        }) as unknown as typeof fetch
+    }
+
+    it("posts act=refund with out_trade_no + money and resolves ok on code=1", async () => {
+        mockFetch({ code: 1, msg: "退款成功" })
+
+        const result = await refundYipayOrder("ord_1", "1.50")
+
+        expect(result).toEqual({ ok: true, message: "退款成功" })
+        const fetchMock = global.fetch as jest.Mock
+        const [url, init] = fetchMock.mock.calls[0]
+        expect(url).toBe("https://z-pay.cn/api.php?act=refund")
+        expect(init.method).toBe("POST")
+        const sentBody = new URLSearchParams(init.body as string)
+        expect(sentBody.get("out_trade_no")).toBe("ord_1")
+        expect(sentBody.get("money")).toBe("1.50")
+        expect(sentBody.get("pid")).toBe("test_pid")
+    })
+
+    it("resolves ok:false with the provider msg when code != 1", async () => {
+        mockFetch({ code: 0, msg: "订单已退款" })
+
+        const result = await refundYipayOrder("ord_1", "1.50")
+
+        expect(result).toEqual({ ok: false, message: "订单已退款" })
+    })
+
+    it("returns null on non-OK HTTP response", async () => {
+        mockFetch({}, false, 500)
+
+        const result = await refundYipayOrder("ord_1", "1.50")
+
+        expect(result).toBeNull()
+    })
+
+    it("uses per-channel credentials when provided", async () => {
+        mockFetch({ code: 1, msg: "ok" })
+
+        await refundYipayOrder("ord_1", "2.00", {
+            pid: "chan_pid",
+            key: "chan_key",
+            submitUrl: "https://chan.example.com/submit.php",
+        })
+
+        const fetchMock = global.fetch as jest.Mock
+        const [url, init] = fetchMock.mock.calls[0]
+        expect(url).toBe("https://chan.example.com/api.php?act=refund")
+        const sentBody = new URLSearchParams(init.body as string)
+        expect(sentBody.get("pid")).toBe("chan_pid")
+        expect(sentBody.get("key")).toBe("chan_key")
     })
 })

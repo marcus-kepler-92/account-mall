@@ -13,6 +13,9 @@ const RULES: ReadonlyArray<Rule> = [
   { from: "AWAITING_FULFILLMENT", to: "CLOSED", productTypes: ["MANUAL"] },
   { from: "PROCESSING", to: "COMPLETED", productTypes: ["MANUAL"] },
   { from: "PROCESSING", to: "CLOSED", productTypes: ["MANUAL"] },
+  // Refund a paid+delivered order via the payment provider (易支付). Reverses
+  // commissions and milestone bonuses; see app/api/admin/orders/[orderId]/refund.
+  { from: "COMPLETED", to: "REFUNDED", productTypes: ALL_TYPES },
 ]
 
 export class InvalidTransitionError extends Error {

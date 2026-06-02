@@ -29,6 +29,7 @@ export type OrderRow = {
         | "PROCESSING"
         | "COMPLETED"
         | "CLOSED"
+        | "REFUNDED"
     paymentMethod: string | null
     paidAt: string | null
     createdAt: string
@@ -39,13 +40,14 @@ export type OrderRow = {
 
 const statusMap: Record<
     OrderRow["status"],
-    { label: string; variant: "warning" | "success" | "secondary" }
+    { label: string; variant: "warning" | "success" | "secondary" | "destructive" }
 > = {
     PENDING: { label: "待完成", variant: "warning" },
     AWAITING_FULFILLMENT: { label: "待发货", variant: "warning" },
     PROCESSING: { label: "发货中", variant: "warning" },
     COMPLETED: { label: "已完成", variant: "success" },
     CLOSED: { label: "已关闭", variant: "secondary" },
+    REFUNDED: { label: "已退款", variant: "destructive" },
 }
 
 const paymentMethodLabel: Record<string, string> = {

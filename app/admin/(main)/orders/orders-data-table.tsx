@@ -60,6 +60,7 @@ const statusOptions = [
     { label: "发货中", value: "PROCESSING" },
     { label: "已完成", value: "COMPLETED" },
     { label: "已关闭", value: "CLOSED" },
+    { label: "已退款", value: "REFUNDED" },
 ];
 
 export function OrdersDataTable({ data, total, statusCounts, distributors, canReassignDistributor, isSuperAdmin = false }: OrdersDataTableProps) {

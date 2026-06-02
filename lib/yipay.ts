@@ -126,6 +126,50 @@ export async function queryYipayOrder(
 }
 
 /**
+ * Refund an order through Yipay (易支付) via `act=refund` POST.
+ * Mirrors queryYipayOrder's credential resolution: per-channel pid/key/submitUrl when provided,
+ * else env fallback. Returns { ok: true } when Yipay confirms refund (code === 1),
+ * { ok: false, message } with Yipay's msg on a declined refund, or null on error/unconfigured.
+ *
+ * @param orderNo  out_trade_no — the platform order number used at payment time
+ * @param money    refund amount string; must equal the original paid amount (Order.amount)
+ */
+export async function refundYipayOrder(
+    orderNo: string,
+    money: string,
+    channel?: Pick<YipayChannelConfig, "pid" | "key" | "submitUrl">,
+): Promise<{ ok: boolean; message?: string } | null> {
+    const pid = channel?.pid ?? config.yipayPid
+    const key = channel?.key ?? config.yipayKey
+    const submitUrl = channel?.submitUrl ?? config.yipaySubmitUrl
+    if (!pid || !key || !submitUrl) return null
+    try {
+        const base = new URL(submitUrl)
+        base.pathname = "/api.php"
+        base.search = ""
+        const url = `${base.toString()}?act=refund`
+        const form = new URLSearchParams({ pid, key, money, out_trade_no: orderNo })
+        const res = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: form.toString(),
+            cache: "no-store",
+        })
+        if (!res.ok) {
+            console.warn("[yipay-refund] orderNo=%s http_status=%d", orderNo, res.status)
+            return null
+        }
+        const data = (await res.json()) as Record<string, unknown>
+        const ok = data.code === 1 || data.code === "1"
+        const message = typeof data.msg === "string" ? data.msg : undefined
+        return { ok, message }
+    } catch (e) {
+        console.error("[yipay-refund] orderNo=%s error=%s", orderNo, e instanceof Error ? e.message : String(e))
+        return null
+    }
+}
+
+/**
  * Verify Yipay async notify sign. Same algorithm as submit: prestr from params (exclude sign/sign_type), mysign = MD5(prestr+key), compare with sign (lowercase).
  */
 export function verifyYipayNotifySign(postData: Record<string, unknown>, key?: string): boolean {

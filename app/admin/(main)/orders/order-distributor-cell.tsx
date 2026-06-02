@@ -35,6 +35,7 @@ interface OrderDistributorCellProps {
     | "PROCESSING"
     | "COMPLETED"
     | "CLOSED"
+    | "REFUNDED"
   distributor: { id: string; name: string; distributorCode: string | null } | null
   distributors: DistributorOption[]
   readOnly?: boolean

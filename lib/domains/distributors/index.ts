@@ -14,6 +14,7 @@ export { getDistributorProfile, getDistributorTierSummary } from "./service"
 
 // Commissions
 export { createOrderCommissions, listDistributorCommissions } from "./service"
+export { cancelOrderCommissions } from "./repository"
 
 // Withdrawals
 export { listDistributorWithdrawals, createWithdrawal, listAdminWithdrawals, countPendingWithdrawals, processWithdrawal } from "./service"
@@ -75,6 +76,7 @@ export {
   deleteInvitationMilestone,
   listDistributorMilestoneBonuses,
   checkAndIssueMilestoneBonuses,
+  revokeMilestoneBonusesForInviter,
 } from "./milestone-service"
 
 export type { CreateMilestoneInput, UpdateMilestoneInput } from "./validators"

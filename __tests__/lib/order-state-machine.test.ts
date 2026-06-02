@@ -27,8 +27,28 @@ describe("order state machine", () => {
     expect(canTransition("PROCESSING", "CLOSED", "MANUAL")).toBe(true)
   })
 
-  it("rejects COMPLETED → anything and CLOSED → anything", () => {
+  it("allows COMPLETED → REFUNDED for all product types", () => {
+    expect(canTransition("COMPLETED", "REFUNDED", "NORMAL")).toBe(true)
+    expect(canTransition("COMPLETED", "REFUNDED", "AUTO_FETCH")).toBe(true)
+    expect(canTransition("COMPLETED", "REFUNDED", "MANUAL")).toBe(true)
+  })
+
+  it("rejects REFUNDED only from COMPLETED (not from other states)", () => {
+    expect(canTransition("PENDING", "REFUNDED", "NORMAL")).toBe(false)
+    expect(canTransition("AWAITING_FULFILLMENT", "REFUNDED", "MANUAL")).toBe(false)
+    expect(canTransition("PROCESSING", "REFUNDED", "MANUAL")).toBe(false)
+    expect(canTransition("CLOSED", "REFUNDED", "NORMAL")).toBe(false)
+  })
+
+  it("rejects REFUNDED → anything (terminal)", () => {
+    expect(canTransition("REFUNDED", "COMPLETED", "NORMAL")).toBe(false)
+    expect(canTransition("REFUNDED", "CLOSED", "MANUAL")).toBe(false)
+    expect(canTransition("REFUNDED", "PENDING", "NORMAL")).toBe(false)
+  })
+
+  it("rejects other COMPLETED → X and CLOSED → anything", () => {
     expect(canTransition("COMPLETED", "PROCESSING", "MANUAL")).toBe(false)
+    expect(canTransition("COMPLETED", "CLOSED", "NORMAL")).toBe(false)
     expect(canTransition("CLOSED", "PENDING", "MANUAL")).toBe(false)
   })
 

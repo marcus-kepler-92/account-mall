@@ -8,6 +8,7 @@ export const orderStatusSchema = z.enum([
     "PROCESSING",
     "COMPLETED",
     "CLOSED",
+    "REFUNDED",
 ])
 
 export const paymentMethodSchema = z.enum(["alipay", "wxpay", "qqpay"])

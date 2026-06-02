@@ -252,8 +252,8 @@ async function createAutoFetchOrder(params: {
             return internalServerError("下单失败，请稍后重试。")
         }
 
-        // Development 快捷通道
-        if (config.nodeEnv === "development") {
+        // Development 快捷通道（DEV_REAL_PAYMENT 打开时跳过，改走真实易支付以便测试退款）
+        if (config.nodeEnv === "development" && !config.devRealPayment) {
             const devResult = await completePendingOrder(paidOrder.orderNo)
             if (devResult.done) {
                 const successToken = createOrderSuccessToken(paidOrder.orderNo)
@@ -735,7 +735,8 @@ export async function POST(request: NextRequest) {
         }
 
         // Development shortcut mirrors NORMAL/AUTO_FETCH for E2E parity
-        if (config.nodeEnv === "development") {
+        // (DEV_REAL_PAYMENT 打开时跳过，改走真实易支付)
+        if (config.nodeEnv === "development" && !config.devRealPayment) {
             const devResult = await completePendingOrder(manualOrder.orderNo)
             if (devResult.done) {
                 const successToken = createOrderSuccessToken(manualOrder.orderNo)
@@ -908,7 +909,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Development: complete order immediately and return successToken so frontend redirects to success page
-    if (config.nodeEnv === "development") {
+    // (DEV_REAL_PAYMENT 打开时跳过，改走真实易支付以便测试退款)
+    if (config.nodeEnv === "development" && !config.devRealPayment) {
         const result = await completePendingOrder(order.orderNo)
         if (!result.done) {
             return internalServerError(result.error ?? "Failed to complete order")

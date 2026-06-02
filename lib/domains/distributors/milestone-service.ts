@@ -169,3 +169,59 @@ export async function checkAndIssueMilestoneBonuses(
     }
   }
 }
+
+/**
+ * Called after an order refund reverses one of a downline's COMPLETED sales.
+ * Recomputes every already-issued bonus for this inviter using the same qualification
+ * rule as checkAndIssueMilestoneBonuses, and revokes (deletes) any bonus whose qualifying
+ * invitee count has now dropped below the milestone threshold.
+ *
+ * Must run AFTER the refunded order has been flipped to REFUNDED in the same transaction,
+ * so the COMPLETED-filtered groupBy below no longer counts it.
+ */
+export async function revokeMilestoneBonusesForInviter(
+  tx: Prisma.TransactionClient,
+  inviterId: string,
+): Promise<void> {
+  const issued = await tx.invitationMilestoneBonus.findMany({
+    where: { inviterId },
+    select: { id: true, milestoneId: true },
+  })
+  if (issued.length === 0) return
+
+  const milestones = await tx.invitationMilestone.findMany({
+    where: { id: { in: issued.map((b) => b.milestoneId) } },
+  })
+  const milestoneById = new Map(milestones.map((m) => [m.id, m]))
+
+  const invitees = await tx.user.findMany({
+    where: { inviterId, role: "DISTRIBUTOR", disabledAt: null },
+    select: { id: true },
+  })
+  const inviteeIds = invitees.map((u) => u.id)
+
+  for (const bonus of issued) {
+    const milestone = milestoneById.get(bonus.milestoneId)
+    if (!milestone) continue
+
+    let qualifiedCount = 0
+    if (inviteeIds.length > 0) {
+      const salesByInvitee = await tx.order.groupBy({
+        by: ["distributorId"],
+        where: {
+          distributorId: { in: inviteeIds },
+          status: "COMPLETED",
+          paidAt: { gte: milestone.createdAt },
+        },
+        _sum: { amount: true },
+      })
+      qualifiedCount = salesByInvitee.filter(
+        (g) => Number(g._sum.amount ?? 0) >= Number(milestone.thresholdAmount),
+      ).length
+    }
+
+    if (qualifiedCount < milestone.thresholdCount) {
+      await tx.invitationMilestoneBonus.delete({ where: { id: bonus.id } })
+    }
+  }
+}

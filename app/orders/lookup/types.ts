@@ -8,6 +8,7 @@ export type OrderResultStatus =
     | "PROCESSING"
     | "COMPLETED"
     | "CLOSED"
+    | "REFUNDED"
 
 export type OrderProductType = "NORMAL" | "AUTO_FETCH" | "MANUAL"
 

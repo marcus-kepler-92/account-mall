@@ -146,6 +146,16 @@ const envSchema = z
       .optional()
             .transform((v) => v === "true" || v === "1")
             .default(false),
+    /**
+     * Dev-only: 绕过开发环境的"下单即自动完成"快捷通道，改走真实易支付付款流程。
+     * 便于在本地产生一笔真实 zpay 付款单，从而测试真实退款。
+     * 仅在 NODE_ENV=development 下生效。由 `npm run dev:realpay` 注入。
+     */
+    devRealPayment: z
+      .string()
+      .optional()
+      .transform((v) => v === "true" || v === "1")
+      .default(false),
     /** 阿里云千问 API Key，AI 客服功能必填 */
     qwenApiKey: z.string().optional(),
     /** AUTO_FETCH：苹果账号管理平台基础 URL（voidlogins 类型商品使用） */
@@ -313,6 +323,7 @@ function getEnvInput() {
     yipayKey: e.YIPAY_KEY,
     yipaySubmitUrl: e.YIPAY_SUBMIT_URL,
     yipaySiteName: e.YIPAY_SITE_NAME,
+    devRealPayment: e.DEV_REAL_PAYMENT,
     cronSecret: e.CRON_SECRET,
     pendingOrderTimeoutMs: e.PENDING_ORDER_TIMEOUT_MS,
     orderRateLimitPoints: e.ORDER_RATE_LIMIT_POINTS,

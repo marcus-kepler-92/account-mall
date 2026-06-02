@@ -34,6 +34,7 @@ const statusOptions = [
     { label: "待支付", value: "PENDING" },
     { label: "已完成", value: "COMPLETED" },
     { label: "已关闭", value: "CLOSED" },
+    { label: "已退款", value: "REFUNDED" },
 ]
 
 export function DistributorOrdersDataTable({

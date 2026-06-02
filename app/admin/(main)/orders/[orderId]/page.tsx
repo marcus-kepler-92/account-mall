@@ -86,7 +86,9 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
                 ? "发货中"
                 : order.status === "COMPLETED"
                   ? "已完成"
-                  : "已关闭"
+                  : order.status === "REFUNDED"
+                    ? "已退款"
+                    : "已关闭"
 
     const statusBadgeClass =
         order.status === "COMPLETED"
@@ -95,7 +97,9 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
                 order.status === "AWAITING_FULFILLMENT" ||
                 order.status === "PROCESSING"
               ? "border-warning/50 bg-warning/10 text-warning"
-              : "border-muted-foreground/30 bg-muted text-muted-foreground"
+              : order.status === "REFUNDED"
+                ? "border-destructive/50 bg-destructive/10 text-destructive"
+                : "border-muted-foreground/30 bg-muted text-muted-foreground"
 
     const cardTemplates = order.product.cardTemplates
     const serializedCards = order.cards.map((c) => ({

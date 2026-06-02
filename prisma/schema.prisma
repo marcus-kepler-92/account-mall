@@ -118,6 +118,7 @@ enum OrderStatus {
   PROCESSING
   COMPLETED
   CLOSED
+  REFUNDED
 }
 
 enum RestockSubscriptionStatus {
@@ -287,6 +288,8 @@ model Order {
   costTotalSnapshot      Decimal?           @db.Decimal(10, 2)
   status                 OrderStatus        @default(PENDING)
   paidAt                 DateTime?
+  /// Set when a COMPLETED order is refunded via the payment provider (易支付). Null otherwise.
+  refundedAt             DateTime?
   /// AUTO_FETCH：订单有效期截止时间；免费=创建时+validityHours，收费=支付时+validityHours
   expiresAt              DateTime?
   promoCode              String? // 下单时使用的推荐码（冗余存储，便于查询）

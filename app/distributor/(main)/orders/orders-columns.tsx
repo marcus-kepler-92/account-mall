@@ -17,7 +17,7 @@ export type DistributorOrderRow = {
     // / CLOSED (those are the only states that affect commissions), but the row
     // type needs to accept the full Prisma OrderStatus union to satisfy
     // `Order.status` widening in page.tsx.
-    status: "PENDING" | "AWAITING_FULFILLMENT" | "PROCESSING" | "COMPLETED" | "CLOSED"
+    status: "PENDING" | "AWAITING_FULFILLMENT" | "PROCESSING" | "COMPLETED" | "CLOSED" | "REFUNDED"
     commissionAmount: number | null
     createdAt: string
 }
@@ -38,12 +38,13 @@ export function CommissionCell({ row }: { row: { original: Pick<DistributorOrder
     )
 }
 
-const statusMap: Record<DistributorOrderRow["status"], { label: string; variant: "warning" | "success" | "secondary" | "outline" }> = {
+const statusMap: Record<DistributorOrderRow["status"], { label: string; variant: "warning" | "success" | "secondary" | "outline" | "destructive" }> = {
     PENDING: { label: "待支付", variant: "warning" },
     AWAITING_FULFILLMENT: { label: "待发货", variant: "outline" },
     PROCESSING: { label: "处理中", variant: "outline" },
     COMPLETED: { label: "已完成", variant: "success" },
     CLOSED: { label: "已关闭", variant: "secondary" },
+    REFUNDED: { label: "已退款", variant: "destructive" },
 }
 
 export const distributorOrdersColumns: ColumnDef<DistributorOrderRow>[] = [

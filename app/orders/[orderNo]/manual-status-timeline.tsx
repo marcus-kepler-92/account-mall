@@ -14,6 +14,7 @@ type Status =
     | "PROCESSING"
     | "COMPLETED"
     | "CLOSED"
+    | "REFUNDED"
 
 /**
  * Buyer-facing 5-state progress hint for MANUAL orders.
@@ -37,6 +38,13 @@ export function ManualStatusTimeline({
         return (
             <div className="text-sm text-muted-foreground">
                 订单已关闭，如有疑问联系客服。
+            </div>
+        )
+    }
+    if (current === "REFUNDED") {
+        return (
+            <div className="text-sm text-muted-foreground">
+                订单已退款，如有疑问联系客服。
             </div>
         )
     }
