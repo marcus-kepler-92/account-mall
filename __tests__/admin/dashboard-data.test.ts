@@ -201,37 +201,26 @@ describe("dashboard-data", () => {
   })
 
   describe("getGlobalKPI", () => {
-    it("excludes milestone bonuses from todayProfit (cumulative reward, not daily op cost)", async () => {
-      prismaMock.order.findMany.mockResolvedValueOnce([
-        { amount: 200, quantity: 1, costSnapshot: null, costTotalSnapshot: "30" } as any,
-      ])
-      prismaMock.commission.aggregate.mockResolvedValueOnce({ _sum: { amount: "10" } } as any)
-
-      const result = await getGlobalKPI()
-
-      // todayProfit = 200 - 30 - 10 = 160; milestone bonus is NOT deducted even if one triggered today
-      expect(result.todayRevenue).toBe(200)
-      expect(result.todayProfit).toBeCloseTo(160, 2)
-      expect(result.todayOrders).toBe(1)
-    })
-
-    it("does not query invitationMilestoneBonus (decoupled from daily KPI)", async () => {
-      prismaMock.order.findMany.mockResolvedValueOnce([])
-      prismaMock.commission.aggregate.mockResolvedValueOnce({ _sum: { amount: 0 } } as any)
-
-      await getGlobalKPI()
-
-      expect(prismaMock.invitationMilestoneBonus.aggregate).not.toHaveBeenCalled()
-    })
+    // Promise.all order: order.findMany (paid+free today), user.count (new
+    // distributors), order.aggregate (refund sum), order.count (fulfillment backlog).
+    function mockKPI(opts: {
+      orders?: { amount: number }[]
+      newDistributors?: number
+      refundSum?: number | string | null
+      awaiting?: number
+    }) {
+      prismaMock.order.findMany.mockResolvedValueOnce((opts.orders ?? []) as any)
+      prismaMock.user.count.mockResolvedValueOnce(opts.newDistributors ?? 0)
+      prismaMock.order.aggregate.mockResolvedValueOnce({
+        _sum: { amount: opts.refundSum ?? null },
+      } as any)
+      prismaMock.order.count.mockResolvedValueOnce(opts.awaiting ?? 0)
+    }
 
     it("splits free (amount 0) vs paid (amount > 0) and computes conversion", async () => {
-      prismaMock.order.findMany.mockResolvedValueOnce([
-        { amount: 0, quantity: 1, costSnapshot: null, costTotalSnapshot: null } as any,
-        { amount: 0, quantity: 1, costSnapshot: null, costTotalSnapshot: null } as any,
-        { amount: 0, quantity: 1, costSnapshot: null, costTotalSnapshot: null } as any,
-        { amount: 100, quantity: 1, costSnapshot: null, costTotalSnapshot: "10" } as any,
-      ])
-      prismaMock.commission.aggregate.mockResolvedValueOnce({ _sum: { amount: 0 } } as any)
+      mockKPI({
+        orders: [{ amount: 0 }, { amount: 0 }, { amount: 0 }, { amount: 100 }],
+      })
 
       const result = await getGlobalKPI()
 
@@ -242,14 +231,31 @@ describe("dashboard-data", () => {
     })
 
     it("returns 0 conversion when there are no orders", async () => {
-      prismaMock.order.findMany.mockResolvedValueOnce([])
-      prismaMock.commission.aggregate.mockResolvedValueOnce({ _sum: { amount: 0 } } as any)
+      mockKPI({ orders: [] })
 
       const result = await getGlobalKPI()
 
       expect(result.todayFreeCount).toBe(0)
       expect(result.todayPaidCount).toBe(0)
       expect(result.todayConversionRate).toBe(0)
+    })
+
+    it("passes through new distributors, refund amount and fulfillment backlog", async () => {
+      mockKPI({ orders: [], newDistributors: 4, refundSum: "59.5", awaiting: 7 })
+
+      const result = await getGlobalKPI()
+
+      expect(result.todayNewDistributors).toBe(4)
+      expect(result.todayRefundAmount).toBeCloseTo(59.5, 2)
+      expect(result.awaitingFulfillmentCount).toBe(7)
+    })
+
+    it("treats a null refund sum as 0", async () => {
+      mockKPI({ orders: [], refundSum: null })
+
+      const result = await getGlobalKPI()
+
+      expect(result.todayRefundAmount).toBe(0)
     })
   })
 

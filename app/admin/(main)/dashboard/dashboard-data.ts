@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma"
 import { getHKTDayStart } from "@/lib/utils"
-import { resolveOrderCost } from "@/lib/profit"
 import {
   type DashboardTrendPoint,
   type TopProductRow,
@@ -196,28 +195,32 @@ export async function getDashboardData(): Promise<DashboardData> {
 }
 
 export type GlobalKPI = {
-  todayRevenue: number
-  todayProfit: number
-  todayOrders: number
   /** Free claims today (AUTO_FETCH price=0 orders, amount === 0). */
   todayFreeCount: number
   /** Paid orders today (amount > 0). */
   todayPaidCount: number
   /** Paid / (free + paid). Fraction 0..1; 0 when no orders. */
   todayConversionRate: number
-  hasMissingCost: boolean
+  /** Distributors (User role=DISTRIBUTOR) registered today. */
+  todayNewDistributors: number
+  /** Sum of refunded order amounts today (status REFUNDED, refundedAt today). */
+  todayRefundAmount: number
+  /** Current backlog of orders awaiting manual fulfillment (not date-scoped). */
+  awaitingFulfillmentCount: number
 }
 
 /**
- * Today revenue / profit / orders / conversion / cost warning.
+ * Top-bar snapshot for the admin dashboard. Picked to NOT overlap the sales tab
+ * (which covers revenue / orders / quantity / avg price / conversion over a window):
+ * growth (conversion, new distributors), risk (refunds) and an action signal
+ * (fulfillment backlog).
  *
  * Conversion = paid / (free + paid) among today's COMPLETED orders. Free claims
  * land as COMPLETED with amount 0 (see app/api/orders POST), paid orders have
  * amount > 0, so both are in the same query set and split by amount.
  *
- * Milestone bonuses are excluded from todayProfit: they reward cumulative invitee
- * spending earned over weeks/months, so attributing the full bonus to the trigger day
- * distorts that day's operational profit. They remain visible in the milestone tab.
+ * `awaitingFulfillmentCount` is a live backlog, intentionally NOT scoped to today —
+ * it answers "what needs shipping right now".
  */
 export async function getGlobalKPI(): Promise<GlobalKPI> {
   const now = new Date()
@@ -225,36 +228,31 @@ export async function getGlobalKPI(): Promise<GlobalKPI> {
   const tomorrowStart = new Date(todayStart)
   tomorrowStart.setDate(tomorrowStart.getDate() + 1)
 
-  const [orders, commissions] = await Promise.all([
-    prisma.order.findMany({
-      where: { status: "COMPLETED", paidAt: { gte: todayStart, lt: tomorrowStart } },
-      select: { amount: true, quantity: true, costSnapshot: true, costTotalSnapshot: true },
-    }),
-    prisma.commission.aggregate({
-      where: {
-        status: { not: "CANCELLED" },
-        createdAt: { gte: todayStart, lt: tomorrowStart },
-      },
-      _sum: { amount: true },
-    }),
-  ])
+  const [paidOrders, todayNewDistributors, refundAgg, awaitingFulfillmentCount] =
+    await Promise.all([
+      prisma.order.findMany({
+        where: { status: "COMPLETED", paidAt: { gte: todayStart, lt: tomorrowStart } },
+        select: { amount: true },
+      }),
+      prisma.user.count({
+        where: { role: "DISTRIBUTOR", createdAt: { gte: todayStart, lt: tomorrowStart } },
+      }),
+      prisma.order.aggregate({
+        where: { status: "REFUNDED", refundedAt: { gte: todayStart, lt: tomorrowStart } },
+        _sum: { amount: true },
+      }),
+      prisma.order.count({ where: { status: "AWAITING_FULFILLMENT" } }),
+    ])
 
-  const todayRevenue = orders.reduce((s, o) => s + Number(o.amount), 0)
-  const costResolutions = orders.map((o) => resolveOrderCost(o))
-  const todayCost = costResolutions.reduce((s, r) => s + r.cost, 0)
-  const hasMissingCost = costResolutions.some((r) => !r.hasCost)
-  const todayCommission = Number(commissions._sum.amount ?? 0)
-
-  const todayFreeCount = orders.filter((o) => Number(o.amount) === 0).length
-  const todayPaidCount = orders.length - todayFreeCount
+  const todayFreeCount = paidOrders.filter((o) => Number(o.amount) === 0).length
+  const todayPaidCount = paidOrders.length - todayFreeCount
 
   return {
-    todayRevenue,
-    todayProfit: todayRevenue - todayCost - todayCommission,
-    todayOrders: orders.length,
     todayFreeCount,
     todayPaidCount,
-    todayConversionRate: orders.length > 0 ? todayPaidCount / orders.length : 0,
-    hasMissingCost,
+    todayConversionRate: paidOrders.length > 0 ? todayPaidCount / paidOrders.length : 0,
+    todayNewDistributors,
+    todayRefundAmount: Number(refundAgg._sum.amount ?? 0),
+    awaitingFulfillmentCount,
   }
 }

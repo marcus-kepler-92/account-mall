@@ -60,8 +60,26 @@ describe("GET /api/admin/sales-report", () => {
     const res = await GET(makeRequest({ from: "2025-03-17", to: "2025-03-17" }))
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.summary).toEqual({ orderCount: 0, totalQuantity: 0, revenue: 0, cost: 0, hasMissingCost: false, milestoneBonus: 0, profit: 0 })
+    expect(body.summary).toEqual({ orderCount: 0, freeOrderCount: 0, paidOrderCount: 0, totalQuantity: 0, revenue: 0, cost: 0, hasMissingCost: false, milestoneBonus: 0, profit: 0 })
     expect(body.products).toEqual([])
+  })
+
+  it("splits free (amount 0) vs paid (amount > 0) order counts", async () => {
+    ;(getAdminSession as jest.Mock).mockResolvedValue(mockSession)
+    prismaMock.order.findMany.mockResolvedValue([
+      { id: "f1", productId: "p1", productNameSnapshot: "免费领取", quantity: 1, amount: "0" as any, costSnapshot: null, costTotalSnapshot: "0" as any, product: { name: "免费领取" } },
+      { id: "f2", productId: "p1", productNameSnapshot: "免费领取", quantity: 1, amount: "0" as any, costSnapshot: null, costTotalSnapshot: "0" as any, product: { name: "免费领取" } },
+      { id: "p_paid", productId: "p2", productNameSnapshot: "付费商品", quantity: 1, amount: "50.00" as any, costSnapshot: null, costTotalSnapshot: "10.00" as any, product: { name: "付费商品" } },
+    ] as any)
+    prismaMock.commission.groupBy.mockResolvedValue([])
+    prismaMock.invitationMilestoneBonus.findMany.mockResolvedValue(NO_BONUS)
+
+    const res = await GET(makeRequest({ from: "2025-03-17", to: "2025-03-17" }))
+    const body = await res.json()
+
+    expect(body.summary.orderCount).toBe(3)
+    expect(body.summary.freeOrderCount).toBe(2)
+    expect(body.summary.paidOrderCount).toBe(1)
   })
 
   it("aggregates orders by product with commissions", async () => {
