@@ -14,16 +14,18 @@ import {
 
 const routeLabels: Record<string, string> = {
     dashboard: "仪表盘",
+    notifications: "通知中心",
     products: "商品管理",
     orders: "订单管理",
+    fulfillment: "人工发货",
     cards: "卡密管理",
     "card-templates": "卡密模版",
     announcements: "公告管理",
     guides: "分销指南",
-    distributors: "分销商",
-    "commission-tiers": "佣金档位",
+    distributors: "分销员管理",
+    "commission-tiers": "阶梯佣金配置",
     "invitation-milestones": "邀请里程碑奖励",
-    withdrawals: "提现",
+    withdrawals: "提现管理",
     files: "文件管理",
     "auto-fetch": "自动获取验证",
     "email-marketing": "邮件营销",
@@ -31,6 +33,8 @@ const routeLabels: Record<string, string> = {
     campaigns: "群发活动",
     "payment-channels": "收款渠道",
     admins: "管理员管理",
+    site: "系统设置",
+    "cross-sell": "联推折扣",
     agent: "客服 Agent",
     knowledge: "知识库",
     leads: "人工跟进",
@@ -55,7 +59,9 @@ function getBreadcrumbItems(pathname: string) {
         const prev = segments[i - 1]
         href += `/${seg}`
 
-        if (seg === "admin") continue
+        // "settings" has no page of its own and is not a menu node — skip it so
+        // the breadcrumb shows only the leaf (系统设置 / 联推折扣), matching the menu.
+        if (seg === "admin" || seg === "settings") continue
 
         let label: string
         if (prev === "products") {

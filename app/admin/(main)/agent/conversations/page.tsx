@@ -114,7 +114,7 @@ export default async function AdminAgentConversationsPage({
     return (
         <div className="space-y-6">
             <PageHeader
-                title="客服会话"
+                title="对话历史"
                 description="Agent 与访客的对话记录，支持按消息内容搜索"
             />
 

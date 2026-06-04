@@ -30,7 +30,7 @@ export default async function AdminDashboardPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="概览"
+        title="仪表盘"
         description={`欢迎使用 ${config.siteName} ${config.adminPanelLabel}`}
       />
       <DashboardGlobalKPI kpi={kpi} />
