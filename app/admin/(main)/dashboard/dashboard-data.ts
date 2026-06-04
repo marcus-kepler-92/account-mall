@@ -199,21 +199,27 @@ export type GlobalKPI = {
   todayRevenue: number
   todayProfit: number
   todayOrders: number
-  lowStockCount: number
+  /** Free claims today (AUTO_FETCH price=0 orders, amount === 0). */
+  todayFreeCount: number
+  /** Paid orders today (amount > 0). */
+  todayPaidCount: number
+  /** Paid / (free + paid). Fraction 0..1; 0 when no orders. */
+  todayConversionRate: number
   hasMissingCost: boolean
 }
 
-export type GlobalKPIMetrics = Omit<GlobalKPI, "lowStockCount">
-
 /**
- * Today revenue / profit / orders / cost warning. Does not query inventory —
- * combine with `countInventoryAttentionProducts(await getInventoryByProduct())` for full `GlobalKPI`.
+ * Today revenue / profit / orders / conversion / cost warning.
+ *
+ * Conversion = paid / (free + paid) among today's COMPLETED orders. Free claims
+ * land as COMPLETED with amount 0 (see app/api/orders POST), paid orders have
+ * amount > 0, so both are in the same query set and split by amount.
  *
  * Milestone bonuses are excluded from todayProfit: they reward cumulative invitee
  * spending earned over weeks/months, so attributing the full bonus to the trigger day
  * distorts that day's operational profit. They remain visible in the milestone tab.
  */
-export async function getGlobalKPI(): Promise<GlobalKPIMetrics> {
+export async function getGlobalKPI(): Promise<GlobalKPI> {
   const now = new Date()
   const todayStart = getHKTDayStart(now)
   const tomorrowStart = new Date(todayStart)
@@ -239,10 +245,16 @@ export async function getGlobalKPI(): Promise<GlobalKPIMetrics> {
   const hasMissingCost = costResolutions.some((r) => !r.hasCost)
   const todayCommission = Number(commissions._sum.amount ?? 0)
 
+  const todayFreeCount = orders.filter((o) => Number(o.amount) === 0).length
+  const todayPaidCount = orders.length - todayFreeCount
+
   return {
     todayRevenue,
     todayProfit: todayRevenue - todayCost - todayCommission,
     todayOrders: orders.length,
+    todayFreeCount,
+    todayPaidCount,
+    todayConversionRate: orders.length > 0 ? todayPaidCount / orders.length : 0,
     hasMissingCost,
   }
 }

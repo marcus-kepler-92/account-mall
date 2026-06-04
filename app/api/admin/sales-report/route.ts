@@ -48,6 +48,10 @@ export type SalesReportSeriesPoint = {
 export type SalesReportResponse = {
     summary: {
         orderCount: number
+        /** Free claims (amount === 0) in range. */
+        freeOrderCount: number
+        /** Paid orders (amount > 0) in range. */
+        paidOrderCount: number
         totalQuantity: number
         revenue: number
         cost: number
@@ -150,7 +154,7 @@ export async function GET(request: Request): Promise<NextResponse> {
             orderCount: 0,
         }))
         return NextResponse.json<SalesReportResponse>({
-            summary: { orderCount: 0, totalQuantity: 0, revenue: 0, cost: 0, milestoneBonus, profit: 0, hasMissingCost: false },
+            summary: { orderCount: 0, freeOrderCount: 0, paidOrderCount: 0, totalQuantity: 0, revenue: 0, cost: 0, milestoneBonus, profit: 0, hasMissingCost: false },
             products: [],
             series: emptySeries,
         })
@@ -249,6 +253,8 @@ export async function GET(request: Request): Promise<NextResponse> {
     const totalCommission = products.reduce((s, p) => s + p.commission, 0)
     const totalCost = products.reduce((s, p) => s + p.cost, 0)
     const hasMissingCost = products.some((p) => p.hasMissingCost)
+    const freeOrderCount = orders.filter((o) => Number(o.amount) === 0).length
+    const paidOrderCount = orders.length - freeOrderCount
 
     const series: SalesReportSeriesPoint[] = dayList.map((date) => {
         const b = dayMap.get(date)
@@ -268,6 +274,8 @@ export async function GET(request: Request): Promise<NextResponse> {
     return NextResponse.json<SalesReportResponse>({
         summary: {
             orderCount: orders.length,
+            freeOrderCount,
+            paidOrderCount,
             totalQuantity: products.reduce((s, p) => s + p.quantity, 0),
             revenue: totalRevenue,
             cost: totalCost,

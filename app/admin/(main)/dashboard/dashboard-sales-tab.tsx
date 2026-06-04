@@ -60,6 +60,11 @@ export function DashboardSalesTab({
     summary && summary.totalQuantity > 0
       ? summary.revenue / summary.totalQuantity
       : 0
+  // Conversion = paid / (free + paid). orderCount already counts both.
+  const conversionRate =
+    summary && summary.orderCount > 0
+      ? summary.paidOrderCount / summary.orderCount
+      : 0
 
   // Build TopProductRow[] for chart — sorted by revenue desc
   const topProducts: TopProductRow[] = (data?.products ?? [])
@@ -90,7 +95,7 @@ export function DashboardSalesTab({
       />
 
       {/* KPI row */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <Card>
           <CardContent>
             <p className="text-xs text-muted-foreground">总营收</p>
@@ -128,6 +133,23 @@ export function DashboardSalesTab({
               <Skeleton className="mt-1 h-7 w-20" />
             ) : (
               <p className="mt-1 text-xl font-bold">{formatCurrency(avgPrice)}</p>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent>
+            <p className="text-xs text-muted-foreground">转化率</p>
+            {isLoading ? (
+              <Skeleton className="mt-1 h-7 w-16" />
+            ) : (
+              <>
+                <p className="mt-1 text-xl font-bold">
+                  {(conversionRate * 100).toFixed(1)}%
+                </p>
+                <p className="mt-0.5 text-[10px] leading-tight text-muted-foreground">
+                  付费 {summary?.paidOrderCount ?? 0} · 领取 {summary?.freeOrderCount ?? 0}
+                </p>
+              </>
             )}
           </CardContent>
         </Card>

@@ -6,8 +6,6 @@ import {
   getInventoryByProduct,
   getRestockPending,
   getRecentOrders,
-  countInventoryAttentionProducts,
-  type GlobalKPI,
 } from "./dashboard-data"
 import { DashboardGlobalKPI } from "./dashboard-global-kpi"
 import { DashboardTabs } from "./dashboard-tabs"
@@ -15,17 +13,12 @@ import { DashboardTabs } from "./dashboard-tabs"
 export const dynamic = "force-dynamic"
 
 export default async function AdminDashboardPage() {
-  const [metrics, inventory, restockPending, recentOrders] = await Promise.all([
+  const [kpi, inventory, restockPending, recentOrders] = await Promise.all([
     getGlobalKPI(),
     getInventoryByProduct(),
     getRestockPending(),
     getRecentOrders(),
   ])
-
-  const kpi: GlobalKPI = {
-    ...metrics,
-    lowStockCount: countInventoryAttentionProducts(inventory),
-  }
 
   return (
     <div className="space-y-6">

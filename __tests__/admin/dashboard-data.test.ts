@@ -223,6 +223,34 @@ describe("dashboard-data", () => {
 
       expect(prismaMock.invitationMilestoneBonus.aggregate).not.toHaveBeenCalled()
     })
+
+    it("splits free (amount 0) vs paid (amount > 0) and computes conversion", async () => {
+      prismaMock.order.findMany.mockResolvedValueOnce([
+        { amount: 0, quantity: 1, costSnapshot: null, costTotalSnapshot: null } as any,
+        { amount: 0, quantity: 1, costSnapshot: null, costTotalSnapshot: null } as any,
+        { amount: 0, quantity: 1, costSnapshot: null, costTotalSnapshot: null } as any,
+        { amount: 100, quantity: 1, costSnapshot: null, costTotalSnapshot: "10" } as any,
+      ])
+      prismaMock.commission.aggregate.mockResolvedValueOnce({ _sum: { amount: 0 } } as any)
+
+      const result = await getGlobalKPI()
+
+      // 1 paid out of 4 total → 25%
+      expect(result.todayFreeCount).toBe(3)
+      expect(result.todayPaidCount).toBe(1)
+      expect(result.todayConversionRate).toBeCloseTo(0.25, 5)
+    })
+
+    it("returns 0 conversion when there are no orders", async () => {
+      prismaMock.order.findMany.mockResolvedValueOnce([])
+      prismaMock.commission.aggregate.mockResolvedValueOnce({ _sum: { amount: 0 } } as any)
+
+      const result = await getGlobalKPI()
+
+      expect(result.todayFreeCount).toBe(0)
+      expect(result.todayPaidCount).toBe(0)
+      expect(result.todayConversionRate).toBe(0)
+    })
   })
 
   describe("getDashboardData", () => {
