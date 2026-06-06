@@ -213,6 +213,13 @@ export class UsernameRequiredError extends Error {
   }
 }
 
+export class NoCredentialAccountError extends Error {
+  constructor() {
+    super("该分销员没有密码凭证")
+    this.name = "NoCredentialAccountError"
+  }
+}
+
 export class InviteTokenConcurrentAcceptError extends Error {
   constructor() {
     super("此邀请链接已被并发使用")

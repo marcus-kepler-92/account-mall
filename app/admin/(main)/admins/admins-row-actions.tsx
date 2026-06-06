@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { MoreHorizontal, KeyRound, UserCog, Trash2, Copy, Check } from "lucide-react"
+import { MoreHorizontal, KeyRound, UserCog, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -33,40 +33,11 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { ADMIN_ROLE_CONFIG, type AdminSubRole } from "@/lib/admin-role-config"
+import { PasswordRevealDialog } from "@/app/admin/components"
 import type { AdminRow } from "./admins-columns"
 
 interface AdminsRowActionsProps {
   row: AdminRow
-}
-
-function PasswordRevealDialog({ password, open, onClose }: { password: string; open: boolean; onClose: () => void }) {
-  const [copied, setCopied] = useState(false)
-
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(password)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>密码已重置</DialogTitle>
-          <DialogDescription>这是一次性密码，仅显示一次。管理员下次登录时需要修改密码。</DialogDescription>
-        </DialogHeader>
-        <div className="flex items-center gap-2 rounded-md border bg-muted px-3 py-2 font-mono text-sm">
-          <span className="flex-1 select-all">{password}</span>
-          <Button variant="ghost" size="icon" className="size-7" onClick={handleCopy}>
-            {copied ? <Check className="size-4 text-green-500" /> : <Copy className="size-4" />}
-          </Button>
-        </div>
-        <DialogFooter>
-          <Button onClick={onClose}>确认</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
 }
 
 export function AdminsRowActions({ row }: AdminsRowActionsProps) {
@@ -219,6 +190,7 @@ export function AdminsRowActions({ row }: AdminsRowActionsProps) {
           password={revealPassword}
           open={true}
           onClose={() => setRevealPassword(null)}
+          description="这是一次性密码，仅显示一次。管理员下次登录时需要修改密码。"
         />
       )}
     </>

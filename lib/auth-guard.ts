@@ -49,6 +49,31 @@ export async function getSuperAdminSession() {
 }
 
 /**
+ * Session lookup for the distributor area (layout, change-password page/API).
+ * Unlike getDistributorSession it does NOT null out disabled / mustChangePassword
+ * users — callers decide how to route them (notice page, forced password change).
+ */
+export async function getSessionForDistributorArea() {
+    const session = await auth.api.getSession({
+        headers: await headers(),
+    })
+    const user = session?.user as SessionUser | undefined
+    if (!session || !user) return null
+
+    const dbUser = await prisma.user.findUnique({
+        where: { id: user.id },
+        select: { role: true, disabledAt: true, mustChangePassword: true },
+    })
+    if (!dbUser || dbUser.role !== "DISTRIBUTOR") return null
+
+    return {
+        session,
+        disabled: dbUser.disabledAt != null,
+        mustChangePassword: dbUser.mustChangePassword,
+    }
+}
+
+/**
  * Returns the session only if authenticated, role is DISTRIBUTOR, and the user is not disabled.
  */
 export async function getDistributorSession() {

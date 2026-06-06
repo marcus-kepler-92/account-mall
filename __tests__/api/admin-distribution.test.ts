@@ -50,14 +50,23 @@ jest.mock("@/lib/domains/distributors", () => {
     }
   }
 
+  class NoCredentialAccountError extends Error {
+    constructor() {
+      super("该分销员没有密码凭证");
+      this.name = "NoCredentialAccountError";
+    }
+  }
+
   return {
     ...jest.requireActual("@/lib/domains/distributors"),
     listDistributors: jest.fn(),
     updateDistributor: jest.fn(),
     deleteDistributor: jest.fn(),
+    resetDistributorPassword: jest.fn(),
     DistributorNotFoundError,
     DistributorNotDisabledError,
     DistributorHasAssociationsError,
+    NoCredentialAccountError,
   };
 });
 
@@ -68,9 +77,11 @@ const mockDistributorModule = require("@/lib/domains/distributors");
 const listDistributors = mockDistributorModule.listDistributors;
 const updateDistributor = mockDistributorModule.updateDistributor;
 const deleteDistributor = mockDistributorModule.deleteDistributor;
+const resetDistributorPassword = mockDistributorModule.resetDistributorPassword;
 const DistributorNotFoundError = mockDistributorModule.DistributorNotFoundError;
 const DistributorNotDisabledError = mockDistributorModule.DistributorNotDisabledError;
 const DistributorHasAssociationsError = mockDistributorModule.DistributorHasAssociationsError;
+const NoCredentialAccountError = mockDistributorModule.NoCredentialAccountError;
 
 function withSession() {
   getAdminSession.mockResolvedValue({ user: { id: "admin_1" } });
@@ -381,6 +392,7 @@ describe("PATCH /api/admin/distributors/[id]", () => {
   beforeEach(() => {
     getAdminSession.mockReset();
     updateDistributor.mockReset();
+    resetDistributorPassword.mockReset();
   });
 
   it("returns 401 when no session", async () => {
@@ -390,6 +402,61 @@ describe("PATCH /api/admin/distributors/[id]", () => {
     } as unknown as NextRequest;
     const res = await DistributorPatch(req, context);
     expect(res.status).toBe(401);
+  });
+
+  it("resetPassword action returns one-time password", async () => {
+    withSession();
+    resetDistributorPassword.mockResolvedValue("TempPass12345678");
+    const req = {
+      json: async () => ({ action: "resetPassword" }),
+    } as unknown as NextRequest;
+    const res = await DistributorPatch(req, context);
+    const data = await res.json();
+    expect(res.status).toBe(200);
+    expect(data.password).toBe("TempPass12345678");
+    expect(resetDistributorPassword).toHaveBeenCalledWith("dist_1");
+    expect(updateDistributor).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when action is mixed with update fields (strict)", async () => {
+    withSession();
+    const req = {
+      json: async () => ({ action: "resetPassword", disabled: true }),
+    } as unknown as NextRequest;
+    const res = await DistributorPatch(req, context);
+    expect(res.status).toBe(400);
+    expect(resetDistributorPassword).not.toHaveBeenCalled();
+    expect(updateDistributor).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 on unknown action value", async () => {
+    withSession();
+    const req = {
+      json: async () => ({ action: "deleteEverything" }),
+    } as unknown as NextRequest;
+    const res = await DistributorPatch(req, context);
+    expect(res.status).toBe(400);
+    expect(resetDistributorPassword).not.toHaveBeenCalled();
+  });
+
+  it("resetPassword returns 404 when distributor not found", async () => {
+    withSession();
+    resetDistributorPassword.mockRejectedValue(new DistributorNotFoundError("not found"));
+    const req = {
+      json: async () => ({ action: "resetPassword" }),
+    } as unknown as NextRequest;
+    const res = await DistributorPatch(req, context);
+    expect(res.status).toBe(404);
+  });
+
+  it("resetPassword returns 404 when distributor has no credential account", async () => {
+    withSession();
+    resetDistributorPassword.mockRejectedValue(new NoCredentialAccountError());
+    const req = {
+      json: async () => ({ action: "resetPassword" }),
+    } as unknown as NextRequest;
+    const res = await DistributorPatch(req, context);
+    expect(res.status).toBe(404);
   });
 
   it("returns 404 when distributor not found", async () => {

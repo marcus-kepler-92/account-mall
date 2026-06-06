@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { MoreHorizontal, UserCheck, UserX, Copy, Loader2, Percent, Trash2 } from "lucide-react"
+import { MoreHorizontal, UserCheck, UserX, Copy, KeyRound, Loader2, Percent, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
     DropdownMenu,
@@ -28,6 +28,7 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { PasswordRevealDialog } from "@/app/admin/components"
 import { EditDiscountDialog } from "./edit-discount-dialog"
 import type { DistributorRow } from "./distributors-columns"
 
@@ -101,6 +102,9 @@ export function DistributorRowActions({ row }: { row: DistributorRow }) {
     const [discountOpen, setDiscountOpen] = useState(false)
     const [deleteOpen, setDeleteOpen] = useState(false)
     const [deleteLoading, setDeleteLoading] = useState(false)
+    const [resetOpen, setResetOpen] = useState(false)
+    const [resetLoading, setResetLoading] = useState(false)
+    const [revealPassword, setRevealPassword] = useState<string | null>(null)
     const disabled = !!row.disabledAt
 
     const handleToggle = async () => {
@@ -132,6 +136,29 @@ export function DistributorRowActions({ row }: { row: DistributorRow }) {
             toast.success("已复制推荐码")
         } catch {
             toast.error("复制失败")
+        }
+    }
+
+    const handleResetPassword = async () => {
+        setResetLoading(true)
+        try {
+            const res = await fetch(`/api/admin/distributors/${row.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "resetPassword" }),
+            })
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}))
+                toast.error(err?.error ?? "操作失败")
+                return
+            }
+            const data = await res.json()
+            setResetOpen(false)
+            setRevealPassword(data.password)
+        } catch {
+            toast.error("操作失败")
+        } finally {
+            setResetLoading(false)
         }
     }
 
@@ -190,6 +217,10 @@ export function DistributorRowActions({ row }: { row: DistributorRow }) {
                         <Percent className="size-4" />
                         优惠码设置
                     </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setResetOpen(true) }}>
+                        <KeyRound className="size-4" />
+                        重置密码
+                    </DropdownMenuItem>
                     {disabled && (
                         <>
                             <DropdownMenuSeparator />
@@ -240,6 +271,37 @@ export function DistributorRowActions({ row }: { row: DistributorRow }) {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+            <AlertDialog open={resetOpen} onOpenChange={setResetOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>重置密码</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            将为该分销员生成一次性临时密码，原密码立即失效，下次登录时需设置新密码。确定继续？
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={resetLoading}>取消</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={(e) => {
+                                e.preventDefault()
+                                handleResetPassword()
+                            }}
+                            disabled={resetLoading}
+                        >
+                            {resetLoading && <Loader2 className="size-4 animate-spin" />}
+                            重置
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+            {revealPassword && (
+                <PasswordRevealDialog
+                    password={revealPassword}
+                    open={true}
+                    onClose={() => setRevealPassword(null)}
+                    description="这是一次性密码，仅显示一次，请转告分销员。分销员下次登录时需要修改密码。"
+                />
+            )}
         </>
     )
 }

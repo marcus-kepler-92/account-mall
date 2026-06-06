@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 
 // Public pages that never require authentication
 const PUBLIC_PAGE_PREFIXES = ["/products", "/orders"];
-const PUBLIC_EXACT_PAGES = ["/", "/admin/login", "/distributor/login", "/distributor/register", "/distributor/accept-invite"];
+const PUBLIC_EXACT_PAGES = ["/", "/admin/login", "/distributor/login", "/distributor/register", "/distributor/accept-invite", "/distributor/forgot-password", "/distributor/reset-password"];
 
 // Public API routes that never require authentication
 const PUBLIC_API_PREFIXES = [
@@ -210,8 +210,10 @@ export async function proxy(request: NextRequest) {
                 );
                 if (response.ok) {
                     const session = await response.json();
-                    const user = session?.user as { role?: string } | undefined;
-                    if (session?.session && user?.role === "DISTRIBUTOR") {
+                    const user = session?.user as { role?: string; disabledAt?: string | null } | undefined;
+                    // Disabled distributors stay on the login page; bouncing them
+                    // to /distributor would loop (its pages redirect back here).
+                    if (session?.session && user?.role === "DISTRIBUTOR" && !user.disabledAt) {
                         return NextResponse.redirect(
                             new URL("/distributor", request.url)
                         );

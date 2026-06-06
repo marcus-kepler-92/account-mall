@@ -33,6 +33,7 @@ import { prismaMock } from "../../../../__mocks__/prisma"
 import {
   updateDistributor,
   deleteDistributor,
+  resetDistributorPassword,
   processWithdrawal,
   createWithdrawal,
   createCommissionTier,
@@ -44,6 +45,7 @@ import {
   DistributorNotFoundError,
   DistributorNotDisabledError,
   DistributorHasAssociationsError,
+  NoCredentialAccountError,
   WithdrawalNotFoundError,
   WithdrawalNotPendingError,
   WithdrawalOverBalanceError,
@@ -119,6 +121,40 @@ describe("deleteDistributor", () => {
     await deleteDistributor("d1")
     expect(repo.deleteDistributorInvitations).toHaveBeenCalledWith("d1")
     expect(repo.deleteDistributorRecord).toHaveBeenCalledWith("d1")
+  })
+})
+
+// ── resetDistributorPassword ──────────────────────────────────────────────────
+
+describe("resetDistributorPassword", () => {
+  it("throws DistributorNotFoundError when not found", async () => {
+    ;(repo.findDistributorById as jest.Mock).mockResolvedValue(null)
+    await expect(resetDistributorPassword("d1")).rejects.toThrow(DistributorNotFoundError)
+  })
+
+  it("throws NoCredentialAccountError when no credential account exists", async () => {
+    ;(repo.findDistributorById as jest.Mock).mockResolvedValue({ id: "d1", disabledAt: null })
+    prismaMock.account.updateMany.mockResolvedValue({ count: 0 })
+    await expect(resetDistributorPassword("d1")).rejects.toThrow(NoCredentialAccountError)
+    expect(prismaMock.user.update).not.toHaveBeenCalled()
+  })
+
+  it("updates credential password, sets mustChangePassword, returns plaintext", async () => {
+    ;(repo.findDistributorById as jest.Mock).mockResolvedValue({ id: "d1", disabledAt: null })
+    prismaMock.account.updateMany.mockResolvedValue({ count: 1 })
+    prismaMock.user.update.mockResolvedValue({ id: "d1" } as never)
+
+    const password = await resetDistributorPassword("d1")
+
+    expect(password).toHaveLength(16)
+    expect(prismaMock.account.updateMany).toHaveBeenCalledWith({
+      where: { userId: "d1", providerId: "credential" },
+      data: { password: "hashed" },
+    })
+    expect(prismaMock.user.update).toHaveBeenCalledWith({
+      where: { id: "d1" },
+      data: { mustChangePassword: true },
+    })
   })
 })
 

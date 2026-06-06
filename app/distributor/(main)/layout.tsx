@@ -1,10 +1,11 @@
 import { redirect } from "next/navigation"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
-import { getDistributorSession } from "@/lib/auth-guard"
+import { getSessionForDistributorArea } from "@/lib/auth-guard"
 import { DistributorSidebar } from "@/app/components/distributor-sidebar"
 import { DistributorBreadcrumb } from "@/app/components/distributor-breadcrumb"
 import { DistributorTopbarActions } from "@/app/components/distributor-topbar-actions"
 import { DistributorMobileNav } from "./distributor-mobile-nav"
+import { DistributorDisabledNotice } from "./distributor-disabled-notice"
 import { VisibilityRefresh } from "@/app/components/visibility-refresh"
 import { FloatingChatLoader } from "./floating-chat-loader"
 import { DistributorMandatoryAnnouncements } from "./distributor-mandatory-announcements"
@@ -14,11 +15,19 @@ export default async function DistributorMainLayout({
 }: {
     children: React.ReactNode
 }) {
-    const session = await getDistributorSession()
-    if (!session) {
+    const result = await getSessionForDistributorArea()
+    if (!result) {
         redirect("/distributor/login")
     }
-    const user = session.user as { name?: string; email?: string; username?: string; distributorCode?: string | null }
+    // Render a notice instead of redirecting to login: the proxy bounces
+    // logged-in distributors off the login page, which would loop.
+    if (result.disabled) {
+        return <DistributorDisabledNotice />
+    }
+    if (result.mustChangePassword) {
+        redirect("/distributor/change-password")
+    }
+    const user = result.session.user as { name?: string; email?: string; username?: string; distributorCode?: string | null }
 
     return (
         <SidebarProvider>

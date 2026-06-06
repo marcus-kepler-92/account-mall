@@ -15,7 +15,7 @@ jest.mock("@/lib/prisma", () => {
     return { __esModule: true, prisma: prismaMock }
 })
 
-import { getDistributorSession, getAdminSession, getSessionForAdminArea, getSuperAdminSession } from "@/lib/auth-guard"
+import { getDistributorSession, getAdminSession, getSessionForAdminArea, getSuperAdminSession, getSessionForDistributorArea } from "@/lib/auth-guard"
 import { prismaMock } from "../../__mocks__/prisma"
 
 describe("getDistributorSession", () => {
@@ -58,6 +58,59 @@ describe("getDistributorSession", () => {
         mockGetSession.mockResolvedValue(session)
         prismaMock.user.findUnique.mockResolvedValue({ disabledAt: null } as any)
         expect(await getDistributorSession()).toEqual(session)
+    })
+})
+
+describe("getSessionForDistributorArea", () => {
+    beforeEach(() => {
+        mockGetSession.mockReset()
+        prismaMock.user.findUnique.mockReset()
+    })
+
+    it("returns null when no session", async () => {
+        mockGetSession.mockResolvedValue(null)
+        expect(await getSessionForDistributorArea()).toBeNull()
+    })
+
+    it("returns null when db user is not DISTRIBUTOR", async () => {
+        mockGetSession.mockResolvedValue({
+            user: { id: "u1", email: "a@b.com", name: "A", role: "ADMIN" },
+        })
+        prismaMock.user.findUnique.mockResolvedValue({
+            role: "ADMIN",
+            disabledAt: null,
+            mustChangePassword: false,
+        } as any)
+        expect(await getSessionForDistributorArea()).toBeNull()
+    })
+
+    it("flags disabled distributor instead of nulling out", async () => {
+        mockGetSession.mockResolvedValue({
+            user: { id: "dist_1", email: "d@b.com", name: "D", role: "DISTRIBUTOR" },
+        })
+        prismaMock.user.findUnique.mockResolvedValue({
+            role: "DISTRIBUTOR",
+            disabledAt: new Date("2025-01-01"),
+            mustChangePassword: false,
+        } as any)
+        const result = await getSessionForDistributorArea()
+        expect(result).not.toBeNull()
+        expect(result!.disabled).toBe(true)
+        expect(result!.mustChangePassword).toBe(false)
+    })
+
+    it("flags mustChangePassword for active distributor", async () => {
+        const session = {
+            user: { id: "dist_1", email: "d@b.com", name: "D", role: "DISTRIBUTOR" },
+        }
+        mockGetSession.mockResolvedValue(session)
+        prismaMock.user.findUnique.mockResolvedValue({
+            role: "DISTRIBUTOR",
+            disabledAt: null,
+            mustChangePassword: true,
+        } as any)
+        const result = await getSessionForDistributorArea()
+        expect(result).toEqual({ session, disabled: false, mustChangePassword: true })
     })
 })
 

@@ -8,6 +8,7 @@ import { render } from "@react-email/render"
 import React from "react"
 import { DistributorInvitation as DistributorInvitationEmail } from "@/app/emails/distributor-invitation"
 import { hashPassword } from "better-auth/crypto"
+import { generatePassword } from "@/lib/password-utils"
 import * as repo from "./repository"
 import { toCents } from "@/lib/utils"
 import { checkAndIssueMilestoneBonuses } from "./milestone-service"
@@ -42,6 +43,7 @@ import {
   UsernameRequiredError,
   InviteTokenConcurrentAcceptError,
   InviteTokenExhaustedError,
+  NoCredentialAccountError,
 } from "./types"
 import type { UpdateDistributorInput, CreateTierInput, UpdateTierInput, UpdateWithdrawalInput, AcceptInviteInput } from "./validators"
 
@@ -194,6 +196,33 @@ export async function deleteDistributor(id: string): Promise<void> {
   if (inviteeCount > 0) throw new DistributorHasAssociationsError("invitees")
   await repo.deleteDistributorInvitations(id)
   await repo.deleteDistributorRecord(id)
+}
+
+/**
+ * Admin-side password reset: issues a one-time random password and forces the
+ * distributor to change it on next login. Returns the plaintext password for
+ * one-time display to the operating admin.
+ */
+export async function resetDistributorPassword(id: string): Promise<string> {
+  const existing = await repo.findDistributorById(id)
+  if (!existing) throw new DistributorNotFoundError(id)
+
+  const password = generatePassword()
+  const hashedPwd = await hashPassword(password)
+
+  await prisma.$transaction(async (tx) => {
+    const result = await tx.account.updateMany({
+      where: { userId: id, providerId: "credential" },
+      data: { password: hashedPwd },
+    })
+    if (result.count === 0) throw new NoCredentialAccountError()
+    await tx.user.update({
+      where: { id },
+      data: { mustChangePassword: true },
+    })
+  })
+
+  return password
 }
 
 // ── Invitations ───────────────────────────────────────────────────────────────

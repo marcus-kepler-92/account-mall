@@ -4,7 +4,7 @@
 export { listCommissionTiers, createCommissionTier, updateCommissionTier, deleteCommissionTier } from "./service"
 
 // Distributor CRUD
-export { listDistributors, updateDistributor, deleteDistributor } from "./service"
+export { listDistributors, updateDistributor, deleteDistributor, resetDistributorPassword } from "./service"
 
 // Invitations
 export { sendInvite, createNoEmailInviteLink, acceptInvite, bindInviter } from "./service"
@@ -91,6 +91,7 @@ export {
   DistributorNotFoundError,
   DistributorNotDisabledError,
   DistributorHasAssociationsError,
+  NoCredentialAccountError,
   WithdrawalNotFoundError,
   WithdrawalNotPendingError,
   WithdrawalOverBalanceError,
