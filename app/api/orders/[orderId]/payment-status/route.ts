@@ -47,14 +47,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     // When order is still PENDING, proactively query Zpay — notify may not have arrived.
     if (order.status === "PENDING") {
-        const orderWithChannel = await prisma.order.findUnique({
-            where: { orderNo },
-            select: { paymentChannel: { select: { pid: true, key: true, submitUrl: true } } },
-        })
-        const zpayResult = await queryZpayOrder(
-            orderNo,
-            orderWithChannel?.paymentChannel ?? undefined,
-        ).catch(() => null)
+        const zpayResult = await queryZpayOrder(orderNo).catch(() => null)
         if (zpayResult?.paid) {
             await completePendingOrder(orderNo).catch(() => null)
             console.info("[payment-status] orderNo=%s source=active_query result=completed", orderNo)

@@ -4,14 +4,13 @@
  * - 401 without admin session
  * - 404 when order not found
  * - 409 when order is not COMPLETED (only COMPLETED is refundable)
- * - 409 when order is not paid via z-pay (no channel + zpay not configured)
+ * - 409 when z-pay is not configured (online refund unsupported)
  * - 503 when the provider refund call errors (returns null)
  * - 400 when the provider declines the refund (code != 1)
  * - 200 happy path: COMPLETED -> REFUNDED (+refundedAt) via updateMany guard,
  *   cancels commissions, revokes the inviter's milestone bonuses
  * - 200 path with no distributor: cancels commissions, skips milestone revoke
  * - 409 concurrent: updateMany count 0 leaves side effects un-run
- * - eligibility via env fallback (no channel but zpay configured) proceeds
  */
 import { type NextRequest } from "next/server"
 import { POST } from "@/app/api/admin/orders/[orderId]/refund/route"
@@ -65,7 +64,6 @@ function makeOrder(
         orderNo: "FAK-REFUND-1",
         status,
         product: { productType: "NORMAL" },
-        paymentChannel: { pid: "chan_pid", key: "chan_key", submitUrl: "https://chan.example.com/submit.php" },
         distributorId: DISTRIBUTOR_ID,
         amount: 99,
         ...overrides,
@@ -95,7 +93,7 @@ describe("POST /api/admin/orders/[orderId]/refund", () => {
         ;(prismaMock.order.updateMany as jest.Mock).mockReset()
         ;(prismaMock.user.findUnique as jest.Mock).mockReset()
         ;(prismaMock.$transaction as unknown as jest.Mock).mockReset()
-        // Default: COMPLETED order paid via a DB channel.
+        // Default: z-pay configured (credentials come from env config).
         adminSessionMock.mockResolvedValue({ user: { id: ADMIN_ID, email: "admin@test.com" } })
         isZpayConfiguredMock.mockReturnValue(true)
     })
@@ -159,11 +157,9 @@ describe("POST /api/admin/orders/[orderId]/refund", () => {
         expect(body.error).not.toMatch(/Internal server error/)
     })
 
-    it("returns 409 when order is not paid via z-pay (no channel + zpay unconfigured)", async () => {
+    it("returns 409 when z-pay is not configured", async () => {
         isZpayConfiguredMock.mockReturnValue(false)
-        ;(prismaMock.order.findUnique as jest.Mock).mockResolvedValueOnce(
-            makeOrder("COMPLETED", { paymentChannel: null }) as any,
-        )
+        ;(prismaMock.order.findUnique as jest.Mock).mockResolvedValueOnce(makeOrder("COMPLETED") as any)
 
         const res = await POST(makeRequest(), makeCtx())
         const body = await res.json()
@@ -195,7 +191,7 @@ describe("POST /api/admin/orders/[orderId]/refund", () => {
         expect(prismaMock.$transaction).not.toHaveBeenCalled()
     })
 
-    it("refunds full amount and passes the DB channel credentials to the provider", async () => {
+    it("refunds the full amount via the provider using env credentials", async () => {
         ;(prismaMock.order.findUnique as jest.Mock).mockResolvedValueOnce(makeOrder("COMPLETED") as any)
         refundZpayMock.mockResolvedValue({ ok: true })
         setupTxMock()
@@ -207,11 +203,7 @@ describe("POST /api/admin/orders/[orderId]/refund", () => {
 
         expect(res.status).toBe(200)
         expect(body).toEqual({ ok: true })
-        expect(refundZpayMock).toHaveBeenCalledWith("FAK-REFUND-1", "99.00", {
-            pid: "chan_pid",
-            key: "chan_key",
-            submitUrl: "https://chan.example.com/submit.php",
-        })
+        expect(refundZpayMock).toHaveBeenCalledWith("FAK-REFUND-1", "99.00")
     })
 
     it("flips COMPLETED -> REFUNDED via updateMany guard, cancels commissions, revokes milestone bonuses", async () => {
@@ -277,22 +269,5 @@ describe("POST /api/admin/orders/[orderId]/refund", () => {
         expect(body.error).toMatch(/订单状态已变更/)
         expect(cancelCommissionsMock).not.toHaveBeenCalled()
         expect(revokeMilestoneMock).not.toHaveBeenCalled()
-    })
-
-    it("is eligible via env fallback when no DB channel but zpay is configured", async () => {
-        isZpayConfiguredMock.mockReturnValue(true)
-        ;(prismaMock.order.findUnique as jest.Mock).mockResolvedValueOnce(
-            makeOrder("COMPLETED", { paymentChannel: null }) as any,
-        )
-        refundZpayMock.mockResolvedValue({ ok: true })
-        setupTxMock()
-        ;(prismaMock.order.updateMany as jest.Mock).mockResolvedValueOnce({ count: 1 })
-        ;(prismaMock.user.findUnique as jest.Mock).mockResolvedValueOnce({ inviterId: null })
-
-        const res = await POST(makeRequest(), makeCtx())
-
-        expect(res.status).toBe(200)
-        // No per-channel override -> provider call uses env credentials (undefined channel arg).
-        expect(refundZpayMock).toHaveBeenCalledWith("FAK-REFUND-1", "99.00", undefined)
     })
 })

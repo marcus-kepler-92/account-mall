@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Search } from "lucide-react"
 import { SiteHeader } from "@/app/components/site-header"
-import { prisma } from "@/lib/prisma"
 import { verifyZpayNotifySign } from "@/lib/zpay"
 import { processZpayNotifyAndComplete } from "@/lib/zpay-notify-complete"
 import { createOrderSuccessToken } from "@/lib/order-success-token"
@@ -52,14 +51,7 @@ export default async function PayReturnPage({
     // return_url from the payment platform, not just knowledge of an orderNo.
     let signValid = false
     if (hasZpayParams && orderNo) {
-        const order = await prisma.order
-            .findFirst({
-                where: { orderNo },
-                include: { paymentChannel: { select: { key: true } } },
-            })
-            .catch(() => null)
-        const channelKey = order?.paymentChannel?.key ?? undefined
-        signValid = verifyZpayNotifySign(postData, channelKey)
+        signValid = verifyZpayNotifySign(postData)
     }
 
     if (signValid && orderNo) {

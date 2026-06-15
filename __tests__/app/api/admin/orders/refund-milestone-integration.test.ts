@@ -78,7 +78,6 @@ function setupRefundScenario(opts: {
         orderNo: ORDER_NO,
         status: "COMPLETED",
         product: { productType: "NORMAL" },
-        paymentChannel: { pid: "p", key: "k", submitUrl: "https://x/submit.php" },
         distributorId: DISTRIBUTOR_ID,
         amount: { toFixed: () => "99.00" },
     } as never)

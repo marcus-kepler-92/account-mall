@@ -40,31 +40,21 @@ export function buildSubmitUrl(params: Record<string, string>, key: string, subm
     return `${base}?${prestr}&sign=${sign}&sign_type=MD5`
 }
 
-export type ZpayChannelConfig = {
-    pid: string
-    key: string
-    submitUrl: string
-    siteName: string
-}
-
 /**
  * Generate Zpay page pay URL. Uses orderNo, totalAmount, subject; notify_url and return_url from config.siteUrl.
- * Returns null if required config (pid/key/submitUrl/siteName) is missing.
+ * Credentials always come from env config. Returns null if required config (pid/key/submitUrl/siteName) is missing.
  * @param params.type - Payment channel: "alipay" | "wxpay" | "qqpay" (default: "alipay")
- * @param params.channel - Optional per-channel config overrides; falls back to global env vars.
  */
 export function getZpayPagePayUrl(params: {
     orderNo: string
     totalAmount: string
     subject: string
     type?: string
-    channel?: ZpayChannelConfig
 }): string | null {
-    const channel = params.channel
-    const pid = channel?.pid ?? config.zpayPid
-    const key = channel?.key ?? config.zpayKey
-    const submitUrl = channel?.submitUrl ?? config.zpaySubmitUrl
-    const siteName = channel?.siteName ?? config.zpaySiteName
+    const pid = config.zpayPid
+    const key = config.zpayKey
+    const submitUrl = config.zpaySubmitUrl
+    const siteName = config.zpaySiteName
 
     if (!pid || !key || !submitUrl || !siteName) return null
 
@@ -88,15 +78,13 @@ export function getZpayPagePayUrl(params: {
 
 /**
  * Query a single order's payment status from Zpay.
+ * Credentials always come from env config.
  * Returns { paid: true } when Zpay confirms payment, { paid: false } when unpaid, null on error/unconfigured.
  */
-export async function queryZpayOrder(
-    orderNo: string,
-    channel?: Pick<ZpayChannelConfig, "pid" | "key" | "submitUrl">,
-): Promise<{ paid: boolean } | null> {
-    const pid = channel?.pid ?? config.zpayPid
-    const key = channel?.key ?? config.zpayKey
-    const submitUrl = channel?.submitUrl ?? config.zpaySubmitUrl
+export async function queryZpayOrder(orderNo: string): Promise<{ paid: boolean } | null> {
+    const pid = config.zpayPid
+    const key = config.zpayKey
+    const submitUrl = config.zpaySubmitUrl
     if (!pid || !key || !submitUrl) return null
     try {
         const base = new URL(submitUrl)
@@ -127,8 +115,7 @@ export async function queryZpayOrder(
 
 /**
  * Refund an order through Zpay (z-pay) via `act=refund` POST.
- * Mirrors queryZpayOrder's credential resolution: per-channel pid/key/submitUrl when provided,
- * else env fallback. Returns { ok: true } when Zpay confirms refund (code === 1),
+ * Credentials always come from env config. Returns { ok: true } when Zpay confirms refund (code === 1),
  * { ok: false, message } with Zpay's msg on a declined refund, or null on error/unconfigured.
  *
  * @param orderNo  out_trade_no — the platform order number used at payment time
@@ -137,11 +124,10 @@ export async function queryZpayOrder(
 export async function refundZpayOrder(
     orderNo: string,
     money: string,
-    channel?: Pick<ZpayChannelConfig, "pid" | "key" | "submitUrl">,
 ): Promise<{ ok: boolean; message?: string } | null> {
-    const pid = channel?.pid ?? config.zpayPid
-    const key = channel?.key ?? config.zpayKey
-    const submitUrl = channel?.submitUrl ?? config.zpaySubmitUrl
+    const pid = config.zpayPid
+    const key = config.zpayKey
+    const submitUrl = config.zpaySubmitUrl
     if (!pid || !key || !submitUrl) return null
     try {
         const base = new URL(submitUrl)
@@ -171,9 +157,10 @@ export async function refundZpayOrder(
 
 /**
  * Verify Zpay async notify sign. Same algorithm as submit: prestr from params (exclude sign/sign_type), mysign = MD5(prestr+key), compare with sign (lowercase).
+ * The signing key always comes from env config.
  */
-export function verifyZpayNotifySign(postData: Record<string, unknown>, key?: string): boolean {
-    const signingKey = key ?? config.zpayKey
+export function verifyZpayNotifySign(postData: Record<string, unknown>): boolean {
+    const signingKey = config.zpayKey
     if (!signingKey) return false
     const signReceived = postData.sign
     if (typeof signReceived !== "string" || !signReceived) return false

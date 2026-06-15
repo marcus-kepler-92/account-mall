@@ -34,7 +34,6 @@ export async function POST(request: NextRequest) {
     let order: {
         status: string
         passwordHash: string
-        paymentChannel: { pid: string | null; key: string | null; submitUrl: string | null } | null
     } | null
 
     try {
@@ -43,7 +42,6 @@ export async function POST(request: NextRequest) {
             select: {
                 status: true,
                 passwordHash: true,
-                paymentChannel: { select: { pid: true, key: true, submitUrl: true } },
             },
         })
     } catch {
@@ -62,15 +60,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ status: order.status })
     }
 
-    const ch = order.paymentChannel
-    const channel = ch?.pid && ch?.key && ch?.submitUrl
-        ? { pid: ch.pid, key: ch.key, submitUrl: ch.submitUrl }
-        : undefined
-
-    const zpayResult = await queryZpayOrder(
-        orderNo.trim(),
-        channel,
-    ).catch(() => null)
+    const zpayResult = await queryZpayOrder(orderNo.trim()).catch(() => null)
 
     if (zpayResult?.paid) {
         await completePendingOrder(orderNo.trim()).catch(() => null)

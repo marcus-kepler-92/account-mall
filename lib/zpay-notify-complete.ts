@@ -8,8 +8,7 @@ import { completePendingOrder } from "@/lib/complete-pending-order"
  * Returns { ok: true } when we should respond success (order completed or already completed);
  * { ok: false } when we should respond failure (bad sign, order not found, amount mismatch, etc).
  *
- * Sign verification uses the channel key from the order's payment channel when available,
- * falling back to the global env var key for historical orders without a channel.
+ * Sign verification uses the z-pay key from env config.
  */
 export async function processZpayNotifyAndComplete(
     postData: Record<string, unknown>,
@@ -23,22 +22,17 @@ export async function processZpayNotifyAndComplete(
         return { ok: false }
     }
 
-    // Look up order first to get the channel key for signature verification
+    if (!verifyZpayNotifySign(postData)) {
+        return { ok: false }
+    }
+
     const order = await prisma.order.findFirst({
         where: { orderNo: outTradeNo },
         include: {
-            paymentChannel: { select: { key: true } },
             product: { select: { name: true } },
             cards: { select: { id: true, status: true } },
         },
     })
-
-    // Use channel key when available, otherwise fall back to env var key
-    const channelKey = order?.paymentChannel?.key ?? undefined
-
-    if (!verifyZpayNotifySign(postData, channelKey)) {
-        return { ok: false }
-    }
 
     const isSuccess =
         tradeStatus === "TRADE_SUCCESS" ||

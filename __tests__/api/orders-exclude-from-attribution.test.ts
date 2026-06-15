@@ -67,9 +67,6 @@ jest.mock("@/lib/order-success-token", () => ({
 jest.mock("@/lib/scrape-shared-accounts", () => ({
     scrapeMultipleUrls: jest.fn(),
 }))
-jest.mock("@/lib/payment-channel", () => ({
-    selectPaymentChannel: jest.fn().mockResolvedValue(null),
-}))
 jest.mock("@/lib/exit-discount", () => ({
     verifyExitDiscountToken: jest.fn().mockReturnValue({ valid: false }),
 }))

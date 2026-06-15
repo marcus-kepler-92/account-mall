@@ -50,7 +50,6 @@ const VALID_BODY = { orderNo: "order-xyz", password: "secret123" }
 const PENDING_ORDER = {
     status: "PENDING",
     passwordHash: "hashed",
-    paymentChannel: { pid: "100", key: "key", submitUrl: "https://z-pay.cn/submit.php" },
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────

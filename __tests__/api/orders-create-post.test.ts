@@ -91,8 +91,6 @@ describe("POST /api/orders (create order)", () => {
     jest.clearAllMocks();
     getConfigMock().turnstileSecretKey = undefined;
     (prismaMock.$transaction as jest.Mock).mockReset();
-    // Default: no DB payment channels configured — selectPaymentChannel returns null
-    (prismaMock.paymentChannel.findMany as jest.Mock).mockResolvedValue([]);
   });
 
   it("returns 400 when body is not valid JSON", async () => {

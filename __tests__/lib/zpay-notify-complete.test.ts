@@ -28,7 +28,6 @@ function makePendingOrder(overrides?: Record<string, unknown>) {
         amount: 99,
         product: { name: "Test" },
         cards: [{ id: "c1", status: "RESERVED" }],
-        paymentChannel: null,
         ...overrides,
     } as any
 }
@@ -42,7 +41,6 @@ describe("processZpayNotifyAndComplete", () => {
     })
 
     it("returns { ok: false } when sign verification fails", async () => {
-        prismaMock.order.findFirst.mockResolvedValue(makePendingOrder())
         verifyMock.mockReturnValue(false)
         const result = await processZpayNotifyAndComplete({
             out_trade_no: "order-1",
@@ -51,10 +49,8 @@ describe("processZpayNotifyAndComplete", () => {
             sign: "bad",
         })
         expect(result).toEqual({ ok: false })
-        // order lookup happens before verify now (to get channel key)
-        expect(prismaMock.order.findFirst).toHaveBeenCalledWith(
-            expect.objectContaining({ where: { orderNo: "order-1" } })
-        )
+        // Sign is verified from env config before any order lookup
+        expect(prismaMock.order.findFirst).not.toHaveBeenCalled()
     })
 
     it("returns { ok: false } when out_trade_no missing", async () => {
@@ -281,10 +277,8 @@ describe("processZpayNotifyAndComplete", () => {
         expect(prismaMock.order.updateMany).toHaveBeenCalled()
     })
 
-    it("uses channel key for verification when order has a channel", async () => {
-        prismaMock.order.findFirst.mockResolvedValue(
-            makePendingOrder({ paymentChannel: { key: "channel_key" } })
-        )
+    it("verifies the sign with the env config key (no per-channel key arg)", async () => {
+        prismaMock.order.findFirst.mockResolvedValue(makePendingOrder())
         verifyMock.mockReturnValue(true)
         prismaMock.$transaction.mockResolvedValue(undefined)
         await processZpayNotifyAndComplete({
@@ -293,19 +287,6 @@ describe("processZpayNotifyAndComplete", () => {
             trade_status: "TRADE_SUCCESS",
             sign: "any",
         })
-        expect(verifyMock).toHaveBeenCalledWith(expect.any(Object), "channel_key")
-    })
-
-    it("falls back to env var key when order has no channel", async () => {
-        prismaMock.order.findFirst.mockResolvedValue(makePendingOrder({ paymentChannel: null }))
-        verifyMock.mockReturnValue(true)
-        prismaMock.$transaction.mockResolvedValue(undefined)
-        await processZpayNotifyAndComplete({
-            out_trade_no: "order-1",
-            money: "99.00",
-            trade_status: "TRADE_SUCCESS",
-            sign: "any",
-        })
-        expect(verifyMock).toHaveBeenCalledWith(expect.any(Object), undefined)
+        expect(verifyMock).toHaveBeenCalledWith(expect.objectContaining({ out_trade_no: "order-1" }))
     })
 })

@@ -7,7 +7,6 @@ import {
     getZpayPagePayUrl,
     refundZpayOrder,
 } from "@/lib/zpay"
-import type { ZpayChannelConfig } from "@/lib/zpay"
 
 jest.mock("@/lib/config", () => ({
     config: {
@@ -153,40 +152,6 @@ describe("getZpayPagePayUrl", () => {
     })
 })
 
-describe("getZpayPagePayUrl with channel override", () => {
-    it("uses channel config instead of global config when provided", () => {
-        const url = getZpayPagePayUrl({
-            orderNo: "ord_1",
-            totalAmount: "99.00",
-            subject: "Test Product",
-            type: "alipay",
-            channel: {
-                pid: "channel_pid",
-                key: "channel_key",
-                submitUrl: "https://other-pay.com/submit.php",
-                siteName: "Other Site",
-            } satisfies ZpayChannelConfig,
-        })
-        expect(url).not.toBeNull()
-        expect(url).toContain("https://other-pay.com/submit.php")
-        expect(url).toContain("pid=channel_pid")
-        expect(url).toContain("sitename=Other Site")
-    })
-})
-
-describe("verifyZpayNotifySign with explicit key", () => {
-    it("verifies with provided key instead of config key", () => {
-        const params = { pid: "1", money: "10.00", out_trade_no: "ord_1" }
-        const key = "channel_signing_key"
-        const url = buildSubmitUrl(params, key, "https://pay.com/submit.php")
-        const urlParams = new URLSearchParams(url.split("?")[1])
-        const sign = urlParams.get("sign")!
-        const postData = { ...params, sign, sign_type: "MD5" }
-        expect(verifyZpayNotifySign(postData, key)).toBe(true)
-        expect(verifyZpayNotifySign(postData, "wrong_key")).toBe(false)
-    })
-})
-
 describe("refundZpayOrder", () => {
     const realFetch = global.fetch
 
@@ -232,22 +197,5 @@ describe("refundZpayOrder", () => {
         const result = await refundZpayOrder("ord_1", "1.50")
 
         expect(result).toBeNull()
-    })
-
-    it("uses per-channel credentials when provided", async () => {
-        mockFetch({ code: 1, msg: "ok" })
-
-        await refundZpayOrder("ord_1", "2.00", {
-            pid: "chan_pid",
-            key: "chan_key",
-            submitUrl: "https://chan.example.com/submit.php",
-        })
-
-        const fetchMock = global.fetch as jest.Mock
-        const [url, init] = fetchMock.mock.calls[0]
-        expect(url).toBe("https://chan.example.com/api.php?act=refund")
-        const sentBody = new URLSearchParams(init.body as string)
-        expect(sentBody.get("pid")).toBe("chan_pid")
-        expect(sentBody.get("key")).toBe("chan_key")
     })
 })

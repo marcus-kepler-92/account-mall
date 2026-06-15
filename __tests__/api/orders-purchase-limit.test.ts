@@ -56,9 +56,6 @@ jest.mock("@/lib/order-success-token", () => ({
 jest.mock("@/lib/scrape-shared-accounts", () => ({
   scrapeMultipleUrls: jest.fn().mockResolvedValue([]),
 }))
-jest.mock("@/lib/payment-channel", () => ({
-  selectPaymentChannel: jest.fn().mockResolvedValue(null),
-}))
 jest.mock("@/lib/turnstile-policy", () => ({
   isStorefrontTurnstileEnforced: jest.fn().mockReturnValue(false),
 }))

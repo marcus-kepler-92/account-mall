@@ -43,7 +43,6 @@ export async function POST(_request: NextRequest, ctx: { params: Promise<{ order
         where: { id: orderId },
         include: {
             product: { select: { productType: true } },
-            paymentChannel: { select: { pid: true, key: true, submitUrl: true } },
         },
     })
     if (!order) return notFound("订单不存在")
@@ -64,17 +63,13 @@ export async function POST(_request: NextRequest, ctx: { params: Promise<{ order
         throw err
     }
 
-    // Eligibility: only orders paid through z-pay can be refunded online. A DB payment
-    // channel (paymentChannelId) is authoritative; env config is the global fallback used
-    // when no per-order channel was recorded.
-    const channel = order.paymentChannel ?? undefined
-    if (!channel && !isZpayConfigured()) {
+    // Eligibility: only orders paid through z-pay can be refunded online.
+    if (!isZpayConfigured()) {
         return conflict("该订单支付渠道不支持在线退款")
     }
 
-    // Refund amount is the paid (post-discount) amount snapshotted on the order.
     const money = order.amount.toFixed(2)
-    const result = await refundZpayOrder(order.orderNo, money, channel)
+    const result = await refundZpayOrder(order.orderNo, money)
     if (result === null) return serviceUnavailable("退款请求失败，请稍后重试")
     if (!result.ok) return badRequest(result.message ?? "退款被拒绝")
 
