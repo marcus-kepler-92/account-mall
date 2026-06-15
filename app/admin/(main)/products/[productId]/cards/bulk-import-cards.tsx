@@ -29,6 +29,8 @@ type BulkImportCardsProps = {
     /** Controlled open state. When provided, the dialog is controlled by the parent and the built-in trigger is not rendered. */
     open?: boolean
     onOpenChange?: (open: boolean) => void
+    /** Current UNSOLD-card count, shown as restock context in the dialog header. */
+    currentStock?: number | null
 }
 
 const MAX_LINES = 500
@@ -40,6 +42,7 @@ export function BulkImportCards({
     defaultOpen = false,
     open: controlledOpen,
     onOpenChange,
+    currentStock = null,
 }: BulkImportCardsProps) {
     const router = useRouter()
     const invalidateNotifications = useInvalidateAdminNotifications()
@@ -136,6 +139,11 @@ export function BulkImportCards({
                 <DialogHeader>
                     <DialogTitle>批量导入卡密</DialogTitle>
                     <DialogDescription>
+                        {currentStock != null && (
+                            <span className="font-medium text-foreground">
+                                当前未售 {currentStock} 张。
+                            </span>
+                        )}{" "}
                         每行输入一条卡密内容，支持最多 {MAX_LINES} 条。重复行将在导入时去重。
                     </DialogDescription>
                 </DialogHeader>

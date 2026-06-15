@@ -76,6 +76,18 @@ describe("BulkImportCards", () => {
             expect(screen.getByLabelText(/采购成本/)).toHaveValue(12.5)
         })
 
+        it("shows current stock context when currentStock is provided", () => {
+            render(
+                <BulkImportCards productId="prod-1" currentStock={7} open onOpenChange={jest.fn()} />,
+            )
+            expect(screen.getByText(/当前未售 7 张/)).toBeInTheDocument()
+        })
+
+        it("omits current stock context when currentStock is null", () => {
+            render(<BulkImportCards productId="prod-1" open onOpenChange={jest.fn()} />)
+            expect(screen.queryByText(/当前未售/)).not.toBeInTheDocument()
+        })
+
         it("posts contents and reports imported count on submit", async () => {
             const onOpenChange = jest.fn()
             global.fetch = jest.fn().mockResolvedValueOnce({

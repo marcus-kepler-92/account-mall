@@ -6,6 +6,7 @@ import { GripVertical, AlertTriangle } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { DataTableColumnHeader } from "@/app/admin/components"
 import { ProductRowActions } from "./product-row-actions"
+import { ProductStockCell } from "./product-stock-cell"
 
 export type ProductRow = {
     id: string
@@ -81,7 +82,16 @@ return [
     {
         accessorKey: "stock",
         header: ({ column }) => <DataTableColumnHeader column={column} title="库存" />,
-        cell: ({ row }) => row.original.stockLabel,
+        cell: ({ row }) => (
+            <ProductStockCell
+                productId={row.original.id}
+                productType={row.original.productType}
+                stock={row.original.stock}
+                stockLabel={row.original.stockLabel}
+                subscriberCount={row.original.subscriberCount}
+                costPerUnit={row.original.costPerUnit}
+            />
+        ),
     },
     {
         accessorKey: "sales",
@@ -141,7 +151,6 @@ return [
                     productType={row.original.productType}
                     isFree={row.original.productType === "AUTO_FETCH" && row.original.price === 0}
                     isSuperAdmin={isSuperAdmin}
-                    costPerUnit={row.original.costPerUnit}
                 />
             </div>
         ),
