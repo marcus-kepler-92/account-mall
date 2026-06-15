@@ -35,7 +35,6 @@ describe("POST /api/payment/zpay/notify", () => {
         verifyMock.mockReset()
         prismaMock.order.findFirst.mockReset()
         prismaMock.$transaction.mockReset()
-        ;(prismaMock.paymentChannel.findMany as jest.Mock).mockResolvedValue([])
     })
 
     it("returns failure when body is not form", async () => {

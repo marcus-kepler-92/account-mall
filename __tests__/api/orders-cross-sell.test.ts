@@ -180,7 +180,6 @@ describe("POST /api/orders — cross-sell discount (cs token model)", () => {
         getCfg().turnstileSecretKey = undefined
         getCfg().exitDiscountSecret = "test-exit-secret"
         ;(prismaMock.$transaction as jest.Mock).mockReset()
-        ;(prismaMock.paymentChannel.findMany as jest.Mock).mockResolvedValue([])
         verifyCsToken.mockReturnValue({ valid: false })
         resolveCrossSellDiscounts.mockResolvedValue(new Map())
         verifyExitDiscountToken.mockReturnValue({ valid: false })

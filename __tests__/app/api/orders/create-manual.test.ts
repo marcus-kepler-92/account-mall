@@ -144,7 +144,6 @@ describe("POST /api/orders — MANUAL branch", () => {
     beforeEach(() => {
         jest.clearAllMocks()
         ;(prismaMock.$transaction as jest.Mock).mockReset()
-        ;(prismaMock.paymentChannel.findMany as jest.Mock).mockResolvedValue([])
     })
 
     it("rejects MANUAL order missing variantId", async () => {

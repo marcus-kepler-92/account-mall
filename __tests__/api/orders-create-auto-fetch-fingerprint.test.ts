@@ -183,7 +183,6 @@ describe("POST /api/orders — AUTO_FETCH 多因素限领", () => {
     prismaMock.user.findFirst.mockResolvedValue(null);
     scrapeMultipleUrlsMock.mockResolvedValue([SCRAPED_ACCOUNT]);
     prismaMock.accountBlacklist.findMany.mockResolvedValue([]);
-    (prismaMock.paymentChannel.findMany as jest.Mock).mockResolvedValue([]);
   });
 
 

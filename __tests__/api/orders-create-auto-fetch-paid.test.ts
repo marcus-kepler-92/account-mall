@@ -144,7 +144,6 @@ describe("POST /api/orders — paid AUTO_FETCH product", () => {
         // Default: scrape returns one account
         scrapeMultipleUrlsMock.mockResolvedValue([SCRAPED_ACCOUNT])
         prismaMock.accountBlacklist.findMany.mockResolvedValue([])
-        ;(prismaMock.paymentChannel.findMany as jest.Mock).mockResolvedValue([])
     })
 
     describe("爬取成功 + price>0 → 收费流程", () => {
