@@ -18,7 +18,6 @@ import {
     FolderOpen,
     FlaskConical,
     Mail,
-    Landmark,
     ShieldCheck,
     LayoutTemplate,
     Trophy,
@@ -77,7 +76,6 @@ const allNavItems = [
     { title: "分销员管理", href: "/admin/distributors", icon: Users },
     { title: "阶梯佣金配置", href: "/admin/commission-tiers", icon: Layers },
     { title: "邀请里程碑奖励", href: "/admin/invitation-milestones", icon: Trophy },
-    { title: "收款渠道", href: "/admin/payment-channels", icon: Landmark },
     { title: "文件管理", href: "/admin/files", icon: FolderOpen },
 ]
 
