@@ -131,6 +131,7 @@ export default async function AdminProductsPage({
             subscriberCount,
             hasAlert,
             activeVariantCount,
+            costPerUnit: p.costPerUnit == null ? null : Number(p.costPerUnit),
         }
     })
 

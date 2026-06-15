@@ -16,6 +16,7 @@ import {
     ExternalLink,
     Trash2,
     ShieldOff,
+    Upload,
     Loader2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -37,6 +38,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { ProductBlacklistModal } from "./product-blacklist-modal"
+import { BulkImportCards } from "./[productId]/cards/bulk-import-cards"
 
 type ProductRowActionsProps = {
     productId: string
@@ -46,6 +48,7 @@ type ProductRowActionsProps = {
     productType: string
     isFree: boolean
     isSuperAdmin?: boolean
+    costPerUnit: number | null
 }
 
 export function ProductRowActions({
@@ -56,6 +59,7 @@ export function ProductRowActions({
     productType,
     isFree,
     isSuperAdmin = false,
+    costPerUnit,
 }: ProductRowActionsProps) {
     const router = useRouter()
     const invalidateNotifications = useInvalidateAdminNotifications()
@@ -65,6 +69,7 @@ export function ProductRowActions({
     const [deleteOpen, setDeleteOpen] = useState(false)
     const [deleteLoading, setDeleteLoading] = useState(false)
     const [blacklistOpen, setBlacklistOpen] = useState(false)
+    const [importOpen, setImportOpen] = useState(false)
     const isActive = status === "ACTIVE"
     const isAutoFetch = productType === "AUTO_FETCH"
     const isManual = productType === "MANUAL"
@@ -163,12 +168,20 @@ export function ProductRowActions({
                         </Link>
                     </DropdownMenuItem>
                     {!isAutoFetch && !isManual && (
-                        <DropdownMenuItem asChild>
-                            <Link href={`/admin/products/${productId}/cards`}>
-                                <CreditCard className="size-4" />
-                                管理卡密
-                            </Link>
-                        </DropdownMenuItem>
+                        <>
+                            <DropdownMenuItem
+                                onSelect={(e) => { e.preventDefault(); setImportOpen(true) }}
+                            >
+                                <Upload className="size-4" />
+                                导入卡密
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild>
+                                <Link href={`/admin/products/${productId}/cards`}>
+                                    <CreditCard className="size-4" />
+                                    管理卡密
+                                </Link>
+                            </DropdownMenuItem>
+                        </>
                     )}
                     {isAutoFetch && (
                         <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setBlacklistOpen(true) }}>
@@ -276,6 +289,15 @@ export function ProductRowActions({
                     productName={productName}
                     open={blacklistOpen}
                     onOpenChange={setBlacklistOpen}
+                />
+            )}
+
+            {!isAutoFetch && !isManual && (
+                <BulkImportCards
+                    productId={productId}
+                    defaultUnitCost={costPerUnit}
+                    open={importOpen}
+                    onOpenChange={setImportOpen}
                 />
             )}
         </>

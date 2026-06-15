@@ -32,6 +32,9 @@ export type ProductRow = {
     // surface a "缺 SKU" warning badge when a MANUAL product is ACTIVE but
     // has zero active variants (misconfigured row that can't be sold).
     activeVariantCount: number
+    // Product-level default purchase cost, prefilled into the inline bulk-import
+    // dialog. Only used for NORMAL products (the ones with a card pool).
+    costPerUnit: number | null
 }
 
 const statusMap: Record<ProductRow["status"], { label: string; variant: "default" | "secondary" }> = {
@@ -138,6 +141,7 @@ return [
                     productType={row.original.productType}
                     isFree={row.original.productType === "AUTO_FETCH" && row.original.price === 0}
                     isSuperAdmin={isSuperAdmin}
+                    costPerUnit={row.original.costPerUnit}
                 />
             </div>
         ),

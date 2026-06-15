@@ -26,21 +26,37 @@ type BulkImportCardsProps = {
     trigger?: React.ReactNode
     /** When true, dialog opens on mount (e.g. when landing with ?action=import). Clears action from URL after open. */
     defaultOpen?: boolean
+    /** Controlled open state. When provided, the dialog is controlled by the parent and the built-in trigger is not rendered. */
+    open?: boolean
+    onOpenChange?: (open: boolean) => void
 }
 
 const MAX_LINES = 500
 
-export function BulkImportCards({ productId, defaultUnitCost = null, trigger, defaultOpen = false }: BulkImportCardsProps) {
+export function BulkImportCards({
+    productId,
+    defaultUnitCost = null,
+    trigger,
+    defaultOpen = false,
+    open: controlledOpen,
+    onOpenChange,
+}: BulkImportCardsProps) {
     const router = useRouter()
     const invalidateNotifications = useInvalidateAdminNotifications()
     const pathname = usePathname()
-    const [open, setOpen] = useState(defaultOpen)
+    const isControlled = controlledOpen !== undefined
+    const [internalOpen, setInternalOpen] = useState(defaultOpen)
+    const open = isControlled ? controlledOpen : internalOpen
+    const setOpen = (next: boolean) => {
+        if (!isControlled) setInternalOpen(next)
+        onOpenChange?.(next)
+    }
 
     useEffect(() => {
-        if (!defaultOpen) return
-        setOpen(true)
+        if (isControlled || !defaultOpen) return
+        setInternalOpen(true)
         router.replace(pathname)
-    }, [defaultOpen, pathname, router])
+    }, [isControlled, defaultOpen, pathname, router])
     const [text, setText] = useState("")
     const [unitCostInput, setUnitCostInput] = useState<string>(
         defaultUnitCost == null ? "" : defaultUnitCost.toString(),
@@ -106,14 +122,16 @@ export function BulkImportCards({ productId, defaultUnitCost = null, trigger, de
 
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
-            <DialogTrigger asChild>
-                {trigger ?? (
-                    <Button>
-                        <Upload className="size-4" />
-                        批量导入
-                    </Button>
-                )}
-            </DialogTrigger>
+            {!isControlled && (
+                <DialogTrigger asChild>
+                    {trigger ?? (
+                        <Button>
+                            <Upload className="size-4" />
+                            批量导入
+                        </Button>
+                    )}
+                </DialogTrigger>
+            )}
             <DialogContent className="sm:max-w-lg max-h-[85vh] flex flex-col">
                 <DialogHeader>
                     <DialogTitle>批量导入卡密</DialogTitle>
