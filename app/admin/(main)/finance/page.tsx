@@ -1,6 +1,4 @@
-import { redirect } from "next/navigation"
 import { prisma } from "@/lib/prisma"
-import { getAdminSession } from "@/lib/auth-guard"
 import { formatCurrency } from "@/lib/utils"
 import { Wallet, TrendingUp, ArrowDownCircle } from "lucide-react"
 import { PageHeader, StatCard } from "@/app/admin/components"
@@ -11,9 +9,6 @@ import type { PayoutRow } from "./payout-columns"
 export const dynamic = "force-dynamic"
 
 export default async function AdminFinancePage() {
-    const session = await getAdminSession()
-    if (!session) redirect("/admin/login")
-
     const [summary, payouts] = await Promise.all([
         getFinanceSummary(),
         prisma.payout.findMany({ orderBy: { createdAt: "desc" } }),
