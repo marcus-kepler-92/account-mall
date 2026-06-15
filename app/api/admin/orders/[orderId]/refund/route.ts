@@ -26,7 +26,7 @@ import {
  *   - re-check the distributor's inviter's issued milestone bonuses; revoke any that no
  *     longer qualify once this order's sales are excluded
  *
- * Statistics (revenue/profit/channel quota/weekly tier/milestone qualification) all filter
+ * Statistics (revenue/profit/weekly tier/milestone qualification) all filter
  * status:"COMPLETED", so flipping to REFUNDED removes the order from them automatically.
  *
  * The provider refund call runs BEFORE the DB transaction (never hold a transaction across a
