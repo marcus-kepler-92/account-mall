@@ -67,6 +67,7 @@ const allNavItems = [
     { title: "订单管理", href: "/admin/orders", icon: ShoppingCart },
     { title: "人工发货", href: "/admin/fulfillment", icon: PackageCheck },
     // 提现
+    { title: "资金管理", href: "/admin/finance", icon: Wallet },
     { title: "提现管理", href: "/admin/withdrawals", icon: Wallet },
     // 公告
     { title: "公告管理", href: "/admin/announcements", icon: Megaphone },
