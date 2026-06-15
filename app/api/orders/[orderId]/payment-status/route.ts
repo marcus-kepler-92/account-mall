@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verifyOrderSuccessToken } from "@/lib/order-success-token"
 import { checkOrderQueryRateLimit } from "@/lib/rate-limit"
-import { queryYipayOrder } from "@/lib/yipay"
+import { queryZpayOrder } from "@/lib/zpay"
 import { completePendingOrder } from "@/lib/complete-pending-order"
 
 const NO_STORE = { "Cache-Control": "no-store" }
@@ -16,7 +16,7 @@ type RouteContext = {
  * Public endpoint: poll order payment status during the awaiting-payment flow.
  * Route param orderId carries the orderNo (same convention as refresh/switch-account).
  * Returns { status: "PENDING" | "COMPLETED" | "CLOSED" } — no card content.
- * Security: token must be a valid order-success-token issued by pay-return after Yipay sign check.
+ * Security: token must be a valid order-success-token issued by pay-return after Zpay sign check.
  */
 export async function GET(request: NextRequest, context: RouteContext) {
     // Rate-limit first — before any HMAC computation or DB query
@@ -45,17 +45,17 @@ export async function GET(request: NextRequest, context: RouteContext) {
         )
     }
 
-    // When order is still PENDING, proactively query Yipay — notify may not have arrived.
+    // When order is still PENDING, proactively query Zpay — notify may not have arrived.
     if (order.status === "PENDING") {
         const orderWithChannel = await prisma.order.findUnique({
             where: { orderNo },
             select: { paymentChannel: { select: { pid: true, key: true, submitUrl: true } } },
         })
-        const yipayResult = await queryYipayOrder(
+        const zpayResult = await queryZpayOrder(
             orderNo,
             orderWithChannel?.paymentChannel ?? undefined,
         ).catch(() => null)
-        if (yipayResult?.paid) {
+        if (zpayResult?.paid) {
             await completePendingOrder(orderNo).catch(() => null)
             console.info("[payment-status] orderNo=%s source=active_query result=completed", orderNo)
             return NextResponse.json({ status: "COMPLETED" }, { headers: NO_STORE })

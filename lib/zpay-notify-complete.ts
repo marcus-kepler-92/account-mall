@@ -1,17 +1,17 @@
 import { prisma } from "@/lib/prisma"
-import { verifyYipayNotifySign } from "@/lib/yipay"
+import { verifyZpayNotifySign } from "@/lib/zpay"
 import { completePendingOrder } from "@/lib/complete-pending-order"
 
 /**
- * Process Yipay notify/return params: verify sign, match order and amount, idempotent complete.
- * Used by POST /api/payment/yipay/notify (async notify) and by pay-return page (sync return_url).
+ * Process Zpay notify/return params: verify sign, match order and amount, idempotent complete.
+ * Used by POST /api/payment/zpay/notify (async notify) and by pay-return page (sync return_url).
  * Returns { ok: true } when we should respond success (order completed or already completed);
  * { ok: false } when we should respond failure (bad sign, order not found, amount mismatch, etc).
  *
  * Sign verification uses the channel key from the order's payment channel when available,
  * falling back to the global env var key for historical orders without a channel.
  */
-export async function processYipayNotifyAndComplete(
+export async function processZpayNotifyAndComplete(
     postData: Record<string, unknown>,
 ): Promise<{ ok: boolean }> {
     const outTradeNo = postData.out_trade_no as string | undefined
@@ -36,7 +36,7 @@ export async function processYipayNotifyAndComplete(
     // Use channel key when available, otherwise fall back to env var key
     const channelKey = order?.paymentChannel?.key ?? undefined
 
-    if (!verifyYipayNotifySign(postData, channelKey)) {
+    if (!verifyZpayNotifySign(postData, channelKey)) {
         return { ok: false }
     }
 
@@ -59,14 +59,14 @@ export async function processYipayNotifyAndComplete(
     }
 
     if (order.status === "COMPLETED") {
-        console.info("[payment-notify] yipay orderNo=%s amount=%s status=already_completed", outTradeNo, orderAmountStr)
+        console.info("[payment-notify] zpay orderNo=%s amount=%s status=already_completed", outTradeNo, orderAmountStr)
         return { ok: true }
     }
     if (order.status !== "PENDING") {
         return { ok: true }
     }
 
-    console.info("[payment-notify] yipay orderNo=%s amount=%s status=completing", outTradeNo, orderAmountStr)
+    console.info("[payment-notify] zpay orderNo=%s amount=%s status=completing", outTradeNo, orderAmountStr)
     await completePendingOrder(outTradeNo)
     return { ok: true }
 }

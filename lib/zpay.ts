@@ -2,11 +2,11 @@ import { createHash } from "crypto"
 import { config } from "@/lib/config"
 
 /**
- * Check if Yipay (易支付) is fully configured. When true, use getYipayPagePayUrl instead of Alipay SDK.
+ * Check if Zpay (z-pay) is fully configured. When true, use getZpayPagePayUrl instead of Alipay SDK.
  */
-export function isYipayConfigured(): boolean {
-    const { yipayPid, yipayKey, yipaySubmitUrl, yipaySiteName } = config
-    return !!(yipayPid && yipayKey && yipaySubmitUrl && yipaySiteName)
+export function isZpayConfigured(): boolean {
+    const { zpayPid, zpayKey, zpaySubmitUrl, zpaySiteName } = config
+    return !!(zpayPid && zpayKey && zpaySubmitUrl && zpaySiteName)
 }
 
 /**
@@ -36,11 +36,11 @@ function md5(str: string): string {
 export function buildSubmitUrl(params: Record<string, string>, key: string, submitUrl?: string): string {
     const prestr = getVerifyParams(params)
     const sign = md5(prestr + key)
-    const base = submitUrl ?? config.yipaySubmitUrl ?? ""
+    const base = submitUrl ?? config.zpaySubmitUrl ?? ""
     return `${base}?${prestr}&sign=${sign}&sign_type=MD5`
 }
 
-export type YipayChannelConfig = {
+export type ZpayChannelConfig = {
     pid: string
     key: string
     submitUrl: string
@@ -48,23 +48,23 @@ export type YipayChannelConfig = {
 }
 
 /**
- * Generate Yipay page pay URL. Uses orderNo, totalAmount, subject; notify_url and return_url from config.siteUrl.
+ * Generate Zpay page pay URL. Uses orderNo, totalAmount, subject; notify_url and return_url from config.siteUrl.
  * Returns null if required config (pid/key/submitUrl/siteName) is missing.
  * @param params.type - Payment channel: "alipay" | "wxpay" | "qqpay" (default: "alipay")
  * @param params.channel - Optional per-channel config overrides; falls back to global env vars.
  */
-export function getYipayPagePayUrl(params: {
+export function getZpayPagePayUrl(params: {
     orderNo: string
     totalAmount: string
     subject: string
     type?: string
-    channel?: YipayChannelConfig
+    channel?: ZpayChannelConfig
 }): string | null {
     const channel = params.channel
-    const pid = channel?.pid ?? config.yipayPid
-    const key = channel?.key ?? config.yipayKey
-    const submitUrl = channel?.submitUrl ?? config.yipaySubmitUrl
-    const siteName = channel?.siteName ?? config.yipaySiteName
+    const pid = channel?.pid ?? config.zpayPid
+    const key = channel?.key ?? config.zpayKey
+    const submitUrl = channel?.submitUrl ?? config.zpaySubmitUrl
+    const siteName = channel?.siteName ?? config.zpaySiteName
 
     if (!pid || !key || !submitUrl || !siteName) return null
 
@@ -73,7 +73,7 @@ export function getYipayPagePayUrl(params: {
         pid,
         money: params.totalAmount,
         name: params.subject,
-        notify_url: `${base}/api/payment/yipay/notify`,
+        notify_url: `${base}/api/payment/zpay/notify`,
         return_url: `${base}/orders/pay-return`,
         out_trade_no: params.orderNo,
         sitename: siteName,
@@ -87,16 +87,16 @@ export function getYipayPagePayUrl(params: {
 }
 
 /**
- * Query a single order's payment status from Yipay.
- * Returns { paid: true } when Yipay confirms payment, { paid: false } when unpaid, null on error/unconfigured.
+ * Query a single order's payment status from Zpay.
+ * Returns { paid: true } when Zpay confirms payment, { paid: false } when unpaid, null on error/unconfigured.
  */
-export async function queryYipayOrder(
+export async function queryZpayOrder(
     orderNo: string,
-    channel?: Pick<YipayChannelConfig, "pid" | "key" | "submitUrl">,
+    channel?: Pick<ZpayChannelConfig, "pid" | "key" | "submitUrl">,
 ): Promise<{ paid: boolean } | null> {
-    const pid = channel?.pid ?? config.yipayPid
-    const key = channel?.key ?? config.yipayKey
-    const submitUrl = channel?.submitUrl ?? config.yipaySubmitUrl
+    const pid = channel?.pid ?? config.zpayPid
+    const key = channel?.key ?? config.zpayKey
+    const submitUrl = channel?.submitUrl ?? config.zpaySubmitUrl
     if (!pid || !key || !submitUrl) return null
     try {
         const base = new URL(submitUrl)
@@ -105,7 +105,7 @@ export async function queryYipayOrder(
         const url = `${base.toString()}?act=order&pid=${encodeURIComponent(pid)}&key=${encodeURIComponent(key)}&out_trade_no=${encodeURIComponent(orderNo)}`
         const res = await fetch(url, { cache: "no-store" })
         if (!res.ok) {
-            console.warn("[yipay-query] orderNo=%s http_status=%d", orderNo, res.status)
+            console.warn("[zpay-query] orderNo=%s http_status=%d", orderNo, res.status)
             return null
         }
         const data = (await res.json()) as Record<string, unknown>
@@ -120,28 +120,28 @@ export async function queryYipayOrder(
             numericStatus === "1"
         return { paid }
     } catch (e) {
-        console.error("[yipay-query] orderNo=%s error=%s", orderNo, e instanceof Error ? e.message : String(e))
+        console.error("[zpay-query] orderNo=%s error=%s", orderNo, e instanceof Error ? e.message : String(e))
         return null
     }
 }
 
 /**
- * Refund an order through Yipay (易支付) via `act=refund` POST.
- * Mirrors queryYipayOrder's credential resolution: per-channel pid/key/submitUrl when provided,
- * else env fallback. Returns { ok: true } when Yipay confirms refund (code === 1),
- * { ok: false, message } with Yipay's msg on a declined refund, or null on error/unconfigured.
+ * Refund an order through Zpay (z-pay) via `act=refund` POST.
+ * Mirrors queryZpayOrder's credential resolution: per-channel pid/key/submitUrl when provided,
+ * else env fallback. Returns { ok: true } when Zpay confirms refund (code === 1),
+ * { ok: false, message } with Zpay's msg on a declined refund, or null on error/unconfigured.
  *
  * @param orderNo  out_trade_no — the platform order number used at payment time
  * @param money    refund amount string; must equal the original paid amount (Order.amount)
  */
-export async function refundYipayOrder(
+export async function refundZpayOrder(
     orderNo: string,
     money: string,
-    channel?: Pick<YipayChannelConfig, "pid" | "key" | "submitUrl">,
+    channel?: Pick<ZpayChannelConfig, "pid" | "key" | "submitUrl">,
 ): Promise<{ ok: boolean; message?: string } | null> {
-    const pid = channel?.pid ?? config.yipayPid
-    const key = channel?.key ?? config.yipayKey
-    const submitUrl = channel?.submitUrl ?? config.yipaySubmitUrl
+    const pid = channel?.pid ?? config.zpayPid
+    const key = channel?.key ?? config.zpayKey
+    const submitUrl = channel?.submitUrl ?? config.zpaySubmitUrl
     if (!pid || !key || !submitUrl) return null
     try {
         const base = new URL(submitUrl)
@@ -156,7 +156,7 @@ export async function refundYipayOrder(
             cache: "no-store",
         })
         if (!res.ok) {
-            console.warn("[yipay-refund] orderNo=%s http_status=%d", orderNo, res.status)
+            console.warn("[zpay-refund] orderNo=%s http_status=%d", orderNo, res.status)
             return null
         }
         const data = (await res.json()) as Record<string, unknown>
@@ -164,16 +164,16 @@ export async function refundYipayOrder(
         const message = typeof data.msg === "string" ? data.msg : undefined
         return { ok, message }
     } catch (e) {
-        console.error("[yipay-refund] orderNo=%s error=%s", orderNo, e instanceof Error ? e.message : String(e))
+        console.error("[zpay-refund] orderNo=%s error=%s", orderNo, e instanceof Error ? e.message : String(e))
         return null
     }
 }
 
 /**
- * Verify Yipay async notify sign. Same algorithm as submit: prestr from params (exclude sign/sign_type), mysign = MD5(prestr+key), compare with sign (lowercase).
+ * Verify Zpay async notify sign. Same algorithm as submit: prestr from params (exclude sign/sign_type), mysign = MD5(prestr+key), compare with sign (lowercase).
  */
-export function verifyYipayNotifySign(postData: Record<string, unknown>, key?: string): boolean {
-    const signingKey = key ?? config.yipayKey
+export function verifyZpayNotifySign(postData: Record<string, unknown>, key?: string): boolean {
+    const signingKey = key ?? config.zpayKey
     if (!signingKey) return false
     const signReceived = postData.sign
     if (typeof signReceived !== "string" || !signReceived) return false

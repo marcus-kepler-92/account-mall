@@ -217,7 +217,7 @@ export function OrderRowActions({ order }: { order: OrderRow }) {
                     <AlertDialogHeader>
                         <AlertDialogTitle>确认退款</AlertDialogTitle>
                         <AlertDialogDescription>
-                            将通过易支付对订单 {order.orderNo} 发起全额退款。成功后订单状态变为「已退款」，本单分销佣金将被撤销，相关里程碑奖金会重新核算。此操作无法撤销。
+                            将通过z-pay对订单 {order.orderNo} 发起全额退款。成功后订单状态变为「已退款」，本单分销佣金将被撤销，相关里程碑奖金会重新核算。此操作无法撤销。
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

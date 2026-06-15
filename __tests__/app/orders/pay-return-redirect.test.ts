@@ -1,7 +1,7 @@
 /**
  * /orders/pay-return redirect behavior.
- * Verifies the security invariant: token is only issued when Yipay sign is valid.
- * Covers: sign valid → awaiting-payment, sign invalid, no Yipay params, no orderNo, null token.
+ * Verifies the security invariant: token is only issued when Zpay sign is valid.
+ * Covers: sign valid → awaiting-payment, sign invalid, no Zpay params, no orderNo, null token.
  */
 import { prismaMock } from "../../../__mocks__/prisma"
 
@@ -20,12 +20,12 @@ jest.mock("next/navigation", () => ({
     },
 }))
 
-jest.mock("@/lib/yipay", () => ({
-    verifyYipayNotifySign: jest.fn(),
+jest.mock("@/lib/zpay", () => ({
+    verifyZpayNotifySign: jest.fn(),
 }))
 
-jest.mock("@/lib/yipay-notify-complete", () => ({
-    processYipayNotifyAndComplete: jest.fn().mockResolvedValue({ ok: true }),
+jest.mock("@/lib/zpay-notify-complete", () => ({
+    processZpayNotifyAndComplete: jest.fn().mockResolvedValue({ ok: true }),
 }))
 
 jest.mock("@/lib/order-success-token", () => ({
@@ -44,13 +44,13 @@ jest.mock("@/components/ui/card", () => ({
     CardTitle: () => null,
 }))
 
-import { verifyYipayNotifySign } from "@/lib/yipay"
-import { processYipayNotifyAndComplete } from "@/lib/yipay-notify-complete"
+import { verifyZpayNotifySign } from "@/lib/zpay"
+import { processZpayNotifyAndComplete } from "@/lib/zpay-notify-complete"
 import { createOrderSuccessToken } from "@/lib/order-success-token"
 import PayReturnPage from "@/app/orders/pay-return/page"
 
-const verifySignMock = verifyYipayNotifySign as jest.Mock
-const processNotifyMock = processYipayNotifyAndComplete as jest.Mock
+const verifySignMock = verifyZpayNotifySign as jest.Mock
+const processNotifyMock = processZpayNotifyAndComplete as jest.Mock
 const createTokenMock = createOrderSuccessToken as jest.Mock
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -59,7 +59,7 @@ function makeSearchParams(params: Record<string, string>) {
     return Promise.resolve(params) as Promise<Record<string, string | string[] | undefined>>
 }
 
-const YIPAY_PARAMS = {
+const ZPAY_PARAMS = {
     out_trade_no: "order-123",
     sign: "abc123",
     trade_status: "TRADE_SUCCESS",
@@ -82,7 +82,7 @@ describe("/orders/pay-return redirect behavior", () => {
         verifySignMock.mockReturnValue(true)
 
         await expect(
-            PayReturnPage({ searchParams: makeSearchParams(YIPAY_PARAMS) }),
+            PayReturnPage({ searchParams: makeSearchParams(ZPAY_PARAMS) }),
         ).rejects.toThrow("NEXT_REDIRECT")
 
         expect(mockRedirect).toHaveBeenCalledWith(
@@ -95,14 +95,14 @@ describe("/orders/pay-return redirect behavior", () => {
     it("does NOT redirect, does NOT issue token, does NOT call notify when sign is invalid", async () => {
         verifySignMock.mockReturnValue(false)
 
-        await PayReturnPage({ searchParams: makeSearchParams(YIPAY_PARAMS) })
+        await PayReturnPage({ searchParams: makeSearchParams(ZPAY_PARAMS) })
 
         expect(mockRedirect).not.toHaveBeenCalled()
         expect(createTokenMock).not.toHaveBeenCalled()
         expect(processNotifyMock).not.toHaveBeenCalled()
     })
 
-    it("does NOT issue token when sign params are missing (no hasYipayParams)", async () => {
+    it("does NOT issue token when sign params are missing (no hasZpayParams)", async () => {
         await PayReturnPage({
             searchParams: makeSearchParams({ out_trade_no: "order-123" }),
         })
@@ -121,7 +121,7 @@ describe("/orders/pay-return redirect behavior", () => {
         verifySignMock.mockReturnValue(true)
         createTokenMock.mockReturnValue(null)
 
-        const result = await PayReturnPage({ searchParams: makeSearchParams(YIPAY_PARAMS) })
+        const result = await PayReturnPage({ searchParams: makeSearchParams(ZPAY_PARAMS) })
 
         expect(result).toBeDefined()
         expect(mockRedirect).not.toHaveBeenCalled()

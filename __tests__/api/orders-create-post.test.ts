@@ -513,7 +513,7 @@ describe("POST /api/orders (create order)", () => {
   it("stores paymentMethod in order and passes it to getPaymentUrlForOrder", async () => {
     const { getPaymentUrlForOrder } = require("@/lib/get-payment-url");
     (getPaymentUrlForOrder as jest.Mock).mockReturnValue(
-      "https://yipay.example/wxpay",
+      "https://zpay.example/wxpay",
     );
     const product = {
       id: "prod_1",
@@ -588,7 +588,7 @@ describe("POST /api/orders (create order)", () => {
     const data = await res.json();
 
     expect(res.status).toBe(200);
-    expect(data.paymentUrl).toBe("https://yipay.example/wxpay");
+    expect(data.paymentUrl).toBe("https://zpay.example/wxpay");
     expect(mockTx.order.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         paymentMethod: "wxpay",

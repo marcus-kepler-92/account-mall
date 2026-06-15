@@ -5,23 +5,23 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Search } from "lucide-react"
 import { SiteHeader } from "@/app/components/site-header"
 import { prisma } from "@/lib/prisma"
-import { verifyYipayNotifySign } from "@/lib/yipay"
-import { processYipayNotifyAndComplete } from "@/lib/yipay-notify-complete"
+import { verifyZpayNotifySign } from "@/lib/zpay"
+import { processZpayNotifyAndComplete } from "@/lib/zpay-notify-complete"
 import { createOrderSuccessToken } from "@/lib/order-success-token"
 
 export const dynamic = "force-dynamic"
 
 /**
- * 支付同步返回页（return_url）. 易支付/支付宝支付完成后会跳转至此。
+ * 支付同步返回页（return_url）. z-pay/支付宝支付完成后会跳转至此。
  *
- * Security: only issues order-success-token when Yipay sign is valid, so the
+ * Security: only issues order-success-token when Zpay sign is valid, so the
  * token capability (poll status + view cards) is gated on a legitimate payment
  * platform redirect rather than on knowledge of the orderNo alone.
  *
  * Flow:
- *   sign valid + processYipayNotifyAndComplete ok  → success page
+ *   sign valid + processZpayNotifyAndComplete ok  → success page
  *   sign valid + not yet completed                 → awaiting-payment (active poll)
- *   sign invalid / no Yipay params                 → static fallback (order lookup link)
+ *   sign invalid / no Zpay params                 → static fallback (order lookup link)
  */
 export default async function PayReturnPage({
     searchParams,
@@ -38,20 +38,20 @@ export default async function PayReturnPage({
               ? rawOrderNo[0]
               : undefined
 
-    const hasYipayParams = !!(params?.out_trade_no && params?.sign && params?.trade_status)
+    const hasZpayParams = !!(params?.out_trade_no && params?.sign && params?.trade_status)
 
-    // Build postData for sign verification and processYipayNotifyAndComplete
+    // Build postData for sign verification and processZpayNotifyAndComplete
     const postData: Record<string, unknown> = {}
     for (const [k, v] of Object.entries(params ?? {})) {
         const val = Array.isArray(v) ? v[0] : v
         postData[k] = val ?? ""
     }
 
-    // Security gate: verify Yipay signature independently before issuing any token.
+    // Security gate: verify Zpay signature independently before issuing any token.
     // Token capability (poll status + view cards) must be anchored to a legitimate
     // return_url from the payment platform, not just knowledge of an orderNo.
     let signValid = false
-    if (hasYipayParams && orderNo) {
+    if (hasZpayParams && orderNo) {
         const order = await prisma.order
             .findFirst({
                 where: { orderNo },
@@ -59,13 +59,13 @@ export default async function PayReturnPage({
             })
             .catch(() => null)
         const channelKey = order?.paymentChannel?.key ?? undefined
-        signValid = verifyYipayNotifySign(postData, channelKey)
+        signValid = verifyZpayNotifySign(postData, channelKey)
     }
 
     if (signValid && orderNo) {
         // Fire-and-forget: attempt order completion via return_url params (idempotent with notify).
         // Does not gate routing — awaiting-payment polls for final status.
-        void processYipayNotifyAndComplete(postData).catch(() => null)
+        void processZpayNotifyAndComplete(postData).catch(() => null)
         const token = createOrderSuccessToken(orderNo)
         if (token) {
             redirect(`/orders/${encodeURIComponent(orderNo)}/awaiting-payment?token=${encodeURIComponent(token)}`)

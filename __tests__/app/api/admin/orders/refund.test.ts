@@ -4,14 +4,14 @@
  * - 401 without admin session
  * - 404 when order not found
  * - 409 when order is not COMPLETED (only COMPLETED is refundable)
- * - 409 when order is not paid via 易支付 (no channel + yipay not configured)
+ * - 409 when order is not paid via z-pay (no channel + zpay not configured)
  * - 503 when the provider refund call errors (returns null)
  * - 400 when the provider declines the refund (code != 1)
  * - 200 happy path: COMPLETED -> REFUNDED (+refundedAt) via updateMany guard,
  *   cancels commissions, revokes the inviter's milestone bonuses
  * - 200 path with no distributor: cancels commissions, skips milestone revoke
  * - 409 concurrent: updateMany count 0 leaves side effects un-run
- * - eligibility via env fallback (no channel but yipay configured) proceeds
+ * - eligibility via env fallback (no channel but zpay configured) proceeds
  */
 import { type NextRequest } from "next/server"
 import { POST } from "@/app/api/admin/orders/[orderId]/refund/route"
@@ -27,10 +27,10 @@ jest.mock("@/lib/auth-guard", () => ({
     getAdminSession: jest.fn(),
 }))
 
-jest.mock("@/lib/yipay", () => ({
+jest.mock("@/lib/zpay", () => ({
     __esModule: true,
-    isYipayConfigured: jest.fn(),
-    refundYipayOrder: jest.fn(),
+    isZpayConfigured: jest.fn(),
+    refundZpayOrder: jest.fn(),
 }))
 
 jest.mock("@/lib/domains/distributors", () => ({
@@ -40,7 +40,7 @@ jest.mock("@/lib/domains/distributors", () => ({
 }))
 
 import { getAdminSession } from "@/lib/auth-guard"
-import { isYipayConfigured, refundYipayOrder } from "@/lib/yipay"
+import { isZpayConfigured, refundZpayOrder } from "@/lib/zpay"
 import { cancelOrderCommissions, revokeMilestoneBonusesForInviter } from "@/lib/domains/distributors"
 
 const ORDER_ID = "crefundorder000000000001"
@@ -80,15 +80,15 @@ function setupTxMock() {
 
 describe("POST /api/admin/orders/[orderId]/refund", () => {
     const adminSessionMock = getAdminSession as jest.Mock
-    const isYipayConfiguredMock = isYipayConfigured as jest.Mock
-    const refundYipayMock = refundYipayOrder as jest.Mock
+    const isZpayConfiguredMock = isZpayConfigured as jest.Mock
+    const refundZpayMock = refundZpayOrder as jest.Mock
     const cancelCommissionsMock = cancelOrderCommissions as jest.Mock
     const revokeMilestoneMock = revokeMilestoneBonusesForInviter as jest.Mock
 
     beforeEach(() => {
         adminSessionMock.mockReset()
-        isYipayConfiguredMock.mockReset()
-        refundYipayMock.mockReset()
+        isZpayConfiguredMock.mockReset()
+        refundZpayMock.mockReset()
         cancelCommissionsMock.mockReset().mockResolvedValue(undefined)
         revokeMilestoneMock.mockReset().mockResolvedValue(undefined)
         ;(prismaMock.order.findUnique as jest.Mock).mockReset()
@@ -97,7 +97,7 @@ describe("POST /api/admin/orders/[orderId]/refund", () => {
         ;(prismaMock.$transaction as unknown as jest.Mock).mockReset()
         // Default: COMPLETED order paid via a DB channel.
         adminSessionMock.mockResolvedValue({ user: { id: ADMIN_ID, email: "admin@test.com" } })
-        isYipayConfiguredMock.mockReturnValue(true)
+        isZpayConfiguredMock.mockReturnValue(true)
     })
 
     it("returns 401 when no admin session", async () => {
@@ -107,7 +107,7 @@ describe("POST /api/admin/orders/[orderId]/refund", () => {
 
         expect(res.status).toBe(401)
         expect(prismaMock.order.findUnique).not.toHaveBeenCalled()
-        expect(refundYipayMock).not.toHaveBeenCalled()
+        expect(refundZpayMock).not.toHaveBeenCalled()
     })
 
     it("returns 404 when order not found", async () => {
@@ -116,7 +116,7 @@ describe("POST /api/admin/orders/[orderId]/refund", () => {
         const res = await POST(makeRequest(), makeCtx())
 
         expect(res.status).toBe(404)
-        expect(refundYipayMock).not.toHaveBeenCalled()
+        expect(refundZpayMock).not.toHaveBeenCalled()
     })
 
     it("returns 409 when order is not COMPLETED", async () => {
@@ -127,7 +127,7 @@ describe("POST /api/admin/orders/[orderId]/refund", () => {
 
         expect(res.status).toBe(409)
         expect(body.error).toMatch(/仅已完成订单可退款/)
-        expect(refundYipayMock).not.toHaveBeenCalled()
+        expect(refundZpayMock).not.toHaveBeenCalled()
     })
 
     it("is idempotent: already-REFUNDED order returns 200 without calling the provider", async () => {
@@ -138,13 +138,13 @@ describe("POST /api/admin/orders/[orderId]/refund", () => {
 
         expect(res.status).toBe(200)
         expect(body).toEqual({ ok: true, alreadyRefunded: true })
-        expect(refundYipayMock).not.toHaveBeenCalled()
+        expect(refundZpayMock).not.toHaveBeenCalled()
         expect(prismaMock.$transaction).not.toHaveBeenCalled()
     })
 
     it("returns a distinct actionable 500 (with orderNo) when provider succeeded but local reversal failed", async () => {
         ;(prismaMock.order.findUnique as jest.Mock).mockResolvedValueOnce(makeOrder("COMPLETED") as any)
-        refundYipayMock.mockResolvedValue({ ok: true })
+        refundZpayMock.mockResolvedValue({ ok: true })
         ;(prismaMock.$transaction as unknown as jest.Mock).mockRejectedValueOnce(new Error("DB down"))
 
         const res = await POST(makeRequest(), makeCtx())
@@ -155,12 +155,12 @@ describe("POST /api/admin/orders/[orderId]/refund", () => {
         expect(body.error).toMatch(/退款已在支付侧完成/)
         expect(body.error).toContain("FAK-REFUND-1")
         // Provider WAS called (money out); generic English 500 must NOT be used.
-        expect(refundYipayMock).toHaveBeenCalledTimes(1)
+        expect(refundZpayMock).toHaveBeenCalledTimes(1)
         expect(body.error).not.toMatch(/Internal server error/)
     })
 
-    it("returns 409 when order is not paid via 易支付 (no channel + yipay unconfigured)", async () => {
-        isYipayConfiguredMock.mockReturnValue(false)
+    it("returns 409 when order is not paid via z-pay (no channel + zpay unconfigured)", async () => {
+        isZpayConfiguredMock.mockReturnValue(false)
         ;(prismaMock.order.findUnique as jest.Mock).mockResolvedValueOnce(
             makeOrder("COMPLETED", { paymentChannel: null }) as any,
         )
@@ -170,12 +170,12 @@ describe("POST /api/admin/orders/[orderId]/refund", () => {
 
         expect(res.status).toBe(409)
         expect(body.error).toMatch(/不支持在线退款/)
-        expect(refundYipayMock).not.toHaveBeenCalled()
+        expect(refundZpayMock).not.toHaveBeenCalled()
     })
 
     it("returns 503 when the provider refund call errors (null)", async () => {
         ;(prismaMock.order.findUnique as jest.Mock).mockResolvedValueOnce(makeOrder("COMPLETED") as any)
-        refundYipayMock.mockResolvedValue(null)
+        refundZpayMock.mockResolvedValue(null)
 
         const res = await POST(makeRequest(), makeCtx())
 
@@ -185,7 +185,7 @@ describe("POST /api/admin/orders/[orderId]/refund", () => {
 
     it("returns 400 with provider message when refund is declined (code != 1)", async () => {
         ;(prismaMock.order.findUnique as jest.Mock).mockResolvedValueOnce(makeOrder("COMPLETED") as any)
-        refundYipayMock.mockResolvedValue({ ok: false, message: "订单已退款" })
+        refundZpayMock.mockResolvedValue({ ok: false, message: "订单已退款" })
 
         const res = await POST(makeRequest(), makeCtx())
         const body = await res.json()
@@ -197,7 +197,7 @@ describe("POST /api/admin/orders/[orderId]/refund", () => {
 
     it("refunds full amount and passes the DB channel credentials to the provider", async () => {
         ;(prismaMock.order.findUnique as jest.Mock).mockResolvedValueOnce(makeOrder("COMPLETED") as any)
-        refundYipayMock.mockResolvedValue({ ok: true })
+        refundZpayMock.mockResolvedValue({ ok: true })
         setupTxMock()
         ;(prismaMock.order.updateMany as jest.Mock).mockResolvedValueOnce({ count: 1 })
         ;(prismaMock.user.findUnique as jest.Mock).mockResolvedValueOnce({ inviterId: INVITER_ID })
@@ -207,7 +207,7 @@ describe("POST /api/admin/orders/[orderId]/refund", () => {
 
         expect(res.status).toBe(200)
         expect(body).toEqual({ ok: true })
-        expect(refundYipayMock).toHaveBeenCalledWith("FAK-REFUND-1", "99.00", {
+        expect(refundZpayMock).toHaveBeenCalledWith("FAK-REFUND-1", "99.00", {
             pid: "chan_pid",
             key: "chan_key",
             submitUrl: "https://chan.example.com/submit.php",
@@ -216,7 +216,7 @@ describe("POST /api/admin/orders/[orderId]/refund", () => {
 
     it("flips COMPLETED -> REFUNDED via updateMany guard, cancels commissions, revokes milestone bonuses", async () => {
         ;(prismaMock.order.findUnique as jest.Mock).mockResolvedValueOnce(makeOrder("COMPLETED") as any)
-        refundYipayMock.mockResolvedValue({ ok: true })
+        refundZpayMock.mockResolvedValue({ ok: true })
         setupTxMock()
         ;(prismaMock.order.updateMany as jest.Mock).mockResolvedValueOnce({ count: 1 })
         ;(prismaMock.user.findUnique as jest.Mock).mockResolvedValueOnce({ inviterId: INVITER_ID })
@@ -238,7 +238,7 @@ describe("POST /api/admin/orders/[orderId]/refund", () => {
         ;(prismaMock.order.findUnique as jest.Mock).mockResolvedValueOnce(
             makeOrder("COMPLETED", { distributorId: null }) as any,
         )
-        refundYipayMock.mockResolvedValue({ ok: true })
+        refundZpayMock.mockResolvedValue({ ok: true })
         setupTxMock()
         ;(prismaMock.order.updateMany as jest.Mock).mockResolvedValueOnce({ count: 1 })
 
@@ -252,7 +252,7 @@ describe("POST /api/admin/orders/[orderId]/refund", () => {
 
     it("skips milestone revoke when the distributor has no inviter", async () => {
         ;(prismaMock.order.findUnique as jest.Mock).mockResolvedValueOnce(makeOrder("COMPLETED") as any)
-        refundYipayMock.mockResolvedValue({ ok: true })
+        refundZpayMock.mockResolvedValue({ ok: true })
         setupTxMock()
         ;(prismaMock.order.updateMany as jest.Mock).mockResolvedValueOnce({ count: 1 })
         ;(prismaMock.user.findUnique as jest.Mock).mockResolvedValueOnce({ inviterId: null })
@@ -266,7 +266,7 @@ describe("POST /api/admin/orders/[orderId]/refund", () => {
 
     it("returns 409 and runs no reversal when updateMany guard sees count 0 (concurrent refund)", async () => {
         ;(prismaMock.order.findUnique as jest.Mock).mockResolvedValueOnce(makeOrder("COMPLETED") as any)
-        refundYipayMock.mockResolvedValue({ ok: true })
+        refundZpayMock.mockResolvedValue({ ok: true })
         setupTxMock()
         ;(prismaMock.order.updateMany as jest.Mock).mockResolvedValueOnce({ count: 0 })
 
@@ -279,12 +279,12 @@ describe("POST /api/admin/orders/[orderId]/refund", () => {
         expect(revokeMilestoneMock).not.toHaveBeenCalled()
     })
 
-    it("is eligible via env fallback when no DB channel but yipay is configured", async () => {
-        isYipayConfiguredMock.mockReturnValue(true)
+    it("is eligible via env fallback when no DB channel but zpay is configured", async () => {
+        isZpayConfiguredMock.mockReturnValue(true)
         ;(prismaMock.order.findUnique as jest.Mock).mockResolvedValueOnce(
             makeOrder("COMPLETED", { paymentChannel: null }) as any,
         )
-        refundYipayMock.mockResolvedValue({ ok: true })
+        refundZpayMock.mockResolvedValue({ ok: true })
         setupTxMock()
         ;(prismaMock.order.updateMany as jest.Mock).mockResolvedValueOnce({ count: 1 })
         ;(prismaMock.user.findUnique as jest.Mock).mockResolvedValueOnce({ inviterId: null })
@@ -293,6 +293,6 @@ describe("POST /api/admin/orders/[orderId]/refund", () => {
 
         expect(res.status).toBe(200)
         // No per-channel override -> provider call uses env credentials (undefined channel arg).
-        expect(refundYipayMock).toHaveBeenCalledWith("FAK-REFUND-1", "99.00", undefined)
+        expect(refundZpayMock).toHaveBeenCalledWith("FAK-REFUND-1", "99.00", undefined)
     })
 })

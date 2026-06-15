@@ -169,8 +169,8 @@ export function ProductOrderForm({
         }
     }, [fingerprintHash, form])
 
-    const disabledSet = new Set(configClient.yipayDisabledPaymentTypes)
-    const allPaymentMethods = configClient.yipayPaymentTypes
+    const disabledSet = new Set(configClient.zpayDisabledPaymentTypes)
+    const allPaymentMethods = configClient.zpayPaymentTypes
         .map((id) => ({ id: id as PaymentMethod, disabled: disabledSet.has(id), ...PAYMENT_METHOD_CONFIG[id as PaymentMethod] }))
         .filter(Boolean)
     const showPaymentSelector = !isFree && allPaymentMethods.length >= 1

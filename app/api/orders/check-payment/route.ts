@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { publicOrderLookupSchema } from "@/lib/validations/order"
 import { verifyPassword } from "better-auth/crypto"
-import { queryYipayOrder } from "@/lib/yipay"
+import { queryZpayOrder } from "@/lib/zpay"
 import { completePendingOrder } from "@/lib/complete-pending-order"
 import { checkOrderQueryRateLimit } from "@/lib/rate-limit"
 import { invalidJsonBody, validationError, badRequest, internalServerError } from "@/lib/api-response"
@@ -10,8 +10,8 @@ import { invalidJsonBody, validationError, badRequest, internalServerError } fro
 /**
  * POST /api/orders/check-payment
  * Password-authenticated active payment check for the order lookup page.
- * If order is PENDING, actively queries Yipay; completes the order if confirmed paid.
- * Intended for "我已付款" self-service flow: user paid but closed Yipay before return_url redirect.
+ * If order is PENDING, actively queries Zpay; completes the order if confirmed paid.
+ * Intended for "我已付款" self-service flow: user paid but closed Zpay before return_url redirect.
  */
 export async function POST(request: NextRequest) {
     const limited = await checkOrderQueryRateLimit(request)
@@ -67,12 +67,12 @@ export async function POST(request: NextRequest) {
         ? { pid: ch.pid, key: ch.key, submitUrl: ch.submitUrl }
         : undefined
 
-    const yipayResult = await queryYipayOrder(
+    const zpayResult = await queryZpayOrder(
         orderNo.trim(),
         channel,
     ).catch(() => null)
 
-    if (yipayResult?.paid) {
+    if (zpayResult?.paid) {
         await completePendingOrder(orderNo.trim()).catch(() => null)
         console.info("[check-payment] orderNo=%s result=completed", orderNo.trim())
         return NextResponse.json({ status: "COMPLETED" })

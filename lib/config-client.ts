@@ -17,15 +17,15 @@ const lowStockThreshold =
         : 5
 
 const VALID_PAYMENT_TYPES = ["alipay", "wxpay", "qqpay"] as const
-const rawPaymentTypes = process.env.NEXT_PUBLIC_YIPAY_PAYMENT_TYPES ?? "alipay"
-const yipayPaymentTypes = rawPaymentTypes
+const rawPaymentTypes = process.env.NEXT_PUBLIC_ZPAY_PAYMENT_TYPES ?? "alipay"
+const zpayPaymentTypes = rawPaymentTypes
     .split(",")
     .map((s) => s.trim())
     .filter((s): s is typeof VALID_PAYMENT_TYPES[number] => (VALID_PAYMENT_TYPES as readonly string[]).includes(s))
     .filter(Boolean)
 
-const rawDisabledTypes = process.env.NEXT_PUBLIC_YIPAY_DISABLED_PAYMENT_TYPES ?? ""
-const yipayDisabledPaymentTypes = rawDisabledTypes
+const rawDisabledTypes = process.env.NEXT_PUBLIC_ZPAY_DISABLED_PAYMENT_TYPES ?? ""
+const zpayDisabledPaymentTypes = rawDisabledTypes
     .split(",")
     .map((s) => s.trim())
     .filter((s): s is typeof VALID_PAYMENT_TYPES[number] => (VALID_PAYMENT_TYPES as readonly string[]).includes(s))
@@ -49,12 +49,12 @@ export const configClient = {
         ? lowStockThreshold
         : 5,
     /**
-     * 易支付开通的支付渠道列表，由 NEXT_PUBLIC_YIPAY_PAYMENT_TYPES 配置（逗号分隔）。
-     * 默认只有 alipay。示例：NEXT_PUBLIC_YIPAY_PAYMENT_TYPES=alipay,wxpay
+     * z-pay开通的支付渠道列表，由 NEXT_PUBLIC_ZPAY_PAYMENT_TYPES 配置（逗号分隔）。
+     * 默认只有 alipay。示例：NEXT_PUBLIC_ZPAY_PAYMENT_TYPES=alipay,wxpay
      */
-    yipayPaymentTypes: yipayPaymentTypes.length > 0 ? yipayPaymentTypes : (["alipay"] as const),
+    zpayPaymentTypes: zpayPaymentTypes.length > 0 ? zpayPaymentTypes : (["alipay"] as const),
     /** 禁用的支付渠道（界面上显示但置灰不可选） */
-    yipayDisabledPaymentTypes: yipayDisabledPaymentTypes,
+    zpayDisabledPaymentTypes: zpayDisabledPaymentTypes,
     /** 客服 Telegram 联系方式（@username 或完整 URL）；空字符串时隐藏 */
     supportTelegram,
     /** 客服微信号；空字符串时隐藏 */

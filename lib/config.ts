@@ -42,10 +42,10 @@ const envSchema = z
     alipayAppId: z.string().optional(),
     alipayPrivateKey: z.string().optional(),
     alipayPublicKey: z.string().optional(),
-    yipayPid: z.string().optional(),
-    yipayKey: z.string().optional(),
-    yipaySubmitUrl: z.string().optional(),
-    yipaySiteName: z.string().optional(),
+    zpayPid: z.string().optional(),
+    zpayKey: z.string().optional(),
+    zpaySubmitUrl: z.string().optional(),
+    zpaySiteName: z.string().optional(),
     pendingOrderTimeoutMs: z.coerce.number().int().positive().default(1800000),
     orderRateLimitPoints: z.coerce.number().int().positive().default(10),
     orderQueryRateLimitPoints: z.coerce.number().int().positive().default(30),
@@ -147,7 +147,7 @@ const envSchema = z
             .transform((v) => v === "true" || v === "1")
             .default(false),
     /**
-     * Dev-only: 绕过开发环境的"下单即自动完成"快捷通道，改走真实易支付付款流程。
+     * Dev-only: 绕过开发环境的"下单即自动完成"快捷通道，改走真实z-pay付款流程。
      * 便于在本地产生一笔真实 zpay 付款单，从而测试真实退款。
      * 仅在 NODE_ENV=development 下生效。由 `npm run dev:realpay` 注入。
      */
@@ -319,10 +319,10 @@ function getEnvInput() {
     alipayAppId: e.ALIPAY_APP_ID,
     alipayPrivateKey: e.ALIPAY_PRIVATE_KEY,
     alipayPublicKey: e.ALIPAY_PUBLIC_KEY,
-    yipayPid: e.YIPAY_PID,
-    yipayKey: e.YIPAY_KEY,
-    yipaySubmitUrl: e.YIPAY_SUBMIT_URL,
-    yipaySiteName: e.YIPAY_SITE_NAME,
+    zpayPid: e.ZPAY_PID,
+    zpayKey: e.ZPAY_KEY,
+    zpaySubmitUrl: e.ZPAY_SUBMIT_URL,
+    zpaySiteName: e.ZPAY_SITE_NAME,
     devRealPayment: e.DEV_REAL_PAYMENT,
     cronSecret: e.CRON_SECRET,
     pendingOrderTimeoutMs: e.PENDING_ORDER_TIMEOUT_MS,

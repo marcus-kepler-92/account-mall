@@ -1,8 +1,8 @@
 import { test, expect, type Page } from "@playwright/test"
 import {
-    buildYipayNotifyForm,
-    isYipayConfiguredForE2E,
-} from "./helpers/yipay-notify"
+    buildZpayNotifyForm,
+    isZpayConfiguredForE2E,
+} from "./helpers/zpay-notify"
 import {
     createTestProduct,
     cleanupTestProduct,
@@ -178,11 +178,11 @@ test.describe.serial("Exit discount flow", () => {
 
         completedOrderNo = orderBody.orderNo
 
-        // 可选：若配置了 yipay，模拟支付完成并验证 COMPLETED
-        if (isYipayConfiguredForE2E() && completedOrderNo) {
+        // 可选：若配置了 zpay，模拟支付完成并验证 COMPLETED
+        if (isZpayConfiguredForE2E() && completedOrderNo) {
             const amountStr = Number(orderBody.amount).toFixed(2)
-            const form = buildYipayNotifyForm(completedOrderNo, amountStr)
-            const notifyRes = await request.post(`${baseURL}/api/payment/yipay/notify`, { form })
+            const form = buildZpayNotifyForm(completedOrderNo, amountStr)
+            const notifyRes = await request.post(`${baseURL}/api/payment/zpay/notify`, { form })
             expect(notifyRes.status()).toBe(200)
 
             await page.goto(`${baseURL}/orders/lookup?orderNo=${encodeURIComponent(completedOrderNo)}`)

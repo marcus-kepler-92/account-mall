@@ -1,8 +1,8 @@
 import { test, expect } from "@playwright/test"
 import {
-    buildYipayNotifyForm,
-    isYipayConfiguredForE2E,
-} from "./helpers/yipay-notify"
+    buildZpayNotifyForm,
+    isZpayConfiguredForE2E,
+} from "./helpers/zpay-notify"
 import {
     createTestProduct,
     cleanupTestProduct,
@@ -152,8 +152,8 @@ test.describe.serial("Payment flow", () => {
         page,
         request,
     }) => {
-        if (!isYipayConfiguredForE2E()) {
-            test.skip(true, "需要配置 YIPAY_PID/KEY/SUBMIT_URL/SITE_NAME 环境变量")
+        if (!isZpayConfiguredForE2E()) {
+            test.skip(true, "需要配置 ZPAY_PID/KEY/SUBMIT_URL/SITE_NAME 环境变量")
         }
 
         await page.goto(`${baseURL}${product.path}`)
@@ -205,9 +205,9 @@ test.describe.serial("Payment flow", () => {
         const amount = orderBody.amount as number
 
         const amountStr = Number(amount).toFixed(2)
-        const form = buildYipayNotifyForm(orderNo, amountStr)
+        const form = buildZpayNotifyForm(orderNo, amountStr)
         const notifyRes = await request.post(
-            `${baseURL}/api/payment/yipay/notify`,
+            `${baseURL}/api/payment/zpay/notify`,
             { form },
         )
         expect(notifyRes.status()).toBe(200)

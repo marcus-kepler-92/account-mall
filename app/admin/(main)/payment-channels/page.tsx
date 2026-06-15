@@ -70,7 +70,7 @@ export default async function AdminPaymentChannelsPage() {
         <div className="space-y-6">
             <PageHeader
                 title="收款渠道"
-                description="管理易支付收款渠道，记录提现，追踪年度进度与余额"
+                description="管理z-pay收款渠道，记录提现，追踪年度进度与余额"
             />
 
             <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">

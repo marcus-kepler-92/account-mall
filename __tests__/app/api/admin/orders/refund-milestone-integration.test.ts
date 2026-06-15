@@ -28,10 +28,10 @@ jest.mock("@/lib/auth-guard", () => ({
     getAdminSession: jest.fn(),
 }))
 
-jest.mock("@/lib/yipay", () => ({
+jest.mock("@/lib/zpay", () => ({
     __esModule: true,
-    isYipayConfigured: jest.fn().mockReturnValue(true),
-    refundYipayOrder: jest.fn().mockResolvedValue({ ok: true }),
+    isZpayConfigured: jest.fn().mockReturnValue(true),
+    refundZpayOrder: jest.fn().mockResolvedValue({ ok: true }),
 }))
 
 // Keep revokeMilestoneBonusesForInviter REAL; only stub cancelOrderCommissions so it needs no

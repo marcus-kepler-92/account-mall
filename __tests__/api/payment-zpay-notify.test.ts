@@ -1,36 +1,36 @@
-import { POST } from "@/app/api/payment/yipay/notify/route"
+import { POST } from "@/app/api/payment/zpay/notify/route"
 
 jest.mock("@/lib/prisma", () => {
     const { prismaMock } = require("../../__mocks__/prisma")
     return { __esModule: true, prisma: prismaMock }
 })
 
-jest.mock("@/lib/yipay", () => ({
-    verifyYipayNotifySign: jest.fn(),
+jest.mock("@/lib/zpay", () => ({
+    verifyZpayNotifySign: jest.fn(),
 }))
 
 jest.mock("@/lib/order-completion-email", () => ({
     sendOrderCompletionEmail: jest.fn().mockResolvedValue(undefined),
 }))
 
-import { verifyYipayNotifySign } from "@/lib/yipay"
+import { verifyZpayNotifySign } from "@/lib/zpay"
 import { prismaMock } from "../../__mocks__/prisma"
 
-const verifyMock = verifyYipayNotifySign as jest.Mock
+const verifyMock = verifyZpayNotifySign as jest.Mock
 
 function createNotifyRequest(params: Record<string, string>): Request {
     const formData = new URLSearchParams()
     for (const [k, v] of Object.entries(params)) {
         formData.append(k, v)
     }
-    return new Request("http://localhost/api/payment/yipay/notify", {
+    return new Request("http://localhost/api/payment/zpay/notify", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: formData.toString(),
     }) as unknown as Request
 }
 
-describe("POST /api/payment/yipay/notify", () => {
+describe("POST /api/payment/zpay/notify", () => {
     beforeEach(() => {
         verifyMock.mockReset()
         prismaMock.order.findFirst.mockReset()
@@ -39,7 +39,7 @@ describe("POST /api/payment/yipay/notify", () => {
     })
 
     it("returns failure when body is not form", async () => {
-        const req = new Request("http://localhost/api/payment/yipay/notify", {
+        const req = new Request("http://localhost/api/payment/zpay/notify", {
             method: "POST",
             body: "not form",
         }) as unknown as Request
@@ -67,7 +67,7 @@ describe("POST /api/payment/yipay/notify", () => {
             money: "1.00",
             trade_status: "TRADE_SUCCESS",
         }).toString()
-        const req = new Request("http://localhost/api/payment/yipay/notify", {
+        const req = new Request("http://localhost/api/payment/zpay/notify", {
             method: "POST",
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
             body,

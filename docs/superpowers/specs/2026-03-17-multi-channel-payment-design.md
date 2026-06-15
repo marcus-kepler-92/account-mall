@@ -4,11 +4,11 @@ Date: 2026-03-17
 
 ## Background
 
-The platform collects revenue through multiple 易支付 accounts registered under different identities for tax management purposes. Currently, only a single 易支付 config (env vars) is supported, making it impossible to track per-account income or manage withdrawals from each account. The annual tax threshold per account is ¥65,000.
+The platform collects revenue through multiple z-pay accounts registered under different identities for tax management purposes. Currently, only a single z-pay config (env vars) is supported, making it impossible to track per-account income or manage withdrawals from each account. The annual tax threshold per account is ¥65,000.
 
 ## Goals
 
-1. Support multiple 易支付 payment channels in the database
+1. Support multiple z-pay payment channels in the database
 2. Automatically route orders to the channel with the most remaining annual capacity
 3. Track per-channel income (derived from orders) and withdrawals (manually recorded)
 4. Admin UI to monitor each channel's annual progress and current balance
@@ -21,10 +21,10 @@ The platform collects revenue through multiple 易支付 accounts registered und
 |-------|------|-------|
 | id | String (cuid) | |
 | nickname | String | Display name, e.g. "张三支付宝" |
-| pid | String | 易支付 merchant ID |
-| key | String | 易支付 signing key |
-| submitUrl | String | 易支付 submit endpoint |
-| siteName | String | 易支付 site name |
+| pid | String | z-pay merchant ID |
+| key | String | z-pay signing key |
+| submitUrl | String | z-pay submit endpoint |
+| siteName | String | z-pay site name |
 | type | String | Payment method type: "alipay" | "wxpay" | "qqpay" |
 | annualLimit | Decimal(10,2) | Annual income limit, default 65000 |
 | sortOrder | Int | Rotation order, lower = higher priority (within same type) |
@@ -70,7 +70,7 @@ This is a soft limit: slight overruns are acceptable since the primary goal is t
 - Write `paymentChannelId` to the order record
 - Use that channel's `pid`, `key`, `submitUrl`, `siteName` to build the payment URL
 
-### Async notify callback (`/api/payment/yipay/notify`)
+### Async notify callback (`/api/payment/zpay/notify`)
 
 - Extract `out_trade_no` from POST body (this is the `orderNo`)
 - Look up `order.paymentChannelId` → fetch `PaymentChannel.key`
@@ -114,7 +114,7 @@ Channels are disabled (`isActive = false`), never deleted. Channels with associa
 - Existing orders with `paymentChannelId = null` continue to work
 - Notify callback falls back to env var key when `paymentChannelId` is null
 - If no channels are configured in DB, `selectPaymentChannel()` returns null and the system uses env var config as before
-- Env var config (`YIPAY_PID` etc.) remains valid as a fallback
+- Env var config (`ZPAY_PID` etc.) remains valid as a fallback
 
 ## Known Limitations
 

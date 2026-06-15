@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Support multiple 易支付 accounts with type-scoped annual-limit rotation, per-channel balance tracking, and admin UI for channel management and withdrawal recording.
+**Goal:** Support multiple z-pay accounts with type-scoped annual-limit rotation, per-channel balance tracking, and admin UI for channel management and withdrawal recording.
 
 **Architecture:** Add `PaymentChannel` and `ChannelWithdrawal` DB models; order creation calls `selectPaymentChannel(type)` to pick a channel and writes `paymentChannelId` to the order; the notify callback looks up the order to get the channel key for verification; admin UI shows per-channel year income + balance with CRUD operations.
 
@@ -19,10 +19,10 @@
 | Modify | `prisma/schema.prisma` |
 | Create | `lib/payment-channel.ts` |
 | Create | `__tests__/lib/payment-channel.test.ts` |
-| Modify | `lib/yipay.ts` |
-| Modify | `__tests__/lib/yipay.test.ts` |
-| Modify | `lib/yipay-notify-complete.ts` |
-| Modify | `__tests__/lib/yipay-notify-complete.test.ts` |
+| Modify | `lib/zpay.ts` |
+| Modify | `__tests__/lib/zpay.test.ts` |
+| Modify | `lib/zpay-notify-complete.ts` |
+| Modify | `__tests__/lib/zpay-notify-complete.test.ts` |
 | Modify | `lib/get-payment-url.ts` |
 | Modify | `__tests__/lib/get-payment-url.test.ts` |
 | Modify | `app/api/orders/route.ts` |
@@ -295,49 +295,49 @@ git commit -m "feat(lib): add selectPaymentChannel with type-scoped annual limit
 
 ---
 
-## Task 3: Update yipay.ts
+## Task 3: Update zpay.ts
 
 **Files:**
-- Modify: `lib/yipay.ts`
-- Modify: `__tests__/lib/yipay.test.ts`
+- Modify: `lib/zpay.ts`
+- Modify: `__tests__/lib/zpay.test.ts`
 
 - [ ] **Step 1: Update `buildSubmitUrl` to accept optional submitUrl**
 
-In `lib/yipay.ts`, change `buildSubmitUrl`:
+In `lib/zpay.ts`, change `buildSubmitUrl`:
 
 ```typescript
 export function buildSubmitUrl(params: Record<string, string>, key: string, submitUrl?: string): string {
     const prestr = getVerifyParams(params)
     const sign = md5(prestr + key)
-    const base = submitUrl ?? config.yipaySubmitUrl ?? ""
+    const base = submitUrl ?? config.zpaySubmitUrl ?? ""
     return `${base}?${prestr}&sign=${sign}&sign_type=MD5`
 }
 ```
 
-- [ ] **Step 2: Update `getYipayPagePayUrl` to accept optional channel config**
+- [ ] **Step 2: Update `getZpayPagePayUrl` to accept optional channel config**
 
 Replace the function signature and body:
 
 ```typescript
-export type YipayChannelConfig = {
+export type ZpayChannelConfig = {
     pid: string
     key: string
     submitUrl: string
     siteName: string
 }
 
-export function getYipayPagePayUrl(params: {
+export function getZpayPagePayUrl(params: {
     orderNo: string
     totalAmount: string
     subject: string
     type?: string
-    channel?: YipayChannelConfig
+    channel?: ZpayChannelConfig
 }): string | null {
     const channel = params.channel
-    const pid = channel?.pid ?? config.yipayPid
-    const key = channel?.key ?? config.yipayKey
-    const submitUrl = channel?.submitUrl ?? config.yipaySubmitUrl
-    const siteName = channel?.siteName ?? config.yipaySiteName
+    const pid = channel?.pid ?? config.zpayPid
+    const key = channel?.key ?? config.zpayKey
+    const submitUrl = channel?.submitUrl ?? config.zpaySubmitUrl
+    const siteName = channel?.siteName ?? config.zpaySiteName
 
     if (!pid || !key || !submitUrl || !siteName) return null
 
@@ -346,7 +346,7 @@ export function getYipayPagePayUrl(params: {
         pid,
         money: params.totalAmount,
         name: params.subject,
-        notify_url: `${base}/api/payment/yipay/notify`,
+        notify_url: `${base}/api/payment/zpay/notify`,
         return_url: `${base}/orders/pay-return`,
         out_trade_no: params.orderNo,
         sitename: siteName,
@@ -360,11 +360,11 @@ export function getYipayPagePayUrl(params: {
 }
 ```
 
-- [ ] **Step 3: Update `verifyYipayNotifySign` to accept optional key**
+- [ ] **Step 3: Update `verifyZpayNotifySign` to accept optional key**
 
 ```typescript
-export function verifyYipayNotifySign(postData: Record<string, unknown>, key?: string): boolean {
-    const signingKey = key ?? config.yipayKey
+export function verifyZpayNotifySign(postData: Record<string, unknown>, key?: string): boolean {
+    const signingKey = key ?? config.zpayKey
     if (!signingKey) return false
     const signReceived = postData.sign
     if (typeof signReceived !== "string" || !signReceived) return false
@@ -380,28 +380,28 @@ export function verifyYipayNotifySign(postData: Record<string, unknown>, key?: s
 }
 ```
 
-Also remove the `isYipayConfigured()` call from this function (no longer relevant — key fallback handles it).
+Also remove the `isZpayConfigured()` call from this function (no longer relevant — key fallback handles it).
 
-- [ ] **Step 4: Remove `isYipayConfigured()` from the function and also update `isYipayConfigured` to check DB channels OR env vars**
+- [ ] **Step 4: Remove `isZpayConfigured()` from the function and also update `isZpayConfigured` to check DB channels OR env vars**
 
-Note: `isYipayConfigured()` is still used in `get-payment-url.ts`. Keep it for env-var fallback detection but it stays as-is. The multi-channel path bypasses it.
+Note: `isZpayConfigured()` is still used in `get-payment-url.ts`. Keep it for env-var fallback detection but it stays as-is. The multi-channel path bypasses it.
 
-- [ ] **Step 5: Run existing yipay tests**
+- [ ] **Step 5: Run existing zpay tests**
 
 ```bash
-npx jest __tests__/lib/yipay.test.ts --no-coverage
+npx jest __tests__/lib/zpay.test.ts --no-coverage
 ```
 
 Expected: PASS — all existing tests still pass (backward compatible: calling without `channel` falls back to config).
 
-- [ ] **Step 6: Add test for channel override in `__tests__/lib/yipay.test.ts`**
+- [ ] **Step 6: Add test for channel override in `__tests__/lib/zpay.test.ts`**
 
 Add to the end of the file:
 
 ```typescript
-describe("getYipayPagePayUrl with channel override", () => {
+describe("getZpayPagePayUrl with channel override", () => {
     it("uses channel config instead of global config when provided", () => {
-        const url = getYipayPagePayUrl({
+        const url = getZpayPagePayUrl({
             orderNo: "ord_1",
             totalAmount: "99.00",
             subject: "Test Product",
@@ -420,7 +420,7 @@ describe("getYipayPagePayUrl with channel override", () => {
     })
 })
 
-describe("verifyYipayNotifySign with explicit key", () => {
+describe("verifyZpayNotifySign with explicit key", () => {
     it("verifies with provided key instead of config key", () => {
         const params = { pid: "1", money: "10.00", out_trade_no: "ord_1" }
         const key = "channel_signing_key"
@@ -429,17 +429,17 @@ describe("verifyYipayNotifySign with explicit key", () => {
         const urlParams = new URLSearchParams(url.split("?")[1])
         const sign = urlParams.get("sign")!
         const postData = { ...params, sign, sign_type: "MD5" }
-        expect(verifyYipayNotifySign(postData, key)).toBe(true)
+        expect(verifyZpayNotifySign(postData, key)).toBe(true)
         // Wrong key should fail
-        expect(verifyYipayNotifySign(postData, "wrong_key")).toBe(false)
+        expect(verifyZpayNotifySign(postData, "wrong_key")).toBe(false)
     })
 })
 ```
 
-- [ ] **Step 7: Run yipay tests again**
+- [ ] **Step 7: Run zpay tests again**
 
 ```bash
-npx jest __tests__/lib/yipay.test.ts --no-coverage
+npx jest __tests__/lib/zpay.test.ts --no-coverage
 ```
 
 Expected: PASS — all tests including the new ones.
@@ -447,28 +447,28 @@ Expected: PASS — all tests including the new ones.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add lib/yipay.ts __tests__/lib/yipay.test.ts
-git commit -m "feat(lib): make yipay functions accept per-channel config overrides"
+git add lib/zpay.ts __tests__/lib/zpay.test.ts
+git commit -m "feat(lib): make zpay functions accept per-channel config overrides"
 ```
 
 ---
 
-## Task 4: Update yipay-notify-complete.ts
+## Task 4: Update zpay-notify-complete.ts
 
 **Files:**
-- Modify: `lib/yipay-notify-complete.ts`
-- Modify: `__tests__/lib/yipay-notify-complete.test.ts`
+- Modify: `lib/zpay-notify-complete.ts`
+- Modify: `__tests__/lib/zpay-notify-complete.test.ts`
 
 The key change: look up the order by `out_trade_no` first (to get the channel key), then verify signature.
 
-- [ ] **Step 1: Rewrite `lib/yipay-notify-complete.ts`**
+- [ ] **Step 1: Rewrite `lib/zpay-notify-complete.ts`**
 
 ```typescript
 import { prisma } from "@/lib/prisma"
-import { verifyYipayNotifySign } from "@/lib/yipay"
+import { verifyZpayNotifySign } from "@/lib/zpay"
 import { completePendingOrder } from "@/lib/complete-pending-order"
 
-export async function processYipayNotifyAndComplete(
+export async function processZpayNotifyAndComplete(
     postData: Record<string, unknown>,
 ): Promise<{ ok: boolean }> {
     const outTradeNo = postData.out_trade_no as string | undefined
@@ -493,7 +493,7 @@ export async function processYipayNotifyAndComplete(
     // Use channel key when available, otherwise fall back to env var key
     const channelKey = order?.paymentChannel?.key ?? undefined
 
-    if (!verifyYipayNotifySign(postData, channelKey)) {
+    if (!verifyZpayNotifySign(postData, channelKey)) {
         return { ok: false }
     }
 
@@ -516,14 +516,14 @@ export async function processYipayNotifyAndComplete(
     }
 
     if (order.status === "COMPLETED") {
-        console.info("[payment-notify] yipay orderNo=%s amount=%s status=already_completed", outTradeNo, orderAmountStr)
+        console.info("[payment-notify] zpay orderNo=%s amount=%s status=already_completed", outTradeNo, orderAmountStr)
         return { ok: true }
     }
     if (order.status !== "PENDING") {
         return { ok: true }
     }
 
-    console.info("[payment-notify] yipay orderNo=%s amount=%s status=completing", outTradeNo, orderAmountStr)
+    console.info("[payment-notify] zpay orderNo=%s amount=%s status=completing", outTradeNo, orderAmountStr)
     await completePendingOrder(outTradeNo)
     return { ok: true }
 }
@@ -532,14 +532,14 @@ export async function processYipayNotifyAndComplete(
 - [ ] **Step 2: Run existing notify-complete tests to see which break**
 
 ```bash
-npx jest __tests__/lib/yipay-notify-complete.test.ts --no-coverage
+npx jest __tests__/lib/zpay-notify-complete.test.ts --no-coverage
 ```
 
 Expected: Some tests fail because the flow changed (order lookup now happens before verify).
 
 - [ ] **Step 3: Read and update the test file**
 
-Read `__tests__/lib/yipay-notify-complete.test.ts` to understand what needs updating.
+Read `__tests__/lib/zpay-notify-complete.test.ts` to understand what needs updating.
 
 The main change: the test `"returns { ok: false } when sign verification fails"` previously asserted `prismaMock.order.findFirst` was NOT called. With the new flow it IS called. Update that test:
 
@@ -547,7 +547,7 @@ The main change: the test `"returns { ok: false } when sign verification fails"`
 it("returns { ok: false } when sign verification fails", async () => {
     prismaMock.order.findFirst.mockResolvedValue(makePendingOrder())
     verifyMock.mockReturnValue(false)
-    const result = await processYipayNotifyAndComplete({
+    const result = await processZpayNotifyAndComplete({
         out_trade_no: "order-1",
         money: "99.00",
         trade_status: "TRADE_SUCCESS",
@@ -587,7 +587,7 @@ it("uses channel key for verification when order has a channel", async () => {
     )
     verifyMock.mockReturnValue(true)
     prismaMock.$transaction.mockResolvedValue(undefined)
-    await processYipayNotifyAndComplete({
+    await processZpayNotifyAndComplete({
         out_trade_no: "order-1",
         money: "99.00",
         trade_status: "TRADE_SUCCESS",
@@ -600,7 +600,7 @@ it("falls back to env var key when order has no channel", async () => {
     prismaMock.order.findFirst.mockResolvedValue(makePendingOrder({ paymentChannel: null }))
     verifyMock.mockReturnValue(true)
     prismaMock.$transaction.mockResolvedValue(undefined)
-    await processYipayNotifyAndComplete({
+    await processZpayNotifyAndComplete({
         out_trade_no: "order-1",
         money: "99.00",
         trade_status: "TRADE_SUCCESS",
@@ -613,7 +613,7 @@ it("falls back to env var key when order has no channel", async () => {
 - [ ] **Step 4: Run tests to verify they pass**
 
 ```bash
-npx jest __tests__/lib/yipay-notify-complete.test.ts --no-coverage
+npx jest __tests__/lib/zpay-notify-complete.test.ts --no-coverage
 ```
 
 Expected: PASS — all tests pass.
@@ -621,8 +621,8 @@ Expected: PASS — all tests pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lib/yipay-notify-complete.ts __tests__/lib/yipay-notify-complete.test.ts
-git commit -m "feat(lib): use channel key for yipay notify verification"
+git add lib/zpay-notify-complete.ts __tests__/lib/zpay-notify-complete.test.ts
+git commit -m "feat(lib): use channel key for zpay notify verification"
 ```
 
 ---
@@ -638,7 +638,7 @@ git commit -m "feat(lib): use channel key for yipay notify verification"
 
 ```typescript
 import { getAlipayPagePayUrl, getAlipayWapPayUrl } from "@/lib/alipay"
-import { isYipayConfigured, getYipayPagePayUrl, type YipayChannelConfig } from "@/lib/yipay"
+import { isZpayConfigured, getZpayPagePayUrl, type ZpayChannelConfig } from "@/lib/zpay"
 
 export type ClientType = "pc" | "wap"
 
@@ -647,17 +647,17 @@ export interface GetPaymentUrlParams {
     totalAmount: string
     subject: string
     clientType?: ClientType
-    /** 支付渠道: "alipay" | "wxpay" | "qqpay"，仅在使用易支付时生效 */
+    /** 支付渠道: "alipay" | "wxpay" | "qqpay"，仅在使用z-pay时生效 */
     paymentMethod?: string
     /** DB 渠道配置，有则优先使用；null/undefined 时 fallback 到 env var */
-    channel?: YipayChannelConfig | null
+    channel?: ZpayChannelConfig | null
 }
 
 export function getPaymentUrlForOrder(params: GetPaymentUrlParams): string | null {
     const { orderNo, totalAmount, subject, clientType = "pc", paymentMethod = "alipay", channel } = params
-    const useYipay = channel != null || isYipayConfigured()
-    return useYipay
-        ? getYipayPagePayUrl({
+    const useZpay = channel != null || isZpayConfigured()
+    return useZpay
+        ? getZpayPagePayUrl({
               orderNo,
               totalAmount,
               subject,
@@ -1664,7 +1664,7 @@ export default async function AdminPaymentChannelsPage() {
         <div className="space-y-6">
             <PageHeader
                 title="收款渠道"
-                description="管理易支付收款渠道，记录提现，追踪年度进度与余额"
+                description="管理z-pay收款渠道，记录提现，追踪年度进度与余额"
             />
 
             <div className="grid gap-4 grid-cols-3">
@@ -1773,8 +1773,8 @@ git commit -m "feat(admin): add 收款渠道 nav item to sidebar"
 | Annual limit threshold selection | Task 2 |
 | Graceful degradation when all over limit | Task 2 |
 | Env var fallback when no DB channels | Task 2 + Task 5 |
-| getYipayPagePayUrl accepts channel config | Task 3 |
-| verifyYipayNotifySign accepts key param | Task 3 |
+| getZpayPagePayUrl accepts channel config | Task 3 |
+| verifyZpayNotifySign accepts key param | Task 3 |
 | Notify callback: order → channel → key | Task 4 |
 | Order creation writes paymentChannelId | Task 5 |
 | AUTO_FETCH paid orders also get channel | Task 5 |

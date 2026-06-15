@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
-import { processYipayNotifyAndComplete } from "@/lib/yipay-notify-complete"
+import { processZpayNotifyAndComplete } from "@/lib/zpay-notify-complete"
 
 
 /**
- * POST /api/payment/yipay/notify
- * Yipay (易支付) async notify. Verify sign, match order and amount, idempotent complete.
+ * POST /api/payment/zpay/notify
+ * Zpay (z-pay) async notify. Verify sign, match order and amount, idempotent complete.
  * Returns plain text "success" or "failure".
  */
 async function parseNotifyBody(request: NextRequest): Promise<Record<string, unknown>> {
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
 
     let result: { ok: boolean }
     try {
-        result = await processYipayNotifyAndComplete(postData)
+        result = await processZpayNotifyAndComplete(postData)
     } catch {
         return new NextResponse("failure", { status: 500, headers: { "Content-Type": "text/plain" } })
     }

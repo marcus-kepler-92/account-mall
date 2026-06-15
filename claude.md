@@ -105,7 +105,7 @@ app/
 └── api/                              # API 路由
     ├── auth/[...all]/                # better-auth 全量处理
     ├── products/, orders/, cards/, tags/  # CRUD
-    ├── payment/                      # 支付宝/易支付 回调
+    ├── payment/                      # 支付宝/z-pay 回调
     ├── admin/                        # Admin-only API
     ├── distributor/                  # 分销员 API
     └── cron/                         # 定时任务
@@ -141,7 +141,7 @@ app/
 | `api-response.ts` | API 响应辅助函数（badRequest, validationError, ...） |
 | `validations/*.ts` | Zod schema（按领域：order, product, card, announcement, ...） |
 | `stores/*.ts` | Zustand store |
-| `alipay.ts` / `yipay.ts` / `get-payment-url.ts` | 支付集成 |
+| `alipay.ts` / `zpay.ts` / `get-payment-url.ts` | 支付集成 |
 | `rate-limit.ts` / `turnstile.ts` | 安全与限流 |
 | `utils.ts` | 通用工具函数（cn, generateSlug） |
 | `form-utils.ts` | 表单错误映射（applyFieldErrors） |

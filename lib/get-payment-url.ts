@@ -1,5 +1,5 @@
 import { getAlipayPagePayUrl, getAlipayWapPayUrl } from "@/lib/alipay"
-import { isYipayConfigured, getYipayPagePayUrl, type YipayChannelConfig } from "@/lib/yipay"
+import { isZpayConfigured, getZpayPagePayUrl, type ZpayChannelConfig } from "@/lib/zpay"
 import { config } from "@/lib/config"
 
 export type ClientType = "pc" | "wap"
@@ -9,23 +9,23 @@ export interface GetPaymentUrlParams {
     totalAmount: string
     subject: string
     clientType?: ClientType
-    /** 支付渠道: "alipay" | "wxpay" | "qqpay"，仅在使用易支付时生效 */
+    /** 支付渠道: "alipay" | "wxpay" | "qqpay"，仅在使用z-pay时生效 */
     paymentMethod?: string
     /** DB 渠道配置，有则优先使用；null/undefined 时 fallback 到 env var */
-    channel?: YipayChannelConfig | null
+    channel?: ZpayChannelConfig | null
 }
 
 /**
- * 根据订单信息生成支付跳转 URL（易支付或支付宝 PC/Wap）。
+ * 根据订单信息生成支付跳转 URL（z-pay或支付宝 PC/Wap）。
  * 未配置支付或生成失败时返回 null。
  */
 export function getPaymentUrlForOrder(params: GetPaymentUrlParams): string | null {
     const { orderNo, totalAmount, clientType = "pc", paymentMethod = "alipay", channel } = params
     // Always use the compliance label as the payment subject, never expose product names
     const subject = config.paymentSubjectLabel
-    const useYipay = channel != null || isYipayConfigured()
-    return useYipay
-        ? getYipayPagePayUrl({
+    const useZpay = channel != null || isZpayConfigured()
+    return useZpay
+        ? getZpayPagePayUrl({
               orderNo,
               totalAmount,
               subject,

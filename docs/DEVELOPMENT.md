@@ -87,7 +87,7 @@ app/admin/(main)/{resource}/
 ### 支付集成
 
 - `lib/alipay.ts`：支付宝官方 SDK
-- `lib/yipay.ts`：易支付聚合
+- `lib/zpay.ts`：z-pay聚合
 - `lib/get-payment-url.ts`：统一入口，根据 `PaymentChannel` 路由到对应实现
 - 回调处理：`app/api/payment/`
 

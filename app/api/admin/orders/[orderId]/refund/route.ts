@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getAdminSession } from "@/lib/auth-guard"
 import { assertTransition, InvalidTransitionError } from "@/lib/order-state-machine"
-import { isYipayConfigured, refundYipayOrder } from "@/lib/yipay"
+import { isZpayConfigured, refundZpayOrder } from "@/lib/zpay"
 import {
     cancelOrderCommissions,
     revokeMilestoneBonusesForInviter,
@@ -19,7 +19,7 @@ import {
 /**
  * POST /api/admin/orders/[orderId]/refund
  *
- * Refund a COMPLETED order through 易支付 (zpay act=refund) for the full paid amount,
+ * Refund a COMPLETED order through z-pay (zpay act=refund) for the full paid amount,
  * then reverse the downstream side effects of completion:
  *   - order status COMPLETED -> REFUNDED (+ refundedAt)
  *   - this order's commissions (SETTLED/PENDING) -> CANCELLED
@@ -64,17 +64,17 @@ export async function POST(_request: NextRequest, ctx: { params: Promise<{ order
         throw err
     }
 
-    // Eligibility: only orders paid through 易支付 can be refunded online. A DB payment
+    // Eligibility: only orders paid through z-pay can be refunded online. A DB payment
     // channel (paymentChannelId) is authoritative; env config is the global fallback used
     // when no per-order channel was recorded.
     const channel = order.paymentChannel ?? undefined
-    if (!channel && !isYipayConfigured()) {
+    if (!channel && !isZpayConfigured()) {
         return conflict("该订单支付渠道不支持在线退款")
     }
 
     // Refund amount is the paid (post-discount) amount snapshotted on the order.
     const money = order.amount.toFixed(2)
-    const result = await refundYipayOrder(order.orderNo, money, channel)
+    const result = await refundZpayOrder(order.orderNo, money, channel)
     if (result === null) return serviceUnavailable("退款请求失败，请稍后重试")
     if (!result.ok) return badRequest(result.message ?? "退款被拒绝")
 

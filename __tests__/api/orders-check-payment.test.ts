@@ -12,8 +12,8 @@ jest.mock("better-auth/crypto", () => ({
     verifyPassword: jest.fn(),
 }))
 
-jest.mock("@/lib/yipay", () => ({
-    queryYipayOrder: jest.fn(),
+jest.mock("@/lib/zpay", () => ({
+    queryZpayOrder: jest.fn(),
 }))
 
 jest.mock("@/lib/complete-pending-order", () => ({
@@ -26,12 +26,12 @@ jest.mock("@/lib/rate-limit", () => ({
 
 import { POST } from "@/app/api/orders/check-payment/route"
 import { verifyPassword } from "better-auth/crypto"
-import { queryYipayOrder } from "@/lib/yipay"
+import { queryZpayOrder } from "@/lib/zpay"
 import { completePendingOrder } from "@/lib/complete-pending-order"
 import { checkOrderQueryRateLimit } from "@/lib/rate-limit"
 
 const verifyPasswordMock = verifyPassword as jest.Mock
-const queryYipayMock = queryYipayOrder as jest.Mock
+const queryZpayMock = queryZpayOrder as jest.Mock
 const completeMock = completePendingOrder as jest.Mock
 const rateLimitMock = checkOrderQueryRateLimit as jest.Mock
 
@@ -58,7 +58,7 @@ const PENDING_ORDER = {
 describe("POST /api/orders/check-payment", () => {
     beforeEach(() => {
         verifyPasswordMock.mockReset()
-        queryYipayMock.mockReset()
+        queryZpayMock.mockReset()
         completeMock.mockReset()
         rateLimitMock.mockResolvedValue(null)
         prismaMock.order.findUnique.mockResolvedValue(null)
@@ -82,31 +82,31 @@ describe("POST /api/orders/check-payment", () => {
         verifyPasswordMock.mockResolvedValue(false)
         const res = await POST(makeRequest(VALID_BODY))
         expect(res.status).toBe(400)
-        expect(queryYipayMock).not.toHaveBeenCalled()
+        expect(queryZpayMock).not.toHaveBeenCalled()
     })
 
-    it("returns current status directly for COMPLETED orders without querying Yipay", async () => {
+    it("returns current status directly for COMPLETED orders without querying Zpay", async () => {
         prismaMock.order.findUnique.mockResolvedValue({ ...PENDING_ORDER, status: "COMPLETED" })
         verifyPasswordMock.mockResolvedValue(true)
         const res = await POST(makeRequest(VALID_BODY))
         expect(res.status).toBe(200)
         expect(await res.json()).toEqual({ status: "COMPLETED" })
-        expect(queryYipayMock).not.toHaveBeenCalled()
+        expect(queryZpayMock).not.toHaveBeenCalled()
     })
 
-    it("returns current status directly for CLOSED orders without querying Yipay", async () => {
+    it("returns current status directly for CLOSED orders without querying Zpay", async () => {
         prismaMock.order.findUnique.mockResolvedValue({ ...PENDING_ORDER, status: "CLOSED" })
         verifyPasswordMock.mockResolvedValue(true)
         const res = await POST(makeRequest(VALID_BODY))
         expect(res.status).toBe(200)
         expect(await res.json()).toEqual({ status: "CLOSED" })
-        expect(queryYipayMock).not.toHaveBeenCalled()
+        expect(queryZpayMock).not.toHaveBeenCalled()
     })
 
-    it("calls completePendingOrder and returns COMPLETED when Yipay confirms paid", async () => {
+    it("calls completePendingOrder and returns COMPLETED when Zpay confirms paid", async () => {
         prismaMock.order.findUnique.mockResolvedValue(PENDING_ORDER)
         verifyPasswordMock.mockResolvedValue(true)
-        queryYipayMock.mockResolvedValue({ paid: true })
+        queryZpayMock.mockResolvedValue({ paid: true })
         completeMock.mockResolvedValue({ done: true })
 
         const res = await POST(makeRequest(VALID_BODY))
@@ -115,10 +115,10 @@ describe("POST /api/orders/check-payment", () => {
         expect(completeMock).toHaveBeenCalledWith("order-xyz")
     })
 
-    it("returns PENDING when Yipay says not paid", async () => {
+    it("returns PENDING when Zpay says not paid", async () => {
         prismaMock.order.findUnique.mockResolvedValue(PENDING_ORDER)
         verifyPasswordMock.mockResolvedValue(true)
-        queryYipayMock.mockResolvedValue({ paid: false })
+        queryZpayMock.mockResolvedValue({ paid: false })
 
         const res = await POST(makeRequest(VALID_BODY))
         expect(res.status).toBe(200)
@@ -126,10 +126,10 @@ describe("POST /api/orders/check-payment", () => {
         expect(completeMock).not.toHaveBeenCalled()
     })
 
-    it("returns PENDING when queryYipayOrder returns null (unconfigured)", async () => {
+    it("returns PENDING when queryZpayOrder returns null (unconfigured)", async () => {
         prismaMock.order.findUnique.mockResolvedValue(PENDING_ORDER)
         verifyPasswordMock.mockResolvedValue(true)
-        queryYipayMock.mockResolvedValue(null)
+        queryZpayMock.mockResolvedValue(null)
 
         const res = await POST(makeRequest(VALID_BODY))
         expect(res.status).toBe(200)

@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
         return new NextResponse("failure", { status: 400, headers: { "Content-Type": "text/plain" } })
     }
 
-    // TRADE_SUCCESS = 交易支付成功
+    // TRADE_SUCCESS = 交z-pay成功
     if (tradeStatus !== "TRADE_SUCCESS" && tradeStatus !== "TRADE_FINISHED") {
         return new NextResponse("success", { headers: { "Content-Type": "text/plain" } })
     }
