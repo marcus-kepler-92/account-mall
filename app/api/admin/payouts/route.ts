@@ -30,3 +30,5 @@ export async function POST(request: NextRequest) {
     })
     return NextResponse.json({ data: payout }, { status: 201 })
 }
+
+export const runtime = "nodejs"

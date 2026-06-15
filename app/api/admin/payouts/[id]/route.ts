@@ -51,3 +51,5 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
     await prisma.payout.delete({ where: { id } })
     return NextResponse.json({ data: { id } })
 }
+
+export const runtime = "nodejs"
