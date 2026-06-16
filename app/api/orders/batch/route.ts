@@ -38,17 +38,17 @@ export async function POST(request: NextRequest) {
 
     const orders = await prisma.order.findMany({
         where: { id: { in: orderIds } },
-        select: { id: true, status: true },
+        select: { id: true, status: true, product: { select: { productType: true } } },
     });
 
-    const orderMap = new Map(orders.map((o) => [o.id, o.status]));
+    const orderMap = new Map(orders.map((o) => [o.id, o]));
 
     let success = 0;
     let skipped = 0;
     const idsToProcess: string[] = [];
 
     for (const id of orderIds) {
-        const status = orderMap.get(id);
+        const status = orderMap.get(id)?.status;
         if (!status) {
             skipped++;
             continue;
@@ -78,11 +78,35 @@ export async function POST(request: NextRequest) {
             // filtered idsToProcess to status="PENDING" only, and PENDING→CLOSED
             // is legal for ALL product types per lib/order-state-machine.ts.
             // The pre-filter is the source-of-truth guard here.
-            const result = await prisma.order.updateMany({
-                where: { id: { in: idsToProcess } },
-                data: { status: "CLOSED" },
+            //
+            // Closing a PENDING order must also release its reserved cards, same
+            // as the single-order PATCH/DELETE and the close-expired-orders cron:
+            // - AUTO_FETCH: temporary crawled cards can't return to stock → delete
+            // - NORMAL/MANUAL: release reserved cards back to inventory
+            const autoFetchIds = idsToProcess.filter(
+                (id) => orderMap.get(id)?.product?.productType === "AUTO_FETCH",
+            );
+            const releaseIds = idsToProcess.filter(
+                (id) => orderMap.get(id)?.product?.productType !== "AUTO_FETCH",
+            );
+            await prisma.$transaction(async (tx) => {
+                await tx.order.updateMany({
+                    where: { id: { in: idsToProcess } },
+                    data: { status: "CLOSED" },
+                });
+                if (autoFetchIds.length > 0) {
+                    await tx.card.deleteMany({
+                        where: { orderId: { in: autoFetchIds }, status: "RESERVED" },
+                    });
+                }
+                if (releaseIds.length > 0) {
+                    await tx.card.updateMany({
+                        where: { orderId: { in: releaseIds }, status: "RESERVED" },
+                        data: { status: "UNSOLD", orderId: null },
+                    });
+                }
             });
-            success = result.count;
+            success = idsToProcess.length;
         } else if (action === "DELETE") {
             const result = await prisma.order.deleteMany({
                 where: { id: { in: idsToProcess } },
