@@ -182,7 +182,7 @@ export function ProductBlacklistModal({ productId, productName, open, onOpenChan
                                     <AlertDialogCancel>取消</AlertDialogCancel>
                                     <AlertDialogAction
                                         onClick={handleClearAll}
-                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                        className="bg-destructive text-white hover:bg-destructive/90"
                                     >
                                         确认清空
                                     </AlertDialogAction>

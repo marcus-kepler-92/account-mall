@@ -258,7 +258,7 @@ export function OrdersDataTable({ data, total, statusCounts, distributors, canRe
                         <AlertDialogAction
                             onClick={() => batchAction && handleBatchAction(batchAction)}
                             disabled={batchLoading}
-                            className={batchAction === "DELETE" ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
+                            className={batchAction === "DELETE" ? "bg-destructive text-white hover:bg-destructive/90" : ""}
                         >
                             {batchLoading ? "处理中..." : "确认"}
                         </AlertDialogAction>

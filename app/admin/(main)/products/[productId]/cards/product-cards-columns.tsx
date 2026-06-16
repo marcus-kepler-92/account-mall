@@ -191,7 +191,7 @@ function ProductCardRowActions({ card }: { card: ProductCardRow }) {
                         <AlertDialogAction
                             onClick={handleDelete}
                             disabled={actionLoading}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            className="bg-destructive text-white hover:bg-destructive/90"
                         >
                             {actionLoading ? "删除中..." : "删除"}
                         </AlertDialogAction>

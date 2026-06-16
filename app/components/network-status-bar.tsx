@@ -25,7 +25,7 @@ export function NetworkStatusBar() {
     if (online) return null
 
     return (
-        <div className="fixed inset-x-0 top-0 z-50 flex items-center justify-center gap-2 bg-destructive py-1.5 text-sm text-destructive-foreground">
+        <div className="fixed inset-x-0 top-0 z-50 flex items-center justify-center gap-2 bg-destructive py-1.5 text-sm text-white">
             <WifiOff className="size-4" />
             网络连接已断开，部分功能暂时不可用
         </div>

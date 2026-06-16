@@ -447,7 +447,7 @@ export function DistributorDetailSheet({
                         <AlertDialogAction
                             onClick={(e) => { e.preventDefault(); handleDelete() }}
                             disabled={deleteLoading}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            className="bg-destructive text-white hover:bg-destructive/90"
                         >
                             {deleteLoading && <Loader2 className="size-4 animate-spin" />}
                             删除

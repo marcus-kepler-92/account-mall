@@ -72,7 +72,7 @@ export function PayoutRowActions({ row }: { row: PayoutRow }) {
                     <AlertDialogFooter>
                         <AlertDialogCancel disabled={deleting}>取消</AlertDialogCancel>
                         <AlertDialogAction
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            className="bg-destructive text-white hover:bg-destructive/90"
                             disabled={deleting}
                             onClick={(e) => { e.preventDefault(); handleDelete() }}
                         >
