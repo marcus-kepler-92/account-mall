@@ -7,7 +7,10 @@ export default function robots(): MetadataRoute.Robots {
         rules: {
             userAgent: "*",
             allow: "/",
-            disallow: "/admin/",
+            // Order detail pages carry a noindex meta tag instead of a robots
+            // disallow, so Google must stay able to crawl /orders/* to see it.
+            // The trees below have no organic value, so block crawling outright.
+            disallow: ["/admin/", "/distributor/", "/api/"],
         },
         sitemap: `${base}/sitemap.xml`,
     }

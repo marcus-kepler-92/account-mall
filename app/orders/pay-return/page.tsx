@@ -7,8 +7,14 @@ import { SiteHeader } from "@/app/components/site-header"
 import { verifyZpayNotifySign } from "@/lib/zpay"
 import { processZpayNotifyAndComplete } from "@/lib/zpay-notify-complete"
 import { createOrderSuccessToken } from "@/lib/order-success-token"
+import type { Metadata } from "next"
 
 export const dynamic = "force-dynamic"
+
+// Payment-return landing is a transient redirect target — keep it out of the index.
+export const metadata: Metadata = {
+  robots: { index: false, follow: true },
+}
 
 /**
  * 支付同步返回页（return_url）. z-pay/支付宝支付完成后会跳转至此。

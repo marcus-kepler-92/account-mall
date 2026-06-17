@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { unstable_cache } from "next/cache";
@@ -15,7 +15,7 @@ import { ProductOrderSection } from "./product-order-section";
 import { SoldOutOverlay } from "@/app/components/sold-out-overlay";
 import { RestockReminderForm } from "./restock-reminder-form";
 import { ProductBottomBar } from "../../components/product-bottom-bar";
-import { descriptionToPlainText } from "@/lib/description";
+import { buildProductDescription, extractProductIdPrefix } from "@/lib/product-seo";
 import { MarkdownViewClient } from "@/app/components/markdown-view-client";
 import { RiskWarningDialog } from "./risk-warning-dialog";
 import { resolveCrossSellDiscounts } from "@/lib/cross-sell";
@@ -44,6 +44,7 @@ const getCachedProductMetaBySlug = unstable_cache(
       where: { slug },
       select: {
         name: true,
+        summary: true,
         description: true,
         price: true,
         status: true,
@@ -53,6 +54,19 @@ const getCachedProductMetaBySlug = unstable_cache(
       },
     }),
   ["product-meta-by-slug"],
+  { revalidate: PRODUCT_CACHE_TTL_SECONDS, tags: ["products"] },
+);
+
+// Resolve the current canonical slug for a product id. Used to 308-redirect
+// stale/renamed slugs to the live one so accumulated ranking equity is merged
+// into the canonical URL instead of being lost to a 404.
+const getCachedCanonicalSlugById = unstable_cache(
+  async (id: string) =>
+    prisma.product.findUnique({
+      where: { id },
+      select: { slug: true, status: true },
+    }),
+  ["product-canonical-slug-by-id"],
   { revalidate: PRODUCT_CACHE_TTL_SECONDS, tags: ["products"] },
 );
 
@@ -75,9 +89,7 @@ export async function generateMetadata({
   const product = await getCachedProductMetaBySlug(slug);
   if (!product || product.status !== "ACTIVE") return { title: "商品" };
 
-  const desc = product.description
-    ? descriptionToPlainText(product.description, 160)
-    : `${product.name} - ¥${Number(product.price).toFixed(2)}`;
+  const desc = buildProductDescription(product);
   const productUrl = `${config.siteUrl}/products/${product.slug}`;
   const ogImages = product.image ? [{ url: product.image }] : undefined;
   return {
@@ -111,6 +123,16 @@ export default async function ProductDetailPage({
   const product = await getCachedProductBySlug(slug);
 
   if (!product || product.status !== "ACTIVE") {
+    // A renamed product leaves its old slug dangling. Rather than 404 (which
+    // discards the URL's ranking equity), 308-redirect to the live canonical
+    // slug so Google merges it into the current URL.
+    const idPrefix = extractProductIdPrefix(slug);
+    if (idPrefix) {
+      const canonical = await getCachedCanonicalSlugById(idPrefix);
+      if (canonical?.status === "ACTIVE" && canonical.slug !== slug) {
+        permanentRedirect(`/products/${canonical.slug}`);
+      }
+    }
     notFound();
   }
 
@@ -207,9 +229,7 @@ export default async function ProductDetailPage({
     isStorefrontTurnstileEnforced();
 
   const productUrl = `${config.siteUrl}/products/${product.slug}`;
-  const descriptionPlain = product.description
-    ? descriptionToPlainText(product.description, 160)
-    : `${product.name} - ¥${priceNumber.toFixed(2)}`;
+  const descriptionPlain = buildProductDescription(product);
 
   const imageRaw = productWithImage.image;
   const imageAbsolute =
