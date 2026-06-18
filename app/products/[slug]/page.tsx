@@ -15,7 +15,11 @@ import { ProductOrderSection } from "./product-order-section";
 import { SoldOutOverlay } from "@/app/components/sold-out-overlay";
 import { RestockReminderForm } from "./restock-reminder-form";
 import { ProductBottomBar } from "../../components/product-bottom-bar";
-import { buildProductDescription, extractProductIdPrefix } from "@/lib/product-seo";
+import {
+  buildProductDescription,
+  buildProductOfferPricing,
+  extractProductIdPrefix,
+} from "@/lib/product-seo";
 import { MarkdownViewClient } from "@/app/components/markdown-view-client";
 import { RiskWarningDialog } from "./risk-warning-dialog";
 import { resolveCrossSellDiscounts } from "@/lib/cross-sell";
@@ -247,9 +251,13 @@ export default async function ProductDetailPage({
   const priceValidUntilStr = priceValidUntil.toISOString().slice(0, 10);
 
   const offers: Record<string, unknown> = {
-    "@type": "Offer",
-    price: priceNumber,
-    priceCurrency: "CNY",
+    ...buildProductOfferPricing({
+      isManual,
+      priceMin: manualDisplay.priceMin,
+      priceMax: manualDisplay.priceMax,
+      fixedPrice: priceNumber,
+      activeVariantCount: variants.length,
+    }),
     availability: isSoldOut
       ? "https://schema.org/OutOfStock"
       : "https://schema.org/InStock",

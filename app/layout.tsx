@@ -32,6 +32,7 @@ const geistMono = Geist_Mono({
 const siteTitle = config.siteName;
 const siteDescription = config.siteDescription;
 const siteUrl = config.siteUrl;
+const contactEmail = config.contactEmail;
 
 export const metadata: Metadata = {
   title: {
@@ -78,7 +79,19 @@ export default function RootLayout({
         name: siteTitle,
         alternateName: ["空域", "VoidLogins", "苹果ID商城"],
         url: siteUrl,
-        logo: `${siteUrl}/favicon.ico`,
+        // Google requires the Organization logo to be ≥112×112px; a favicon.ico
+        // is explicitly unsuitable. apple-icon.png is 180×180 and crawlable.
+        logo: `${siteUrl}/apple-icon.png`,
+        description: siteDescription,
+        // contactPoint is a recommended trust signal — only emit it when a real
+        // support address is configured, never a placeholder.
+        ...(contactEmail && {
+          contactPoint: {
+            "@type": "ContactPoint",
+            contactType: "customer support",
+            email: contactEmail,
+          },
+        }),
       },
       {
         "@type": "WebSite",

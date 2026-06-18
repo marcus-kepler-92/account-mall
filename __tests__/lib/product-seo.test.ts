@@ -1,4 +1,8 @@
-import { extractProductIdPrefix, buildProductDescription } from "@/lib/product-seo"
+import {
+  extractProductIdPrefix,
+  buildProductDescription,
+  buildProductOfferPricing,
+} from "@/lib/product-seo"
 
 describe("extractProductIdPrefix", () => {
   it("extracts the cuid prefix from a `{cuid}-{descriptive}` slug", () => {
@@ -60,5 +64,66 @@ describe("buildProductDescription", () => {
     expect(
       buildProductDescription({ ...base, summary: null, description: null }),
     ).toBe("日本 Apple ID - ¥9.90")
+  })
+})
+
+describe("buildProductOfferPricing", () => {
+  it("emits a plain Offer for non-MANUAL products", () => {
+    expect(
+      buildProductOfferPricing({
+        isManual: false,
+        priceMin: null,
+        priceMax: null,
+        fixedPrice: 12.5,
+        activeVariantCount: 0,
+      }),
+    ).toEqual({ "@type": "Offer", priceCurrency: "CNY", price: 12.5 })
+  })
+
+  it("emits an AggregateOffer with low/high price for a MANUAL price band", () => {
+    expect(
+      buildProductOfferPricing({
+        isManual: true,
+        priceMin: 9.9,
+        priceMax: 29.9,
+        fixedPrice: 0,
+        activeVariantCount: 3,
+      }),
+    ).toEqual({
+      "@type": "AggregateOffer",
+      priceCurrency: "CNY",
+      lowPrice: 9.9,
+      highPrice: 29.9,
+      offerCount: 3,
+    })
+  })
+
+  it("omits highPrice when MANUAL variants share a single price", () => {
+    const offer = buildProductOfferPricing({
+      isManual: true,
+      priceMin: 9.9,
+      priceMax: 9.9,
+      fixedPrice: 0,
+      activeVariantCount: 2,
+    })
+    expect(offer).not.toHaveProperty("highPrice")
+    expect(offer).toMatchObject({
+      "@type": "AggregateOffer",
+      lowPrice: 9.9,
+      offerCount: 2,
+    })
+  })
+
+  it("falls back to a plain Offer when a MANUAL product has no priced variants", () => {
+    // isUnavailable MANUAL rows surface priceMin === null; never publish ¥0 as a band.
+    expect(
+      buildProductOfferPricing({
+        isManual: true,
+        priceMin: null,
+        priceMax: null,
+        fixedPrice: 0,
+        activeVariantCount: 0,
+      }),
+    ).toEqual({ "@type": "Offer", priceCurrency: "CNY", price: 0 })
   })
 })

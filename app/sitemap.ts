@@ -20,35 +20,40 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.8,
     }))
 
-    const now = new Date()
+    // Google ignores lastmod values it deems unreliable — a per-request
+    // `new Date()` makes every static page look "just updated" and discredits
+    // the whole signal. The homepage reflects the catalog, so derive its
+    // lastmod from the most recent product update; the rarely-changing static
+    // pages omit lastmod entirely (preferable to a fabricated timestamp).
+    const latestProductUpdate = products.reduce<Date | undefined>(
+        (latest, p) => (!latest || p.updatedAt > latest ? p.updatedAt : latest),
+        undefined,
+    )
+
     return [
         {
             url: base,
-            lastModified: now,
+            ...(latestProductUpdate && { lastModified: latestProductUpdate }),
             changeFrequency: "daily" as const,
             priority: 1,
         },
         {
             url: `${base}/orders/lookup`,
-            lastModified: now,
             changeFrequency: "weekly" as const,
             priority: 0.5,
         },
         {
             url: `${base}/privacy`,
-            lastModified: now,
             changeFrequency: "yearly" as const,
             priority: 0.3,
         },
         {
             url: `${base}/terms`,
-            lastModified: now,
             changeFrequency: "yearly" as const,
             priority: 0.3,
         },
         {
             url: `${base}/refund`,
-            lastModified: now,
             changeFrequency: "yearly" as const,
             priority: 0.3,
         },

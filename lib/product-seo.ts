@@ -12,6 +12,44 @@ export function extractProductIdPrefix(slug: string): string | null {
   return /^c[a-z0-9]{20,}$/.test(prefix) ? prefix : null
 }
 
+// Build the schema.org offer node for a product's structured data.
+//
+// NORMAL / AUTO_FETCH products have a single meaningful `product.price`, so they
+// emit a plain Offer. MANUAL products price per-variant (the product-level price
+// is always 0), and the page shows a "¥min 起" band — emitting a single Offer
+// there would publish a price of 0, contradicting the visible price. Google
+// forbids ProductGroup-less variants but supports AggregateOffer for a price
+// band, so MANUAL products with active variants emit an AggregateOffer whose
+// lowPrice/highPrice mirror the visible band. The caller merges shared fields
+// (availability, shippingDetails, return policy, etc.) onto the returned object.
+export function buildProductOfferPricing(args: {
+  isManual: boolean
+  priceMin: number | null
+  priceMax: number | null
+  fixedPrice: number
+  activeVariantCount: number
+}): Record<string, unknown> {
+  if (args.isManual && args.priceMin != null) {
+    const offer: Record<string, unknown> = {
+      "@type": "AggregateOffer",
+      priceCurrency: "CNY",
+      lowPrice: args.priceMin,
+    }
+    if (args.priceMax != null && args.priceMax !== args.priceMin) {
+      offer.highPrice = args.priceMax
+    }
+    if (args.activeVariantCount > 0) {
+      offer.offerCount = args.activeVariantCount
+    }
+    return offer
+  }
+  return {
+    "@type": "Offer",
+    priceCurrency: "CNY",
+    price: args.fixedPrice,
+  }
+}
+
 // Shared meta + structured-data description. Prefers the admin-authored summary
 // (keyword-rich, capped at 300 chars in the schema), then the rich description,
 // then a name + price stub. Truncated to 160 chars for SERP snippets.
