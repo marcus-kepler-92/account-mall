@@ -151,6 +151,8 @@ return [
                     productType={row.original.productType}
                     isFree={row.original.productType === "AUTO_FETCH" && row.original.price === 0}
                     isSuperAdmin={isSuperAdmin}
+                    defaultUnitCost={row.original.costPerUnit}
+                    currentStock={row.original.stock}
                 />
             </div>
         ),

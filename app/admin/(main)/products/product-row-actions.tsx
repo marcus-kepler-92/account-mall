@@ -8,7 +8,7 @@ import { useState } from "react"
 import {
     MoreHorizontal,
     Pencil,
-    CreditCard,
+    Upload,
     Copy,
     CopyPlus,
     Archive,
@@ -37,6 +37,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { ProductBlacklistModal } from "./product-blacklist-modal"
+import { BulkImportCards } from "./[productId]/cards/bulk-import-cards"
 
 type ProductRowActionsProps = {
     productId: string
@@ -46,6 +47,10 @@ type ProductRowActionsProps = {
     productType: string
     isFree: boolean
     isSuperAdmin?: boolean
+    /** Prefilled into the import dialog's unit cost input. */
+    defaultUnitCost?: number | null
+    /** Current UNSOLD-card count, shown as restock context in the import dialog. */
+    currentStock?: number | null
 }
 
 export function ProductRowActions({
@@ -56,6 +61,8 @@ export function ProductRowActions({
     productType,
     isFree,
     isSuperAdmin = false,
+    defaultUnitCost = null,
+    currentStock = null,
 }: ProductRowActionsProps) {
     const router = useRouter()
     const invalidateNotifications = useInvalidateAdminNotifications()
@@ -65,6 +72,7 @@ export function ProductRowActions({
     const [deleteOpen, setDeleteOpen] = useState(false)
     const [deleteLoading, setDeleteLoading] = useState(false)
     const [blacklistOpen, setBlacklistOpen] = useState(false)
+    const [importOpen, setImportOpen] = useState(false)
     const isActive = status === "ACTIVE"
     const isAutoFetch = productType === "AUTO_FETCH"
     const isManual = productType === "MANUAL"
@@ -163,11 +171,9 @@ export function ProductRowActions({
                         </Link>
                     </DropdownMenuItem>
                     {!isAutoFetch && !isManual && (
-                        <DropdownMenuItem asChild>
-                            <Link href={`/admin/products/${productId}/cards`}>
-                                <CreditCard className="size-4" />
-                                管理卡密
-                            </Link>
+                        <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setImportOpen(true) }}>
+                            <Upload className="size-4" />
+                            导入卡密
                         </DropdownMenuItem>
                     )}
                     {isAutoFetch && (
@@ -276,6 +282,16 @@ export function ProductRowActions({
                     productName={productName}
                     open={blacklistOpen}
                     onOpenChange={setBlacklistOpen}
+                />
+            )}
+
+            {!isAutoFetch && !isManual && (
+                <BulkImportCards
+                    productId={productId}
+                    defaultUnitCost={defaultUnitCost}
+                    currentStock={currentStock}
+                    open={importOpen}
+                    onOpenChange={setImportOpen}
                 />
             )}
         </>

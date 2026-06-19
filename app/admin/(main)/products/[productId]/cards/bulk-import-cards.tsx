@@ -147,7 +147,7 @@ export function BulkImportCards({
                         每行输入一条卡密内容，支持最多 {MAX_LINES} 条。重复行将在导入时去重。
                     </DialogDescription>
                 </DialogHeader>
-                <div className="space-y-4 flex-1 overflow-y-auto min-h-0">
+                <div className="space-y-4 flex flex-1 flex-col min-h-0">
                     <div className="space-y-1.5">
                         <Label htmlFor="bulk-import-unit-cost">
                             采购成本（每张，可选）
@@ -171,7 +171,7 @@ export function BulkImportCards({
                             </p>
                         )}
                     </div>
-                    <div className="space-y-2">
+                    <div className="flex flex-1 flex-col gap-2 min-h-0">
                         <Textarea
                             placeholder={`例如：
 账号1|密码1
@@ -179,10 +179,10 @@ export function BulkImportCards({
 ...`}
                             value={text}
                             onChange={(e) => setText(e.target.value)}
-                            className="min-h-[180px] font-mono text-sm max-h-[50vh]"
+                            className="flex-1 min-h-[180px] font-mono text-sm resize-none"
                             disabled={loading}
                         />
-                        <div className="flex justify-between text-sm text-muted-foreground">
+                        <div className="flex shrink-0 justify-between text-sm text-muted-foreground">
                             <span>共 {totalCount} 条，去重后 {uniqueCount} 条</span>
                             {totalCount > MAX_LINES && (
                                 <span className="text-destructive">
