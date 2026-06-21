@@ -24,6 +24,7 @@ interface DistributorOrdersDataTableProps {
         PENDING: number
         COMPLETED: number
         CLOSED: number
+        REFUNDED: number
     }
 }
 

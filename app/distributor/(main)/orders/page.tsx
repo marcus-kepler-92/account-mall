@@ -30,7 +30,7 @@ export default async function DistributorOrdersPage({
         { sort: "createdAt", sortDir: "desc" },
     )
 
-    const where: { distributorId: string; status?: { in: ("PENDING" | "COMPLETED" | "CLOSED")[] }; orderNo?: { contains: string } } = {
+    const where: { distributorId: string; status?: { in: ("PENDING" | "COMPLETED" | "CLOSED" | "REFUNDED")[] }; orderNo?: { contains: string } } = {
         distributorId: user.id,
     }
     if (filters.statusList.length > 0) {
@@ -69,6 +69,7 @@ export default async function DistributorOrdersPage({
         PENDING: statusCounts.find((c) => c.status === "PENDING")?._count.id ?? 0,
         COMPLETED: statusCounts.find((c) => c.status === "COMPLETED")?._count.id ?? 0,
         CLOSED: statusCounts.find((c) => c.status === "CLOSED")?._count.id ?? 0,
+        REFUNDED: statusCounts.find((c) => c.status === "REFUNDED")?._count.id ?? 0,
     }
 
     const rows: DistributorOrderRow[] = orders.map((o) => ({

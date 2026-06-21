@@ -1,4 +1,4 @@
-const ORDER_STATUS_VALUES = ["PENDING", "COMPLETED", "CLOSED"] as const
+const ORDER_STATUS_VALUES = ["PENDING", "COMPLETED", "CLOSED", "REFUNDED"] as const
 export type OrderStatusFilter = (typeof ORDER_STATUS_VALUES)[number]
 
 export type DistributorOrderFiltersState = {
