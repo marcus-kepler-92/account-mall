@@ -9,6 +9,7 @@ import {
     type DistributorCommissionFiltersInput,
 } from "./commissions-filters"
 import { parseServerSort } from "@/lib/table-sort"
+import { toCents } from "@/lib/utils"
 import { Suspense } from "react"
 import { DistributorCommissionsDataTable } from "./commissions-data-table"
 import type { DistributorCommissionRow } from "./commissions-columns"
@@ -102,8 +103,15 @@ export default async function DistributorCommissionsPage({
     const milestoneBonusTotal = milestoneBonuses.reduce((sum, b) => sum + Number(b.amount), 0)
     const paidTotal = Number(paidSum._sum.amount ?? 0)
     const pendingWithdrawalTotal = Number(pendingSum._sum.amount ?? 0)
+    // Compute in integer cents to mirror the server-side balance check (createWithdrawal)
+    // and avoid IEEE 754 drift that breaks the native max= constraint on the amount input.
     const withdrawableBalance =
-        level1SettledTotal + level2SettledTotal + milestoneBonusTotal - paidTotal - pendingWithdrawalTotal
+        (toCents(level1SettledTotal) +
+            toCents(level2SettledTotal) +
+            toCents(milestoneBonusTotal) -
+            toCents(paidTotal) -
+            toCents(pendingWithdrawalTotal)) /
+        100
 
     const sourceDistributorIds = [
         ...new Set(

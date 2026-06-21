@@ -25,6 +25,16 @@ describe("ApplyWithdrawalForm", () => {
         expect(input).toHaveAttribute("min", "0.01")
     })
 
+    it("renders max attribute rounded to 2 decimals so float-drift balances don't block native validation", () => {
+        // Regression: a balance like 119.19999999999999 (IEEE 754 drift from summing
+        // commission amounts) used to be passed raw to max=, while "全部提现" filled
+        // "119.20" (toFixed). The native rangeOverflow check then rejected the full
+        // withdrawal ("值必须小于或等于 119.2"). max= must match the toFixed value.
+        render(<ApplyWithdrawalForm withdrawableBalance={119.19999999999999} minAmount={50} />)
+        const input = screen.getByLabelText(/提现金额/i)
+        expect(input).toHaveAttribute("max", "119.20")
+    })
+
     it("shows below-minimum notice in helper text", () => {
         render(<ApplyWithdrawalForm {...defaultProps} />)
         expect(screen.getByText(/低于.*¥50.*不会受理/)).toBeInTheDocument()

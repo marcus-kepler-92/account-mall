@@ -171,7 +171,7 @@ export function ApplyWithdrawalForm({
                                         type="number"
                                         min={0.01}
                                         step={0.01}
-                                        max={withdrawableBalance}
+                                        max={withdrawableBalance.toFixed(2)}
                                         placeholder="0.00"
                                         className="w-40 font-medium"
                                         {...field}
