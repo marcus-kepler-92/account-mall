@@ -211,7 +211,7 @@ export async function GET() {
                     subtitle: l.urgency === "HIGH" ? "紧急" : undefined,
                     statusLabel: AGENT_LEAD_STATUS_LABEL[l.status] ?? l.status,
                     statusTone: AGENT_LEAD_STATUS_TONE[l.status] ?? "secondary",
-                    href: `/admin/agent/leads`,
+                    href: `/admin/agent/leads/${l.id}`,
                 }
             }
             case "inventoryAlerts": {
@@ -229,7 +229,7 @@ export async function GET() {
                     title: p.name,
                     statusLabel: p.status === "ACTIVE" ? "在售" : "已下架",
                     statusTone: p.status === "ACTIVE" ? "success" : "secondary",
-                    href: `/admin/products`,
+                    href: `/admin/products/${p.id}`,
                 }
             }
             case "manualPendingOrders": {

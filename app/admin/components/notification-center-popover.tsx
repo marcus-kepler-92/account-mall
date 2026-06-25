@@ -16,6 +16,7 @@ import {
   useDismissAdminNotifications,
 } from "@/app/admin/hooks/use-admin-notifications"
 import { SOURCES, type SourceKey, type SourceResult } from "@/lib/admin-notifications"
+import { notificationHref } from "@/lib/admin-notifications/href"
 import { formatCurrency } from "@/lib/utils"
 import { cn } from "@/lib/utils"
 
@@ -48,7 +49,7 @@ function Row({
   return (
     <div className="group/notif-row -mx-2 flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-muted/50">
       <Link
-        href="/admin/notifications"
+        href={notificationHref(sourceKey, itemId)}
         className="block min-w-0 flex-1 hover:underline"
       >
         {children}
@@ -206,7 +207,7 @@ export function NotificationCenterPopover() {
           </div>
           {totalCount > 0 && (
             <p className="mt-1 text-xs text-muted-foreground">
-              点击通知或顶部标题进入「通知中心」；悬停点 × 标记单条已读
+              点击通知跳转到对应页面；点顶部标题进入「通知中心」；悬停点 × 标记单条已读
             </p>
           )}
         </div>

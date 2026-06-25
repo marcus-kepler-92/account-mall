@@ -24,6 +24,7 @@ import {
     TabsTrigger,
 } from "@/components/ui/tabs"
 import { SOURCES, type SourceKey, type SourceResult } from "@/lib/admin-notifications"
+import { notificationHref } from "@/lib/admin-notifications/href"
 import { formatCurrency } from "@/lib/utils"
 import {
     useAdminNotifications,
@@ -159,9 +160,12 @@ function UnreadRow({
 }) {
     return (
         <li className="group/notif-row flex items-center gap-3 px-6 py-3 text-sm transition-colors hover:bg-muted/40">
-            <div className="min-w-0 flex-1">
+            <Link
+                href={notificationHref(source.key, item.id)}
+                className="min-w-0 flex-1 hover:underline"
+            >
                 <UnreadRowContent source={source} itemId={item.id} />
-            </div>
+            </Link>
             <Button
                 variant="ghost"
                 size="icon"
@@ -229,12 +233,9 @@ function UnreadRowContent({
             const display = it.variantName ?? it.productName
             return (
                 <div className="flex items-center justify-between gap-3">
-                    <Link
-                        href={`/admin/orders/${it.id}`}
-                        className="truncate hover:underline"
-                    >
+                    <span className="truncate">
                         {display} · {formatCurrency(it.amount)}
-                    </Link>
+                    </span>
                     <span className="text-xs text-muted-foreground tabular-nums shrink-0">
                         {timeAgo(it.createdAt)}
                         {it.dunCount > 0 ? ` · 催 ${it.dunCount}` : ""}
