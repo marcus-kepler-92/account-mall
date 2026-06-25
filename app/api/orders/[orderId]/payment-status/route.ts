@@ -47,8 +47,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     // When order is still PENDING, proactively query Zpay — notify may not have arrived.
     if (order.status === "PENDING") {
-        const zpayResult = await queryZpayOrder(orderNo).catch(() => null)
-        if (zpayResult?.paid) {
+        const zpayResult = await queryZpayOrder(orderNo).catch(() => ({ status: "error" as const }))
+        if (zpayResult.status === "paid") {
             await completePendingOrder(orderNo).catch(() => null)
             console.info("[payment-status] orderNo=%s source=active_query result=completed", orderNo)
             return NextResponse.json({ status: "COMPLETED" }, { headers: NO_STORE })

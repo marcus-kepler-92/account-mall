@@ -47,6 +47,14 @@ const envSchema = z
     zpaySubmitUrl: z.string().optional(),
     zpaySiteName: z.string().optional(),
     pendingOrderTimeoutMs: z.coerce.number().int().positive().default(1800000),
+    /**
+     * Hard backstop for the close-expired reconciliation. When an expired order's
+     * active Zpay query keeps returning "error" (transient/unreachable), it is left
+     * PENDING and retried — but once the order is older than this, it is escalated
+     * (logged for human review) rather than retried forever or silently closed.
+     * Default 24h: well past any real Zpay payment window.
+     */
+    zpayReconcileBackstopMs: z.coerce.number().int().positive().default(86400000),
     orderRateLimitPoints: z.coerce.number().int().positive().default(10),
     orderQueryRateLimitPoints: z.coerce.number().int().positive().default(30),
     maxPendingOrdersPerIp: z.coerce.number().int().positive().default(6),
@@ -326,6 +334,7 @@ function getEnvInput() {
     devRealPayment: e.DEV_REAL_PAYMENT,
     cronSecret: e.CRON_SECRET,
     pendingOrderTimeoutMs: e.PENDING_ORDER_TIMEOUT_MS,
+    zpayReconcileBackstopMs: e.ZPAY_RECONCILE_BACKSTOP_MS,
     orderRateLimitPoints: e.ORDER_RATE_LIMIT_POINTS,
     orderQueryRateLimitPoints: e.ORDER_QUERY_RATE_LIMIT_POINTS,
     maxPendingOrdersPerIp: e.MAX_PENDING_ORDERS_PER_IP,

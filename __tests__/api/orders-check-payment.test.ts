@@ -105,7 +105,7 @@ describe("POST /api/orders/check-payment", () => {
     it("calls completePendingOrder and returns COMPLETED when Zpay confirms paid", async () => {
         prismaMock.order.findUnique.mockResolvedValue(PENDING_ORDER)
         verifyPasswordMock.mockResolvedValue(true)
-        queryZpayMock.mockResolvedValue({ paid: true })
+        queryZpayMock.mockResolvedValue({ status: "paid" })
         completeMock.mockResolvedValue({ done: true })
 
         const res = await POST(makeRequest(VALID_BODY))
@@ -117,7 +117,7 @@ describe("POST /api/orders/check-payment", () => {
     it("returns PENDING when Zpay says not paid", async () => {
         prismaMock.order.findUnique.mockResolvedValue(PENDING_ORDER)
         verifyPasswordMock.mockResolvedValue(true)
-        queryZpayMock.mockResolvedValue({ paid: false })
+        queryZpayMock.mockResolvedValue({ status: "unpaid" })
 
         const res = await POST(makeRequest(VALID_BODY))
         expect(res.status).toBe(200)
@@ -125,10 +125,10 @@ describe("POST /api/orders/check-payment", () => {
         expect(completeMock).not.toHaveBeenCalled()
     })
 
-    it("returns PENDING when queryZpayOrder returns null (unconfigured)", async () => {
+    it("returns PENDING when queryZpayOrder returns error (unconfigured/transient)", async () => {
         prismaMock.order.findUnique.mockResolvedValue(PENDING_ORDER)
         verifyPasswordMock.mockResolvedValue(true)
-        queryZpayMock.mockResolvedValue(null)
+        queryZpayMock.mockResolvedValue({ status: "error" })
 
         const res = await POST(makeRequest(VALID_BODY))
         expect(res.status).toBe(200)

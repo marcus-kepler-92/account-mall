@@ -60,9 +60,9 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ status: order.status })
     }
 
-    const zpayResult = await queryZpayOrder(orderNo.trim()).catch(() => null)
+    const zpayResult = await queryZpayOrder(orderNo.trim()).catch(() => ({ status: "error" as const }))
 
-    if (zpayResult?.paid) {
+    if (zpayResult.status === "paid") {
         await completePendingOrder(orderNo.trim()).catch(() => null)
         console.info("[check-payment] orderNo=%s result=completed", orderNo.trim())
         return NextResponse.json({ status: "COMPLETED" })

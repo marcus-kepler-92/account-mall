@@ -77,27 +77,53 @@ export function getZpayPagePayUrl(params: {
 }
 
 /**
- * Query a single order's payment status from Zpay.
- * Credentials always come from env config.
- * Returns { paid: true } when Zpay confirms payment, { paid: false } when unpaid, null on error/unconfigured.
+ * Outcome of an active Zpay order query, used to drive irreversible decisions
+ * (e.g. closing an expired order). The four states are deliberately distinct so
+ * callers never have to collapse "gateway says no such order" with "we couldn't
+ * reach the gateway" — those demand opposite handling:
+ *
+ * - "paid":      Zpay confirms the order is paid → complete it.
+ * - "unpaid":    Zpay knows the order and it is not paid → safe to close.
+ * - "not_found": Zpay positively reports no such out_trade_no → never can be
+ *                paid (customer never reached the gateway) → safe to close.
+ * - "error":     Transient failure / unrecognized response / unconfigured →
+ *                we cannot tell. Callers must NOT close on this (money safety).
  */
-export async function queryZpayOrder(orderNo: string): Promise<{ paid: boolean } | null> {
+export type ZpayOrderQuery = { status: "paid" | "unpaid" | "not_found" | "error" }
+
+/** Matches Zpay/epay "order does not exist" style messages for unknown out_trade_no. */
+const ZPAY_NOT_FOUND_MSG = /不存在|无此订单|查询不到|not.?found|no.*order/i
+
+/** Hard timeout for a single Zpay query so a hung gateway can't stall a batch (cron) caller. */
+const ZPAY_QUERY_TIMEOUT_MS = 8_000
+
+/**
+ * Query a single order's payment status from Zpay. Credentials always come from
+ * env config. Never throws and never returns null — failures map to "error" so
+ * callers get a total function over {@link ZpayOrderQuery}.
+ */
+export async function queryZpayOrder(orderNo: string): Promise<ZpayOrderQuery> {
     const pid = config.zpayPid
     const key = config.zpayKey
     const submitUrl = config.zpaySubmitUrl
-    if (!pid || !key || !submitUrl) return null
+    if (!pid || !key || !submitUrl) return { status: "error" }
     try {
         const base = new URL(submitUrl)
         base.pathname = "/api.php"
         base.search = ""
         const url = `${base.toString()}?act=order&pid=${encodeURIComponent(pid)}&key=${encodeURIComponent(key)}&out_trade_no=${encodeURIComponent(orderNo)}`
-        const res = await fetch(url, { cache: "no-store" })
+        const res = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(ZPAY_QUERY_TIMEOUT_MS) })
         if (!res.ok) {
             console.warn("[zpay-query] orderNo=%s http_status=%d", orderNo, res.status)
-            return null
+            return { status: "error" }
         }
         const data = (await res.json()) as Record<string, unknown>
-        if (data.code !== 1 && data.code !== "1") return null
+        if (data.code !== 1 && data.code !== "1") {
+            // Non-success code: only treat as not_found when the gateway message
+            // positively says so; otherwise stay conservative ("error", do not close).
+            const msg = typeof data.msg === "string" ? data.msg : ""
+            return { status: ZPAY_NOT_FOUND_MSG.test(msg) ? "not_found" : "error" }
+        }
         const tradeStatus = data.trade_status as string | undefined
         const numericStatus = data.status
         const paid =
@@ -106,10 +132,10 @@ export async function queryZpayOrder(orderNo: string): Promise<{ paid: boolean }
             tradeStatus === "success" ||
             numericStatus === 1 ||
             numericStatus === "1"
-        return { paid }
+        return { status: paid ? "paid" : "unpaid" }
     } catch (e) {
         console.error("[zpay-query] orderNo=%s error=%s", orderNo, e instanceof Error ? e.message : String(e))
-        return null
+        return { status: "error" }
     }
 }
 
