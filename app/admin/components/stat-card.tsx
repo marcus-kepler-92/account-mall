@@ -10,6 +10,7 @@ interface StatCardProps {
     iconColor: string
     active?: boolean
     href?: string
+    hint?: string
 }
 
 export function StatCard({
@@ -20,6 +21,7 @@ export function StatCard({
     iconColor,
     active,
     href,
+    hint,
 }: StatCardProps) {
     const card = (
         <Card
@@ -32,6 +34,7 @@ export function StatCard({
                     <div>
                         <p className="text-sm font-medium text-muted-foreground">{label}</p>
                         <p className="text-2xl font-bold mt-1">{value}</p>
+                        {hint && <p className="text-xs text-muted-foreground mt-0.5">{hint}</p>}
                     </div>
                     <Icon className={`size-8 ${iconColor} opacity-80`} />
                 </div>

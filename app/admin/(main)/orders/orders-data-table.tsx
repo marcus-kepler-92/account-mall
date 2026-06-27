@@ -30,6 +30,7 @@ import {
     DataTableToolbar,
     DataTablePagination,
     DataTableSelectionBar,
+    DataTableFacetedFilter,
 } from "@/app/admin/components";
 import { createOrdersColumns, type OrderRow } from "./orders-columns"
 import type { DistributorOption } from "./order-distributor-cell";
@@ -199,7 +200,20 @@ export function OrdersDataTable({ data, total, statusCounts, distributors, canRe
                     searchParamKey="search"
                     statusOptions={statusOptions}
                     statusParamKey="status"
-                />
+                >
+                    {distributors.length > 0 && (
+                        <DataTableFacetedFilter
+                            title="分销员"
+                            paramKey="distributorId"
+                            options={distributors.map((d) => ({
+                                label: d.distributorCode
+                                    ? `${d.name || "未命名"} (${d.distributorCode})`
+                                    : d.name || "未命名",
+                                value: d.id,
+                            }))}
+                        />
+                    )}
+                </DataTableToolbar>
 
                 <DataTableSelectionBar table={table}>
                     {canBatchClose && (

@@ -25,6 +25,12 @@ export { reassignOrderDistributor } from "./service"
 // Report
 export { getDistributorReport } from "./service"
 
+// View rows + detail (admin distributors list / detail page)
+export { buildDistributorViewRows } from "./view-rows"
+export type { DistributorViewRow } from "./view-rows"
+export { getDistributorDetailBase, getDistributorBasic } from "./detail"
+export type { DistributorDetailBase, DistributorBasic } from "./detail"
+
 // Utilities (consumed by shims)
 export { toNumber, getWeekStart, adjustRate } from "./service"
 

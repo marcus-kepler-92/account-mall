@@ -4,12 +4,12 @@
 import "@testing-library/jest-dom"
 import { render, screen } from "@testing-library/react"
 import { DistributorDetailSheet } from "@/app/admin/(main)/distributors/distributor-detail-sheet"
-import type { DistributorRow } from "@/app/admin/(main)/distributors/distributors-columns"
+import type { DistributorViewRow } from "@/app/admin/(main)/distributors/distributors-columns"
 
 jest.mock("next/navigation", () => ({ useRouter: () => ({ refresh: jest.fn() }) }))
 jest.mock("sonner", () => ({ toast: { success: jest.fn(), error: jest.fn() } }))
 
-const row: DistributorRow = {
+const row: DistributorViewRow = {
     id: "u1",
     email: "alice@example.com",
     name: "Alice",

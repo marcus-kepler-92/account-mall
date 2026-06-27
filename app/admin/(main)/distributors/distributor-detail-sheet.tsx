@@ -31,11 +31,12 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { EditDiscountDialog } from "./edit-discount-dialog"
-import type { DistributorRow } from "./distributors-columns"
+import type { DistributorViewRow } from "./distributors-columns"
 import type { TierSummaryItem } from "@/lib/distributor-tier-summary"
+import { getCurrentTier } from "@/app/admin/(main)/distributors/[id]/data"
 
 interface DistributorDetailSheetProps {
-    row: DistributorRow | null
+    row: DistributorViewRow | null
     open: boolean
     onOpenChange: (open: boolean) => void
     onSuccess: () => void
@@ -45,16 +46,6 @@ interface DistributorDetailSheetProps {
 }
 
 const INVITEE_PREVIEW_LIMIT = 3
-
-function getCurrentTier(weeklySalesTotal: number, tiers: TierSummaryItem[]): { tier: TierSummaryItem; index: number } | null {
-    for (let i = 0; i < tiers.length; i++) {
-        const t = tiers[i]
-        if (weeklySalesTotal >= t.minAmount && weeklySalesTotal < t.maxAmount) {
-            return { tier: t, index: i }
-        }
-    }
-    return tiers.length > 0 ? { tier: tiers[0], index: 0 } : null
-}
 
 export function DistributorDetailSheet({
     row,
@@ -143,23 +134,33 @@ export function DistributorDetailSheet({
                                 {disabled ? "已停用" : "启用"}
                             </Badge>
                         </SheetTitle>
-                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground flex-wrap">
-                            <span className="truncate">{row.email ?? row.username ?? "—"}</span>
-                            {row.distributorCode && (
-                                <>
-                                    <span aria-hidden>·</span>
-                                    <code className="text-xs font-mono">{row.distributorCode}</code>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="size-6"
-                                        onClick={handleCopyCode}
-                                        title="复制推荐码"
-                                    >
-                                        <Copy className="size-3" />
-                                    </Button>
-                                </>
-                            )}
+                        <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
+                            <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                                <span className="truncate">{row.email ?? row.username ?? "—"}</span>
+                                {row.distributorCode && (
+                                    <>
+                                        <span aria-hidden>·</span>
+                                        <code className="text-xs font-mono">{row.distributorCode}</code>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="size-6"
+                                            onClick={handleCopyCode}
+                                            title="复制推荐码"
+                                        >
+                                            <Copy className="size-3" />
+                                        </Button>
+                                    </>
+                                )}
+                            </div>
+                            <Link
+                                href={`/admin/distributors/${row.id}`}
+                                onClick={() => onOpenChange(false)}
+                                className="shrink-0 flex items-center gap-0.5 text-xs text-primary hover:underline"
+                            >
+                                完整详情
+                                <ChevronRight className="size-3.5" />
+                            </Link>
                         </div>
                     </SheetHeader>
 
@@ -209,6 +210,13 @@ export function DistributorDetailSheet({
                                     <span className="text-muted-foreground">成交订单</span>
                                     <span className="tabular-nums">{row.completedOrderCount} 单</span>
                                 </div>
+                                <Link
+                                    href={`/admin/distributors/${row.id}?tab=orders`}
+                                    className="block text-xs text-primary hover:underline pt-1"
+                                    onClick={() => onOpenChange(false)}
+                                >
+                                    查看全部订单 →
+                                </Link>
                             </div>
                         </section>
 
@@ -228,6 +236,13 @@ export function DistributorDetailSheet({
                                     <span>二级佣金</span>
                                     <span className="tabular-nums">¥{row.level2CommissionTotal.toFixed(2)}</span>
                                 </div>
+                                <Link
+                                    href={`/admin/distributors/${row.id}?tab=commissions`}
+                                    className="block text-xs text-primary hover:underline pt-1"
+                                    onClick={() => onOpenChange(false)}
+                                >
+                                    查看佣金明细 →
+                                </Link>
                             </div>
                         </section>
 
@@ -257,6 +272,13 @@ export function DistributorDetailSheet({
                                         <span className="tabular-nums">¥{row.pendingTotal.toFixed(2)}</span>
                                     </div>
                                 )}
+                                <Link
+                                    href={`/admin/distributors/${row.id}?tab=withdrawals`}
+                                    className="block text-xs text-primary hover:underline pt-1"
+                                    onClick={() => onOpenChange(false)}
+                                >
+                                    查看提现记录 →
+                                </Link>
                             </div>
                         </section>
 
@@ -328,15 +350,6 @@ export function DistributorDetailSheet({
                                                 </div>
                                             )
                                         })}
-                                        {row.invitees.length > INVITEE_PREVIEW_LIMIT && (
-                                            <Link
-                                                href={`/admin/distributors?inviterId=${row.id}`}
-                                                className="block text-xs text-primary hover:underline pt-1"
-                                                onClick={() => onOpenChange(false)}
-                                            >
-                                                查看全部 {row.inviteeCount} 个下线 →
-                                            </Link>
-                                        )}
                                     </div>
                                 )}
                                 {row.milestoneSummary && (
@@ -363,6 +376,13 @@ export function DistributorDetailSheet({
                                         )}
                                     </div>
                                 )}
+                                <Link
+                                    href={`/admin/distributors/${row.id}?tab=team`}
+                                    className="block text-xs text-primary hover:underline pt-1"
+                                    onClick={() => onOpenChange(false)}
+                                >
+                                    查看团队明细 →
+                                </Link>
                             </div>
                         </section>
                     </div>

@@ -117,6 +117,8 @@ function getBreadcrumbItems(pathname: string) {
             } else {
                 label = routeLabels[seg] ?? seg
             }
+        } else if (prev === "distributors" && isIdSegment(seg)) {
+            label = "分销员详情"
         } else if (prev === "leads" && isIdSegment(seg)) {
             label = "跟进详情"
         } else if (prev === "conversations" && isIdSegment(seg)) {

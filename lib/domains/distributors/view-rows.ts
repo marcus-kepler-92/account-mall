@@ -1,5 +1,41 @@
 import { prisma } from "@/lib/prisma"
-import type { DistributorRow } from "./distributors-row-types"
+
+/**
+ * Detailed distributor view-model row: per-distributor aggregates used by the
+ * admin distributors list, the detail sheet, and the distributor detail page.
+ * Distinct from the lightweight `DistributorRow` in ./types (used by
+ * listDistributors) — this one carries the full sales / commission / balance /
+ * team / milestone rollup.
+ */
+export type DistributorViewRow = {
+    id: string
+    email: string | null
+    username: string | null
+    name: string
+    distributorCode: string | null
+    discountCodeEnabled: boolean
+    discountPercent: number | null
+    disabledAt: string | null
+    createdAt: string
+    completedOrderCount: number
+    salesTotal: number
+    weeklySalesTotal: number
+    totalCommission: number
+    level1CommissionTotal: number
+    level2CommissionTotal: number
+    level1Settled: number
+    level2Settled: number
+    paidTotal: number
+    pendingTotal: number
+    withdrawableBalance: number
+    inviteeCount: number
+    invitees: { id: string; name: string; distributorCode: string | null }[]
+    inviter: { id: string; name: string; distributorCode: string | null } | null
+    milestoneSummary: {
+        triggeredCount: number
+        nextMilestone: { thresholdAmount: number; thresholdCount: number; bonusAmount: number } | null
+    } | null
+}
 
 const weekBounds = () => {
     const now = new Date()
@@ -27,13 +63,13 @@ type RawDistributorInput = {
 }
 
 /**
- * Build DistributorRow view-model records for a given set of distributor users.
+ * Build DistributorViewRow view-model records for a given set of distributor users.
  * Accepts raw Prisma-shaped records (Decimal / Date fields) and returns
- * fully serialized DistributorRow values safe for JSON transport.
+ * fully serialized DistributorViewRow values safe for JSON transport.
  */
 export async function buildDistributorViewRows(
     distributors: RawDistributorInput[],
-): Promise<DistributorRow[]> {
+): Promise<DistributorViewRow[]> {
     if (distributors.length === 0) return []
 
     const ids = distributors.map((d) => d.id)
@@ -50,8 +86,6 @@ export async function buildDistributorViewRows(
         withdrawalPending,
         inviteeCounts,
         inviteeList,
-        level1All,
-        level2All,
         milestoneBonuses,
     ] = await Promise.all([
         prisma.invitationMilestone.findMany({ orderBy: { thresholdAmount: "asc" } }),
@@ -100,16 +134,6 @@ export async function buildDistributorViewRows(
             select: { id: true, name: true, distributorCode: true, inviterId: true },
             orderBy: { name: "asc" },
         }),
-        prisma.commission.groupBy({
-            by: ["distributorId"],
-            where: { distributorId: { in: ids }, level: 1, status: "SETTLED" },
-            _sum: { amount: true },
-        }),
-        prisma.commission.groupBy({
-            by: ["distributorId"],
-            where: { distributorId: { in: ids }, level: 2, status: "SETTLED" },
-            _sum: { amount: true },
-        }),
         prisma.invitationMilestoneBonus.groupBy({
             by: ["inviterId"],
             where: { inviterId: { in: ids } },
@@ -132,8 +156,6 @@ export async function buildDistributorViewRows(
     const paidMap = new Map(withdrawalPaid.map((w) => [w.distributorId, Number(w._sum.amount ?? 0)]))
     const pendingMap = new Map(withdrawalPending.map((w) => [w.distributorId, Number(w._sum.amount ?? 0)]))
     const inviteeCountMap = new Map(inviteeCounts.map((u) => [u.inviterId as string, u._count.id]))
-    const level1AllMap = new Map(level1All.map((c) => [c.distributorId, Number(c._sum.amount ?? 0)]))
-    const level2AllMap = new Map(level2All.map((c) => [c.distributorId, Number(c._sum.amount ?? 0)]))
     const milestoneBonusMap = new Map(milestoneBonuses.map((b) => [b.inviterId as string, Number(b._sum.amount ?? 0)]))
 
     const inviteeListMap = new Map<string, { id: string; name: string; distributorCode: string | null }[]>()
@@ -174,9 +196,9 @@ export async function buildDistributorViewRows(
             completedOrderCount: orderCountMap.get(d.id) ?? 0,
             salesTotal: salesTotalMap.get(d.id) ?? 0,
             weeklySalesTotal: weeklyTotalMap.get(d.id) ?? 0,
-            totalCommission: (level1AllMap.get(d.id) ?? 0) + (level2AllMap.get(d.id) ?? 0),
-            level1CommissionTotal: level1AllMap.get(d.id) ?? 0,
-            level2CommissionTotal: level2AllMap.get(d.id) ?? 0,
+            totalCommission: l1Settled + l2Settled,
+            level1CommissionTotal: l1Settled,
+            level2CommissionTotal: l2Settled,
             level1Settled: l1Settled,
             level2Settled: l2Settled,
             paidTotal: paid,

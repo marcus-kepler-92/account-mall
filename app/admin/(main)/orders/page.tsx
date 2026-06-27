@@ -22,6 +22,7 @@ type SearchParams = Promise<{
     orderNo?: string
     dateFrom?: string
     dateTo?: string
+    distributorId?: string
     sort?: string
     sortDir?: string
 }>
@@ -91,6 +92,10 @@ export default async function AdminOrdersPage({
             createdAt.lte = toDate
         }
         where.createdAt = createdAt
+    }
+
+    if (filters.distributorIds.length > 0) {
+        where.distributorId = { in: filters.distributorIds }
     }
 
     const perms = await getAdminPermissions()

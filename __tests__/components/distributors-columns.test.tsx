@@ -3,10 +3,10 @@
  */
 import "@testing-library/jest-dom"
 import { render, screen } from "@testing-library/react"
-import type { DistributorRow } from "@/app/admin/(main)/distributors/distributors-columns"
+import type { DistributorViewRow } from "@/app/admin/(main)/distributors/distributors-columns"
 import { DistributorIdentityCell, DistributorTeamCell } from "@/app/admin/(main)/distributors/distributors-columns"
 
-const baseRow: DistributorRow = {
+const baseRow: DistributorViewRow = {
   id: "1",
   email: "alice@example.com",
   name: "Alice",
@@ -107,9 +107,9 @@ describe("DistributorDiscountCell", () => {
   })
 })
 
-describe("DistributorRow type includes salesTotal", () => {
+describe("DistributorViewRow type includes salesTotal", () => {
   it("accepts salesTotal field", () => {
-    const row: DistributorRow = {
+    const row: DistributorViewRow = {
       id: "1",
       email: "a@b.com",
       name: "Alice",

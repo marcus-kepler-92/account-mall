@@ -184,7 +184,10 @@ export function DashboardProfitTab() {
                       {leaderboard.map((d) => (
                         <TableRow key={d.distributorId}>
                           <TableCell>
-                            <Link href="/admin/distributors" className="hover:underline">
+                            <Link
+                              href={`/admin/distributors/${d.distributorId}`}
+                              className="hover:underline"
+                            >
                               {d.name ?? d.email}
                             </Link>
                           </TableCell>

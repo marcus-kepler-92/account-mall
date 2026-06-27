@@ -7,7 +7,7 @@ import {
 import { DistributorsDataTable } from "./distributors-data-table"
 import { PageHeader } from "@/app/admin/components"
 import { parseServerSort } from "@/lib/table-sort"
-import { buildDistributorViewRows } from "./distributor-rows-data"
+import { buildDistributorViewRows } from "@/lib/domains/distributors"
 
 export const dynamic = "force-dynamic"
 

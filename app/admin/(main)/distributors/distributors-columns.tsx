@@ -11,11 +11,11 @@ import type { ColumnDef } from "@tanstack/react-table"
 import { Badge } from "@/components/ui/badge"
 import { DataTableColumnHeader } from "@/app/admin/components"
 import { DistributorRowActions, BalanceTooltip, CommissionTooltip } from "./distributor-row-actions"
-import type { DistributorRow } from "./distributors-row-types"
+import type { DistributorViewRow } from "@/lib/domains/distributors"
 
-export type { DistributorRow }
+export type { DistributorViewRow }
 
-export function DistributorIdentityCell({ row }: { row: DistributorRow }) {
+export function DistributorIdentityCell({ row }: { row: DistributorViewRow }) {
     const disabled = !!row.disabledAt
     return (
         <div className="space-y-0.5">
@@ -33,7 +33,7 @@ export function DistributorIdentityCell({ row }: { row: DistributorRow }) {
     )
 }
 
-export function DistributorTeamCell({ row }: { row: DistributorRow }) {
+export function DistributorTeamCell({ row }: { row: DistributorViewRow }) {
     return (
         <div className="space-y-0.5">
             {row.inviter && (
@@ -51,7 +51,7 @@ export function DistributorTeamCell({ row }: { row: DistributorRow }) {
     )
 }
 
-export function DistributorSalesCell({ row }: { row: DistributorRow }) {
+export function DistributorSalesCell({ row }: { row: DistributorViewRow }) {
     return (
         <div className="text-right space-y-0.5">
             <div className="font-medium tabular-nums">¥{row.salesTotal.toFixed(2)}</div>
@@ -60,7 +60,7 @@ export function DistributorSalesCell({ row }: { row: DistributorRow }) {
     )
 }
 
-export function DistributorDiscountCell({ row }: { row: DistributorRow }) {
+export function DistributorDiscountCell({ row }: { row: DistributorViewRow }) {
     if (!row.discountCodeEnabled) {
         return <span className="text-sm text-muted-foreground">关闭</span>
     }
@@ -68,7 +68,7 @@ export function DistributorDiscountCell({ row }: { row: DistributorRow }) {
     return <Badge variant="secondary">{label}</Badge>
 }
 
-export const distributorsColumns: ColumnDef<DistributorRow>[] = [
+export const distributorsColumns: ColumnDef<DistributorViewRow>[] = [
     {
         accessorKey: "name",
         header: ({ column }) => (

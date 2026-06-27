@@ -22,13 +22,13 @@ import {
     DataTablePagination,
 } from "@/app/admin/components"
 import { sortQueryStates, parseSortingState, encodeSortingState } from "@/lib/table-sort"
-import { distributorsColumns, type DistributorRow } from "./distributors-columns"
+import { distributorsColumns, type DistributorViewRow } from "./distributors-columns"
 import type { TierSummaryItem } from "@/lib/distributor-tier-summary"
 import { InviteDistributorButtonClient } from "./invite-distributor-button-client"
 import { DistributorDetailSheet } from "./distributor-detail-sheet"
 
 interface DistributorsDataTableProps {
-    data: DistributorRow[]
+    data: DistributorViewRow[]
     total: number
     statusCounts: { enabled: number; disabled: number }
     tiers: TierSummaryItem[]
@@ -53,7 +53,7 @@ export function DistributorsDataTable({
     const pathname = usePathname()
     const searchParams = useSearchParams()
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
-    const [selectedRow, setSelectedRow] = useState<DistributorRow | null>(null)
+    const [selectedRow, setSelectedRow] = useState<DistributorViewRow | null>(null)
     const [sheetOpen, setSheetOpen] = useState(false)
     const [selectLoading, setSelectLoading] = useState(false)
 
@@ -65,7 +65,7 @@ export function DistributorsDataTable({
                 toast.error("加载分销员详情失败")
                 return
             }
-            const json = await res.json() as { row: DistributorRow }
+            const json = await res.json() as { row: DistributorViewRow }
             setSelectedRow(json.row)
             setSheetOpen(true)
         } catch {

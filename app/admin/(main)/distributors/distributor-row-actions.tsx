@@ -1,9 +1,10 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { MoreHorizontal, UserCheck, UserX, Copy, KeyRound, Loader2, Percent, Trash2 } from "lucide-react"
+import { MoreHorizontal, UserCheck, UserX, Copy, KeyRound, Loader2, Percent, Trash2, Eye } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
     DropdownMenu,
@@ -30,9 +31,9 @@ import {
 } from "@/components/ui/tooltip"
 import { PasswordRevealDialog } from "@/app/admin/components"
 import { EditDiscountDialog } from "./edit-discount-dialog"
-import type { DistributorRow } from "./distributors-columns"
+import type { DistributorViewRow } from "./distributors-columns"
 
-export function BalanceTooltip({ row }: { row: DistributorRow }) {
+export function BalanceTooltip({ row }: { row: DistributorViewRow }) {
     return (
         <TooltipProvider>
             <Tooltip>
@@ -68,7 +69,7 @@ export function BalanceTooltip({ row }: { row: DistributorRow }) {
     )
 }
 
-export function CommissionTooltip({ row }: { row: DistributorRow }) {
+export function CommissionTooltip({ row }: { row: DistributorViewRow }) {
     return (
         <TooltipProvider>
             <Tooltip>
@@ -96,7 +97,7 @@ export function CommissionTooltip({ row }: { row: DistributorRow }) {
     )
 }
 
-export function DistributorRowActions({ row }: { row: DistributorRow }) {
+export function DistributorRowActions({ row }: { row: DistributorViewRow }) {
     const router = useRouter()
     const [loading, setLoading] = useState(false)
     const [discountOpen, setDiscountOpen] = useState(false)
@@ -191,6 +192,13 @@ export function DistributorRowActions({ row }: { row: DistributorRow }) {
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                    <DropdownMenuItem asChild>
+                        <Link href={`/admin/distributors/${row.id}`}>
+                            <Eye className="size-4" />
+                            查看详情
+                        </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
                     <DropdownMenuItem
                         onSelect={(e) => { e.preventDefault(); handleToggle() }}
                         disabled={loading}

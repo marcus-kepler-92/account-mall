@@ -24,6 +24,8 @@ export type OrderFiltersState = {
     orderNo: string
     dateFrom: string
     dateTo: string
+    /** Comma-separated in URL; parsed to distributorIds */
+    distributorIds: string[]
 }
 
 export type OrderFiltersInput = {
@@ -35,6 +37,7 @@ export type OrderFiltersInput = {
     orderNo?: string | null
     dateFrom?: string | null
     dateTo?: string | null
+    distributorId?: string | null
 }
 
 export const DEFAULT_ORDER_FILTERS: OrderFiltersState = {
@@ -47,6 +50,7 @@ export const DEFAULT_ORDER_FILTERS: OrderFiltersState = {
     orderNo: "",
     dateFrom: "",
     dateTo: "",
+    distributorIds: [],
 }
 
 export function parseOrderFilters(input: OrderFiltersInput): OrderFiltersState {
@@ -72,6 +76,10 @@ export function parseOrderFilters(input: OrderFiltersInput): OrderFiltersState {
               : "ALL"
 
     const search = (input.search ?? "").trim()
+    const distributorIds = (input.distributorId ?? "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
     return {
         page,
         pageSize,
@@ -82,6 +90,7 @@ export function parseOrderFilters(input: OrderFiltersInput): OrderFiltersState {
         orderNo: (input.orderNo ?? "").trim(),
         dateFrom: (input.dateFrom ?? "").trim(),
         dateTo: (input.dateTo ?? "").trim(),
+        distributorIds,
     }
 }
 
@@ -118,6 +127,10 @@ export function buildOrderFiltersQuery(filters: OrderFiltersState): string {
 
     if (filters.dateTo) {
         params.set("dateTo", filters.dateTo)
+    }
+
+    if (filters.distributorIds.length > 0) {
+        params.set("distributorId", filters.distributorIds.join(","))
     }
 
     const query = params.toString()
