@@ -1,6 +1,7 @@
 import {
   extractProductIdPrefix,
   buildProductDescription,
+  buildProductTitle,
   buildProductOfferPricing,
 } from "@/lib/product-seo"
 
@@ -58,6 +59,23 @@ describe("buildProductDescription", () => {
         description: "fallback body",
       }),
     ).toBe("fallback body")
+  })
+
+  it("prefers the SEO description over the summary", () => {
+    expect(
+      buildProductDescription({
+        ...base,
+        seoDescription: "  日本Apple ID购买，日区独享账号  ",
+        summary: "卡片简介",
+        description: "rich description",
+      }),
+    ).toBe("日本Apple ID购买，日区独享账号")
+  })
+
+  it("ignores a whitespace-only SEO description", () => {
+    expect(
+      buildProductDescription({ ...base, seoDescription: " ", summary: "卡片简介", description: null }),
+    ).toBe("卡片简介")
   })
 
   it("falls back to name + price when neither summary nor description exist", () => {
@@ -125,5 +143,16 @@ describe("buildProductOfferPricing", () => {
         activeVariantCount: 0,
       }),
     ).toEqual({ "@type": "Offer", priceCurrency: "CNY", price: 0 })
+  })
+})
+
+describe("buildProductTitle", () => {
+  it("uses the SEO title when set", () => {
+    expect(buildProductTitle({ seoTitle: " 日本Apple ID购买 ", name: "日本苹果账号" })).toBe("日本Apple ID购买")
+  })
+
+  it("falls back to the product name when the SEO title is empty", () => {
+    expect(buildProductTitle({ seoTitle: null, name: "日本苹果账号" })).toBe("日本苹果账号")
+    expect(buildProductTitle({ seoTitle: "  ", name: "日本苹果账号" })).toBe("日本苹果账号")
   })
 })

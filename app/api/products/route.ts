@@ -235,7 +235,7 @@ export async function POST(request: NextRequest) {
         return validationError(parsed.error.flatten());
     }
 
-    const { name, slug, description, summary, image, price, maxQuantity, status, tagIds, productType, sourceUrl, validityHours, allowAccountSwitch, accountSwitchLimit, couponEnabled, riskWarningEnabled, riskWarningTitle, riskWarningContent, riskWarningCountdown, riskWarningConfirmText, purchaseLimitEnabled, purchaseLimitQuantity, commissionMode, commissionValue, emailOnFulfill, variants } =
+    const { name, slug, description, summary, seoTitle, seoDescription, image, price, maxQuantity, status, tagIds, productType, sourceUrl, validityHours, allowAccountSwitch, accountSwitchLimit, couponEnabled, riskWarningEnabled, riskWarningTitle, riskWarningContent, riskWarningCountdown, riskWarningConfirmText, purchaseLimitEnabled, purchaseLimitQuantity, commissionMode, commissionValue, emailOnFulfill, variants } =
         parsed.data;
 
     // MANUAL ↔ variants contract:
@@ -296,6 +296,8 @@ export async function POST(request: NextRequest) {
         slug,
         description: description ?? null,
         summary: summary ?? null,
+        seoTitle: seoTitle ?? null,
+        seoDescription: seoDescription ?? null,
         image: image ?? null,
         price: finalPrice,
         maxQuantity: finalMaxQuantity,

@@ -18,9 +18,10 @@ import { ProductBottomBar } from "../../components/product-bottom-bar";
 import {
   buildProductDescription,
   buildProductOfferPricing,
+  buildProductTitle,
   extractProductIdPrefix,
 } from "@/lib/product-seo";
-import { MarkdownViewClient } from "@/app/components/markdown-view-client";
+import { ProductDescription } from "./product-description";
 import { RiskWarningDialog } from "./risk-warning-dialog";
 import { resolveCrossSellDiscounts } from "@/lib/cross-sell";
 import { getSiteSettings } from "@/lib/site-settings";
@@ -48,6 +49,8 @@ const getCachedProductMetaBySlug = unstable_cache(
       where: { slug },
       select: {
         name: true,
+        seoTitle: true,
+        seoDescription: true,
         summary: true,
         description: true,
         price: true,
@@ -93,15 +96,16 @@ export async function generateMetadata({
   const product = await getCachedProductMetaBySlug(slug);
   if (!product || product.status !== "ACTIVE") return { title: "商品" };
 
+  const title = buildProductTitle(product);
   const desc = buildProductDescription(product);
   const productUrl = `${config.siteUrl}/products/${product.slug}`;
   const ogImages = product.image ? [{ url: product.image }] : undefined;
   return {
-    title: product.name,
+    title,
     description: desc,
     alternates: { canonical: productUrl },
     openGraph: {
-      title: product.name,
+      title,
       description: desc,
       url: productUrl,
       siteName: config.siteName,
@@ -110,7 +114,7 @@ export async function generateMetadata({
     },
     twitter: {
       card: "summary_large_image",
-      title: product.name,
+      title,
       description: desc,
       ...(ogImages && { images: ogImages }),
     },
@@ -424,7 +428,7 @@ export default async function ProductDetailPage({
                   <h2 className="mb-3 text-sm font-semibold text-muted-foreground">
                     商品详情
                   </h2>
-                  <MarkdownViewClient content={product.description} />
+                  <ProductDescription content={product.description} productName={product.name} />
                 </div>
               </section>
             )}
