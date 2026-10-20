@@ -4,6 +4,7 @@ import {
     isInDay,
 } from "@/app/admin/(main)/dashboard/dashboard-utils"
 import { ORDER_STATUS_LABEL } from "@/app/admin/(main)/dashboard/types"
+import { getHKTDayStart } from "@/lib/utils"
 
 describe("dashboard-utils", () => {
     describe("getDateRange", () => {
@@ -27,13 +28,21 @@ describe("dashboard-utils", () => {
             expect(getDaysForTrend(30)).toHaveLength(30)
         })
 
-        it("each element is a Date at midnight", () => {
+        it("each element is midnight in HKT, regardless of the host timezone", () => {
             const days = getDaysForTrend(3)
             days.forEach((d) => {
-                expect(d.getHours()).toBe(0)
-                expect(d.getMinutes()).toBe(0)
-                expect(d.getSeconds()).toBe(0)
+                // Dashboard buckets by Hong Kong day; HKT = UTC+8, so HKT
+                // midnight is 16:00 UTC the previous day.
+                expect(d.getUTCHours()).toBe(16)
+                expect(d.getUTCMinutes()).toBe(0)
+                expect(d.getUTCSeconds()).toBe(0)
+                expect(d.getUTCMilliseconds()).toBe(0)
             })
+        })
+
+        it("ends on today's HKT day start", () => {
+            const days = getDaysForTrend(3)
+            expect(days[days.length - 1].getTime()).toBe(getHKTDayStart(new Date()).getTime())
         })
 
         it("returns consecutive days", () => {

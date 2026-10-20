@@ -1,4 +1,4 @@
-import { getHKTDayStart } from "@/lib/utils"
+import { addHKTDays, getHKTDayStart } from "@/lib/utils"
 
 /**
  * Dashboard 日期范围等纯函数，便于单测
@@ -11,11 +11,8 @@ import { getHKTDayStart } from "@/lib/utils"
  */
 export function getDateRange(fromToday: number, numDays: number): { start: Date; end: Date } {
     const now = new Date()
-    const todayStart = getHKTDayStart(now)
-    const start = new Date(todayStart)
-    start.setDate(start.getDate() - fromToday - numDays + 1)
-    const end = new Date(start)
-    end.setDate(end.getDate() + numDays)
+    const start = addHKTDays(getHKTDayStart(now), -fromToday - numDays + 1)
+    const end = addHKTDays(start, numDays)
     return { start, end }
 }
 
@@ -27,9 +24,7 @@ export function getDaysForTrend(days: number): Date[] {
     const result: Date[] = []
     const todayStart = getHKTDayStart(new Date())
     for (let i = days - 1; i >= 0; i--) {
-        const d = new Date(todayStart)
-        d.setDate(d.getDate() - i)
-        result.push(d)
+        result.push(addHKTDays(todayStart, -i))
     }
     return result
 }
@@ -38,7 +33,6 @@ export function getDaysForTrend(days: number): Date[] {
  * 判断某时间戳是否落在 [dayStart, dayEnd) 内
  */
 export function isInDay(ts: Date, dayStart: Date): boolean {
-    const dayEnd = new Date(dayStart)
-    dayEnd.setDate(dayEnd.getDate() + 1)
+    const dayEnd = addHKTDays(dayStart, 1)
     return ts >= dayStart && ts < dayEnd
 }
