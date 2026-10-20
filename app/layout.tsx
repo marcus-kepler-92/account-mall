@@ -41,9 +41,9 @@ export const metadata: Metadata = {
   },
   description: siteDescription,
   metadataBase: new URL(siteUrl),
-  alternates: {
-    canonical: siteUrl,
-  },
+  // No site-wide `alternates.canonical`: it is inherited by every page that
+  // doesn't override it, which canonicalised e.g. /orders/lookup to the
+  // homepage. Each indexable page declares its own canonical instead.
   openGraph: {
     title: siteTitle,
     description: siteDescription,
@@ -101,14 +101,8 @@ export default function RootLayout({
         description: siteDescription,
         inLanguage: "zh-CN",
         publisher: { "@id": organizationId },
-        potentialAction: {
-          "@type": "SearchAction",
-          target: {
-            "@type": "EntryPoint",
-            urlTemplate: `${siteUrl}/?tag={search_term_string}`,
-          },
-          "query-input": "required name=search_term_string",
-        },
+        // No SearchAction: Google retired the sitelinks search box (Nov 2024)
+        // and `?tag=` is a tag filter, not a free-text search endpoint.
       },
     ],
   }

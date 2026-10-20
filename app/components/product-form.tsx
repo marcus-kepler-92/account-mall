@@ -31,6 +31,8 @@ const PRODUCT_FORM_FIELD_LABELS: Record<string, string> = {
     slug: "URL 别名",
     description: "商品描述",
     summary: "商品简介",
+    seoTitle: "SEO 标题",
+    seoDescription: "SEO 描述",
     image: "商品图片",
     price: "价格",
     costPerUnit: "成本",
@@ -84,6 +86,8 @@ type ProductData = {
     slug: string
     description: string | null
     summary: string | null
+    seoTitle?: string | null
+    seoDescription?: string | null
     image: string | null
     price: number
     costPerUnit?: number | null
@@ -135,6 +139,8 @@ export function ProductForm({
             slug: product?.slug ?? "",
             description: product?.description ?? "",
             summary: product?.summary ?? "",
+            seoTitle: product?.seoTitle ?? "",
+            seoDescription: product?.seoDescription ?? "",
             image: product?.image ?? "",
             price: product ? String(product.price) : "",
             costPerUnit: product?.costPerUnit != null ? Number(product.costPerUnit) : null,
@@ -206,6 +212,8 @@ export function ProductForm({
             slug: data.slug.trim(),
             description: data.description?.trim() || undefined,
             summary: data.summary?.trim() || null,
+            seoTitle: data.seoTitle?.trim() || null,
+            seoDescription: data.seoDescription?.trim() || null,
             image: data.image || null,
             price:
                 isManual

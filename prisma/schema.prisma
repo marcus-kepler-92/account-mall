@@ -154,6 +154,12 @@ model Product {
   slug                   String                @unique
   summary                String?               @db.VarChar(300)
   description            String?
+  /// Search-result title override. null → falls back to `name`. Kept separate
+  /// from `name` because the display name (cards, H1) and the SERP title target
+  /// different jobs: the SERP title leads with the buyer's query wording.
+  seoTitle               String?               @db.VarChar(60)
+  /// Meta description override. null → falls back to `summary` / description.
+  seoDescription         String?               @db.VarChar(160)
   image                  String?               @db.Text
   price                  Decimal               @db.Decimal(10, 2)
   /// Default unit cost prefilled into the bulk card import dialog for NORMAL products.

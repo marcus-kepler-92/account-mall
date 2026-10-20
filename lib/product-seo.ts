@@ -50,15 +50,25 @@ export function buildProductOfferPricing(args: {
   }
 }
 
-// Shared meta + structured-data description. Prefers the admin-authored summary
-// (keyword-rich, capped at 300 chars in the schema), then the rich description,
-// then a name + price stub. Truncated to 160 chars for SERP snippets.
+// SERP / social title. The admin-authored `seoTitle` leads with the buyer's
+// query wording ("美区Apple ID购买"); the display name stays free for the
+// storefront. The root layout's title template appends the site name.
+export function buildProductTitle(p: { seoTitle?: string | null; name: string }): string {
+  return p.seoTitle?.trim() || p.name
+}
+
+// Shared meta + structured-data description. Prefers the admin-authored SEO
+// description, then the summary (also shown on catalog cards), then the rich
+// description, then a name + price stub. Truncated to 160 chars for SERP snippets.
 export function buildProductDescription(p: {
+  seoDescription?: string | null
   summary: string | null
   description: string | null
   name: string
   price: Prisma.Decimal | number
 }): string {
+  const seoDescription = p.seoDescription?.trim()
+  if (seoDescription) return seoDescription.slice(0, 160)
   const summary = p.summary?.trim()
   if (summary) return summary.slice(0, 160)
   if (p.description) return descriptionToPlainText(p.description, 160)

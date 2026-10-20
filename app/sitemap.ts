@@ -25,6 +25,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // the whole signal. The homepage reflects the catalog, so derive its
     // lastmod from the most recent product update; the rarely-changing static
     // pages omit lastmod entirely (preferable to a fabricated timestamp).
+    // /privacy, /terms and /refund are noindex, so they stay out of the
+    // sitemap — listing a noindex URL sends Search Console a contradiction.
     const latestProductUpdate = products.reduce<Date | undefined>(
         (latest, p) => (!latest || p.updatedAt > latest ? p.updatedAt : latest),
         undefined,
@@ -41,21 +43,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
             url: `${base}/orders/lookup`,
             changeFrequency: "weekly" as const,
             priority: 0.5,
-        },
-        {
-            url: `${base}/privacy`,
-            changeFrequency: "yearly" as const,
-            priority: 0.3,
-        },
-        {
-            url: `${base}/terms`,
-            changeFrequency: "yearly" as const,
-            priority: 0.3,
-        },
-        {
-            url: `${base}/refund`,
-            changeFrequency: "yearly" as const,
-            priority: 0.3,
         },
         ...productUrls,
     ]
