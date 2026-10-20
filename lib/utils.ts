@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { addDays } from "date-fns"
 import { toZonedTime, fromZonedTime } from "date-fns-tz"
 
 export function cn(...inputs: ClassValue[]) {
@@ -31,6 +32,15 @@ export function getHKTDayStart(date: Date): Date {
   const zoned = toZonedTime(date, DATE_TIMEZONE)
   zoned.setHours(0, 0, 0, 0)
   return fromZonedTime(zoned, DATE_TIMEZONE)
+}
+
+/**
+ * Shift a date by whole calendar days in HKT. Calendar math runs on the
+ * HKT wall clock, so the result is independent of the server's timezone.
+ * @example addHKTDays(getHKTDayStart(now), -1) // → yesterday 00:00 HKT
+ */
+export function addHKTDays(date: Date, days: number): Date {
+  return fromZonedTime(addDays(toZonedTime(date, DATE_TIMEZONE), days), DATE_TIMEZONE)
 }
 
 /**

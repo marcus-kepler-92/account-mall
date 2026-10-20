@@ -2,7 +2,7 @@
  * Unit tests for lib/utils: cn and generateSlug.
  */
 
-import { cn, generateSlug, parseVoidloginsSourceUrl, buildVoidloginsSourceUrl, toCents } from "@/lib/utils"
+import { cn, generateSlug, parseVoidloginsSourceUrl, buildVoidloginsSourceUrl, toCents, addHKTDays, getHKTDayStart } from "@/lib/utils"
 
 describe("cn", () => {
     it("merges class names", () => {
@@ -108,5 +108,22 @@ describe("toCents", () => {
         // which would incorrectly reject a withdrawal of exactly 10.3
         // toCents handles each operand independently so the error doesn't accumulate
         expect(toCents(100) - toCents(89.7)).toBe(toCents(10.3))
+    })
+})
+
+describe("addHKTDays", () => {
+    it("steps whole HKT calendar days from an HKT midnight", () => {
+        const start = new Date("2025-03-09T16:00:00.000Z") // 2025-03-10 00:00 HKT
+        expect(addHKTDays(start, 1).toISOString()).toBe("2025-03-10T16:00:00.000Z")
+        expect(addHKTDays(start, -1).toISOString()).toBe("2025-03-08T16:00:00.000Z")
+        expect(addHKTDays(start, 0).toISOString()).toBe(start.toISOString())
+    })
+
+    it("keeps HKT midnight across a US DST change (host-timezone independent)", () => {
+        // 2025-03-09 is the US spring-forward date; HKT has no DST.
+        const start = getHKTDayStart(new Date("2025-03-08T04:00:00.000Z"))
+        const days = [0, 1, 2].map((i) => addHKTDays(start, i))
+        days.forEach((d) => expect(d.getUTCHours()).toBe(16))
+        expect(days[2].getTime() - days[0].getTime()).toBe(2 * 24 * 60 * 60 * 1000)
     })
 })
