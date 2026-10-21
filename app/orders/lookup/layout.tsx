@@ -6,6 +6,9 @@ import { config } from "@/lib/config"
 const title = "订单查询"
 const description = "输入订单号或下单邮箱，查询空域账号商城的订单状态，查看已购买的账号与卡密信息。"
 const url = `${config.siteUrl}/orders/lookup`
+// The root app/opengraph-image card; restated because overriding openGraph
+// drops the file-based image the page would otherwise inherit.
+const shareImage = { url: "/opengraph-image", width: 1200, height: 630, alt: "VoidLogins — Apple ID Store" }
 
 // openGraph / twitter replace the root layout's objects wholesale (Next.js
 // merges metadata shallowly), so the shared fields are restated here.
@@ -20,11 +23,13 @@ export const metadata: Metadata = {
     siteName: config.siteName,
     locale: "zh_CN",
     type: "website",
+    images: [shareImage],
   },
   twitter: {
     card: "summary_large_image",
     title: `${title} | ${config.siteName}`,
     description,
+    images: [shareImage],
   },
 }
 
