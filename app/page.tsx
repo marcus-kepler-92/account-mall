@@ -299,7 +299,9 @@ export default async function HomePage({
                             {DEFAULT_SEO_H1}
                         </h1>
                         <p className="mx-auto mt-3 max-w-2xl text-base sm:text-lg text-muted-foreground">
-                            {config.siteSubtitle || DEFAULT_SEO_SUBTITLE}
+                            {/* Fixed SEO copy, like the H1: the SITE_SUBTITLE env override
+                                once shipped a comma-separated keyword list here. */}
+                            {DEFAULT_SEO_SUBTITLE}
                         </p>
                     </section>
                     <AnnouncementsBlock announcements={frontAnnouncements} />
