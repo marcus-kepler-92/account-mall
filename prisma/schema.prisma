@@ -211,6 +211,8 @@ model Product {
   crossSellTargets       ProductCrossSell[]    @relation("CrossSellSource")
   crossSellSources       ProductCrossSell[]    @relation("CrossSellTarget")
   variants               ProductVariant[]
+  /// Public guide articles that recommend this product (internal linking).
+  articles               Article[]             @relation("ArticleProducts")
 
   @@index([sortOrder])
 }
@@ -565,6 +567,31 @@ model DistributorGuide {
   tag         Tag?               @relation(fields: [tagId], references: [id])
 
   @@index([status, sortOrder])
+}
+
+/// Public guide / FAQ article served at /guides/[slug]. Targets informational
+/// search demand (注册、付款、锁机、礼品卡…) that product pages should not chase,
+/// and links readers on to the related products.
+model Article {
+  id             String             @id @default(cuid())
+  /// URL segment: lowercase ASCII words joined by hyphens, e.g. us-apple-id-guide.
+  slug           String             @unique @db.VarChar(100)
+  /// Page H1 and default SERP title.
+  title          String             @db.VarChar(200)
+  /// SERP title override. null → falls back to `title`.
+  seoTitle       String?            @db.VarChar(60)
+  /// Meta description override. null → falls back to `summary` / content.
+  seoDescription String?            @db.VarChar(160)
+  /// Short intro shown on the /guides list.
+  summary        String?            @db.VarChar(300)
+  content        String?            @db.Text // Markdown 正文
+  status         AnnouncementStatus @default(DRAFT)
+  publishedAt    DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  products       Product[]          @relation("ArticleProducts")
+
+  @@index([status, publishedAt])
 }
 
 // Exit Intent 折扣使用记录：用于防止同一用户（按指纹/cookie/IP 三信号）重复领取离开挽留折扣

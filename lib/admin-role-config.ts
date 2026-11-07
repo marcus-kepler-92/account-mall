@@ -10,6 +10,7 @@ export const ADMIN_ROLE_CONFIG = {
       "/admin/fulfillment",
       "/admin/announcements",
       "/admin/guides",
+      "/admin/articles",
       "/admin/files",
       "/admin/auto-fetch",
       "/admin/cards",

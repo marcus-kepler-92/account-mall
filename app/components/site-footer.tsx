@@ -16,6 +16,9 @@ export async function SiteFooter() {
                             <span className="text-sm font-medium">{config.siteName}</span>
                         </div>
                         <nav className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                            <Link href="/guides" className="hover:text-foreground transition-colors">
+                                使用教程
+                            </Link>
                             <Link href="/orders/lookup" className="hover:text-foreground transition-colors">
                                 订单查询
                             </Link>

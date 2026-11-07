@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Search, LayoutDashboard } from "lucide-react"
+import { Search, LayoutDashboard, BookOpen } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/app/components/theme-toggle"
 import { BrandMark } from "@/app/components/brand-mark"
@@ -33,6 +33,18 @@ export function SiteHeader({ cs }: SiteHeaderProps = {}) {
                     </span>
                 </Link>
                 <nav className="flex shrink-0 min-w-0 items-center justify-end gap-0.5 sm:gap-2 overflow-x-auto [-webkit-overflow-scrolling:touch]" aria-label="主导航">
+                    <Button variant="ghost" size="sm" className="h-9 shrink-0 px-2 sm:px-3 touch-manipulation" asChild>
+                        <Link
+                            href="/guides"
+                            title="使用教程"
+                            aria-label="使用教程"
+                            className="gap-1.5"
+                        >
+                            <BookOpen className="hidden sm:block size-4 shrink-0" aria-hidden />
+                            <span className="text-xs sm:hidden">教程</span>
+                            <span className="hidden sm:inline">使用教程</span>
+                        </Link>
+                    </Button>
                     <Button variant="ghost" size="sm" className="h-9 shrink-0 px-2 sm:px-3 touch-manipulation" asChild>
                         <Link
                             href="/orders/lookup"

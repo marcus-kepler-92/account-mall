@@ -28,6 +28,7 @@ import {
     UserSearch,
     MessagesSquare,
     Settings,
+    Newspaper,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { authClient } from "@/lib/auth-client"
@@ -73,6 +74,7 @@ const allNavItems = [
     // 公告
     { title: "公告管理", href: "/admin/announcements", icon: Megaphone },
     { title: "分销指南", href: "/admin/guides", icon: BookOpen },
+    { title: "教程文章", href: "/admin/articles", icon: Newspaper },
     { title: "邮件营销", href: "/admin/email-marketing", icon: Mail },
     // 运维
     { title: "分销员管理", href: "/admin/distributors", icon: Users },

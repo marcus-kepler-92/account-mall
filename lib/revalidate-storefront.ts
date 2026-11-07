@@ -8,6 +8,7 @@ import { revalidateTag } from "next/cache"
  * - "tags"          — catalog tag filter list
  * - "announcements" — homepage announcements
  * - "cards"         — stock counts only
+ * - "articles"      — /guides list + article pages + product-page related guides
  */
 
 export function revalidateProducts(): void {
@@ -25,4 +26,8 @@ export function revalidateTags(): void {
 
 export function revalidateCards(): void {
   revalidateTag("cards", "max")
+}
+
+export function revalidateArticles(): void {
+  revalidateTag("articles", "max")
 }

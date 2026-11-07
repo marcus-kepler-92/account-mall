@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 // Public pages that never require authentication
-const PUBLIC_PAGE_PREFIXES = ["/products", "/orders"];
+const PUBLIC_PAGE_PREFIXES = ["/products", "/orders", "/guides"];
 const PUBLIC_EXACT_PAGES = ["/", "/admin/login", "/distributor/login", "/distributor/register", "/distributor/accept-invite", "/distributor/forgot-password", "/distributor/reset-password"];
 
 // Public API routes that never require authentication

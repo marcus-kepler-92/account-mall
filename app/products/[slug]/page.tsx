@@ -22,6 +22,8 @@ import {
   extractProductIdPrefix,
 } from "@/lib/product-seo";
 import { ProductDescription } from "./product-description";
+import { ProductRelatedGuides } from "./product-related-guides";
+import { getArticlesForProduct } from "@/lib/articles";
 import { RiskWarningDialog } from "./risk-warning-dialog";
 import { resolveCrossSellDiscounts } from "@/lib/cross-sell";
 import { getSiteSettings } from "@/lib/site-settings";
@@ -195,7 +197,10 @@ export default async function ProductDetailPage({
     : isManual
       ? 1
       : 0;
-  const stockCount = isManual ? manualStock : await getCachedStockCount(product.id);
+  const [stockCount, relatedGuides] = await Promise.all([
+    isManual ? manualStock : getCachedStockCount(product.id),
+    getArticlesForProduct(product.id),
+  ]);
 
   // Centralized MANUAL display payload: isUnavailable, priceMin/Max, priceLabel.
   // Drives the unavailable fallback below + price header + sticky bar.
@@ -432,6 +437,7 @@ export default async function ProductDetailPage({
                 </div>
               </section>
             )}
+            <ProductRelatedGuides guides={relatedGuides} />
           </div>
 
           {/* Right: info + meta + order + restock（PC 侧栏卡片，移动端纵向） */}

@@ -115,6 +115,14 @@ describe("Public pages (no auth required)", () => {
     expect(response.status).toBe(200);
   });
 
+  it("should allow access to /guides and /guides/:slug", async () => {
+    for (const path of ["/guides", "/guides/which-region-apple-id"]) {
+      const response = await middleware(createRequest(path));
+      expect(response.status).toBe(200);
+      expect(response.headers.get("x-middleware-next")).toBe("1");
+    }
+  });
+
   it("should allow access to /orders/:orderNo/success", async () => {
     const request = createRequest("/orders/FAK202601010001/success");
     const response = await middleware(request);
