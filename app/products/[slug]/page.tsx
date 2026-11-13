@@ -23,6 +23,7 @@ import {
 } from "@/lib/product-seo";
 import { ProductDescription } from "./product-description";
 import { ProductRelatedGuides } from "./product-related-guides";
+import { ProductMoreProducts } from "./product-more-products";
 import { getArticlesForProduct } from "@/lib/articles";
 import { RiskWarningDialog } from "./risk-warning-dialog";
 import { resolveCrossSellDiscounts } from "@/lib/cross-sell";
@@ -84,6 +85,21 @@ const getCachedStockCount = unstable_cache(
     prisma.card.count({ where: { productId, status: "UNSOLD" } }),
   ["product-stock"],
   { revalidate: STOCK_CACHE_TTL_SECONDS, tags: ["cards"] },
+);
+
+const MORE_PRODUCTS_LIMIT = 12;
+
+// Every active product in catalog order, for the "其他地区与商品" links. One
+// shared cache entry; each page filters itself out.
+const getCachedActiveProductLinks = unstable_cache(
+  async () =>
+    prisma.product.findMany({
+      where: { status: "ACTIVE" },
+      orderBy: [{ sortOrder: "asc" }],
+      select: { slug: true, name: true },
+    }),
+  ["product-active-links"],
+  { revalidate: PRODUCT_CACHE_TTL_SECONDS, tags: ["products"] },
 );
 
 type PageProps = {
@@ -197,10 +213,14 @@ export default async function ProductDetailPage({
     : isManual
       ? 1
       : 0;
-  const [stockCount, relatedGuides] = await Promise.all([
+  const [stockCount, relatedGuides, activeProductLinks] = await Promise.all([
     isManual ? manualStock : getCachedStockCount(product.id),
     getArticlesForProduct(product.id),
+    getCachedActiveProductLinks(),
   ]);
+  const moreProducts = activeProductLinks
+    .filter((p) => p.slug !== product.slug)
+    .slice(0, MORE_PRODUCTS_LIMIT);
 
   // Centralized MANUAL display payload: isUnavailable, priceMin/Max, priceLabel.
   // Drives the unavailable fallback below + price header + sticky bar.
@@ -438,6 +458,7 @@ export default async function ProductDetailPage({
               </section>
             )}
             <ProductRelatedGuides guides={relatedGuides} />
+            <ProductMoreProducts products={moreProducts} />
           </div>
 
           {/* Right: info + meta + order + restock（PC 侧栏卡片，移动端纵向） */}

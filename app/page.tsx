@@ -5,6 +5,8 @@ import { ProductCatalog } from "@/app/components/product-catalog"
 import { SiteHeader } from "@/app/components/site-header"
 import { SiteFooter } from "@/app/components/site-footer"
 import { AnnouncementsBlock } from "./announcements-block"
+import { HomeGuidesBlock } from "./home-guides-block"
+import { getPublishedArticles } from "@/lib/articles"
 import { config } from "@/lib/config"
 import {
   DEFAULT_SEO_TITLE,
@@ -18,6 +20,7 @@ import { resolveCrossSellDiscounts } from "@/lib/cross-sell"
 const PAGE_SIZE = 18
 const ANNOUNCEMENTS_LIMIT = 20
 const HOMEPAGE_CACHE_REVALIDATE_SECONDS = 300
+const HOME_GUIDES_LIMIT = 6
 
 export const metadata: Metadata = {
   title: DEFAULT_SEO_TITLE,
@@ -218,10 +221,11 @@ export default async function HomePage({
         ? tagParam.split(",").map(s => s.trim()).filter(Boolean).sort()
         : []
 
-    const [announcements, tags, productsResult] = await Promise.all([
+    const [announcements, tags, productsResult, guides] = await Promise.all([
         getCachedAnnouncements(),
         getCachedTags(),
         getCachedProducts(tagSlugs),
+        getPublishedArticles(),
     ])
     const { products, total } = productsResult
 
@@ -306,6 +310,7 @@ export default async function HomePage({
                     </section>
                     <AnnouncementsBlock announcements={frontAnnouncements} />
                     <ProductCatalog initialData={initialData} />
+                    <HomeGuidesBlock guides={guides.slice(0, HOME_GUIDES_LIMIT)} />
                 </div>
             </main>
 
