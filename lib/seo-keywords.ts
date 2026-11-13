@@ -36,7 +36,8 @@ export const P0_CORE: SeoKeywordItem[] = [
   { kw: "苹果ID购买", intent: "transactional", page: "/", kp: "1k–10k" },
   { kw: "Apple ID购买", intent: "transactional", page: "/", kp: "1k–10k" },
   { kw: "海外Apple ID", intent: "transactional", page: "/", kp: "100–1k" },
-  { kw: "苹果账号购买", intent: "transactional", page: "/", kp: "100–1k" },
+  { kw: "苹果账号购买", intent: "transactional", page: "/", kp: "100–1k", note: "in description + subtitle since 2026-11-13; competitors' homepages lead with it" },
+  { kw: "国外ID购买", intent: "transactional", page: "/", note: "KP unverified; homepage head term of guowaiid / accountboy / xiaohaoduo (SERP 2026-11-13)" },
   { kw: "苹果ID商城", intent: "navigational", page: "/", kp: "10–100", note: "GSC 16mo: 15 impressions, 3 clicks" },
 ]
 
@@ -52,7 +53,7 @@ export const P1_REGION: SeoKeywordItem[] = [
 /** P2 — Shadowrocket, gift card, temporary/free; split by intent */
 export const P2_PRODUCT: SeoKeywordItem[] = [
   { kw: "小火箭账号购买", intent: "transactional", page: "apple-id-shadowrocket-us", kp: "1k–10k", note: "小火箭账号 / shadowrocket账号 1k–10k; 已购小火箭id has no KP data" },
-  { kw: "小火箭共享账号", intent: "transactional", page: "apple-id-shadowrocket", kp: "1k–10k", note: "SERP mixes free-share blogs" },
+  { kw: "小火箭共享账号", intent: "transactional", page: "apple-id-shadowrocket", kp: "1k–10k", note: "SERP 2026-11-13: top 9 are all free-share pages, no shops — wrong intent for a paid product; retarget this page to 小火箭账号购买" },
   { kw: "美区礼品卡购买", intent: "transactional", page: "apple-gift-card-us", kp: "100–1k", note: "SERP led by guides + SEAGM/Bitrefill" },
   { kw: "苹果临时ID", intent: "transactional", page: "temporary-apple-id-random-region", kp: "10–100", note: "GSC: 临时id 16 impr @9.4, 苹果临时id 2 clicks" },
   { kw: "免费Apple ID", intent: "informational", page: "apple-id-free", kp: "100–1k", note: "GSC: free page has the most product clicks" },
@@ -98,7 +99,7 @@ export const DEFAULT_SEO_TITLE =
  * auto-delivery promise is scoped to Apple IDs.
  */
 export const DEFAULT_SEO_DESCRIPTION =
-  "空域账号商城提供海外Apple ID购买：美国、香港、日本、台湾、韩国等地区的独享与共享苹果ID，已购小火箭Shadowrocket账号，以及美国Apple礼品卡。Apple ID付款后自动发货，7×24小时自助下单。"
+  "空域账号商城提供苹果ID、苹果账号购买：美区、港区、日区、台湾、韩国等国外ID，独享与共享的海外Apple ID均有，另有已购小火箭Shadowrocket账号和美国Apple礼品卡。Apple ID付款后自动发货，7×24小时自助下单。"
 
 /**
  * Default site H1 — SEO-optimized, decoupled from siteTagline (which may be
@@ -108,4 +109,4 @@ export const DEFAULT_SEO_H1 = "苹果ID购买 · 海外Apple ID商城"
 
 /** Default sub-headline (paragraph under H1) */
 export const DEFAULT_SEO_SUBTITLE =
-  "美区/港区/日区/台区/韩区独享与共享Apple ID、已购小火箭Shadowrocket账号、美国Apple礼品卡，Apple ID付款后自动发货。"
+  "美区/港区/日区/台区/韩区国外ID，独享与共享苹果账号、已购小火箭Shadowrocket账号、美国Apple礼品卡，Apple ID付款后自动发货。"

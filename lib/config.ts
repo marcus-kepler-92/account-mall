@@ -24,13 +24,13 @@ const envSchema = z
     siteDescription: z
       .string()
       .default(
-        "空域账号商城提供海外Apple ID购买：美国、香港、日本、台湾、韩国等地区的独享与共享苹果ID，已购小火箭Shadowrocket账号，以及美国Apple礼品卡。Apple ID付款后自动发货，7×24小时自助下单。",
+        "空域账号商城提供苹果ID、苹果账号购买：美区、港区、日区、台湾、韩国等国外ID，独享与共享的海外Apple ID均有，另有已购小火箭Shadowrocket账号和美国Apple礼品卡。Apple ID付款后自动发货，7×24小时自助下单。",
       ),
     siteTagline: z.string().default("苹果ID购买 · 海外Apple ID商城"),
     siteSubtitle: z
       .string()
       .default(
-        "美区/港区/日区/台区/韩区独享与共享Apple ID、已购小火箭Shadowrocket账号、美国Apple礼品卡，Apple ID付款后自动发货。",
+        "美区/港区/日区/台区/韩区国外ID，独享与共享苹果账号、已购小火箭Shadowrocket账号、美国Apple礼品卡，Apple ID付款后自动发货。",
       ),
     siteKeywords: z.string().optional(),
     adminPanelLabel: z.string().default("管理后台"),
