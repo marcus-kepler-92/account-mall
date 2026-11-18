@@ -143,6 +143,31 @@
 
 依据：独享商品详情页的账号信息格式含三条密保，并写明可自改密码与密保；「成品号」是小火箭独享商品在后台的标签。「已开通 iCloud」没有写，未核实。
 
+### 搜索结果展示修正（2026-11-18）
+
+起因：Google 上韩国商品页的结果显示为标题「韩国苹果账号Apple ID Korea - 空域账号商城」、摘要「¥42.00 仅剩1件，手慢无！自动发货，付款后秒到…」、价格「JP¥42」。SEO 标题、meta 描述都没被采用，币种被显示成日元。富媒体搜索结果测试显示该页产品摘要 / 商家信息 / 路径三项结构化数据均有效（`priceCurrency: CNY`），所以币种不是标注错误，Google 显示成日元的原因未查明。
+
+| 改动 | 内容 |
+|---|---|
+| 代码：H1 下显示卖点 | 商品页 H1 下方渲染后台的 SEO 描述，让卖点成为 H1 之后的第一段文字 |
+| 代码：价格标注币种 | 商品页主价格后加「人民币」小字（能否改变 Google 的显示未验证） |
+| 后台：商品名（即 H1） | 10 个商品改名，把目标词放进商品名，见下表 |
+
+| slug | 原商品名 | 新商品名 |
+|---|---|---|
+| apple-id-us | 美国苹果商城账号 Apple ID US（热门） | 美区Apple ID独享账号 · 美国苹果商城号（热门） |
+| apple-id-hongkong | 香港苹果商城账号 Apple ID HongKong | 香港Apple ID独享账号 · 港区苹果商城号 |
+| apple-id-taiwan | 台湾苹果商城账号 Apple id Taiwan | 台湾Apple ID独享账号 · 台区苹果商城号 |
+| apple-id-japan | 日本苹果商城账号 Apple ID Japan | 日本Apple ID独享账号 · 日区苹果商城号 |
+| apple-id-korea | 韩国苹果账号 Apple ID Korea | 韩国Apple ID独享账号 · 韩区苹果账号 |
+| apple-id-thailand | 泰国苹果账号 Apple ID Thailand | 泰国Apple ID独享账号 · 泰区苹果账号 |
+| apple-id-malaysia | 马来西亚苹果账号 Apple ID Malaysia | 马来西亚Apple ID独享账号 · 马区苹果账号 |
+| apple-id-england | 英国苹果账号 Apple ID England | 英国Apple ID独享账号 · 英区苹果账号 |
+| apple-id-shadowrocket | 美区商城账号 Apple ID · 已购小火箭（临时共享） | 小火箭共享账号 · 已购Shadowrocket美区Apple ID（临时） |
+| apple-id-shadowrocket-us | 美区商城账号 Apple ID 独享· 已购小火箭 | 小火箭独享账号 · 已购Shadowrocket美区Apple ID |
+
+免费号、临时空白号、礼品卡三个商品名没有改。
+
 ### 需要在代码之外处理
 
 1. **站外入口**：GitHub 教程仓库、X / YouTube 内容，链接回站内教程页。这是目前最大的缺口。

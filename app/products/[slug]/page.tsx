@@ -679,6 +679,9 @@ function ProductInfoSection({
                     )}
                   >
                     {manualPriceLabel}
+                    <span className="ml-2 text-xs font-normal text-muted-foreground">
+                      人民币
+                    </span>
                   </span>
                 ) : (
                   <span className="text-2xl font-bold tabular-nums text-muted-foreground lg:text-3xl">
@@ -722,6 +725,9 @@ function ProductInfoSection({
                     ¥{price.toFixed(2)}
                   </span>
                 )}
+                {/* "¥" alone reads as yen outside mainland China — Google
+                    labelled a ¥42 product "JP¥42" in search results. */}
+                <span className="text-xs text-muted-foreground">人民币</span>
                 {isAutoFetch ? (
                   <Badge variant="secondary" className="text-xs font-normal">
                     有货
