@@ -465,6 +465,7 @@ export default async function ProductDetailPage({
           <div className="mt-4 flex min-w-0 flex-col space-y-4 lg:mt-0 lg:space-y-4 lg:sticky lg:top-24 lg:self-start">
             <ProductInfoSection
               name={product.name}
+              tagline={product.seoDescription}
               tags={product.tags}
               price={priceNumber}
               stockCount={stockCount}
@@ -579,6 +580,10 @@ function ProductMediaSection({
 
 type ProductInfoSectionProps = {
   name: string;
+  // The admin-written SEO description, shown under the H1. Without it the first
+  // text after the H1 was price + generic delivery badges, and that is what
+  // Google quoted as the search snippet instead of the product's selling points.
+  tagline?: string | null;
   tags: { id: string; name: string; slug: string }[];
   price: number;
   stockCount: number;
@@ -603,6 +608,7 @@ type ProductInfoSectionProps = {
 
 function ProductInfoSection({
   name,
+  tagline,
   tags,
   price,
   stockCount,
@@ -650,6 +656,11 @@ function ProductInfoSection({
         >
           {name}
         </h1>
+        {tagline && (
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            {tagline}
+          </p>
+        )}
         <div className="flex items-end justify-between gap-3">
           <div className="flex items-baseline gap-2">
             {isFree ? (
